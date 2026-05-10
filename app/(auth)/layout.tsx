@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Route } from "next";
 import { ChefHat } from "lucide-react";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
@@ -15,6 +16,14 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <p className="mt-5 text-center text-xs text-muted-foreground">
           CookLoop keeps your meal history private to your account.
         </p>
+        <div className="mt-3 flex justify-center gap-4 text-xs text-muted-foreground">
+          <Link href={"/privacy" as Route} className="hover:text-foreground">
+            Privacy
+          </Link>
+          <Link href={"/help" as Route} className="hover:text-foreground">
+            Help
+          </Link>
+        </div>
       </div>
     </main>
   );

@@ -1,8 +1,8 @@
 import Link from "next/link";
+import type { Route } from "next";
 import type { Metadata } from "next";
 import {
   ArrowRight,
-  ChefHat,
   Clock3,
   History,
   Lock,
@@ -131,8 +131,8 @@ export default function HomePage() {
       />
       <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-2">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <ChefHat className="h-5 w-5" />
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary font-serif italic text-[26px] leading-none text-primary-foreground">
+            C
           </span>
           <span className="text-lg font-semibold">CookLoop</span>
         </Link>
@@ -149,7 +149,7 @@ export default function HomePage() {
       <section className="mx-auto grid w-full max-w-7xl gap-10 px-4 py-10 sm:px-6 md:grid-cols-[1fr_0.95fr] md:items-center md:py-16 lg:px-8">
         <div>
           <Badge variant="secondary">Personal cooking memory</Badge>
-          <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl">
+          <h1 className="mt-5 font-serif text-4xl tracking-normal sm:text-5xl lg:text-6xl">
             Never wonder what to cook again.
           </h1>
           <p className="mt-5 max-w-2xl text-lg text-muted-foreground">
@@ -178,7 +178,7 @@ export default function HomePage() {
       <section className="mx-auto grid w-full max-w-7xl gap-5 px-4 py-10 sm:px-6 lg:px-8">
         <div className="max-w-3xl">
           <p className="text-sm font-medium text-primary">The problem</p>
-          <h2 className="mt-2 text-3xl font-semibold tracking-tight">
+          <h2 className="mt-2 font-serif text-3xl tracking-normal">
             Dinner decisions are hard because your memory is scattered.
           </h2>
           <p className="mt-3 text-muted-foreground">
@@ -209,7 +209,7 @@ export default function HomePage() {
       <section className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-10 sm:px-6 md:grid-cols-2 lg:px-8">
         <Card>
           <CardContent className="p-6">
-            <h2 className="text-2xl font-semibold">Smart resurfacing, not meal planning.</h2>
+            <h2 className="font-serif text-2xl">Smart resurfacing, not meal planning.</h2>
             <p className="mt-3 text-muted-foreground">
               CookLoop looks at your own history: what you repeat, what is quick, and what
               you have not cooked lately. It suggests from your real life, not a trend feed.
@@ -218,7 +218,7 @@ export default function HomePage() {
         </Card>
         <Card>
           <CardContent className="p-6">
-            <h2 className="text-2xl font-semibold">Built for quiet trust.</h2>
+            <h2 className="font-serif text-2xl">Built for quiet trust.</h2>
             <p className="mt-3 text-muted-foreground">
               No public profiles, no social feed, no nutrition pressure. Just your private
               cooking memory, available when you need dinner to feel easier.
@@ -228,7 +228,7 @@ export default function HomePage() {
       </section>
 
       <section className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
-        <h2 className="text-3xl font-semibold tracking-tight">Questions before you start</h2>
+        <h2 className="font-serif text-3xl tracking-normal">Questions before you start</h2>
         <div className="mt-5 grid gap-3">
           {faqs.map((faq) => (
             <Card key={faq.question}>
@@ -245,6 +245,12 @@ export default function HomePage() {
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
           <p>CookLoop helps you remember meals worth making again.</p>
           <div className="flex gap-4">
+            <Link href={"/privacy" as Route} className="hover:text-foreground">
+              Privacy
+            </Link>
+            <Link href={"/help" as Route} className="hover:text-foreground">
+              Help
+            </Link>
             <Link href="/sign-in" className="hover:text-foreground">
               Sign in
             </Link>

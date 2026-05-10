@@ -20,8 +20,8 @@ export default function DashboardError({
         </CardTitle>
       </CardHeader>
       <CardContent className="grid gap-4 text-sm text-muted-foreground">
-        <p>{error.message || "Something went wrong. Please try again, or come back in a moment."}</p>
-        {error.digest ? <p className="text-xs text-muted-foreground/70">Error code: {error.digest}</p> : null}
+        <p>Something went wrong. Please try again, or come back in a moment.</p>
+        {error.digest ? <p className="text-xs text-muted-foreground/70">Reference: {error.digest}</p> : null}
         <Button type="button" onClick={reset}>
           Try again
         </Button>

@@ -1,3 +1,5 @@
+import Link from "next/link";
+import type { Route } from "next";
 import {
   Card,
   CardContent,
@@ -71,6 +73,15 @@ export default async function SettingsPage() {
           <SignOutButton />
         </CardContent>
       </Card>
+
+      <div className="flex gap-4 text-sm text-muted-foreground">
+        <Link href={"/privacy" as Route} className="hover:text-foreground">
+          Privacy
+        </Link>
+        <Link href={"/help" as Route} className="hover:text-foreground">
+          Help
+        </Link>
+      </div>
     </div>
   );
 }
