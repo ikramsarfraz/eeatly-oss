@@ -1,8 +1,15 @@
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import type { MealStat } from "@/types";
+
+const thumbColors = [
+  "bg-gradient-to-br from-[#d3c0a8] to-[#a8946d]",
+  "bg-gradient-to-br from-[#b6cbb3] to-[#6b8869]",
+  "bg-gradient-to-br from-[#f0d4ba] to-[#d28a52]",
+  "bg-gradient-to-br from-[#d4c9b0] to-[#8c7a4d]",
+  "bg-gradient-to-br from-[#cdd8c8] to-[#7a9272]"
+];
 
 export function MealStatsList({
   title,
@@ -12,49 +19,71 @@ export function MealStatsList({
   meals: MealStat[];
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-3">
-          {meals.length === 0 ? (
-            <div className="rounded-lg border border-dashed bg-background/60 p-4 text-sm text-muted-foreground">
-              This fills in automatically as you repeat meals.
-            </div>
-          ) : null}
-          {meals.slice(0, 5).map((meal) => (
-            (() => {
-              const daysAgo = differenceInCalendarDays(new Date(), parseISO(meal.lastCookedAt));
+    <div
+      className="overflow-hidden rounded-[14px] border bg-[var(--surface)]"
+      style={{ boxShadow: "var(--shadow-sm)" }}
+    >
+      <div className="flex items-center justify-between border-b px-[18px] py-4">
+        <h3 className="flex items-center gap-2 text-[14px] font-semibold">
+          {title}{" "}
+          <span className="rounded-[5px] bg-[var(--surface-2)] px-[7px] py-px font-mono-brand text-[11px] text-muted-foreground">
+            {meals.length}
+          </span>
+        </h3>
+        <button className="text-[11.5px] text-muted-foreground hover:text-foreground">
+          view all
+        </button>
+      </div>
 
-              return (
-                <div
-                  key={meal.mealId}
-                  className="grid gap-3 rounded-lg border bg-background/60 p-3 sm:grid-cols-[1fr_auto]"
-                >
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium">{meal.mealName}</p>
-                      {daysAgo >= 14 ? (
-                        <Badge variant="outline">not cooked in {daysAgo} days</Badge>
-                      ) : null}
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Last cooked {format(parseISO(meal.lastCookedAt), "MMM d")}
-                    </p>
-                  </div>
-                  <div className="flex items-start gap-2 sm:justify-end">
-                    <div className="rounded-full bg-muted px-3 py-1 text-sm font-medium">
-                      {meal.cookCount}x
-                    </div>
-                    <LogAgainButton mealName={meal.mealName} />
-                  </div>
+      <div>
+        {meals.length === 0 ? (
+          <div className="px-[18px] py-4 text-sm text-muted-foreground">
+            This fills in automatically as you repeat meals.
+          </div>
+        ) : null}
+        {meals.slice(0, 5).map((meal, i) => {
+          const daysAgo = differenceInCalendarDays(new Date(), parseISO(meal.lastCookedAt));
+          const isStale = daysAgo >= 14;
+
+          return (
+            <div
+              key={meal.mealId}
+              className="grid grid-cols-[44px_1fr_auto] items-center gap-3 border-b px-[18px] py-[11px] last:border-0 hover:bg-[var(--surface-2)]"
+            >
+              {/* Thumbnail */}
+              <div
+                className={cn(
+                  "h-11 w-11 shrink-0 rounded-[9px]",
+                  thumbColors[i % thumbColors.length]
+                )}
+              />
+
+              {/* Info */}
+              <div className="min-w-0">
+                <div className="truncate text-[13.5px] font-medium">{meal.mealName}</div>
+                <div className="mt-0.5 flex items-center gap-2 text-[11.5px] text-muted-foreground">
+                  <span>last {format(parseISO(meal.lastCookedAt), "MMM d")}</span>
+                  {isStale ? (
+                    <>
+                      <span className="h-0.5 w-0.5 rounded-full bg-current opacity-60" />
+                      <span style={{ color: "var(--accent)" }}>{daysAgo}d ago</span>
+                    </>
+                  ) : null}
                 </div>
-              );
-            })()
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+              </div>
+
+              {/* Cook count or log-again */}
+              {"cookCount" in meal && typeof meal.cookCount === "number" ? (
+                <span className="rounded-[6px] bg-[var(--surface-2)] px-[7px] py-[3px] font-mono-brand text-[11.5px] font-medium text-foreground">
+                  {meal.cookCount}×
+                </span>
+              ) : (
+                <LogAgainButton mealName={meal.mealName} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

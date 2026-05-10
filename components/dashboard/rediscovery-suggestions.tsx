@@ -1,16 +1,38 @@
 import { Clock, Flame, History, Sparkles, Zap } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { RediscoveryTrackButton } from "@/components/dashboard/rediscovery-track-button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { formatDaysAgo } from "@/lib/utils";
 import type { RediscoverySuggestion } from "@/types";
 
-const icons = {
-  neglected: History,
-  frequent: Flame,
-  quick: Zap,
-  favorite: Sparkles
+const reasonConfig = {
+  neglected: {
+    icon: History,
+    colorClass: "bg-[var(--accent-soft)] text-[#8c4a25]",
+    label: "Neglected"
+  },
+  frequent: {
+    icon: Flame,
+    colorClass: "bg-[var(--primary-soft)] text-primary",
+    label: "Repeat"
+  },
+  quick: {
+    icon: Zap,
+    colorClass: "bg-[var(--primary-soft)] text-primary",
+    label: "Quick win"
+  },
+  favorite: {
+    icon: Sparkles,
+    colorClass: "bg-[#f3e8c8] text-[#8a6a1c]",
+    label: "Favorite"
+  }
+} as const;
+
+const effortBadgeClass = {
+  quick: "bg-[var(--primary-soft)] text-primary border-transparent",
+  easy: "bg-[var(--primary-soft)] text-primary border-transparent",
+  medium: "bg-[var(--accent-soft)] text-[#8c4a25] border-transparent",
+  high_effort: "bg-muted text-muted-foreground"
 };
 
 export function RediscoverySuggestions({
@@ -20,72 +42,87 @@ export function RediscoverySuggestions({
 }) {
   if (suggestions.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Ideas for tonight</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-2 text-sm text-muted-foreground">
-          <p>Log a few meals and CookLoop will start resurfacing good options.</p>
-          <p className="text-xs">
-            Repeats, quick dinners, and neglected favorites will all show up here.
-          </p>
-        </CardContent>
-      </Card>
+      <div className="rounded-[14px] border bg-[var(--surface)] p-4 text-sm text-muted-foreground">
+        <p className="font-medium text-foreground">Ideas for tonight</p>
+        <p className="mt-1 text-xs">
+          Log a few meals and CookLoop will start resurfacing good options.
+        </p>
+      </div>
     );
   }
 
   return (
-    <section className="grid gap-3 sm:grid-cols-2">
+    <div className="grid gap-[14px] sm:grid-cols-2">
       {suggestions.map((suggestion) => {
-        const Icon = icons[suggestion.reason];
+        const config = reasonConfig[suggestion.reason];
+        const Icon = config.icon;
+        const effort = suggestion.effortLevel as keyof typeof effortBadgeClass | null;
 
         return (
-          <Card key={suggestion.id} className="overflow-hidden transition-colors hover:bg-muted/30">
-            <CardContent className="grid gap-4 p-4">
-              <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-muted-foreground">
-                      {suggestion.title}
-                    </p>
-                    <h3 className="text-lg font-semibold leading-tight">
-                      {suggestion.mealName}
-                    </h3>
-                  </div>
-                </div>
-                {suggestion.effortLevel ? (
-                  <Badge className="w-fit" variant="warm">
-                    {suggestion.effortLevel.replace("_", " ")}
-                  </Badge>
-                ) : null}
+          <article
+            key={suggestion.id}
+            className="flex flex-col gap-[14px] rounded-[14px] border bg-[var(--surface)] p-[18px] transition-colors hover:border-[var(--border-strong,#cfccc0)]"
+            style={{ boxShadow: "var(--shadow-sm)" }}
+          >
+            {/* Top row: reason glyph + effort badge */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-[7px] text-[11.5px] font-medium text-muted-foreground">
+                <span
+                  className={cn(
+                    "flex h-[22px] w-[22px] items-center justify-center rounded-[6px]",
+                    config.colorClass
+                  )}
+                >
+                  <Icon className="h-3 w-3" strokeWidth={2.4} />
+                </span>
+                {config.label}
+                {suggestion.title ? ` · ${suggestion.title}` : ""}
               </div>
-              <p className="text-sm text-muted-foreground">{suggestion.description}</p>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                {suggestion.daysSinceCooked !== null ? (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Clock className="h-4 w-4" />
-                    Last cooked {formatDaysAgo(suggestion.daysSinceCooked)}
-                  </div>
-                ) : (
-                  <span className="hidden sm:block" aria-hidden />
-                )}
-                <div className="flex flex-wrap items-center gap-2">
-                  <LogAgainButton
-                    mealName={suggestion.mealName}
-                    effortLevel={suggestion.effortLevel}
-                    variant="default"
-                    size="sm"
-                  />
-                  <RediscoveryTrackButton suggestion={suggestion} />
+              {effort ? (
+                <span
+                  className={cn(
+                    "inline-flex items-center rounded-full border px-2 py-px text-[11px] font-medium",
+                    effortBadgeClass[effort] ?? "bg-muted text-muted-foreground"
+                  )}
+                >
+                  {effort.replace("_", " ")}
+                </span>
+              ) : null}
+            </div>
+
+            {/* Meal name + description */}
+            <div>
+              <h3 className="font-serif text-[24px] font-normal leading-[1.15] tracking-[-0.005em]">
+                {suggestion.mealName}
+              </h3>
+              <p className="mt-1 text-[13px] leading-[1.5] text-muted-foreground">
+                {suggestion.description}
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between gap-2 border-t border-[var(--border)] pt-3">
+              {suggestion.daysSinceCooked !== null ? (
+                <div className="flex items-center gap-[5px] text-[11.5px] text-[var(--subtle-fg,#8b948e)]">
+                  <Clock className="h-[11px] w-[11px]" />
+                  Last cooked {formatDaysAgo(suggestion.daysSinceCooked)}
                 </div>
+              ) : (
+                <span />
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <LogAgainButton
+                  mealName={suggestion.mealName}
+                  effortLevel={suggestion.effortLevel}
+                  variant="default"
+                  size="sm"
+                />
+                <RediscoveryTrackButton suggestion={suggestion} />
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </article>
         );
       })}
-    </section>
+    </div>
   );
 }

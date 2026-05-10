@@ -1,6 +1,14 @@
 @import "tailwindcss";
 
 @theme inline {
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-ring: var(--sidebar-ring);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -20,33 +28,67 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-primary-soft: var(--primary-soft);
+  --color-accent-soft: var(--accent-soft);
+  --color-border-strong: var(--border-strong);
+  --color-warn: var(--warn);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --font-serif: var(--font-serif-val);
+  --font-mono: var(--font-mono-val);
 }
 
 :root {
-  --background: #f7f7f2;
-  --foreground: #1f2320;
-  --card: #fffefd;
-  --card-foreground: #1f2320;
-  --popover: #fffefd;
-  --popover-foreground: #1f2320;
+  --background: #f7f5ee;
+  --foreground: #1b2220;
+  --card: #fdfcf7;
+  --card-foreground: #1b2220;
+  --popover: #fdfcf7;
+  --popover-foreground: #1b2220;
   --primary: #2f6f58;
   --primary-foreground: #f9fffb;
-  --secondary: #dbe9e4;
-  --secondary-foreground: #244136;
-  --muted: #eceee7;
-  --muted-foreground: #66706a;
-  --accent: #f28f62;
+  --secondary: #dde9e2;
+  --secondary-foreground: #1c4738;
+  --muted: #f1efe6;
+  --muted-foreground: #6b746e;
+  --accent: #d77a4a;
   --accent-foreground: #25120b;
   --destructive: #c44949;
   --destructive-foreground: #fffafa;
-  --border: #dfe4dc;
-  --input: #dfe4dc;
-  --ring: #2f6f58;
+  --border: #e2dfd3;
+  --input: #e2dfd3;
+  --ring: rgba(47, 111, 88, 0.35);
   --radius: 0.75rem;
+
+  /* Sidebar tokens (shadcn sidebar palette) */
+  --sidebar: #fdfcf7;
+  --sidebar-foreground: #1b2220;
+  --sidebar-border: #e2dfd3;
+  --sidebar-accent: #f1efe6;
+  --sidebar-accent-foreground: #1c4738;
+  --sidebar-primary: #2f6f58;
+  --sidebar-primary-foreground: #f9fffb;
+  --sidebar-ring: rgba(47, 111, 88, 0.35);
+
+  /* Extended design tokens */
+  --surface: #fdfcf7;
+  --surface-2: #f1efe6;
+  --primary-soft: #dde9e2;
+  --accent-soft: #f5dccb;
+  --border-strong: #cfccc0;
+  --subtle-fg: #8b948e;
+  --warn: #c08a2a;
+  --shadow-sm: 0 1px 0 rgba(27,34,32,0.04), 0 1px 2px rgba(27,34,32,0.04);
+  --shadow-md: 0 1px 0 rgba(27,34,32,0.05), 0 8px 24px -12px rgba(27,34,32,0.16);
+  --sidebar-w: 256px;
+  --sidebar-w-collapsed: 68px;
+  --header-h: 60px;
+  --font-serif-val: "Instrument Serif", "Cormorant Garamond", Georgia, serif;
+  --font-mono-val: "JetBrains Mono", ui-monospace, monospace;
 }
 
 * {
@@ -55,14 +97,10 @@
 
 body {
   min-height: 100vh;
-  background:
-    radial-gradient(circle at top left, rgba(242, 143, 98, 0.16), transparent 30rem),
-    linear-gradient(180deg, rgba(219, 233, 228, 0.46), rgba(247, 247, 242, 0.86) 18rem),
-    var(--background);
+  background: var(--background);
   color: var(--foreground);
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 button,
@@ -74,4 +112,14 @@ select {
 
 ::selection {
   background: rgba(47, 111, 88, 0.22);
+}
+
+/* Serif utility */
+.font-serif {
+  font-family: var(--font-serif-val);
+}
+
+/* Mono utility */
+.font-mono-brand {
+  font-family: var(--font-mono-val);
 }
