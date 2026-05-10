@@ -107,7 +107,20 @@ export function MealLogForm({ canWrite, onSuccess }: MealLogFormProps) {
       await persist(values);
       resetAfterSuccess();
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : "Unable to log meal.");
+      const msg = error instanceof Error ? error.message : String(error);
+
+      const isNetworkFailure =
+        error instanceof TypeError ||
+        msg === "Failed to fetch" ||
+        (typeof msg === "string" && msg.toLowerCase().includes("network"));
+
+      setFormError(
+        isNetworkFailure
+          ? photoFile
+            ? "Upload couldn’t finish (blocked request). Try logging without a photo, or configure R2 bucket CORS for browser uploads."
+            : "Could not reach CookLoop — often a localhost port mismatch. Set BETTER_AUTH_URL and NEXT_PUBLIC_APP_URL to the exact URL shown in your browser (e.g. http://localhost:3001), restart `pnpm dev`, then sign in again."
+          : msg || "Unable to log meal."
+      );
     }
   });
 

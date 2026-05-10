@@ -9,6 +9,7 @@ import { Loader2, MessageSquare } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { submitFeedbackAction } from "@/actions/feedback";
 import { Button } from "@/components/ui/button";
+import { useHydrated } from "@/hooks/use-hydrated";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +43,7 @@ const feedbackTypeLabels: Record<FeedbackInput["type"], string> = {
 };
 
 export function FeedbackDialog({ trigger }: FeedbackDialogProps) {
+  const hydrated = useHydrated();
   const pathname = usePathname();
   const { showToast } = useToast();
   const [open, setOpen] = React.useState(false);
@@ -80,16 +82,20 @@ export function FeedbackDialog({ trigger }: FeedbackDialogProps) {
     }
   }, [form, pathname]);
 
+  const defaultTrigger = (
+    <Button variant="outline" size="sm">
+      <MessageSquare className="h-4 w-4" />
+      Send feedback
+    </Button>
+  );
+
+  if (!hydrated) {
+    return <>{trigger ?? defaultTrigger}</>;
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger ?? (
-          <Button variant="outline" size="sm">
-            <MessageSquare className="h-4 w-4" />
-            Send feedback
-          </Button>
-        )}
-      </DialogTrigger>
+      <DialogTrigger asChild>{trigger ?? defaultTrigger}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Send feedback</DialogTitle>

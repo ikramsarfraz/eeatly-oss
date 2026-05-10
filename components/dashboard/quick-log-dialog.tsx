@@ -4,6 +4,7 @@ import * as React from "react";
 import { Plus } from "lucide-react";
 import { MealLogForm } from "@/components/forms/meal-log-form";
 import { Button } from "@/components/ui/button";
+import { useHydrated } from "@/hooks/use-hydrated";
 import {
   Dialog,
   DialogContent,
@@ -20,18 +21,23 @@ export function QuickLogDialog({
   canWrite: boolean;
   trigger?: React.ReactNode;
 }) {
+  const hydrated = useHydrated();
   const [open, setOpen] = React.useState(false);
+
+  const defaultTrigger = (
+    <Button>
+      <Plus className="h-4 w-4" />
+      Quick log
+    </Button>
+  );
+
+  if (!hydrated) {
+    return <>{trigger ?? defaultTrigger}</>;
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger ?? (
-          <Button>
-            <Plus className="h-4 w-4" />
-            Quick log
-          </Button>
-        )}
-      </DialogTrigger>
+      <DialogTrigger asChild>{trigger ?? defaultTrigger}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Log a meal</DialogTitle>

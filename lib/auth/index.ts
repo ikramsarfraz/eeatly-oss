@@ -11,6 +11,33 @@ import { sendMagicLinkEmail } from "@/lib/email/resend";
 const env = getServerEnv();
 const appUrl = env.BETTER_AUTH_URL;
 
+/**
+ * Better Auth rejects server actions from origins not listed here.
+ * Dev often runs on alternate ports (:3001, …) while .env stays on :3000 — widen in development only.
+ */
+function developmentLocalhostOrigins(): string[] {
+  if (process.env.NODE_ENV === "production") {
+    return [];
+  }
+
+  const ports = ["3000", "3001", "3002", "3003", "5173"];
+  const hosts = ["localhost", "127.0.0.1"];
+  const out: string[] = [];
+
+  for (const hostname of hosts) {
+    for (const port of ports) {
+      out.push(`http://${hostname}:${port}`);
+    }
+  }
+
+  return out;
+}
+
+function trustedOriginsList(): string[] {
+  const fromEnv = [env.NEXT_PUBLIC_APP_URL, env.BETTER_AUTH_URL, appUrl].filter(Boolean);
+  return [...new Set([...fromEnv, ...developmentLocalhostOrigins()])];
+}
+
 export const auth = betterAuth({
   appName: "CookLoop",
   baseURL: appUrl,
@@ -54,7 +81,7 @@ export const auth = betterAuth({
       maxAge: 5 * 60
     }
   },
-  trustedOrigins: [env.NEXT_PUBLIC_APP_URL, env.BETTER_AUTH_URL, appUrl]
+  trustedOrigins: trustedOriginsList()
 });
 
 export type AuthSession = Awaited<ReturnType<typeof auth.api.getSession>>;
