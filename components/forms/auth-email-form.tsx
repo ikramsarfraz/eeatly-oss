@@ -37,14 +37,14 @@ export function AuthEmailForm({ mode }: AuthEmailFormProps) {
       });
 
       if (result.error) {
-        setError(result.error.message ?? "Authentication failed.");
+        setError(result.error.message ?? "Something went wrong. Please try again.");
         return;
       }
 
       setSubmittedEmail(email);
       void trackAuthFunnelAction(isSignUp ? "signed_up" : "signed_in");
     } catch {
-      setError("Email sign-in is not available until Better Auth, email, and the database are configured.");
+      setError("Sign-in is temporarily unavailable. Please try again later.");
     } finally {
       setPending(false);
     }
@@ -90,7 +90,7 @@ export function AuthEmailForm({ mode }: AuthEmailFormProps) {
             : "Send my sign-in link"}
       </Button>
       <p className="text-center text-xs text-muted-foreground">
-        Magic links keep beta access simple and password-free.
+        We&apos;ll send you a link — no password needed.
       </p>
     </form>
   );

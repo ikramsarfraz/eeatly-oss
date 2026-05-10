@@ -59,7 +59,7 @@ export function RecentHistoryList({ meals }: { meals: RecentMeal[] }) {
                 {meal.notes ? (
                   <>
                     <span className="h-0.5 w-0.5 rounded-full bg-current opacity-60" />
-                    <span className="truncate italic">"{meal.notes}"</span>
+                    <span className="truncate italic">&ldquo;{meal.notes}&rdquo;</span>
                   </>
                 ) : null}
               </div>

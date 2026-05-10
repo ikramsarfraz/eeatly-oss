@@ -89,7 +89,7 @@ export function MealLogForm({ canWrite, onSuccess }: MealLogFormProps) {
     });
     setPhotoFile(null);
     setFormError(null);
-    setSuccessMessage("Meal logged. Your dashboard is refreshed.");
+    setSuccessMessage("Logged! Your meal has been saved.");
     onSuccess?.();
   }
 
@@ -137,7 +137,7 @@ export function MealLogForm({ canWrite, onSuccess }: MealLogFormProps) {
     >
       {!canWrite ? (
         <div className="rounded-lg border bg-muted/60 p-3 text-sm text-muted-foreground">
-          Meal logging is unavailable for this session.
+          Meal logging isn&apos;t available right now.
         </div>
       ) : null}
 

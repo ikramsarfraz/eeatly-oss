@@ -46,7 +46,7 @@ const faqs = [
   {
     question: "Do I need to track nutrition or ingredients?",
     answer:
-      "No. The beta focuses on fast meal logging, history, and rediscovery."
+      "Not yet. Right now CookLoop focuses on fast meal logging, history, and rediscovery."
   },
   {
     question: "Is my cooking history public?",

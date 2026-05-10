@@ -1,7 +1,7 @@
 "use client";
 
 import { differenceInCalendarDays, parseISO } from "date-fns";
-import { AlertCircle, BookOpen, Check, Loader2, RotateCcw, TrendingUp } from "lucide-react";
+import { AlertCircle, BookOpen, Check, Loader2, TrendingUp } from "lucide-react";
 import { MealLogForm } from "@/components/forms/meal-log-form";
 import { OnboardingCard } from "@/components/dashboard/onboarding-card";
 import { RediscoverySuggestions } from "@/components/dashboard/rediscovery-suggestions";
@@ -103,7 +103,7 @@ export function DashboardClient({
                 <div className="mt-1.5 font-serif text-[32px] leading-none tracking-[-0.01em] max-[820px]:text-[24px] max-[480px]:text-[20px]">
                   {totalRecentLogs}
                 </div>
-                <div className="mt-1 text-[11px] text-primary">this cycle</div>
+                <div className="mt-1 text-[11px] text-primary">meals logged</div>
               </div>
               <div>
                 <div className="text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--muted-foreground)]">
@@ -181,7 +181,7 @@ export function DashboardClient({
               Ideas <em className="italic text-[var(--muted-foreground)]">for tonight</em>
             </h2>
             <div className="flex items-center gap-3 text-[12px] text-[var(--muted-foreground)]">
-              <span>{meals.suggestions.length} surfaced</span>
+              <span>{meals.suggestions.length} ideas</span>
             </div>
           </div>
           <RediscoverySuggestions suggestions={meals.suggestions} />

@@ -18,7 +18,6 @@ import {
   DialogTitle,
   DialogTrigger
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -65,7 +64,7 @@ export function FeedbackDialog({ trigger }: FeedbackDialogProps) {
       showToast({
         variant: "success",
         title: "Feedback sent",
-        description: "Thanks. This helps shape the beta."
+        description: "Thanks for sharing — this genuinely helps."
       });
     } catch (error) {
       showToast({
@@ -100,7 +99,7 @@ export function FeedbackDialog({ trigger }: FeedbackDialogProps) {
         <DialogHeader>
           <DialogTitle>Send feedback</DialogTitle>
           <DialogDescription>
-            Tell us what felt broken, confusing, or useful during beta testing.
+            Tell us what felt confusing, useful, or missing.
           </DialogDescription>
         </DialogHeader>
         <form
@@ -158,20 +157,7 @@ export function FeedbackDialog({ trigger }: FeedbackDialogProps) {
             ) : null}
           </div>
 
-          <div className="grid gap-2">
-            <Label htmlFor="feedback-context">Page or context</Label>
-            <Input
-              id="feedback-context"
-              placeholder="/dashboard"
-              disabled={isSubmitting}
-              {...form.register("context")}
-            />
-            {form.formState.errors.context ? (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.context.message}
-              </p>
-            ) : null}
-          </div>
+          <input type="hidden" {...form.register("context")} />
 
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
