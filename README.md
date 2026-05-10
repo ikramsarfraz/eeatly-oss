@@ -1,3 +1,4 @@
+# CookLoop
 
 CookLoop is a personal cooking memory app for quick meal logging, cooking history, and smart meal resurfacing.
 
