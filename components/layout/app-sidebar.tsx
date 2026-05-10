@@ -106,7 +106,7 @@ export function AppSidebar({ user, canWrite, ...props }: AppSidebarProps) {
           <SidebarGroupLabel>Cooking</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {cookingNav.map((item) => {
+              {cookingNav.map(item => {
                 const Icon = item.icon;
                 return (
                   <SidebarMenuItem key={item.href}>
@@ -131,7 +131,7 @@ export function AppSidebar({ user, canWrite, ...props }: AppSidebarProps) {
           <SidebarGroupLabel>You</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {youNav.map((item) => {
+              {youNav.map(item => {
                 const Icon = item.icon;
                 return (
                   <SidebarMenuItem key={item.href}>
@@ -164,15 +164,11 @@ export function AppSidebar({ user, canWrite, ...props }: AppSidebarProps) {
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="flex items-center gap-2 px-2 py-1">
-          <div className="group-data-[collapsible=icon]:hidden grid flex-1 min-w-0 text-left text-sm leading-tight">
-            <span className="truncate font-medium">{user.name}</span>
-            <span className="truncate text-xs text-muted-foreground">
-              {user.email}
-            </span>
-          </div>
-          <UserMenu user={user} />
-        </div>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <UserMenu user={user} />
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
 
       <SidebarRail />
