@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Privacy",
-  description: "How CookLoop handles your cooking history and personal information."
+  description: "How eeatly handles your cooking history and personal information."
 };
 
 export default function PrivacyPage() {
@@ -10,15 +10,15 @@ export default function PrivacyPage() {
     <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6 lg:px-8">
       <h1 className="text-3xl font-semibold tracking-tight">Privacy</h1>
       <p className="mt-3 text-muted-foreground">
-        CookLoop is built around one simple idea: your cooking history belongs to you.
+        eeatly is built around one simple idea: your cooking history belongs to you.
         Here is what we save, why, and how it stays yours.
       </p>
 
       <div className="mt-10 grid gap-10">
         <section>
-          <h2 className="text-xl font-semibold">What CookLoop saves</h2>
+          <h2 className="text-xl font-semibold">What eeatly saves</h2>
           <p className="mt-3 text-sm text-muted-foreground">
-            When you log a meal, CookLoop saves:
+            When you log a meal, eeatly saves:
           </p>
           <ul className="mt-2 list-inside list-disc grid gap-1 text-sm text-muted-foreground">
             <li>The meal name you type</li>
@@ -36,7 +36,7 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-xl font-semibold">Why we save your cooking history</h2>
           <p className="mt-3 text-sm text-muted-foreground">
-            CookLoop uses your meal history to do two things: show you what you have cooked
+            eeatly uses your meal history to do two things: show you what you have cooked
             recently, and surface meals worth repeating when you are not sure what to make.
             Without your history, the app would have nothing useful to show you.
           </p>
@@ -56,7 +56,7 @@ export default function PrivacyPage() {
           <p className="mt-3 text-sm text-muted-foreground">
             If you send feedback through the app, a small team may read it to understand
             what is working and what could be better. We treat feedback with care and use
-            it only to improve CookLoop. We will not share it publicly or attach it to
+            it only to improve eeatly. We will not share it publicly or attach it to
             your name without asking.
           </p>
         </section>

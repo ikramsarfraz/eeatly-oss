@@ -16,7 +16,7 @@ export default function DashboardError({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <AlertCircle className="h-5 w-5 text-destructive" />
-          Unable to load CookLoop
+          Unable to load eeatly
         </CardTitle>
       </CardHeader>
       <CardContent className="grid gap-4 text-sm text-muted-foreground">

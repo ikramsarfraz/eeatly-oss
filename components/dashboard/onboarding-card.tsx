@@ -14,7 +14,7 @@ export function OnboardingCard() {
   return (
     <Card className="border-dashed">
       <CardHeader>
-        <CardTitle>Welcome to CookLoop</CardTitle>
+        <CardTitle>Welcome to eeatly</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-4 text-sm text-muted-foreground">
         <p>

@@ -9,30 +9,30 @@ const appUrl = getPublicEnv().NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
   title: {
-    default: "CookLoop",
-    template: "%s | CookLoop"
+    default: "eeatly",
+    template: "%s | eeatly"
   },
-  description: "A personal cooking memory app for remembering what to cook next.",
-  applicationName: "CookLoop",
+  description: "eeatly helps you remember meals you love and decide what to cook next.",
+  applicationName: "eeatly",
   openGraph: {
-    title: "CookLoop",
-    description: "Remember meals worth making again.",
+    title: "eeatly",
+    description: "Remember meals you love. Decide what to cook next.",
     url: appUrl,
-    siteName: "CookLoop",
+    siteName: "eeatly",
     type: "website",
     images: [
       {
         url: "/og.svg",
         width: 1200,
         height: 630,
-        alt: "CookLoop dashboard preview"
+        alt: "eeatly dashboard preview"
       }
     ]
   },
   twitter: {
     card: "summary_large_image",
-    title: "CookLoop",
-    description: "Remember meals worth making again.",
+    title: "eeatly",
+    description: "Remember meals you love. Decide what to cook next.",
     images: ["/og.svg"]
   },
   icons: {

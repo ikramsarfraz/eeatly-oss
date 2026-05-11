@@ -14,9 +14,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 export const metadata: Metadata = {
-  title: "CookLoop | Remember what to cook next",
+  title: "eeatly | Dinner decisions made easier",
   description:
-    "CookLoop is a private cooking memory for logging meals, remembering repeats, and rediscovering dinners worth making again."
+    "eeatly helps you remember meals you love, spot your reliable dinners, and rediscover favorites when you're not sure what to cook."
 };
 
 const features = [
@@ -28,7 +28,7 @@ const features = [
   {
     icon: RotateCcw,
     title: "See reliable repeats",
-    description: "CookLoop quietly learns the meals you come back to instead of forcing a meal plan."
+    description: "eeatly quietly learns the meals you come back to instead of forcing a meal plan."
   },
   {
     icon: Sparkles,
@@ -39,14 +39,14 @@ const features = [
 
 const faqs = [
   {
-    question: "Is CookLoop a recipe app?",
+    question: "Is eeatly a recipe app?",
     answer:
       "No. It is a memory for meals you already cook, so deciding what to make again is easier."
   },
   {
     question: "Do I need to track nutrition or ingredients?",
     answer:
-      "Not yet. Right now CookLoop focuses on fast meal logging, history, and rediscovery."
+      "Not yet. Right now eeatly focuses on fast meal logging, history, and rediscovery."
   },
   {
     question: "Is my cooking history public?",
@@ -116,11 +116,11 @@ export default function HomePage() {
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    name: "CookLoop",
+    name: "eeatly",
     applicationCategory: "LifestyleApplication",
     operatingSystem: "Web",
     description:
-      "A private cooking memory for logging meals and remembering what to cook next."
+      "A private meal memory for logging dinners and rediscovering what to cook next."
   };
 
   return (
@@ -132,9 +132,9 @@ export default function HomePage() {
       <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-2">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary font-serif italic text-[26px] leading-none text-primary-foreground">
-            C
+            e
           </span>
-          <span className="text-lg font-semibold">CookLoop</span>
+          <span className="text-lg font-semibold">eeatly</span>
         </Link>
         <nav className="flex items-center gap-2">
           <Button asChild variant="ghost" size="sm">
@@ -153,7 +153,7 @@ export default function HomePage() {
             Never wonder what to cook again.
           </h1>
           <p className="mt-5 max-w-2xl text-lg text-muted-foreground">
-            CookLoop helps you remember the meals worth repeating. Log what you cooked,
+            eeatly helps you remember the meals worth repeating. Log what you cooked,
             spot your reliable dinners, and rediscover favorites when dinner feels blank.
           </p>
           <div className="mt-7 flex flex-col gap-3 sm:flex-row">
@@ -182,7 +182,7 @@ export default function HomePage() {
             Dinner decisions are hard because your memory is scattered.
           </h2>
           <p className="mt-3 text-muted-foreground">
-            Good meals disappear into camera rolls, texts, and vague memories. CookLoop
+            Good meals disappear into camera rolls, texts, and vague memories. eeatly
             gives those meals one calm home so future-you can find them quickly.
           </p>
         </div>
@@ -211,7 +211,7 @@ export default function HomePage() {
           <CardContent className="p-6">
             <h2 className="font-serif text-2xl">Smart resurfacing, not meal planning.</h2>
             <p className="mt-3 text-muted-foreground">
-              CookLoop looks at your own history: what you repeat, what is quick, and what
+              eeatly looks at your own history: what you repeat, what is quick, and what
               you have not cooked lately. It suggests from your real life, not a trend feed.
             </p>
           </CardContent>
@@ -243,7 +243,7 @@ export default function HomePage() {
 
       <footer className="border-t">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
-          <p>CookLoop helps you remember meals worth making again.</p>
+          <p>eeatly helps you remember meals worth making again.</p>
           <div className="flex gap-4">
             <Link href={"/privacy" as Route} className="hover:text-foreground">
               Privacy

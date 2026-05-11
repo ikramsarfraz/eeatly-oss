@@ -64,13 +64,13 @@ export function AppSidebar({ user, canWrite, ...props }: AppSidebarProps) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild tooltip="CookLoop">
+            <SidebarMenuButton size="lg" asChild tooltip="eeatly">
               <Link href="/dashboard">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-primary font-serif italic text-[22px] leading-none text-primary-foreground">
-                  C
+                  e
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">CookLoop</span>
+                  <span className="truncate font-semibold">eeatly</span>
                   <span className="truncate text-xs text-muted-foreground">
                     private beta
                   </span>

@@ -3,7 +3,7 @@ import "server-only";
 import * as React from "react";
 import { getServerEnv } from "@/lib/env/server";
 import { logEmailDelivery } from "@/lib/email/delivery-log";
-import { cookloopEmailTags, recordOutboundEmailFromApiSend } from "@/services/email-delivery";
+import { eeatlyEmailTags, recordOutboundEmailFromApiSend } from "@/services/email-delivery";
 import { getResendClient } from "@/lib/email/resend-client";
 import { FirstMealEncouragementEmail } from "@/lib/email/templates/first-meal-encouragement-email";
 import { InactiveReminderEmail } from "@/lib/email/templates/inactive-reminder-email";
@@ -68,17 +68,17 @@ export async function dispatchTransactionalEmail(
   }
 
   const href = dashboardUrl(baseUrl);
-  let subject = "CookLoop";
+  let subject = "eeatly";
   let element: React.ReactElement;
 
   switch (input.template) {
     case "welcome":
-      subject = "Welcome to CookLoop";
+      subject = "Welcome to eeatly";
       element = React.createElement(WelcomeEmail, { name: input.toName });
       break;
 
     case "first_meal_encouragement":
-      subject = "Log your first meal on CookLoop";
+      subject = "Log your first meal on eeatly";
       element = React.createElement(FirstMealEncouragementEmail, {
         name: input.toName,
         dashboardUrl: href
@@ -86,7 +86,7 @@ export async function dispatchTransactionalEmail(
       break;
 
     case "inactive_reminder":
-      subject = "We miss seeing your cooks on CookLoop";
+      subject = "We miss seeing your cooks on eeatly";
       element = React.createElement(InactiveReminderEmail, {
         name: input.toName,
         dashboardUrl: href,
@@ -95,7 +95,7 @@ export async function dispatchTransactionalEmail(
       break;
 
     case "weekly_recap_placeholder":
-      subject = "Your CookLoop week (preview)";
+      subject = "Your eeatly week (preview)";
       element = React.createElement(WeeklyRecapEmail, {
         name: input.toName,
         teaserLine:
@@ -113,7 +113,7 @@ export async function dispatchTransactionalEmail(
       to: input.toEmail,
       subject,
       react: element,
-      tags: cookloopEmailTags({ template: input.template, userId: input.userId })
+      tags: eeatlyEmailTags({ template: input.template, userId: input.userId })
     });
 
     if (sendResult.error) {

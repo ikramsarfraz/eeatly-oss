@@ -1,7 +1,7 @@
 {
-  "name": "CookLoop",
-  "short_name": "CookLoop",
-  "description": "A private cooking memory for meals worth making again.",
+  "name": "eeatly",
+  "short_name": "eeatly",
+  "description": "Remember meals you love. Decide what to cook next.",
   "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#f7f7f2",

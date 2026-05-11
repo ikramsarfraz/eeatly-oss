@@ -22,13 +22,13 @@ export function isSafeResendTagValue(value: string) {
   return /^[a-zA-Z0-9_-]{1,256}$/.test(value);
 }
 
-export function cookloopEmailTags(options: { template: string; userId?: string }) {
+export function eeatlyEmailTags(options: { template: string; userId?: string }) {
   const tags: { name: string; value: string }[] = [
-    { name: "cookloop_template", value: options.template }
+    { name: "eeatly_template", value: options.template }
   ];
 
   if (options.userId && isSafeResendTagValue(options.userId)) {
-    tags.push({ name: "cookloop_user_id", value: options.userId });
+    tags.push({ name: "eeatly_user_id", value: options.userId });
   }
 
   return tags;
@@ -184,8 +184,8 @@ export async function applyResendWebhookToDeliveryLog(parsed: ParsedResendWebhoo
   const incomingStatus = mapWebhookTypeToDeliveryStatus(parsed.type);
   const emailId = parsed.data.email_id;
   const recipient = (parsed.data.to[0] ?? "").trim();
-  const templateKey = parsed.data.tags?.cookloop_template?.slice(0, 120) ?? null;
-  const tagUserCandidate = parsed.data.tags?.cookloop_user_id;
+  const templateKey = parsed.data.tags?.eeatly_template?.slice(0, 120) ?? null;
+  const tagUserCandidate = parsed.data.tags?.eeatly_user_id;
   const userIdCandidate =
     tagUserCandidate && isSafeResendTagValue(tagUserCandidate) ? tagUserCandidate : null;
   const reason = webhookFailureReason(parsed.type, parsed.data);

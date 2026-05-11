@@ -1,6 +1,6 @@
 # Beta launch runbook
 
-Short operational guide for the first CookLoop beta cohort. Prefer stability and learning over feature churn.
+Short operational guide for the first eeatly beta cohort. Prefer stability and learning over feature churn.
 
 ## Who to invite first
 

@@ -77,7 +77,7 @@ export function DashboardClient({
           <p className="relative mb-[22px] max-w-[480px] text-[15px] leading-[1.55] text-[var(--muted-foreground)]">
             {topSuggestion
               ? `${topSuggestion.mealName} is worth considering — ${topSuggestion.description}`
-              : "CookLoop gets useful after a few quick logs. Add what you cooked, then come back here when you need an easy answer."}
+              : "eeatly gets useful after a few quick logs. Add what you cooked, then come back here when you need an easy answer."}
           </p>
 
           {/* CTAs */}
@@ -143,7 +143,7 @@ export function DashboardClient({
                 <div className="grid gap-1">
                   <p className="font-medium text-foreground">Start with one meal.</p>
                   <p>
-                    Log something you cooked recently. CookLoop will turn those quick notes
+                    Log something you cooked recently. eeatly will turn those quick notes
                     into recent history, most-cooked meals, and rediscovery ideas.
                   </p>
                 </div>

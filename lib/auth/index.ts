@@ -39,7 +39,7 @@ function trustedOriginsList(): string[] {
 }
 
 export const auth = betterAuth({
-  appName: "CookLoop",
+  appName: "eeatly",
   baseURL: appUrl,
   secret: env.BETTER_AUTH_SECRET,
   database: drizzleAdapter(db, {

@@ -10,11 +10,11 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <ChefHat className="h-5 w-5" />
           </span>
-          <span className="text-xl font-semibold">CookLoop</span>
+          <span className="text-xl font-semibold">eeatly</span>
         </Link>
         {children}
         <p className="mt-5 text-center text-xs text-muted-foreground">
-          CookLoop keeps your meal history private to your account.
+          eeatly keeps your meal history private to your account.
         </p>
         <div className="mt-3 flex justify-center gap-4 text-xs text-muted-foreground">
           <Link href={"/privacy" as Route} className="hover:text-foreground">

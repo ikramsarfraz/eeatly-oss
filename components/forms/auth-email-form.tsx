@@ -26,7 +26,7 @@ export function AuthEmailForm({ mode }: AuthEmailFormProps) {
 
     const formData = new FormData(event.currentTarget);
     const email = String(formData.get("email") ?? "").trim().toLowerCase();
-    const name = email.split("@")[0] || "CookLoop User";
+    const name = email.split("@")[0] || "eeatly user";
 
     try {
       const result = await authClient.signIn.magicLink({
@@ -58,7 +58,7 @@ export function AuthEmailForm({ mode }: AuthEmailFormProps) {
           <div>
             <p className="font-medium text-foreground">Check your email</p>
             <p className="mt-1">
-              We sent a CookLoop link to{" "}
+              We sent an eeatly link to{" "}
               <span className="font-medium text-foreground">{submittedEmail}</span>.
             </p>
           </div>

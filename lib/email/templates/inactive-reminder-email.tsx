@@ -34,7 +34,7 @@ export function InactiveReminderEmail({ name, dashboardUrl, daysQuiet }: Inactiv
             <Heading style={emailHeading}>Missing your kitchen notes, {name}</Heading>
             <Text style={emailText}>{quietLine}</Text>
             <Text style={emailText}>
-              CookLoop stays useful when you toss in quick wins — same repeat dinners are perfect.
+              eeatly stays useful when you toss in quick wins — same repeat dinners are perfect.
             </Text>
             <Section style={{ marginTop: "24px" }}>
               <Button href={dashboardUrl} style={emailButton}>

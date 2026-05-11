@@ -1,5 +1,5 @@
 /**
- * Shared CookLoop transactional email styles (inline for client compatibility).
+ * Shared eeatly transactional email styles (inline for client compatibility).
  */
 export const emailBody = {
   backgroundColor: "#f7f7f2",

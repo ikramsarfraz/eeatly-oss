@@ -24,7 +24,7 @@ Set these for the **Production** environment:
 |---|---|---|
 | `DATABASE_URL` | ✅ | Neon pooled URL |
 | `BETTER_AUTH_SECRET` | ✅ | 32+ random chars — generate with `openssl rand -base64 32` |
-| `BETTER_AUTH_URL` | ✅ | Your production domain, e.g. `https://cookloop.app` |
+| `BETTER_AUTH_URL` | ✅ | Your production domain, e.g. `https://eeatly.app` |
 | `NEXT_PUBLIC_APP_URL` | ✅ | Same production domain |
 | `RESEND_API_KEY` | ✅ for email | From Resend dashboard |
 | `EMAIL_FROM` | ✅ for email | Verified sender address |

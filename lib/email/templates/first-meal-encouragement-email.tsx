@@ -21,7 +21,7 @@ export function FirstMealEncouragementEmail({ name, dashboardUrl }: FirstMealEnc
   return (
     <Html>
       <Head />
-      <Preview>Log your first meal — CookLoop shines with a little history</Preview>
+      <Preview>Log your first meal — eeatly gets better with a little history</Preview>
       <Body style={emailBody}>
         <Container style={emailContainer}>
           <Section>

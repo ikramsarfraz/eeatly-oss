@@ -19,14 +19,14 @@ export default async function SettingsPage() {
       <div>
         <h1 className="text-3xl font-semibold tracking-normal">Settings</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Manage your CookLoop account and preferences.
+          Manage your eeatly account and preferences.
         </p>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Account</CardTitle>
-          <CardDescription>Your CookLoop account details.</CardDescription>
+          <CardDescription>Your eeatly account details.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           <div className="grid gap-1 rounded-lg border bg-background/60 p-4">
@@ -45,14 +45,14 @@ export default async function SettingsPage() {
           <CardTitle>Your cooking history</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
-          Your cooking history is private to your account. CookLoop uses it to help you
+          Your cooking history is private to your account. eeatly uses it to help you
           remember meals you love and suggest what to cook again.
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Help improve CookLoop</CardTitle>
+          <CardTitle>Help improve eeatly</CardTitle>
           <CardDescription>
             Tell us what felt confusing, useful, or missing.
           </CardDescription>
@@ -66,7 +66,7 @@ export default async function SettingsPage() {
         <CardHeader>
           <CardTitle>Sign out</CardTitle>
           <CardDescription>
-            Sign out of your CookLoop account on this device.
+            Sign out of your eeatly account on this device.
           </CardDescription>
         </CardHeader>
         <CardContent>

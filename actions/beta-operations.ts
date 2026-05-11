@@ -100,7 +100,7 @@ export async function adminDispatchLifecycleEmailAction(formData: FormData): Pro
   const result = await dispatchTransactionalEmail({
     template,
     toEmail: user.email,
-    toName: user.name?.trim() || user.email.split("@")[0] || "CookLoop friend",
+    toName: user.name?.trim() || user.email.split("@")[0] || "eeatly friend",
     userId,
     daysQuiet,
     recapTeaser: template === "weekly_recap_placeholder" && recapTeaserRaw.length > 0 ? recapTeaserRaw : undefined,

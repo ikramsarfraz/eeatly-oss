@@ -34,7 +34,7 @@ Set in the Vercel project → Settings → Environment Variables (Production unl
 | `R2_*` | Either **all** R2 variables for photo uploads, or leave all unset to disable uploads with a clear config error. |
 | `PLATFORM_ADMIN_HOST` | Optional; if set, `/admin/*` only resolves when `Host` matches (use with a dedicated admin hostname). |
 
-**Security:** Do not put server secrets in `NEXT_PUBLIC_*`. CookLoop only exposes `NEXT_PUBLIC_APP_URL` to the browser.
+**Security:** Do not put server secrets in `NEXT_PUBLIC_*`. eeatly only exposes `NEXT_PUBLIC_APP_URL` to the browser.
 
 ---
 

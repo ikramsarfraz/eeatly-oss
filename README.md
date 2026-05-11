@@ -1,6 +1,6 @@
-# CookLoop
+# eeatly
 
-CookLoop is a personal cooking memory app for quick meal logging, cooking history, and smart meal resurfacing.
+eeatly is a personal meal memory app for quick meal logging, cooking history, and smart meal resurfacing.
 
 ## Stack
 
@@ -27,7 +27,7 @@ Open `http://localhost:3000`. The project is pinned to Node `24.14.x` and pnpm `
 
 ## Auth And Database
 
-CookLoop uses Better Auth magic links backed by Neon Postgres through Drizzle. Set
+eeatly uses Better Auth magic links backed by Neon Postgres through Drizzle. Set
 `DATABASE_URL`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_APP_URL`, and `BETTER_AUTH_SECRET` in
 `.env.local`, then generate and apply migrations:
 
@@ -37,7 +37,7 @@ pnpm db:migrate
 ```
 
 For local email-only sign-in, set `RESEND_API_KEY` and `EMAIL_FROM`. If those are missing,
-CookLoop prints the magic sign-in link to the dev server console so local development can
+eeatly prints the magic sign-in link to the dev server console so local development can
 continue without sending real email.
 
 ## Required Environment Variables
@@ -46,7 +46,7 @@ Server-only:
 
 - `DATABASE_URL` — Neon serverless Postgres URL (use the pooled connection string)
 - `BETTER_AUTH_SECRET` — 32-byte or longer secret for Better Auth
-- `BETTER_AUTH_URL` — App origin used by Better Auth, e.g. `https://cookloop.app`
+- `BETTER_AUTH_URL` — App origin used by Better Auth, e.g. `https://eeatly.app`
 - `RESEND_API_KEY` and `EMAIL_FROM` — required before sending production magic-link email
 - `RESEND_WEBHOOK_SECRET` (typically `whsec_…`) — Svix signing secret from the Resend webhook pointed at `/api/webhooks/resend`; optional locally
 - `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_BASE_URL` — all required together for photo uploads; omit all to disable
@@ -86,7 +86,7 @@ pnpm smoke:prod -- --base-url http://localhost:3000
 
 ## Deployment
 
-CookLoop uses `vercel.json`: **installCommand** is `pnpm install --frozen-lockfile`, **buildCommand** is `pnpm build`. Migrations are **not** run during the build and must be applied separately.
+eeatly uses `vercel.json`: **installCommand** is `pnpm install --frozen-lockfile`, **buildCommand** is `pnpm build`. Migrations are **not** run during the build and must be applied separately.
 
 ### Production deployment order
 
@@ -173,7 +173,7 @@ Detailed runbooks: [docs/beta-launch-runbook.md](docs/beta-launch-runbook.md) ·
 
 ## Analytics
 
-CookLoop stores privacy-first product analytics in the `analytics_events` table. Events
+eeatly stores privacy-first product analytics in the `analytics_events` table. Events
 are recorded server-side and used for beta product health only — not ads or third-party
 tracking. Platform admins can view aggregates at `/admin/analytics`.
 
@@ -181,7 +181,7 @@ Key tracked events: `signed_up`, `signed_in`, `completed_onboarding`, `first_mea
 `second_meal_logged`, `meal_logged`, `meal_logged_again`, `feedback_submitted`,
 `rediscovery_clicked`, and email lifecycle events from Resend webhooks.
 
-## What CookLoop Does (and Does Not) Do
+## What eeatly Does (and Does Not) Do
 
 **Implemented:**
 - Quick meal logging with optional notes and photo

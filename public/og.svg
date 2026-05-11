@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="CookLoop preview">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="eeatly preview">
   <rect width="1200" height="630" fill="#f7f7f2"/>
   <circle cx="120" cy="80" r="260" fill="#f28f62" opacity="0.16"/>
   <circle cx="1080" cy="560" r="280" fill="#2f6f58" opacity="0.12"/>
@@ -13,7 +13,7 @@
     <rect width="84" height="84" rx="20" fill="#2f6f58"/>
     <path d="M27 44c0-17 10-30 25-30s25 13 25 30v17c0 7-5 12-12 12H39c-7 0-12-5-12-12V44Z" fill="#f7f7f2" transform="scale(.72) translate(18 8)"/>
   </g>
-  <text x="110" y="270" fill="#1f2320" font-family="Inter, Arial, sans-serif" font-size="78" font-weight="700">CookLoop</text>
-  <text x="110" y="344" fill="#1f2320" font-family="Inter, Arial, sans-serif" font-size="44" font-weight="600">Remember what to cook next.</text>
-  <text x="110" y="418" fill="#66706a" font-family="Inter, Arial, sans-serif" font-size="30">A private cooking memory for meals worth making again.</text>
+  <text x="110" y="270" fill="#1f2320" font-family="Inter, Arial, sans-serif" font-size="78" font-weight="700">eeatly</text>
+  <text x="110" y="344" fill="#1f2320" font-family="Inter, Arial, sans-serif" font-size="44" font-weight="600">Dinner decisions made easier.</text>
+  <text x="110" y="418" fill="#66706a" font-family="Inter, Arial, sans-serif" font-size="30">Remember meals you love. Decide what to cook next.</text>
 </svg>

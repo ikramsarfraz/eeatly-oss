@@ -4,14 +4,14 @@ import { Card, CardContent } from "@/components/ui/card";
 
 export const metadata: Metadata = {
   title: "Help",
-  description: "Learn how to use CookLoop to remember and rediscover your meals."
+  description: "Learn how to use eeatly to remember and rediscover your meals."
 };
 
 const topics = [
   {
-    question: "What is CookLoop?",
+    question: "What is eeatly?",
     answer:
-      "CookLoop is a personal cooking memory. It helps you remember what you have cooked, notice which meals you come back to most, and rediscover dinners you have not made in a while. It is not a recipe app — it is a memory for the meals you already cook."
+      "eeatly is a personal meal memory. It helps you remember what you have cooked, notice which meals you come back to most, and rediscover dinners you have not made in a while. It is not a recipe app — it is a memory for the meals you already cook."
   },
   {
     question: "How do I log a meal?",
@@ -26,7 +26,7 @@ const topics = [
   {
     question: "How do suggestions work?",
     answer:
-      "CookLoop looks at your own meal history to suggest what to cook tonight. It considers meals you have not made in a while, meals you cook often, and meals that do not take much effort. Everything it suggests comes from your own history — not a recipe database or trend list."
+      "eeatly looks at your own meal history to suggest what to cook tonight. It considers meals you have not made in a while, meals you cook often, and meals that do not take much effort. Everything it suggests comes from your own history — not a recipe database or trend list."
   },
   {
     question: "How do I send feedback?",
@@ -45,7 +45,7 @@ export default function HelpPage() {
     <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6 lg:px-8">
       <h1 className="text-3xl font-semibold tracking-tight">Help</h1>
       <p className="mt-3 text-muted-foreground">
-        New to CookLoop? Here is what you need to know.
+        New to eeatly? Here is what you need to know.
       </p>
 
       <div className="mt-10 grid gap-6">

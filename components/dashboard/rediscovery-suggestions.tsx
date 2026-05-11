@@ -45,7 +45,7 @@ export function RediscoverySuggestions({
       <div className="rounded-[14px] border bg-[var(--surface)] p-4 text-sm text-muted-foreground">
         <p className="font-medium text-foreground">Ideas for tonight</p>
         <p className="mt-1 text-xs">
-          Log a few meals and CookLoop will start resurfacing good options.
+          Log a few meals and eeatly will start resurfacing good options.
         </p>
       </div>
     );

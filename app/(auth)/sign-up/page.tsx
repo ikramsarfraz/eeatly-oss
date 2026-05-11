@@ -11,7 +11,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Start your cooking memory",
-  description: "Create a private CookLoop account with an email magic link."
+  description: "Create a private eeatly account with an email magic link."
 };
 
 export default function SignUpPage() {
@@ -20,7 +20,7 @@ export default function SignUpPage() {
       <CardHeader>
         <CardTitle>Start your cooking memory</CardTitle>
         <CardDescription>
-          Enter your email and we&apos;ll send a link to create your private CookLoop.
+          Enter your email and we&apos;ll send a link to create your private eeatly account.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">

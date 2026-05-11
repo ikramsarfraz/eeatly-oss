@@ -260,7 +260,7 @@ export default async function AdminUsersPage(props: PageProps) {
       </section>
       <p className="text-xs text-muted-foreground">
         Each send emits <code className="text-[11px]">reminder_email_sent</code> with a metadata template id;
-        stubs mirror future ESP webhooks without leaving CookLoop infra.
+        stubs mirror future ESP webhooks without leaving eeatly infra.
       </p>
     </main>
   );

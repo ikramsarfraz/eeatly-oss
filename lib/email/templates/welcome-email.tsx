@@ -13,13 +13,13 @@ export function WelcomeEmail({ name }: { name: string }) {
   return (
     <Html>
       <Head />
-      <Preview>Welcome to CookLoop</Preview>
+      <Preview>Welcome to eeatly</Preview>
       <Body style={body}>
         <Container style={container}>
           <Section>
             <Heading style={heading}>Welcome, {name}</Heading>
             <Text style={text}>
-              CookLoop is ready to help you remember what is worth making again.
+              eeatly is ready to help you remember the meals worth making again.
             </Text>
           </Section>
         </Container>

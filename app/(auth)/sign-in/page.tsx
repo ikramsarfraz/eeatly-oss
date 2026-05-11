@@ -11,7 +11,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Sign in",
-  description: "Sign in to your private CookLoop cooking memory."
+  description: "Sign in to your private eeatly meal memory."
 };
 
 export default function SignInPage() {

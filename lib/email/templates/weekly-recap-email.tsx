@@ -23,7 +23,7 @@ export function WeeklyRecapEmail({ name, teaserLine }: WeeklyRecapEmailProps) {
   return (
     <Html>
       <Head />
-      <Preview>Your CookLoop recap is almost ready</Preview>
+      <Preview>Your eeatly recap is almost ready</Preview>
       <Body style={emailBody}>
         <Container style={emailContainer}>
           <Section>
