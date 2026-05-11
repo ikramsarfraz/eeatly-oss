@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { cn } from "@/lib/utils";
@@ -25,9 +26,13 @@ export function RecentHistoryList({ meals }: { meals: RecentMeal[] }) {
             {meals.length}
           </span>
         </h3>
-        <button className="text-[11.5px] text-muted-foreground hover:text-foreground">
+        <Link
+          href="/history"
+          className="text-[11.5px] text-muted-foreground hover:text-foreground"
+          aria-label="View full meal history"
+        >
           view all
-        </button>
+        </Link>
       </div>
 
       <div>
@@ -43,6 +48,7 @@ export function RecentHistoryList({ meals }: { meals: RecentMeal[] }) {
           >
             {/* Thumbnail */}
             <div
+              aria-hidden="true"
               className={cn(
                 "h-11 w-11 shrink-0 rounded-[9px]",
                 thumbColors[i % thumbColors.length]

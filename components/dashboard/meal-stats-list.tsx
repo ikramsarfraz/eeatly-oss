@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { cn } from "@/lib/utils";
@@ -30,9 +31,13 @@ export function MealStatsList({
             {meals.length}
           </span>
         </h3>
-        <button className="text-[11.5px] text-muted-foreground hover:text-foreground">
+        <Link
+          href="/history"
+          className="text-[11.5px] text-muted-foreground hover:text-foreground"
+          aria-label={`View all meals — ${title}`}
+        >
           view all
-        </button>
+        </Link>
       </div>
 
       <div>
@@ -52,6 +57,7 @@ export function MealStatsList({
             >
               {/* Thumbnail */}
               <div
+                aria-hidden="true"
                 className={cn(
                   "h-11 w-11 shrink-0 rounded-[9px]",
                   thumbColors[i % thumbColors.length]

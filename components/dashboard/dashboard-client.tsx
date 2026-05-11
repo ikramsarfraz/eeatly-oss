@@ -17,7 +17,7 @@ export function DashboardClient({
   initialData: DashboardMeals;
   canWrite: boolean;
 }) {
-  const { data, error, isError, isFetching } = useDashboardMeals(initialData);
+  const { data, isError, isFetching } = useDashboardMeals(initialData);
   const meals = data ?? initialData;
   const topSuggestion = meals.suggestions[0];
   const hasMeals = meals.recentMeals.length > 0;
@@ -37,9 +37,9 @@ export function DashboardClient({
   return (
     <div className="grid gap-5">
       {isError ? (
-        <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-          <AlertCircle className="h-4 w-4" />
-          {error instanceof Error ? error.message : "Unable to load your meal history."}
+        <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+          <AlertCircle className="h-4 w-4" aria-hidden="true" />
+          We couldn&apos;t load your meals right now. Please try again in a moment.
         </div>
       ) : null}
 
@@ -52,6 +52,7 @@ export function DashboardClient({
         >
           {/* Decorative radial */}
           <div
+            aria-hidden="true"
             className="pointer-events-none absolute -right-[60px] -top-[60px] h-[280px] w-[280px] rounded-full opacity-70"
             style={{
               background:
@@ -82,12 +83,12 @@ export function DashboardClient({
           {/* CTAs */}
           {hasMeals && topSuggestion ? (
             <div className="relative flex flex-wrap gap-[10px]">
-              <button className="inline-flex items-center gap-2 rounded-[10px] bg-primary px-[14px] py-[10px] text-[13.5px] font-medium text-primary-foreground transition-colors hover:bg-[#265a48]">
-                <Check className="h-3.5 w-3.5" />
+              <button type="button" className="inline-flex items-center gap-2 rounded-[10px] bg-primary px-[14px] py-[10px] text-[13.5px] font-medium text-primary-foreground transition-colors hover:bg-[#265a48]">
+                <Check className="h-3.5 w-3.5" aria-hidden="true" />
                 Cook this tonight
               </button>
-              <button className="inline-flex items-center gap-2 rounded-[8px] px-[10px] py-[7px] text-[13px] text-foreground hover:bg-[var(--surface-2)]">
-                <TrendingUp className="h-3.5 w-3.5" />
+              <button type="button" className="inline-flex items-center gap-2 rounded-[8px] px-[10px] py-[7px] text-[13px] text-foreground hover:bg-[var(--surface-2)]">
+                <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
                 Show more ideas
               </button>
             </div>

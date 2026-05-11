@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { getPublicEnv } from "@/lib/env/public";
 import "./globals.css";
 
+// NEXT_PUBLIC_APP_URL must be set to the production origin in Vercel env vars.
+// The localhost fallback is only for local development.
 const appUrl = getPublicEnv().NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
 export const metadata: Metadata = {
