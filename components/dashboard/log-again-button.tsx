@@ -12,13 +12,15 @@ type LogAgainButtonProps = {
   effortLevel?: EffortLevel | null;
   variant?: "default" | "secondary" | "outline" | "ghost";
   size?: "default" | "sm";
+  compact?: boolean;
 };
 
 export function LogAgainButton({
   mealName,
   effortLevel = "easy",
   variant = "outline",
-  size = "sm"
+  size = "sm",
+  compact = false
 }: LogAgainButtonProps) {
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const mutation = useCreateMealLog({ source: "log_again" });
@@ -74,12 +76,14 @@ export function LogAgainButton({
         )}
         Log again
       </Button>
-      {errorMessage ? (
-        <p className="text-xs text-destructive" role="status">
-          {errorMessage}
-        </p>
-      ) : (
-        <p className="text-[11px] text-muted-foreground">Defaults to today with your last-known effort.</p>
+      {!compact && (
+        errorMessage ? (
+          <p className="text-xs text-destructive" role="status">
+            {errorMessage}
+          </p>
+        ) : (
+          <p className="text-[11px] text-muted-foreground">Defaults to today with your last-known effort.</p>
+        )
       )}
     </div>
   );

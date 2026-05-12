@@ -12,8 +12,8 @@ function scopeMealsToUser(userId: string) {
   return and(eq(meals.userId, userId), isNull(meals.archivedAt));
 }
 
-function scopeMealLogsToUser(userId: string) {
-  return eq(mealLogs.userId, userId);
+function activeMealLogsForUser(userId: string) {
+  return and(eq(mealLogs.userId, userId), isNull(mealLogs.deletedAt));
 }
 
 export async function getDashboardMeals(userId: string): Promise<DashboardMeals> {
@@ -29,41 +29,63 @@ export async function getDashboardMeals(userId: string): Promise<DashboardMeals>
     })
     .from(mealLogs)
     .innerJoin(meals, eq(mealLogs.mealId, meals.id))
-    .where(scopeMealLogsToUser(userId))
+    .where(activeMealLogsForUser(userId))
     .orderBy(desc(mealLogs.cookedAt))
     .limit(10);
 
-  const stats = await db
-    .select({
-      mealId: meals.id,
-      mealName: meals.name,
-      cookCount: count(mealLogs.id),
-      lastCookedAt: max(mealLogs.cookedAt),
-      photoUrl: meals.photoUrl
-    })
-    .from(meals)
-    .innerJoin(mealLogs, eq(mealLogs.mealId, meals.id))
-    .where(scopeMealsToUser(userId))
-    .groupBy(meals.id)
-    .orderBy(desc(count(mealLogs.id)))
-    .limit(24);
+  const [mostCookedStats, neglectedStats] = await Promise.all([
+    db
+      .select({
+        mealId: meals.id,
+        mealName: meals.name,
+        cookCount: count(mealLogs.id),
+        lastCookedAt: max(mealLogs.cookedAt),
+        photoUrl: meals.photoUrl,
+        recipeText: meals.recipeText,
+        recipeSourceUrl: meals.recipeSourceUrl
+      })
+      .from(meals)
+      .innerJoin(mealLogs, and(eq(mealLogs.mealId, meals.id), isNull(mealLogs.deletedAt)))
+      .where(scopeMealsToUser(userId))
+      .groupBy(meals.id)
+      .orderBy(desc(count(mealLogs.id)))
+      .limit(6),
 
-  const normalizedStats: MealStat[] = stats
-    .filter((meal): meal is typeof meal & { lastCookedAt: string } =>
-      Boolean(meal.lastCookedAt)
-    )
-    .map((meal) => ({
-      mealId: meal.mealId,
-      mealName: meal.mealName,
-      cookCount: Number(meal.cookCount),
-      lastCookedAt: meal.lastCookedAt,
-      photoUrl: meal.photoUrl
-    }));
+    db
+      .select({
+        mealId: meals.id,
+        mealName: meals.name,
+        cookCount: count(mealLogs.id),
+        lastCookedAt: max(mealLogs.cookedAt),
+        photoUrl: meals.photoUrl,
+        recipeText: meals.recipeText,
+        recipeSourceUrl: meals.recipeSourceUrl
+      })
+      .from(meals)
+      .leftJoin(mealLogs, and(eq(mealLogs.mealId, meals.id), isNull(mealLogs.deletedAt)))
+      .where(scopeMealsToUser(userId))
+      .groupBy(meals.id)
+      .orderBy(sql`max(${mealLogs.cookedAt}) asc nulls first`)
+      .limit(18)
+  ]);
 
-  const mostCookedMeals = normalizedStats.slice(0, 6);
-  const neglectedMeals = [...normalizedStats]
-    .sort((a, b) => a.lastCookedAt.localeCompare(b.lastCookedAt))
-    .slice(0, 6);
+  const toMealStat = (meal: typeof mostCookedStats[number]): MealStat => ({
+    mealId: meal.mealId,
+    mealName: meal.mealName,
+    cookCount: Number(meal.cookCount),
+    lastCookedAt: meal.lastCookedAt,
+    photoUrl: meal.photoUrl,
+    recipeText: meal.recipeText,
+    recipeSourceUrl: meal.recipeSourceUrl
+  });
+
+  const mostCookedMeals = mostCookedStats.map(toMealStat);
+
+  const mostCookedIds = new Set(mostCookedStats.map((m) => m.mealId));
+  const neglectedMeals = neglectedStats
+    .filter((m) => !mostCookedIds.has(m.mealId))
+    .slice(0, 6)
+    .map(toMealStat);
 
   return withSuggestions(recentMeals as RecentMeal[], mostCookedMeals, neglectedMeals);
 }
@@ -76,6 +98,8 @@ export async function createMealLog(userId: string, input: MealLogInput): Promis
   const normalizedName = normalizeMealName(payload.mealName);
   const photoUrl = payload.photoUrl || null;
   const notes = payload.notes || null;
+  const recipeText = payload.recipeText !== undefined ? (payload.recipeText.trim() || null) : undefined;
+  const recipeSourceUrl = payload.recipeSourceUrl !== undefined ? (payload.recipeSourceUrl.trim() || null) : undefined;
 
   return db.transaction(async (tx) => {
     const existingMeal = await tx.query.meals.findFirst({
@@ -92,6 +116,8 @@ export async function createMealLog(userId: string, input: MealLogInput): Promis
             name: payload.mealName,
             normalizedName,
             photoUrl,
+            recipeText: recipeText ?? null,
+            recipeSourceUrl: recipeSourceUrl ?? null,
             updatedAt: new Date()
           })
           .returning()
@@ -106,6 +132,8 @@ export async function createMealLog(userId: string, input: MealLogInput): Promis
         .update(meals)
         .set({
           photoUrl: photoUrl && !existingMeal.photoUrl ? photoUrl : existingMeal.photoUrl,
+          ...(recipeText !== undefined && { recipeText }),
+          ...(recipeSourceUrl !== undefined && { recipeSourceUrl }),
           updatedAt: new Date()
         })
         .where(eq(meals.id, existingMeal.id));
@@ -126,10 +154,28 @@ export async function createMealLog(userId: string, input: MealLogInput): Promis
     const [mealLogCountRow] = await tx
       .select({ value: count(mealLogs.id) })
       .from(mealLogs)
-      .where(scopeMealLogsToUser(userId));
+      .where(activeMealLogsForUser(userId));
 
     const mealLogCount = Number(mealLogCountRow?.value ?? 0);
 
     return { mealLog: log, mealLogCount };
   });
+}
+
+export async function deleteMealLog(userId: string, logId: string): Promise<void> {
+  const [updated] = await db
+    .update(mealLogs)
+    .set({ deletedAt: new Date(), updatedAt: new Date() })
+    .where(
+      and(
+        eq(mealLogs.id, logId),
+        eq(mealLogs.userId, userId),
+        isNull(mealLogs.deletedAt)
+      )
+    )
+    .returning({ id: mealLogs.id });
+
+  if (!updated) {
+    throw new Error("Meal log not found.");
+  }
 }

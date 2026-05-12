@@ -23,6 +23,17 @@ export const mealLogInputSchema = z.object({
     .trim()
     .url("Photo URL must be valid.")
     .optional()
+    .or(z.literal("")),
+  recipeText: z
+    .string()
+    .max(10000, "Recipe should stay under 10,000 characters.")
+    .optional()
+    .or(z.literal("")),
+  recipeSourceUrl: z
+    .string()
+    .trim()
+    .url("Recipe source must be a valid URL.")
+    .optional()
     .or(z.literal(""))
 });
 

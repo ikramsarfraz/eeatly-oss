@@ -9,7 +9,7 @@ import {
   Preview,
   Section,
   Text
-} from "@react-email/components";
+} from "react-email";
 import { emailBody, emailButton, emailContainer, emailHeading, emailText } from "./base-styles";
 
 export type InactiveReminderEmailProps = {

@@ -4,5 +4,5 @@ import { getDashboardMealsAction } from "@/actions/meals";
 export default async function DashboardPage() {
   const meals = await getDashboardMealsAction();
 
-  return <DashboardClient initialData={meals} canWrite />;
+  return <DashboardClient initialData={meals} />;
 }

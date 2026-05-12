@@ -47,8 +47,10 @@ export function MealStatsList({
           </div>
         ) : null}
         {meals.slice(0, 5).map((meal, i) => {
-          const daysAgo = differenceInCalendarDays(new Date(), parseISO(meal.lastCookedAt));
-          const isStale = daysAgo >= 14;
+          const daysAgo = meal.lastCookedAt
+            ? differenceInCalendarDays(new Date(), parseISO(meal.lastCookedAt))
+            : null;
+          const isStale = daysAgo !== null && daysAgo >= 14;
 
           return (
             <div
@@ -68,7 +70,11 @@ export function MealStatsList({
               <div className="min-w-0">
                 <div className="truncate text-[13.5px] font-medium">{meal.mealName}</div>
                 <div className="mt-0.5 flex items-center gap-2 text-[11.5px] text-muted-foreground">
-                  <span>last {format(parseISO(meal.lastCookedAt), "MMM d")}</span>
+                  <span>
+                    {meal.lastCookedAt
+                      ? `last ${format(parseISO(meal.lastCookedAt), "MMM d")}`
+                      : "never cooked"}
+                  </span>
                   {isStale ? (
                     <>
                       <span className="h-0.5 w-0.5 rounded-full bg-current opacity-60" />

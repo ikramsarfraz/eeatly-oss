@@ -27,7 +27,11 @@ const serverEnvSchema = z.object({
   R2_ACCESS_KEY_ID: optionalString,
   R2_SECRET_ACCESS_KEY: optionalString,
   R2_BUCKET: optionalString,
-  R2_PUBLIC_BASE_URL: optionalUrl
+  R2_PUBLIC_BASE_URL: optionalUrl,
+  UPSTASH_REDIS_REST_URL: z.string().url("UPSTASH_REDIS_REST_URL must be a valid URL."),
+  UPSTASH_REDIS_REST_TOKEN: z.string().min(1, "UPSTASH_REDIS_REST_TOKEN is required."),
+  ANTHROPIC_API_KEY: z.string().min(1, "ANTHROPIC_API_KEY is required."),
+  OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required.")
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

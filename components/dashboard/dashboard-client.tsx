@@ -1,7 +1,7 @@
 "use client";
 
 import { differenceInCalendarDays, parseISO } from "date-fns";
-import { AlertCircle, BookOpen, Check, Loader2, TrendingUp } from "lucide-react";
+import { AlertCircle, BookOpen, Loader2 } from "lucide-react";
 import { MealLogForm } from "@/components/forms/meal-log-form";
 import { OnboardingCard } from "@/components/dashboard/onboarding-card";
 import { RediscoverySuggestions } from "@/components/dashboard/rediscovery-suggestions";
@@ -11,11 +11,9 @@ import { useDashboardMeals } from "@/hooks/use-dashboard-meals";
 import type { DashboardMeals } from "@/types";
 
 export function DashboardClient({
-  initialData,
-  canWrite
+  initialData
 }: {
   initialData: DashboardMeals;
-  canWrite: boolean;
 }) {
   const { data, isError, isFetching } = useDashboardMeals(initialData);
   const meals = data ?? initialData;
@@ -80,19 +78,6 @@ export function DashboardClient({
               : "eeatly gets useful after a few quick logs. Add what you cooked, then come back here when you need an easy answer."}
           </p>
 
-          {/* CTAs */}
-          {hasMeals && topSuggestion ? (
-            <div className="relative flex flex-wrap gap-[10px]">
-              <button type="button" className="inline-flex items-center gap-2 rounded-[10px] bg-primary px-[14px] py-[10px] text-[13.5px] font-medium text-primary-foreground transition-colors hover:bg-[#265a48]">
-                <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                Cook this tonight
-              </button>
-              <button type="button" className="inline-flex items-center gap-2 rounded-[8px] px-[10px] py-[7px] text-[13px] text-foreground hover:bg-[var(--surface-2)]">
-                <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
-                Show more ideas
-              </button>
-            </div>
-          ) : null}
 
           {/* Stats */}
           {hasMeals ? (
@@ -170,7 +155,7 @@ export function DashboardClient({
               ⌘ + Enter
             </span>
           </div>
-          <MealLogForm canWrite={canWrite} />
+          <MealLogForm />
         </div>
       </section>
 

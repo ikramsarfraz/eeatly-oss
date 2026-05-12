@@ -10,7 +10,6 @@ import {
   uuid
 } from "drizzle-orm/pg-core";
 import { users } from "./auth";
-import { tenants } from "./tenancy";
 
 export const effortLevelEnum = pgEnum("effort_level", [
   "quick",
@@ -26,11 +25,12 @@ export const meals = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "set null" }),
     name: text("name").notNull(),
     normalizedName: text("normalized_name").notNull(),
     photoUrl: text("photo_url"),
     notes: text("notes"),
+    recipeText: text("recipe_text"),
+    recipeSourceUrl: text("recipe_source_url"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     archivedAt: timestamp("archived_at", { withTimezone: true })
@@ -41,8 +41,7 @@ export const meals = pgTable(
       table.normalizedName
     ),
     userUpdatedAtIdx: index("meals_user_updated_at_idx").on(table.userId, table.updatedAt),
-    userArchivedAtIdx: index("meals_user_archived_at_idx").on(table.userId, table.archivedAt),
-    tenantIdx: index("meals_tenant_idx").on(table.tenantId)
+    userArchivedAtIdx: index("meals_user_archived_at_idx").on(table.userId, table.archivedAt)
   })
 );
 
@@ -56,13 +55,13 @@ export const mealLogs = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "set null" }),
     effortLevel: effortLevelEnum("effort_level").notNull(),
     notes: text("notes"),
     cookedAt: date("cooked_at").notNull(),
     photoUrl: text("photo_url"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true })
   },
   (table) => ({
     userCookedAtIdx: index("meal_logs_user_cooked_at_idx").on(
@@ -78,8 +77,7 @@ export const mealLogs = pgTable(
     mealCookedAtIdx: index("meal_logs_meal_cooked_at_idx").on(
       table.mealId,
       table.cookedAt
-    ),
-    tenantIdx: index("meal_logs_tenant_idx").on(table.tenantId)
+    )
   })
 );
 
@@ -87,10 +85,6 @@ export const mealRelations = relations(meals, ({ many, one }) => ({
   user: one(users, {
     fields: [meals.userId],
     references: [users.id]
-  }),
-  tenant: one(tenants, {
-    fields: [meals.tenantId],
-    references: [tenants.id]
   }),
   logs: many(mealLogs)
 }));
@@ -103,9 +97,5 @@ export const mealLogRelations = relations(mealLogs, ({ one }) => ({
   user: one(users, {
     fields: [mealLogs.userId],
     references: [users.id]
-  }),
-  tenant: one(tenants, {
-    fields: [mealLogs.tenantId],
-    references: [tenants.id]
   })
 }));

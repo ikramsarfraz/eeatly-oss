@@ -7,8 +7,10 @@ export type CreateMealLogResponse = {
 };
 
 export type PresignUploadResponse = {
-  uploadUrl: string;
+  url: string;
+  fields: Record<string, string>;
   publicUrl: string;
+  key: string;
 };
 
 export const endpoints = {

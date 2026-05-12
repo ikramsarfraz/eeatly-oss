@@ -16,18 +16,16 @@ import type { AppUser } from "@/lib/auth/session";
 
 export function AppShell({
   user,
-  canWrite,
   children,
 }: {
   user: AppUser;
-  canWrite: boolean;
   children: React.ReactNode;
 }) {
   return (
     <TooltipProvider>
       <BreadcrumbLabelProvider>
         <SidebarProvider>
-          <AppSidebar user={user} canWrite={canWrite} />
+          <AppSidebar user={user} />
           <SidebarInset>
             <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
               <SidebarTrigger className="-ml-1" />

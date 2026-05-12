@@ -48,10 +48,9 @@ const youNav: NavItem[] = [
 
 type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   user: AppUser;
-  canWrite: boolean;
 };
 
-export function AppSidebar({ user, canWrite, ...props }: AppSidebarProps) {
+export function AppSidebar({ user, ...props }: AppSidebarProps) {
   const pathname = usePathname() ?? "";
 
   const isActive = (href: string) =>
@@ -83,7 +82,6 @@ export function AppSidebar({ user, canWrite, ...props }: AppSidebarProps) {
         <SidebarMenu>
           <SidebarMenuItem>
             <QuickLogDialog
-              canWrite={canWrite}
               trigger={
                 <SidebarMenuButton
                   className="bg-foreground text-background hover:bg-[#2a3431] hover:text-background active:bg-[#2a3431] active:text-background"

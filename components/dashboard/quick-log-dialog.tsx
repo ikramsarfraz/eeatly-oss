@@ -14,15 +14,30 @@ import {
   DialogTrigger
 } from "@/components/ui/dialog";
 
-export function QuickLogDialog({
-  canWrite,
-  trigger
-}: {
-  canWrite: boolean;
+type QuickLogDialogProps = {
   trigger?: React.ReactNode;
-}) {
+  /** When provided, the dialog is fully controlled by the parent. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  initialMealName?: string;
+  autoFocusRecipe?: boolean;
+};
+
+export function QuickLogDialog({
+  trigger,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+  initialMealName,
+  autoFocusRecipe
+}: QuickLogDialogProps) {
   const hydrated = useHydrated();
-  const [open, setOpen] = React.useState(false);
+  const [internalOpen, setInternalOpen] = React.useState(false);
+
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = isControlled
+    ? (controlledOnOpenChange ?? (() => {}))
+    : setInternalOpen;
 
   const defaultTrigger = (
     <Button>
@@ -32,12 +47,14 @@ export function QuickLogDialog({
   );
 
   if (!hydrated) {
-    return <>{trigger ?? defaultTrigger}</>;
+    return isControlled ? null : <>{trigger ?? defaultTrigger}</>;
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{trigger ?? defaultTrigger}</DialogTrigger>
+      {!isControlled && (
+        <DialogTrigger asChild>{trigger ?? defaultTrigger}</DialogTrigger>
+      )}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Log a meal</DialogTitle>
@@ -45,7 +62,11 @@ export function QuickLogDialog({
             Add the thing you cooked, how much effort it took, and anything worth remembering.
           </DialogDescription>
         </DialogHeader>
-        <MealLogForm canWrite={canWrite} onSuccess={() => setOpen(false)} />
+        <MealLogForm
+          onSuccess={() => setOpen(false)}
+          initialMealName={initialMealName}
+          autoFocusRecipe={autoFocusRecipe}
+        />
       </DialogContent>
     </Dialog>
   );
