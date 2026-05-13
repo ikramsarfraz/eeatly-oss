@@ -85,6 +85,20 @@
       "when": 1778683944881,
       "tag": "0011_dry_hannibal_king",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1778690835938,
+      "tag": "0012_nosy_changeling",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1778691523354,
+      "tag": "0013_wide_killmonger",
+      "breakpoints": true
     }
   ]
 }

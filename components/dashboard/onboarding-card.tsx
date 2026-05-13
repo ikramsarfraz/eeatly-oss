@@ -1,41 +1,27 @@
-import { Badge } from "@/components/ui/badge";
-import { OnboardingCompleteButton } from "@/components/dashboard/onboarding-complete-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-const starterMeals = [
-  "Pasta night",
-  "Rice bowl",
-  "Soup",
-  "Tacos",
-  "Breakfast for dinner"
-];
-
+/**
+ * No-meals empty-state hint on the dashboard. Formerly the "Welcome to
+ * eeatly" onboarding card with its own completion button — the multi-step
+ * flow at /onboarding now handles welcome + setup. This card is strictly
+ * a "log your first meal" nudge for users who finished onboarding without
+ * logging anything.
+ */
 export function OnboardingCard() {
   return (
     <Card className="border-dashed">
       <CardHeader>
-        <CardTitle>Welcome to eeatly</CardTitle>
+        <CardTitle>Start with one meal</CardTitle>
       </CardHeader>
-      <CardContent className="grid gap-4 text-sm text-muted-foreground">
+      <CardContent className="grid gap-3 text-sm text-muted-foreground">
         <p>
-          Start small: log the kind of meals you actually cook. Weeknight repeats,
-          leftovers, and low-effort wins are all useful.
+          Type a meal you cooked recently into Quick log. eeatly will start
+          surfacing it back to you when it&apos;s worth cooking again.
         </p>
-        <div className="grid gap-2">
-          <p className="font-medium text-foreground">What kinds of meals do you cook?</p>
-          <div className="flex flex-wrap gap-2">
-            {starterMeals.map((meal) => (
-              <Badge key={meal} variant="secondary">
-                {meal}
-              </Badge>
-            ))}
-          </div>
-        </div>
         <p className="text-xs">
-          Choose one real dinner you made recently, type the name in Quick log, and you are done in
-          under a minute.
+          Weeknight repeats, leftovers, low-effort wins — anything counts.
+          Under a minute to log.
         </p>
-        <OnboardingCompleteButton />
       </CardContent>
     </Card>
   );

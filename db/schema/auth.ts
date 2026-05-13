@@ -1,12 +1,14 @@
 import {
   boolean,
   index,
+  integer,
   pgEnum,
   pgTable,
   text,
   timestamp,
   uniqueIndex
 } from "drizzle-orm/pg-core";
+import { effortLevelEnum } from "./meals";
 
 export const userRoleEnum = pgEnum("user_role", [
   "root_app_user",
@@ -34,6 +36,11 @@ export const users = pgTable("user", {
   // source for "did this user finish onboarding" — analytics events
   // (completed_onboarding) remain for funnel analysis but are fire-and-forget.
   onboardingCompletedAt: timestamp("onboarding_completed_at", { withTimezone: true }),
+  // Captured during multi-step onboarding. Used to tune rediscovery cadence
+  // and lifecycle-email frequency. Nullable — user can complete onboarding
+  // without answering these (skipped path).
+  cooksPerWeek: integer("cooks_per_week"),
+  weeknightEffort: effortLevelEnum("weeknight_effort"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
 });
