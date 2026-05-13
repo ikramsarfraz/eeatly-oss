@@ -517,6 +517,80 @@ export async function userOwnsMultiMemberHousehold(userId: string): Promise<bool
 }
 
 /**
+ * Idempotent setup of the user's solo household. Used by:
+ *   - Better Auth's user.create.after hook (new sign-ups)
+ *   - getCurrentHousehold's self-heal path (existing users predating the
+ *     backfill or anyone whose membership row was deleted out from under them)
+ *
+ * Returns the existing household if one already exists; otherwise creates
+ * a household + owner membership + sets users.preferred_household_id in a
+ * single transaction. Safe under concurrent calls: the unique index on
+ * household_members.user_id throws on the second insert; we catch and
+ * re-read.
+ *
+ * `displayName` is used to label the household ("Alex's Kitchen"). When
+ * empty/null we fall back to "My Kitchen" to match the 0015 backfill.
+ */
+export async function ensureHouseholdForUser(
+  userId: string,
+  displayName: string | null
+): Promise<{ id: string; name: string; created: boolean }> {
+  // Fast path: already a member somewhere.
+  const [existing] = await db
+    .select({ id: households.id, name: households.name })
+    .from(householdMembers)
+    .innerJoin(households, eq(householdMembers.householdId, households.id))
+    .where(eq(householdMembers.userId, userId))
+    .limit(1);
+  if (existing) {
+    return { ...existing, created: false };
+  }
+
+  const trimmed = (displayName ?? "").trim();
+  const householdName = trimmed.length > 0 ? `${trimmed}’s Kitchen` : "My Kitchen";
+
+  try {
+    return await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(households)
+        .values({ name: householdName, ownerId: userId })
+        .returning({ id: households.id, name: households.name });
+      if (!created) {
+        throw new Error("Failed to create household.");
+      }
+      await tx.insert(householdMembers).values({
+        householdId: created.id,
+        userId,
+        role: "owner"
+      });
+      await tx
+        .update(users)
+        .set({ preferredHouseholdId: created.id, updatedAt: new Date() })
+        .where(eq(users.id, userId));
+      logger.info("household_auto_created", { userId, householdId: created.id });
+      return { id: created.id, name: created.name, created: true };
+    });
+  } catch (error) {
+    // Race: a concurrent request beat us. Re-read; the row must exist now.
+    const [winner] = await db
+      .select({ id: households.id, name: households.name })
+      .from(householdMembers)
+      .innerJoin(households, eq(householdMembers.householdId, households.id))
+      .where(eq(householdMembers.userId, userId))
+      .limit(1);
+    if (winner) {
+      return { ...winner, created: false };
+    }
+    // Not a race — actual failure. Log and rethrow so callers can decide.
+    logger.error("household_auto_create_failed", {
+      userId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    throw error;
+  }
+}
+
+/**
  * Cheap count used by the dashboard header. Returns 1 for a single-person
  * household — callers compare against 1 to decide whether to render the
  * subtle "shared" indicator.

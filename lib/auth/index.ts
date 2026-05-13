@@ -7,6 +7,8 @@ import { db } from "@/lib/db/client";
 import * as schema from "@/db/schema";
 import { getServerEnv, hasGoogleAuthEnv } from "@/lib/env/server";
 import { sendMagicLinkEmail } from "@/lib/email/resend";
+import { logger } from "@/lib/observability/logger";
+import { ensureHouseholdForUser } from "@/services/households";
 
 const env = getServerEnv();
 const appUrl = env.BETTER_AUTH_URL;
@@ -78,11 +80,27 @@ export const auth = betterAuth({
         required: false,
         defaultValue: "root_app_user",
         input: false
-      },
-      preferredTenantId: {
-        type: "string",
-        required: false,
-        input: false
+      }
+    }
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        // Round-4 invariant: every user must be a member of exactly one
+        // household. Run this *after* the user row commits so the FK in
+        // household_members can resolve. Failure here would leave the user
+        // without a household — getCurrentHousehold also self-heals as a
+        // backstop, but logging here makes the gap visible in metrics.
+        after: async (user) => {
+          try {
+            await ensureHouseholdForUser(user.id, user.name ?? null);
+          } catch (error) {
+            logger.error("user_create_household_setup_failed", {
+              userId: user.id,
+              error: error instanceof Error ? error.message : String(error)
+            });
+          }
+        }
       }
     }
   },
