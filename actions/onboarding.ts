@@ -79,3 +79,35 @@ export async function completeOnboardingAction() {
   revalidatePath("/dashboard");
   redirect("/dashboard");
 }
+
+/**
+ * Updates the captured habits from the Settings preferences editor.
+ * Same validation as the onboarding step; doesn't touch onboarding
+ * completion status. Returns the persisted values so the client can
+ * refresh its display without a refetch.
+ */
+export async function updatePreferencesAction(input: OnboardingHabitsInput) {
+  const user = await requireCurrentUser();
+  const parsed = onboardingHabitsInputSchema.parse(input);
+
+  try {
+    await db
+      .update(users)
+      .set({
+        cooksPerWeek: parsed.cooksPerWeek,
+        weeknightEffort: parsed.weeknightEffort,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, user.id));
+  } catch (error) {
+    logger.warn("preferences_update_failed", {
+      requestId: (await getRequestId()) ?? undefined,
+      userId: user.id,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    throw new Error("Couldn't save your preferences. Please try again.");
+  }
+
+  revalidatePath("/settings");
+  return { ok: true, ...parsed } as const;
+}
