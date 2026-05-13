@@ -71,6 +71,13 @@
       "when": 1778551213187,
       "tag": "0009_organic_bill_hollister",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1778681206473,
+      "tag": "0010_bent_tarot",
+      "breakpoints": true
     }
   ]
 }
