@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { differenceInCalendarDays, parseISO } from "date-fns";
 import { AlertCircle, BookOpen, Loader2, Sparkles } from "lucide-react";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
@@ -28,11 +29,16 @@ export function DashboardClient({
     ? differenceInCalendarDays(new Date(), parseISO(recentLog.cookedAt))
     : null;
 
-  const timeLabel = new Date().toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true
-  });
+  const [timeLabel, setTimeLabel] = useState("");
+  useEffect(() => {
+    setTimeLabel(
+      new Date().toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true
+      })
+    );
+  }, []);
 
   return (
     <div className="grid gap-5">
