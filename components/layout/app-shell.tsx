@@ -1,6 +1,9 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
+import type { Route } from "next";
+import { Users } from "lucide-react";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
@@ -20,9 +23,11 @@ import type { AppUser } from "@/lib/auth/session";
 
 export function AppShell({
   user,
+  householdLabel,
   children,
 }: {
   user: AppUser;
+  householdLabel?: string | null;
   children: React.ReactNode;
 }) {
   return (
@@ -40,7 +45,17 @@ export function AppShell({
                 />
                 <Separator orientation="vertical" className="mr-2 h-4 md:max-lg:hidden" />
                 <AppBreadcrumb />
-                <div className="ml-auto flex items-center gap-1">
+                <div className="ml-auto flex items-center gap-2">
+                  {householdLabel ? (
+                    <Link
+                      href={"/settings" as Route}
+                      className="hidden items-center gap-1.5 rounded-full border bg-background/60 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground sm:inline-flex"
+                      aria-label={`Shared kitchen: ${householdLabel}`}
+                    >
+                      <Users className="h-3.5 w-3.5" />
+                      <span className="max-w-[10rem] truncate">{householdLabel}</span>
+                    </Link>
+                  ) : null}
                   <NotificationBell />
                 </div>
               </header>

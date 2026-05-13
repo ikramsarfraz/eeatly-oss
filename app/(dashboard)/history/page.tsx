@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { requireCurrentUser } from "@/lib/auth/session";
+import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
 import {
   getHistoryRows,
   getHistoryStats,
@@ -60,7 +60,7 @@ export default async function HistoryPage(props: {
     page?: string;
   }>;
 }) {
-  const user = await requireCurrentUser();
+  const { user, household } = await requireCurrentUserWithHousehold();
   const sp = await props.searchParams;
 
   const filters: HistoryFilters = {
@@ -74,7 +74,7 @@ export default async function HistoryPage(props: {
   const page = parsePage(sp.page);
 
   const [rowsResult, stats] = await Promise.all([
-    getHistoryRows(user.id, {
+    getHistoryRows(user.id, household.id, {
       tab: filters.tab,
       sort: filters.sort,
       dir: filters.dir,
@@ -84,7 +84,7 @@ export default async function HistoryPage(props: {
       page,
       pageSize: 20
     }),
-    getHistoryStats(user.id)
+    getHistoryStats(user.id, household.id)
   ]);
 
   return (
@@ -94,6 +94,7 @@ export default async function HistoryPage(props: {
       page={rowsResult.page}
       pageSize={rowsResult.pageSize}
       filters={filters}
+      currentUserId={user.id}
       stats={{
         thisYear: stats.thisYear,
         thisMonth: stats.thisMonth,

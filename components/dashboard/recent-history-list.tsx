@@ -4,7 +4,13 @@ import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { MealThumb } from "@/components/dashboard/meal-thumb";
 import type { RecentMeal } from "@/types";
 
-export function RecentHistoryList({ meals }: { meals: RecentMeal[] }) {
+export function RecentHistoryList({
+  meals,
+  currentUserId
+}: {
+  meals: RecentMeal[];
+  currentUserId: string;
+}) {
   return (
     <div
       className="overflow-hidden rounded-[14px] border bg-[var(--surface)]"
@@ -51,6 +57,12 @@ export function RecentHistoryList({ meals }: { meals: RecentMeal[] }) {
                 <span>{format(parseISO(meal.cookedAt), "MMM d")}</span>
                 <span className="h-0.5 w-0.5 rounded-full bg-current opacity-60" />
                 <span>{meal.effortLevel.replace("_", " ")}</span>
+                {meal.cookedByName && meal.cookedByUserId !== currentUserId ? (
+                  <>
+                    <span className="h-0.5 w-0.5 rounded-full bg-current opacity-60" />
+                    <span className="truncate">by {meal.cookedByName}</span>
+                  </>
+                ) : null}
                 {meal.notes ? (
                   <>
                     <span className="h-0.5 w-0.5 rounded-full bg-current opacity-60" />

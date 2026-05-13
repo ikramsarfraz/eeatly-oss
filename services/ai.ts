@@ -41,10 +41,12 @@ export async function suggestMealFromText(text: string): Promise<MealSuggestion>
 
 export async function generateShareableRecipe(
   mealId: string,
-  userId: string
+  householdId: string
 ): Promise<ShareActionResult> {
+  // Round 4: scope by household, not user. Any member can generate a
+  // share text for a meal that belongs to their household.
   const meal = await db.query.meals.findFirst({
-    where: and(eq(meals.id, mealId), eq(meals.userId, userId), isNull(meals.archivedAt))
+    where: and(eq(meals.id, mealId), eq(meals.householdId, householdId), isNull(meals.archivedAt))
   });
 
   if (!meal) {
@@ -56,7 +58,7 @@ export async function generateShareableRecipe(
   }
 
   const latestLog = await db.query.mealLogs.findFirst({
-    where: and(eq(mealLogs.mealId, mealId), eq(mealLogs.userId, userId), isNull(mealLogs.deletedAt)),
+    where: and(eq(mealLogs.mealId, mealId), eq(mealLogs.householdId, householdId), isNull(mealLogs.deletedAt)),
     orderBy: desc(mealLogs.cookedAt)
   });
 

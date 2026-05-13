@@ -9,6 +9,7 @@ let _mealMutationLimiter: Ratelimit | null = null;
 let _aiCallLimiter: Ratelimit | null = null;
 let _uploadPresignLimiter: Ratelimit | null = null;
 let _feedbackLimiter: Ratelimit | null = null;
+let _invitationLimiter: Ratelimit | null = null;
 
 function getRedis(): Redis {
   if (!_redis) {
@@ -90,5 +91,28 @@ export async function checkFeedbackLimit(userId: string): Promise<void> {
   const { success } = await getFeedbackLimiter().limit(userId);
   if (!success) {
     throw new Error("Too many feedback submissions in a short time. Please try again later.");
+  }
+}
+
+function getInvitationLimiter(): Ratelimit {
+  if (!_invitationLimiter) {
+    // Hard daily cap is enforced at the DB layer (10 invitations created
+    // per owner per day in services/households.ts). This limiter is the
+    // brute-force throttle that fires faster — 20 calls per hour. A
+    // legitimate owner sending invites in a burst won't hit it; a
+    // scripted abuse path will.
+    _invitationLimiter = new Ratelimit({
+      redis: getRedis(),
+      limiter: Ratelimit.slidingWindow(20, "1 h"),
+      prefix: "rl:invitation"
+    });
+  }
+  return _invitationLimiter;
+}
+
+export async function checkInvitationLimit(userId: string): Promise<void> {
+  const { success } = await getInvitationLimiter().limit(userId);
+  if (!success) {
+    throw new Error("Too many invitations sent in a short time. Please try again later.");
   }
 }

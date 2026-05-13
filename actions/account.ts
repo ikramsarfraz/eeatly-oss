@@ -4,10 +4,12 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { requireCurrentUser } from "@/lib/auth/session";
+import { OwnerAccountDeletionBlockedError } from "@/lib/errors/households";
 import { logger } from "@/lib/observability/logger";
 import { getRequestId } from "@/lib/observability/request-id";
 import { checkMealMutationLimit } from "@/lib/security/rate-limit";
 import { deleteUserAccount } from "@/services/account";
+import { userOwnsMultiMemberHousehold } from "@/services/households";
 
 const CONFIRMATION_PHRASE = "delete my account";
 
@@ -34,6 +36,15 @@ export async function deleteAccountAction(confirmationPhrase: string) {
     throw new Error(
       `Type "${CONFIRMATION_PHRASE}" exactly to confirm.`
     );
+  }
+
+  // Round-4 guard: owners of multi-member households can't be deleted
+  // without first transferring ownership — cascade-deleting the user
+  // would orphan or wipe the household for the remaining members. The
+  // UI surfaces the OwnerAccountDeletionBlockedError.code to show a
+  // dedicated message with a "contact support" link.
+  if (await userOwnsMultiMemberHousehold(user.id)) {
+    throw new OwnerAccountDeletionBlockedError();
   }
 
   const requestId = (await getRequestId()) ?? undefined;

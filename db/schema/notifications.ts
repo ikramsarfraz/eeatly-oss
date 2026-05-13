@@ -13,7 +13,8 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "rediscovery",
   "neglected_meal",
   "weekly_recap",
-  "system"
+  "system",
+  "household_invitation"
 ]);
 
 // In-app notifications surfaced via the topbar bell. Created server-side

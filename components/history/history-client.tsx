@@ -26,6 +26,7 @@ type HistoryClientProps = {
   page: number;
   pageSize: number;
   filters: HistoryFilters;
+  currentUserId: string;
   stats: {
     thisYear: number;
     thisMonth: number;
@@ -55,6 +56,7 @@ export function HistoryClient({
   page,
   pageSize,
   filters,
+  currentUserId,
   stats,
   counts
 }: HistoryClientProps) {
@@ -131,11 +133,17 @@ export function HistoryClient({
       {initialRows.length === 0 ? (
         <EmptyHistory tab={filters.tab} />
       ) : bp === "mobile" ? (
-        <HistoryCards rows={initialRows} />
+        <HistoryCards rows={initialRows} currentUserId={currentUserId} />
       ) : bp === "tablet" ? (
-        <HistoryRows rows={initialRows} />
+        <HistoryRows rows={initialRows} currentUserId={currentUserId} />
       ) : (
-        <HistoryTable rows={initialRows} sort={filters.sort} dir={filters.dir} onSort={setSort} />
+        <HistoryTable
+          rows={initialRows}
+          sort={filters.sort}
+          dir={filters.dir}
+          onSort={setSort}
+          currentUserId={currentUserId}
+        />
       )}
 
       {initialRows.length > 0 ? (

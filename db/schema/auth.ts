@@ -6,9 +6,15 @@ import {
   pgTable,
   text,
   timestamp,
-  uniqueIndex
+  uniqueIndex,
+  uuid
 } from "drizzle-orm/pg-core";
 import { effortLevelEnum } from "./meals";
+// NOTE: no runtime import of `./households` here. households.ts imports
+// users from this file; reciprocating creates a circular type reference
+// that TS can't resolve for inferred PgTable shapes. The FK from
+// preferred_household_id → households.id is declared at the SQL layer in
+// migration 0014 instead — Drizzle relations are decorative, not required.
 
 export const userRoleEnum = pgEnum("user_role", [
   "root_app_user",
@@ -30,7 +36,13 @@ export const users = pgTable("user", {
   emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
   role: userRoleEnum("role").notNull().default("root_app_user"),
-  preferredTenantId: text("preferred_tenant_id"),
+  // Round 4 households: each user belongs to exactly one household.
+  // Nullable so account creation can land before the membership row is
+  // inserted (onboarding bootstraps the household, then sets this).
+  // Renamed from the unused `preferred_tenant_id` scaffold. The FK to
+  // households.id is declared in migration 0014 (not here, to avoid the
+  // auth↔households TS circular import).
+  preferredHouseholdId: uuid("preferred_household_id"),
   betaCohort: betaCohortEnum("beta_cohort"),
   // Set when the user explicitly completes the onboarding card. Authoritative
   // source for "did this user finish onboarding" — analytics events

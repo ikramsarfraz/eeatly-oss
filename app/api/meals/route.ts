@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireApiUser } from "@/lib/auth/session";
+import { getCurrentHousehold, requireApiUser } from "@/lib/auth/session";
 import { trackMealLogLifecycleEvent } from "@/lib/observability/funnel";
 import { logger } from "@/lib/observability/logger";
 import { checkMealMutationLimit } from "@/lib/security/rate-limit";
@@ -13,7 +13,8 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const meals = await getDashboardMeals(user.id);
+  const household = await getCurrentHousehold(user.id);
+  const meals = await getDashboardMeals(user.id, household.id);
 
   return NextResponse.json(meals);
 }
@@ -45,8 +46,17 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { mealLog, mealLogCount } = await createMealLog(user.id, parsed.data);
-    logger.info("api_meal_log_created", { userId: user.id, mealLogId: mealLog?.id });
+    const household = await getCurrentHousehold(user.id);
+    const { mealLog, mealLogCount } = await createMealLog(
+      user.id,
+      household.id,
+      parsed.data
+    );
+    logger.info("api_meal_log_created", {
+      userId: user.id,
+      householdId: household.id,
+      mealLogId: mealLog?.id
+    });
     trackMealLogLifecycleEvent({
       userId: user.id,
       mealLogCount,

@@ -10,15 +10,20 @@ import {
 } from "@/components/ui/card";
 import { DeleteAccountCard } from "@/components/account/delete-account-card";
 import { ExportDataCard } from "@/components/account/export-data-card";
+import { HouseholdCard } from "@/components/account/household-card";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog";
 import { PreferencesCard } from "@/components/account/preferences-card";
 import { SignOutButton } from "@/components/layout/sign-out-button";
-import { users } from "@/db/schema";
-import { requireCurrentUser } from "@/lib/auth/session";
+import { households, users } from "@/db/schema";
+import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
 import { db } from "@/lib/db/client";
+import {
+  listHouseholdMembers,
+  listPendingInvitations
+} from "@/services/households";
 
 export default async function SettingsPage() {
-  const user = await requireCurrentUser();
+  const { user, household } = await requireCurrentUserWithHousehold();
 
   // Pull the captured onboarding habits so the preferences card can show
   // them. A null row would mean a user predating the columns — UI treats
@@ -31,6 +36,18 @@ export default async function SettingsPage() {
     .from(users)
     .where(eq(users.id, user.id))
     .limit(1);
+
+  // Household data: owner pointer, members, pending invitations.
+  const [ownerRow] = await db
+    .select({ ownerId: households.ownerId })
+    .from(households)
+    .where(eq(households.id, household.id))
+    .limit(1);
+  const isOwner = ownerRow?.ownerId === user.id;
+  const [members, invitations] = await Promise.all([
+    listHouseholdMembers(household.id),
+    isOwner ? listPendingInvitations(household.id) : Promise.resolve([])
+  ]);
 
   return (
     <div className="grid max-w-3xl gap-5 pb-20 md:pb-0">
@@ -63,13 +80,32 @@ export default async function SettingsPage() {
         weeknightEffort={prefsRow?.weeknightEffort ?? null}
       />
 
+      <HouseholdCard
+        householdName={household.name}
+        currentUserId={user.id}
+        isOwner={isOwner}
+        members={members.map((m) => ({
+          userId: m.userId,
+          name: m.name,
+          email: m.email,
+          role: m.role,
+          joinedAt: m.joinedAt.toISOString()
+        }))}
+        invitations={invitations.map((i) => ({
+          id: i.id,
+          email: i.email,
+          createdAt: i.createdAt.toISOString(),
+          expiresAt: i.expiresAt.toISOString()
+        }))}
+      />
+
       <Card>
         <CardHeader>
           <CardTitle>Your cooking history</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
-          Your cooking history is private to your account. eeatly uses it to help you
-          remember meals you love and suggest what to cook again.
+          Your cooking history is shared with everyone in your kitchen. eeatly uses it
+          to help your household remember meals you all love and suggest what to cook again.
         </CardContent>
       </Card>
 

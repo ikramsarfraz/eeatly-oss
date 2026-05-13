@@ -9,6 +9,7 @@ import {
   uniqueIndex,
   uuid
 } from "drizzle-orm/pg-core";
+import { households } from "./households";
 import { users } from "./auth";
 
 export const effortLevelEnum = pgEnum("effort_level", [
@@ -22,9 +23,21 @@ export const meals = pgTable(
   "meals",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    userId: text("user_id")
+    // Round 4 households: meals scope to a household, not a single user.
+    // TS shape reflects the POST-0016 schema. If this code is deployed
+    // before all three round-4 migrations have run, inserts will reject
+    // (the live DB still has user_id NOT NULL with no default).
+    // APPLY 0014 + 0015 + 0016 BEFORE DEPLOYING this code.
+    householdId: uuid("household_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => households.id, { onDelete: "cascade" }),
+    // Attribution: who first added this recipe to the household. Set on
+    // insert only; never overwritten when other members cook the meal.
+    // ON DELETE SET NULL so removing a member doesn't cascade-delete
+    // recipes other members still want.
+    createdByUserId: text("created_by_user_id").references(() => users.id, {
+      onDelete: "set null"
+    }),
     name: text("name").notNull(),
     normalizedName: text("normalized_name").notNull(),
     photoUrl: text("photo_url"),
@@ -36,12 +49,21 @@ export const meals = pgTable(
     archivedAt: timestamp("archived_at", { withTimezone: true })
   },
   (table) => ({
-    userMealIdx: uniqueIndex("meals_user_normalized_name_idx").on(
-      table.userId,
+    // Round 4: unique scope moved to (householdId, normalizedName). Two
+    // members in the same household can't add the same recipe twice;
+    // two households can both have "Soy ginger noodles" with no conflict.
+    householdMealIdx: uniqueIndex("meals_household_normalized_name_idx").on(
+      table.householdId,
       table.normalizedName
     ),
-    userUpdatedAtIdx: index("meals_user_updated_at_idx").on(table.userId, table.updatedAt),
-    userArchivedAtIdx: index("meals_user_archived_at_idx").on(table.userId, table.archivedAt)
+    householdUpdatedAtIdx: index("meals_household_updated_at_idx").on(
+      table.householdId,
+      table.updatedAt
+    ),
+    householdArchivedAtIdx: index("meals_household_archived_at_idx").on(
+      table.householdId,
+      table.archivedAt
+    )
   })
 );
 
@@ -52,7 +74,14 @@ export const mealLogs = pgTable(
     mealId: uuid("meal_id")
       .notNull()
       .references(() => meals.id, { onDelete: "cascade" }),
-    userId: text("user_id")
+    // Round 4 households: logs scope to a household + carry attribution
+    // for who actually cooked the meal. cookedByUserId is renamed from
+    // user_id in migration 0014 (preserves existing data + indexes).
+    // POST-0016 state: NOT NULL.
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id, { onDelete: "cascade" }),
+    cookedByUserId: text("cooked_by_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     effortLevel: effortLevelEnum("effort_level").notNull(),
@@ -64,16 +93,22 @@ export const mealLogs = pgTable(
     deletedAt: timestamp("deleted_at", { withTimezone: true })
   },
   (table) => ({
+    // Index names retain the pre-rename "user" stem — Postgres index names
+    // are independent of column references, so renaming is hygiene-only
+    // and intentionally deferred.
     userCookedAtIdx: index("meal_logs_user_cooked_at_idx").on(
-      table.userId,
+      table.cookedByUserId,
       table.cookedAt
     ),
     userMealCookedAtIdx: index("meal_logs_user_meal_cooked_at_idx").on(
-      table.userId,
+      table.cookedByUserId,
       table.mealId,
       table.cookedAt
     ),
-    userEffortIdx: index("meal_logs_user_effort_idx").on(table.userId, table.effortLevel),
+    userEffortIdx: index("meal_logs_user_effort_idx").on(
+      table.cookedByUserId,
+      table.effortLevel
+    ),
     mealCookedAtIdx: index("meal_logs_meal_cooked_at_idx").on(
       table.mealId,
       table.cookedAt
@@ -82,9 +117,13 @@ export const mealLogs = pgTable(
 );
 
 export const mealRelations = relations(meals, ({ many, one }) => ({
-  user: one(users, {
-    fields: [meals.userId],
+  creator: one(users, {
+    fields: [meals.createdByUserId],
     references: [users.id]
+  }),
+  household: one(households, {
+    fields: [meals.householdId],
+    references: [households.id]
   }),
   logs: many(mealLogs)
 }));
@@ -94,8 +133,12 @@ export const mealLogRelations = relations(mealLogs, ({ one }) => ({
     fields: [mealLogs.mealId],
     references: [meals.id]
   }),
-  user: one(users, {
-    fields: [mealLogs.userId],
+  cookedBy: one(users, {
+    fields: [mealLogs.cookedByUserId],
     references: [users.id]
+  }),
+  household: one(households, {
+    fields: [mealLogs.householdId],
+    references: [households.id]
   })
 }));

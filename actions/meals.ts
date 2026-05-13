@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireCurrentUser } from "@/lib/auth/session";
+import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
 import { trackMealLogLifecycleEvent } from "@/lib/observability/funnel";
 import { logger } from "@/lib/observability/logger";
 import { checkMealMutationLimit } from "@/lib/security/rate-limit";
@@ -19,24 +19,23 @@ export async function getDashboardMealsAction(options?: {
   suggestionLimit?: number;
   recentMealsLimit?: number;
 }) {
-  const user = await requireCurrentUser();
-
-  return getDashboardMeals(user.id, options);
+  const { user, household } = await requireCurrentUserWithHousehold();
+  return getDashboardMeals(user.id, household.id, options);
 }
 
 export async function getHistoryRowsAction(options?: HistoryListOptions) {
-  const user = await requireCurrentUser();
-  return getHistoryRows(user.id, options);
+  const { user, household } = await requireCurrentUserWithHousehold();
+  return getHistoryRows(user.id, household.id, options);
 }
 
 export async function createMealLogAction(
   input: MealLogInput,
   options?: { source?: "quick_log" | "log_again" }
 ) {
-  const user = await requireCurrentUser();
+  const { user, household } = await requireCurrentUserWithHousehold();
   await checkMealMutationLimit(user.id);
 
-  const { mealLog, mealLogCount } = await createMealLog(user.id, input);
+  const { mealLog, mealLogCount } = await createMealLog(user.id, household.id, input);
 
   revalidatePath("/dashboard");
   revalidatePath("/history");
@@ -87,11 +86,15 @@ export async function createMealLogAction(
 }
 
 export async function deleteMealLogAction(logId: string): Promise<void> {
-  const user = await requireCurrentUser();
+  const { user, household } = await requireCurrentUserWithHousehold();
   await checkMealMutationLimit(user.id);
-  await deleteMealLog(user.id, logId);
+  await deleteMealLog(user.id, household.id, logId);
   revalidatePath("/dashboard");
   revalidatePath("/history");
   revalidatePath("/ideas");
-  logger.info("meal_log_deleted", { userId: user.id, logId });
+  logger.info("meal_log_deleted", {
+    userId: user.id,
+    householdId: household.id,
+    logId
+  });
 }

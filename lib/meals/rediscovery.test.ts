@@ -22,7 +22,9 @@ function recent(overrides: Partial<RecentMeal> = {}): RecentMeal {
     cookedAt: overrides.cookedAt ?? "2026-05-10",
     effortLevel: overrides.effortLevel ?? "easy",
     notes: overrides.notes ?? null,
-    photoUrl: overrides.photoUrl ?? null
+    photoUrl: overrides.photoUrl ?? null,
+    cookedByUserId: overrides.cookedByUserId ?? "user-1",
+    cookedByName: overrides.cookedByName ?? "Test Cook"
   };
 }
 

@@ -41,9 +41,17 @@ export function DeleteAccountCard() {
       if (message.includes("NEXT_REDIRECT")) return;
 
       setPending(false);
+      // Round-4 guard: owners of multi-member households get a dedicated
+      // toast pointing at the resolution path. The action throws
+      // `OwnerAccountDeletionBlockedError`, but server actions don't
+      // preserve the class across the boundary — match on the message
+      // prefix the class uses.
+      const isOwnerBlocked = message.startsWith("You own a household");
       showToast({
         variant: "error",
-        title: "Couldn't delete your account",
+        title: isOwnerBlocked
+          ? "Can't delete your account yet"
+          : "Couldn't delete your account",
         description: message
       });
     }

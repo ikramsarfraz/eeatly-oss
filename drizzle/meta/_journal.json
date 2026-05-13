@@ -99,6 +99,27 @@
       "when": 1778691523354,
       "tag": "0013_wide_killmonger",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1778691600000,
+      "tag": "0014_households_structural",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1778691601000,
+      "tag": "0015_households_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1778691602000,
+      "tag": "0016_households_tighten",
+      "breakpoints": true
     }
   ]
 }
