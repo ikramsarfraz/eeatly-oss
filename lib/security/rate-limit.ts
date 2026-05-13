@@ -7,6 +7,8 @@ import { getServerEnv } from "@/lib/env/server";
 let _redis: Redis | null = null;
 let _mealMutationLimiter: Ratelimit | null = null;
 let _aiCallLimiter: Ratelimit | null = null;
+let _uploadPresignLimiter: Ratelimit | null = null;
+let _feedbackLimiter: Ratelimit | null = null;
 
 function getRedis(): Redis {
   if (!_redis) {
@@ -41,6 +43,28 @@ function getAiCallLimiter(): Ratelimit {
   return _aiCallLimiter;
 }
 
+function getUploadPresignLimiter(): Ratelimit {
+  if (!_uploadPresignLimiter) {
+    _uploadPresignLimiter = new Ratelimit({
+      redis: getRedis(),
+      limiter: Ratelimit.slidingWindow(30, "5 m"),
+      prefix: "rl:upload-presign"
+    });
+  }
+  return _uploadPresignLimiter;
+}
+
+function getFeedbackLimiter(): Ratelimit {
+  if (!_feedbackLimiter) {
+    _feedbackLimiter = new Ratelimit({
+      redis: getRedis(),
+      limiter: Ratelimit.slidingWindow(10, "1 h"),
+      prefix: "rl:feedback"
+    });
+  }
+  return _feedbackLimiter;
+}
+
 export async function checkMealMutationLimit(userId: string): Promise<void> {
   const { success } = await getMealMutationLimiter().limit(userId);
   if (!success) {
@@ -52,5 +76,19 @@ export async function checkAiCallLimit(userId: string): Promise<void> {
   const { success } = await getAiCallLimiter().limit(userId);
   if (!success) {
     throw new Error("You've hit your daily AI limit. Try again tomorrow.");
+  }
+}
+
+export async function checkUploadPresignLimit(userId: string): Promise<void> {
+  const { success } = await getUploadPresignLimiter().limit(userId);
+  if (!success) {
+    throw new Error("Too many upload requests. Please wait a few minutes and try again.");
+  }
+}
+
+export async function checkFeedbackLimit(userId: string): Promise<void> {
+  const { success } = await getFeedbackLimiter().limit(userId);
+  if (!success) {
+    throw new Error("Too many feedback submissions in a short time. Please try again later.");
   }
 }

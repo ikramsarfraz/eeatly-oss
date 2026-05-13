@@ -3,13 +3,13 @@
 import { logger } from "@/lib/observability/logger";
 import { trackActivationFunnelEvent } from "@/lib/observability/funnel";
 import { requireCurrentUser } from "@/lib/auth/session";
-import { checkMealMutationLimit } from "@/lib/security/rate-limit";
+import { checkFeedbackLimit } from "@/lib/security/rate-limit";
 import { createBetaFeedback } from "@/services/feedback";
 import type { FeedbackInput } from "@/lib/validators/feedback";
 
 export async function submitFeedbackAction(input: FeedbackInput) {
   const user = await requireCurrentUser();
-  await checkMealMutationLimit(user.id);
+  await checkFeedbackLimit(user.id);
 
   const feedback = await createBetaFeedback(user.id, input);
   logger.info("beta_feedback_submitted", {
