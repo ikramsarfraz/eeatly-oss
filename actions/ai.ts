@@ -1,6 +1,6 @@
 "use server";
 
-import { requireCurrentUser } from "@/lib/auth/session";
+import { requireCurrentUser, requireCurrentUserWithHousehold } from "@/lib/auth/session";
 import { checkAiCallLimit } from "@/lib/security/rate-limit";
 import { generateShareableRecipe, suggestMealFromImage, suggestMealFromText } from "@/services/ai";
 import type { MealSuggestion, ShareActionResult } from "@/types";
@@ -37,7 +37,7 @@ export async function suggestFromTextAction(text: string): Promise<MealSuggestio
 }
 
 export async function generateShareAction(mealId: string): Promise<ShareActionResult> {
-  const user = await requireCurrentUser();
+  const { user, household } = await requireCurrentUserWithHousehold();
 
   try {
     await checkAiCallLimit(user.id);
@@ -46,7 +46,7 @@ export async function generateShareAction(mealId: string): Promise<ShareActionRe
   }
 
   try {
-    return await generateShareableRecipe(mealId, user.id);
+    return await generateShareableRecipe(mealId, household.id);
   } catch {
     return { ok: false, code: "AI_ERROR", message: "Something went wrong. Please try again." };
   }

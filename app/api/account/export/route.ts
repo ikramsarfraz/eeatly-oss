@@ -39,7 +39,7 @@ export async function GET() {
       })
       .from(mealLogs)
       .innerJoin(meals, eq(mealLogs.mealId, meals.id))
-      .where(and(eq(mealLogs.userId, user.id), isNull(mealLogs.deletedAt)))
+      .where(and(eq(mealLogs.cookedByUserId, user.id), isNull(mealLogs.deletedAt)))
       .orderBy(desc(mealLogs.cookedAt));
 
     const csv = toCsv(rows);

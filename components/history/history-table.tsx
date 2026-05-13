@@ -13,9 +13,16 @@ type HistoryTableProps = {
   sort: HistorySortField;
   dir: HistorySortDir;
   onSort: (field: HistorySortField) => void;
+  currentUserId: string;
 };
 
-export function HistoryTable({ rows, sort, dir, onSort }: HistoryTableProps) {
+export function HistoryTable({
+  rows,
+  sort,
+  dir,
+  onSort,
+  currentUserId
+}: HistoryTableProps) {
   const groups = groupByMonth(rows);
 
   return (
@@ -57,6 +64,11 @@ export function HistoryTable({ rows, sort, dir, onSort }: HistoryTableProps) {
                 <div className="truncate text-[14px] font-medium text-foreground">
                   {row.mealName}
                 </div>
+                {row.cookedByName && row.cookedByUserId !== currentUserId ? (
+                  <div className="truncate text-[11.5px] text-muted-foreground">
+                    by {row.cookedByName}
+                  </div>
+                ) : null}
               </div>
               <div className="text-[12.5px]">
                 <div className="font-mono-brand text-foreground">

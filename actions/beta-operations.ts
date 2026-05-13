@@ -63,7 +63,7 @@ async function lastMealTimestamp(userId: string) {
   const [row] = await db
     .select({ lastAt: max(mealLogs.createdAt) })
     .from(mealLogs)
-    .where(eq(mealLogs.userId, userId));
+    .where(eq(mealLogs.cookedByUserId, userId));
 
   return row?.lastAt ?? null;
 }

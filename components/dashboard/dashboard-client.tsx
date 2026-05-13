@@ -14,9 +14,11 @@ import { useDashboardMeals } from "@/hooks/use-dashboard-meals";
 import type { DashboardMeals } from "@/types";
 
 export function DashboardClient({
-  initialData
+  initialData,
+  currentUserId
 }: {
   initialData: DashboardMeals;
+  currentUserId: string;
 }) {
   const { data, isError, isFetching } = useDashboardMeals(initialData);
   const meals = data ?? initialData;
@@ -219,7 +221,7 @@ export function DashboardClient({
           </h2>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <RecentHistoryList meals={meals.recentMeals} />
+          <RecentHistoryList meals={meals.recentMeals} currentUserId={currentUserId} />
           <MealStatsList title="Most cooked" meals={meals.mostCookedMeals} />
           <MealStatsList title="Not cooked recently" meals={meals.neglectedMeals} />
         </div>

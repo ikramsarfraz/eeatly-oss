@@ -6,6 +6,7 @@ import { logEmailDelivery } from "@/lib/email/delivery-log";
 import { eeatlyEmailTags, recordOutboundEmailFromApiSend } from "@/services/email-delivery";
 import { getResendClient } from "@/lib/email/resend-client";
 import { FirstMealEncouragementEmail } from "@/lib/email/templates/first-meal-encouragement-email";
+import { HouseholdInvitationEmail } from "@/lib/email/templates/household-invitation-email";
 import { InactiveReminderEmail } from "@/lib/email/templates/inactive-reminder-email";
 import { WelcomeEmail } from "@/lib/email/templates/welcome-email";
 import { WeeklyRecapEmail } from "@/lib/email/templates/weekly-recap-email";
@@ -16,7 +17,8 @@ export type TransactionalTemplate =
   | "welcome"
   | "first_meal_encouragement"
   | "inactive_reminder"
-  | "weekly_recap_placeholder";
+  | "weekly_recap_placeholder"
+  | "household_invitation";
 
 export type TransactionalEmailResult = {
   skipped: boolean;
@@ -34,6 +36,13 @@ export type DispatchTransactionalEmailInput = {
   daysQuiet?: number | null;
   /** Weekly recap placeholder line */
   recapTeaser?: string;
+  /** For household_invitation — passed straight into the template. */
+  invitation?: {
+    inviterName: string;
+    householdName: string;
+    inviteUrl: string;
+    expiresInDays: number;
+  };
   /**
    * When true, record `reminder_email_sent` for analytics (non-blocking).
    * All templates use the same event with a `template` metadata key for filtering.
@@ -102,6 +111,22 @@ export async function dispatchTransactionalEmail(
           input.recapTeaser ?? "Your personalized recap stitches together recent logs automatically."
       });
       break;
+
+    case "household_invitation": {
+      if (!input.invitation) {
+        // Required payload missing — return a skipped result rather than
+        // hitting Resend with a template the caller didn't fully populate.
+        // Treat as a programmer error; the action layer should never get
+        // here unless the wiring is wrong.
+        logger.error("transactional_email_invitation_missing_payload", {
+          toEmail: input.toEmail
+        });
+        return { skipped: true, detail: "Invitation payload missing" };
+      }
+      subject = `${input.invitation.inviterName} invited you to ${input.invitation.householdName} on eeatly`;
+      element = React.createElement(HouseholdInvitationEmail, input.invitation);
+      break;
+    }
 
     default:
       return { skipped: true, detail: "Unknown template" };

@@ -17,11 +17,22 @@ export function useDashboardMeals(initialData?: DashboardMeals) {
   });
 }
 
-export function useCreateMealLog(options?: { source?: "quick_log" | "log_again" }) {
+export function useCreateMealLog(options?: {
+  source?: "quick_log" | "log_again";
+  /**
+   * Current user info for the optimistic row's attribution fields. The
+   * renderer hides "by X" when cookedByUserId matches the viewer — passing
+   * the viewer's id keeps the optimistic row clean. Optional: when omitted,
+   * the optimistic row uses an empty userId, which means the renderer will
+   * try to render an empty "by " until the server response invalidates.
+   */
+  cookedBy?: { userId: string; name: string };
+}) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (input: MealLogInput) => createMealLogAction(input, options),
+    mutationFn: (input: MealLogInput) =>
+      createMealLogAction(input, { source: options?.source }),
     onMutate: async (input) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.meals.dashboard() });
       const previous = queryClient.getQueryData<DashboardMeals>(queryKeys.meals.dashboard());
@@ -34,7 +45,9 @@ export function useCreateMealLog(options?: { source?: "quick_log" | "log_again" 
           cookedAt: input.cookedDate,
           effortLevel: input.effortLevel,
           notes: input.notes || null,
-          photoUrl: input.photoUrl || null
+          photoUrl: input.photoUrl || null,
+          cookedByUserId: options?.cookedBy?.userId ?? "",
+          cookedByName: options?.cookedBy?.name ?? ""
         };
 
         const existingStat = previous.mostCookedMeals.find(

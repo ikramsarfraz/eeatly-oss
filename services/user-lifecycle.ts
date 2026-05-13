@@ -51,12 +51,12 @@ export async function listOperationalUserRows(
 
   const mealAgg = db
     .select({
-      userId: mealLogs.userId,
+      userId: mealLogs.cookedByUserId,
       mealCount: sql<number>`count(${mealLogs.id})::int`,
       lastMealAt: sql<Date | null>`max(${mealLogs.createdAt})`
     })
     .from(mealLogs)
-    .groupBy(mealLogs.userId)
+    .groupBy(mealLogs.cookedByUserId)
     .as("meal_agg");
 
   const feedbackAgg = db

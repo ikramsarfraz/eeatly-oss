@@ -6,7 +6,13 @@ import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { MealThumb } from "@/components/dashboard/meal-thumb";
 import type { HistoryRow } from "@/services/meals";
 
-export function HistoryRows({ rows }: { rows: HistoryRow[] }) {
+export function HistoryRows({
+  rows,
+  currentUserId
+}: {
+  rows: HistoryRow[];
+  currentUserId: string;
+}) {
   const groups = groupByMonth(rows);
 
   return (
@@ -37,6 +43,11 @@ export function HistoryRows({ rows }: { rows: HistoryRow[] }) {
                   <div className="truncate text-[14px] font-medium text-foreground">
                     {row.mealName}
                   </div>
+                  {row.cookedByName && row.cookedByUserId !== currentUserId ? (
+                    <div className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
+                      by {row.cookedByName}
+                    </div>
+                  ) : null}
                   {row.notes ? (
                     <div className="mt-0.5 truncate text-[12px] text-muted-foreground">
                       {row.notes}

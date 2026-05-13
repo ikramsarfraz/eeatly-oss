@@ -60,16 +60,16 @@ export async function getAdminAnalyticsSummary() {
     .where(and(inArray(analyticsEvents.name, onboardingEventNamesForInArray), isNotNull(analyticsEvents.userId)));
 
   const [firstMealsUsersRow] = await db
-    .select({ value: sql<number>`count(distinct ${mealLogs.userId})::int` })
+    .select({ value: sql<number>`count(distinct ${mealLogs.cookedByUserId})::int` })
     .from(mealLogs);
 
   const [secondMealsUsersRow] = await db
     .select({
       value: sql<number>`(
         SELECT COUNT(*)::int FROM (
-          SELECT ${mealLogs.userId}
+          SELECT ${mealLogs.cookedByUserId}
           FROM ${mealLogs}
-          GROUP BY ${mealLogs.userId}
+          GROUP BY ${mealLogs.cookedByUserId}
           HAVING COUNT(${mealLogs.id}) > 1
         ) repeat_log_users
       )`.mapWith(Number)
@@ -158,9 +158,9 @@ export async function getAdminAnalyticsSummary() {
     .select({
       value: sql<number>`(
         SELECT COUNT(*)::int FROM (
-          SELECT ${mealLogs.userId}
+          SELECT ${mealLogs.cookedByUserId}
           FROM ${mealLogs}
-          GROUP BY ${mealLogs.userId}
+          GROUP BY ${mealLogs.cookedByUserId}
           HAVING COUNT(${mealLogs.id}) >= 3
         ) heavy_loggers
       )`.mapWith(Number)
@@ -171,7 +171,7 @@ export async function getAdminAnalyticsSummary() {
   const usersNoMealsSubquery = db
     .select({ id: mealLogs.id })
     .from(mealLogs)
-    .where(eq(mealLogs.userId, users.id))
+    .where(eq(mealLogs.cookedByUserId, users.id))
     .limit(1);
 
   const [usersNoMealsRow] = await db
@@ -180,12 +180,12 @@ export async function getAdminAnalyticsSummary() {
     .where(notExists(usersNoMealsSubquery));
 
   const [weeklyMealUsersRow] = await db
-    .select({ value: sql<number>`count(distinct ${mealLogs.userId})::int` })
+    .select({ value: sql<number>`count(distinct ${mealLogs.cookedByUserId})::int` })
     .from(mealLogs)
     .where(gte(mealLogs.createdAt, weekAgo));
 
   const [todayMealUsersRow] = await db
-    .select({ value: sql<number>`count(distinct ${mealLogs.userId})::int` })
+    .select({ value: sql<number>`count(distinct ${mealLogs.cookedByUserId})::int` })
     .from(mealLogs)
     .where(gte(mealLogs.createdAt, today));
 

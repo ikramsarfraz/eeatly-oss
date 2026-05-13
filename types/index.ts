@@ -14,6 +14,9 @@ export type RecentMeal = {
   effortLevel: EffortLevel;
   notes: string | null;
   photoUrl: string | null;
+  /** Round-4 attribution: who logged this cook. Present on log rows. */
+  cookedByUserId: string;
+  cookedByName: string;
 };
 
 export type MealStat = {

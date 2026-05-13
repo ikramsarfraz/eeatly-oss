@@ -6,7 +6,13 @@ import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { MealThumb } from "@/components/dashboard/meal-thumb";
 import type { HistoryRow } from "@/services/meals";
 
-export function HistoryCards({ rows }: { rows: HistoryRow[] }) {
+export function HistoryCards({
+  rows,
+  currentUserId
+}: {
+  rows: HistoryRow[];
+  currentUserId: string;
+}) {
   const groups = groupByMonth(rows);
 
   return (
@@ -39,6 +45,9 @@ export function HistoryCards({ rows }: { rows: HistoryRow[] }) {
                     <p className="mt-0.5 text-[11.5px] text-muted-foreground">
                       {format(parseISO(row.cookedAt), "MMM d")} ·{" "}
                       {formatDistanceToNow(parseISO(row.cookedAt), { addSuffix: true })}
+                      {row.cookedByName && row.cookedByUserId !== currentUserId ? (
+                        <span> · by {row.cookedByName}</span>
+                      ) : null}
                     </p>
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
                       <EffortPill level={row.effortLevel} compact />

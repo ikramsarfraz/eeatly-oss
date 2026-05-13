@@ -2,24 +2,32 @@ import "server-only";
 
 import { and, count, desc, eq, inArray, isNull, max, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
+import { requireHouseholdMember } from "@/lib/auth/session";
 import { withSuggestions } from "@/lib/meals/rediscovery";
 import { normalizeMealName } from "@/lib/utils";
 import { mealLogInputSchema, type MealLogInput } from "@/lib/validators/meals";
-import { mealLogs, meals } from "@/db/schema";
+import { mealLogs, meals, users } from "@/db/schema";
 import type { DashboardMeals, MealStat, RecentMeal } from "@/types";
 
-function scopeMealsToUser(userId: string) {
-  return and(eq(meals.userId, userId), isNull(meals.archivedAt));
+// Round-4 scopes are household-level. The first arg of every public service
+// fn is the calling user's id (for the membership check); the second is the
+// household id the request targets. requireHouseholdMember runs at the top
+// of each so cross-household access fails fast with a logged error.
+function scopeMealsToHousehold(householdId: string) {
+  return and(eq(meals.householdId, householdId), isNull(meals.archivedAt));
 }
 
-function activeMealLogsForUser(userId: string) {
-  return and(eq(mealLogs.userId, userId), isNull(mealLogs.deletedAt));
+function activeMealLogsForHousehold(householdId: string) {
+  return and(eq(mealLogs.householdId, householdId), isNull(mealLogs.deletedAt));
 }
 
 export async function getDashboardMeals(
   userId: string,
+  householdId: string,
   options?: { suggestionLimit?: number; recentMealsLimit?: number }
 ): Promise<DashboardMeals> {
+  await requireHouseholdMember(userId, householdId);
+
   const recentLimit = options?.recentMealsLimit ?? 10;
 
   // Run all three independent queries in parallel — the original code
@@ -35,11 +43,14 @@ export async function getDashboardMeals(
         cookedAt: mealLogs.cookedAt,
         effortLevel: mealLogs.effortLevel,
         notes: mealLogs.notes,
-        photoUrl: sql<string | null>`coalesce(${mealLogs.photoUrl}, ${meals.photoUrl})`
+        photoUrl: sql<string | null>`coalesce(${mealLogs.photoUrl}, ${meals.photoUrl})`,
+        cookedByUserId: mealLogs.cookedByUserId,
+        cookedByName: users.name
       })
       .from(mealLogs)
       .innerJoin(meals, eq(mealLogs.mealId, meals.id))
-      .where(activeMealLogsForUser(userId))
+      .innerJoin(users, eq(users.id, mealLogs.cookedByUserId))
+      .where(activeMealLogsForHousehold(householdId))
       .orderBy(desc(mealLogs.cookedAt))
       .limit(recentLimit),
 
@@ -55,7 +66,7 @@ export async function getDashboardMeals(
       })
       .from(meals)
       .innerJoin(mealLogs, and(eq(mealLogs.mealId, meals.id), isNull(mealLogs.deletedAt)))
-      .where(scopeMealsToUser(userId))
+      .where(scopeMealsToHousehold(householdId))
       .groupBy(meals.id)
       .orderBy(desc(count(mealLogs.id)))
       .limit(6),
@@ -72,7 +83,7 @@ export async function getDashboardMeals(
       })
       .from(meals)
       .leftJoin(mealLogs, and(eq(mealLogs.mealId, meals.id), isNull(mealLogs.deletedAt)))
-      .where(scopeMealsToUser(userId))
+      .where(scopeMealsToHousehold(householdId))
       .groupBy(meals.id)
       .orderBy(sql`max(${mealLogs.cookedAt}) asc nulls first`)
       .limit(18)
@@ -104,10 +115,16 @@ export async function getDashboardMeals(
   );
 }
 
-export async function createMealLog(userId: string, input: MealLogInput): Promise<{
+export async function createMealLog(
+  userId: string,
+  householdId: string,
+  input: MealLogInput
+): Promise<{
   mealLog: (typeof mealLogs.$inferSelect) | undefined;
   mealLogCount: number;
 }> {
+  await requireHouseholdMember(userId, householdId);
+
   const payload = mealLogInputSchema.parse(input);
   const normalizedName = normalizeMealName(payload.mealName);
   const photoUrl = payload.photoUrl || null;
@@ -116,8 +133,11 @@ export async function createMealLog(userId: string, input: MealLogInput): Promis
   const recipeSourceUrl = payload.recipeSourceUrl !== undefined ? (payload.recipeSourceUrl.trim() || null) : undefined;
 
   return db.transaction(async (tx) => {
+    // Match against the household's existing meal by normalized name —
+    // the post-0016 unique index is (household_id, normalized_name), so
+    // any duplicate is the right one to merge into.
     const existingMeal = await tx.query.meals.findFirst({
-      where: and(scopeMealsToUser(userId), eq(meals.normalizedName, normalizedName))
+      where: and(scopeMealsToHousehold(householdId), eq(meals.normalizedName, normalizedName))
     });
 
     const meal =
@@ -126,7 +146,11 @@ export async function createMealLog(userId: string, input: MealLogInput): Promis
         await tx
           .insert(meals)
           .values({
-            userId,
+            householdId,
+            // Attribution: who first added this recipe to the household.
+            // Set only on insert; never overwritten on subsequent logs by
+            // other household members.
+            createdByUserId: userId,
             name: payload.mealName,
             normalizedName,
             photoUrl,
@@ -151,13 +175,16 @@ export async function createMealLog(userId: string, input: MealLogInput): Promis
           updatedAt: new Date()
         })
         .where(eq(meals.id, existingMeal.id));
+      // NB: existingMeal.createdByUserId is preserved — attribution sticks
+      // with the first member who added this recipe.
     }
 
     const [log] = await tx
       .insert(mealLogs)
       .values({
         mealId: meal.id,
-        userId,
+        householdId,
+        cookedByUserId: userId,
         effortLevel: payload.effortLevel,
         notes,
         cookedAt: payload.cookedDate,
@@ -165,10 +192,16 @@ export async function createMealLog(userId: string, input: MealLogInput): Promis
       })
       .returning();
 
+    // mealLogCount is per-USER for activation funnel events (first / second
+    // meal milestones in actions/meals.ts). Household-scoped wouldn't work
+    // — a new member joining a multi-user household would never see "first
+    // meal" because someone else already logged one.
     const [mealLogCountRow] = await tx
       .select({ value: count(mealLogs.id) })
       .from(mealLogs)
-      .where(activeMealLogsForUser(userId));
+      .where(
+        and(eq(mealLogs.cookedByUserId, userId), isNull(mealLogs.deletedAt))
+      );
 
     const mealLogCount = Number(mealLogCountRow?.value ?? 0);
 
@@ -191,6 +224,13 @@ export type HistoryRow = {
   notes: string | null;
   photoUrl: string | null;
   tags: string[];
+  /**
+   * Round-4 attribution. Populated on the `recent` (log-level) tab; null on
+   * aggregate tabs (`most`, `neglected`) where many cooks may share a row.
+   * The UI hides attribution when null OR when the cook is the viewer.
+   */
+  cookedByUserId: string | null;
+  cookedByName: string | null;
 };
 
 export type HistoryListOptions = {
@@ -221,8 +261,11 @@ const DEFAULT_PAGE_SIZE = 20;
  */
 export async function getHistoryRows(
   userId: string,
+  householdId: string,
   options: HistoryListOptions = {}
 ): Promise<{ rows: HistoryRow[]; total: number; page: number; pageSize: number }> {
+  await requireHouseholdMember(userId, householdId);
+
   const tab = options.tab ?? "recent";
   const sort = options.sort ?? "date";
   const dir = options.dir ?? "desc";
@@ -231,7 +274,7 @@ export async function getHistoryRows(
   const offset = (page - 1) * pageSize;
 
   const baseFilters = [
-    activeMealLogsForUser(userId),
+    activeMealLogsForHousehold(householdId),
     options.effortLevels && options.effortLevels.length > 0
       ? inArray(mealLogs.effortLevel, [...options.effortLevels])
       : undefined,
@@ -241,7 +284,7 @@ export async function getHistoryRows(
     options.q && options.q.trim().length > 0
       ? sql`(lower(${meals.name}) like ${`%${options.q.trim().toLowerCase()}%`} or lower(coalesce(${mealLogs.notes}, '')) like ${`%${options.q.trim().toLowerCase()}%`})`
       : undefined
-  ].filter(Boolean) as ReturnType<typeof activeMealLogsForUser>[];
+  ].filter(Boolean) as ReturnType<typeof activeMealLogsForHousehold>[];
 
   const where = baseFilters.length === 1 ? baseFilters[0] : and(...baseFilters);
 
@@ -264,10 +307,13 @@ export async function getHistoryRows(
           cookedAt: mealLogs.cookedAt,
           effortLevel: mealLogs.effortLevel,
           notes: mealLogs.notes,
-          photoUrl: sql<string | null>`coalesce(${mealLogs.photoUrl}, ${meals.photoUrl})`
+          photoUrl: sql<string | null>`coalesce(${mealLogs.photoUrl}, ${meals.photoUrl})`,
+          cookedByUserId: mealLogs.cookedByUserId,
+          cookedByName: users.name
         })
         .from(mealLogs)
         .innerJoin(meals, eq(mealLogs.mealId, meals.id))
+        .innerJoin(users, eq(users.id, mealLogs.cookedByUserId))
         .where(where)
         .orderBy(orderClause)
         .limit(pageSize)
@@ -287,7 +333,9 @@ export async function getHistoryRows(
       effortLevel: r.effortLevel,
       notes: r.notes,
       photoUrl: r.photoUrl,
-      tags: []
+      tags: [],
+      cookedByUserId: r.cookedByUserId,
+      cookedByName: r.cookedByName
     }));
 
     return {
@@ -362,7 +410,10 @@ export async function getHistoryRows(
     effortLevel: "easy",
     notes: null,
     photoUrl: r.photoUrl,
-    tags: []
+    tags: [],
+    // Aggregate rows span multiple cooks — no single attribution makes sense.
+    cookedByUserId: null,
+    cookedByName: null
   }));
 
   return {
@@ -378,12 +429,17 @@ export async function getHistoryRows(
  * from `getHistoryRows` so the page can fire row fetch + stats in parallel
  * without coupling their SQL shape.
  */
-export async function getHistoryStats(userId: string): Promise<{
+export async function getHistoryStats(
+  userId: string,
+  householdId: string
+): Promise<{
   thisYear: number;
   thisMonth: number;
   neglectedCount: number;
   counts: { recent: number; most: number; neglected: number };
 }> {
+  await requireHouseholdMember(userId, householdId);
+
   const [statsRow, mealAggRows] = await Promise.all([
     db
       .select({
@@ -392,7 +448,7 @@ export async function getHistoryStats(userId: string): Promise<{
         totalLogs: count(mealLogs.id)
       })
       .from(mealLogs)
-      .where(activeMealLogsForUser(userId)),
+      .where(activeMealLogsForHousehold(householdId)),
     db
       .select({
         mealId: meals.id,
@@ -404,7 +460,7 @@ export async function getHistoryStats(userId: string): Promise<{
         mealLogs,
         and(eq(mealLogs.mealId, meals.id), isNull(mealLogs.deletedAt))
       )
-      .where(scopeMealsToUser(userId))
+      .where(scopeMealsToHousehold(householdId))
       .groupBy(meals.id)
   ]);
 
@@ -431,14 +487,25 @@ export async function getHistoryStats(userId: string): Promise<{
   };
 }
 
-export async function deleteMealLog(userId: string, logId: string): Promise<void> {
+export async function deleteMealLog(
+  userId: string,
+  householdId: string,
+  logId: string
+): Promise<void> {
+  await requireHouseholdMember(userId, householdId);
+
+  // Household trust model: any member can delete any log in the shared
+  // kitchen. Authorization is "user is in this household AND log is in
+  // this household." Notably NOT scoped to cookedByUserId — that would
+  // be cook-only deletion, which can be added later if households want
+  // that policy.
   const [updated] = await db
     .update(mealLogs)
     .set({ deletedAt: new Date(), updatedAt: new Date() })
     .where(
       and(
         eq(mealLogs.id, logId),
-        eq(mealLogs.userId, userId),
+        eq(mealLogs.householdId, householdId),
         isNull(mealLogs.deletedAt)
       )
     )
