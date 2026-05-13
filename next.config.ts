@@ -1,10 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // typedRoutes intentionally disabled — it regenerates route type metadata
-  // on every HMR pass, contributing to Turbopack's async-hooks Map pressure
-  // in dev. Existing `as Route` casts still typecheck cleanly without it.
-  typedRoutes: false,
+  typedRoutes: true,
   async headers() {
     return [
       {
