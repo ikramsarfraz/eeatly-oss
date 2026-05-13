@@ -1,6 +1,32 @@
 import type { Metadata, Viewport } from "next";
+import { Inter, Instrument_Serif, JetBrains_Mono } from "next/font/google";
 import { getPublicEnv } from "@/lib/env/public";
 import "./globals.css";
+
+// Self-hosted via next/font — no Google Fonts CDN dependency, font files are
+// inlined into the HTML bundle, and the CSS variables below are consumed
+// from globals.css.
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-sans-loaded",
+  display: "swap"
+});
+
+const instrumentSerif = Instrument_Serif({
+  subsets: ["latin"],
+  weight: ["400"],
+  style: ["normal", "italic"],
+  variable: "--font-serif-loaded",
+  display: "swap"
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-mono-loaded",
+  display: "swap"
+});
 
 // NEXT_PUBLIC_APP_URL must be set to the production origin in Vercel env vars.
 // The localhost fallback is only for local development.
@@ -53,17 +79,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body>{children}</body>
+    <html
+      lang="en"
+      className={`${inter.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable}`}
+    >
+      <body>
+        {/* Keyboard accessibility: jump straight to content without
+            tab-walking the sidebar/topbar on every page. The target is
+            the <main> element rendered by each layout/page. */}
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:bg-foreground focus:px-3 focus:py-2 focus:text-sm focus:text-background focus:shadow-md focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          Skip to content
+        </a>
+        {children}
+      </body>
     </html>
   );
 }

@@ -40,7 +40,11 @@ export function AppShell({
                 <Separator orientation="vertical" className="mr-2 h-4 md:max-lg:hidden" />
                 <AppBreadcrumb />
               </header>
-              <main className="flex-1 px-8 py-7 pb-20 max-md:px-4 max-md:py-5 max-md:pb-28">
+              <main
+                id="main"
+                tabIndex={-1}
+                className="flex-1 px-8 py-7 pb-20 max-md:px-4 max-md:py-5 max-md:pb-28"
+              >
                 {children}
               </main>
               <BottomTabBar />

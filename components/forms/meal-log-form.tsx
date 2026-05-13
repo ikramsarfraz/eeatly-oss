@@ -256,7 +256,7 @@ export function MealLogForm({ onSuccess, initialMealName, autoFocusRecipe }: Mea
           className={cn(
             "rounded-lg border px-3 py-2 text-[12.5px]",
             aiNotice.confidence === "low"
-              ? "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
+              ? "border-amber-300 bg-amber-50 text-amber-800"
               : "border-primary/20 bg-primary/10 text-primary"
           )}
         >
