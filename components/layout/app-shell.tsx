@@ -13,6 +13,7 @@ import { BreadcrumbLabelProvider } from "@/components/breadcrumb-label-provider"
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AppBreadcrumb } from "@/components/layout/app-breadcrumb";
 import { BottomTabBar } from "@/components/layout/bottom-tab-bar";
+import { NotificationBell } from "@/components/layout/notification-bell";
 import { TabletRailEnforcer } from "@/components/layout/tablet-rail-enforcer";
 import { QuickLogProvider } from "@/components/dashboard/quick-log-provider";
 import type { AppUser } from "@/lib/auth/session";
@@ -39,6 +40,9 @@ export function AppShell({
                 />
                 <Separator orientation="vertical" className="mr-2 h-4 md:max-lg:hidden" />
                 <AppBreadcrumb />
+                <div className="ml-auto flex items-center gap-1">
+                  <NotificationBell />
+                </div>
               </header>
               <main
                 id="main"
