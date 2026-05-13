@@ -9,7 +9,9 @@ import type { DashboardMeals, MealStat, RecentMeal } from "@/types";
 export function useDashboardMeals(initialData?: DashboardMeals) {
   return useQuery({
     queryKey: queryKeys.meals.dashboard(),
-    queryFn: getDashboardMealsAction,
+    // Wrap the action so TanStack's queryFn context (a single object arg) doesn't
+    // collide with the action's optional options-object parameter.
+    queryFn: () => getDashboardMealsAction(),
     staleTime: 30_000,
     initialData
   });

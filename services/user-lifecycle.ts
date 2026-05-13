@@ -77,6 +77,7 @@ export async function listOperationalUserRows(
       name: users.name,
       signupAt: users.createdAt,
       betaCohort: users.betaCohort,
+      onboardingCompletedAt: users.onboardingCompletedAt,
       mealCount: sql<number>`coalesce(${mealAgg.mealCount}, 0)::int`,
       lastMealAt: mealAgg.lastMealAt,
       feedbackCount: sql<number>`coalesce(${feedbackAgg.feedbackCount}, 0)::int`
@@ -120,7 +121,10 @@ export async function listOperationalUserRows(
       mealCount,
       lastMealAt,
       feedbackCount: Number(row.feedbackCount ?? 0),
-      onboardingCompleted: onboarded.has(row.userId),
+      // Trust the column when set; fall back to historical analytics events
+      // so users who completed onboarding before this column existed still
+      // count as onboarded.
+      onboardingCompleted: row.onboardingCompletedAt !== null || onboarded.has(row.userId),
       retentionStatus
     };
   });

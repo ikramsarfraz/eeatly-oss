@@ -10,7 +10,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getDashboardMealsAction } from "@/actions/meals";
 
 export default async function HistoryPage() {
-  const meals = await getDashboardMealsAction();
+  // The dashboard's 10-log cap is too tight for the dedicated history page.
+  // 100 covers active users for months; proper paginated load-more is a
+  // follow-up once we see real usage past 100.
+  const meals = await getDashboardMealsAction({ recentMealsLimit: 100 });
 
   return (
     <div className="grid gap-4 pb-20 md:gap-5 md:pb-0">

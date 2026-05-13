@@ -1,16 +1,8 @@
 import Link from "next/link";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
-import { cn } from "@/lib/utils";
+import { MealThumb } from "@/components/dashboard/meal-thumb";
 import type { MealStat } from "@/types";
-
-const thumbColors = [
-  "bg-gradient-to-br from-[#d3c0a8] to-[#a8946d]",
-  "bg-gradient-to-br from-[#b6cbb3] to-[#6b8869]",
-  "bg-gradient-to-br from-[#f0d4ba] to-[#d28a52]",
-  "bg-gradient-to-br from-[#d4c9b0] to-[#8c7a4d]",
-  "bg-gradient-to-br from-[#cdd8c8] to-[#7a9272]"
-];
 
 export function MealStatsList({
   title,
@@ -57,13 +49,11 @@ export function MealStatsList({
               key={meal.mealId}
               className="grid grid-cols-[44px_1fr_auto] items-center gap-3 border-b px-[18px] py-[11px] last:border-0 hover:bg-[var(--surface-2)]"
             >
-              {/* Thumbnail */}
-              <div
-                aria-hidden="true"
-                className={cn(
-                  "h-11 w-11 shrink-0 rounded-[9px]",
-                  thumbColors[i % thumbColors.length]
-                )}
+              {/* Thumbnail — photo if uploaded, gradient fallback otherwise */}
+              <MealThumb
+                photoUrl={meal.photoUrl}
+                mealName={meal.mealName}
+                fallbackIndex={i}
               />
 
               {/* Info */}

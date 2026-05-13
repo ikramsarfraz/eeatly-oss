@@ -8,10 +8,13 @@ import { checkMealMutationLimit } from "@/lib/security/rate-limit";
 import { createMealLog, deleteMealLog, getDashboardMeals } from "@/services/meals";
 import type { MealLogInput } from "@/lib/validators/meals";
 
-export async function getDashboardMealsAction() {
+export async function getDashboardMealsAction(options?: {
+  suggestionLimit?: number;
+  recentMealsLimit?: number;
+}) {
   const user = await requireCurrentUser();
 
-  return getDashboardMeals(user.id);
+  return getDashboardMeals(user.id, options);
 }
 
 export async function createMealLogAction(
@@ -25,6 +28,7 @@ export async function createMealLogAction(
 
   revalidatePath("/dashboard");
   revalidatePath("/history");
+  revalidatePath("/ideas");
   logger.info("meal_log_created", { userId: user.id, mealLogId: mealLog?.id });
   trackMealLogLifecycleEvent({
     userId: user.id,
@@ -41,4 +45,5 @@ export async function deleteMealLogAction(logId: string): Promise<void> {
   await deleteMealLog(user.id, logId);
   revalidatePath("/dashboard");
   revalidatePath("/history");
+  revalidatePath("/ideas");
 }

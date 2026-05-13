@@ -31,6 +31,9 @@ export function DashboardClient({
 
   const [timeLabel, setTimeLabel] = useState("");
   useEffect(() => {
+    // Deferred to client to avoid SSR/client hydration mismatch on the time
+    // display in the hero eyebrow pill.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTimeLabel(
       new Date().toLocaleTimeString("en-US", {
         hour: "numeric",

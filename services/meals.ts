@@ -16,7 +16,12 @@ function activeMealLogsForUser(userId: string) {
   return and(eq(mealLogs.userId, userId), isNull(mealLogs.deletedAt));
 }
 
-export async function getDashboardMeals(userId: string): Promise<DashboardMeals> {
+export async function getDashboardMeals(
+  userId: string,
+  options?: { suggestionLimit?: number; recentMealsLimit?: number }
+): Promise<DashboardMeals> {
+  const recentLimit = options?.recentMealsLimit ?? 10;
+
   const recentMeals = await db
     .select({
       id: mealLogs.id,
@@ -31,7 +36,7 @@ export async function getDashboardMeals(userId: string): Promise<DashboardMeals>
     .innerJoin(meals, eq(mealLogs.mealId, meals.id))
     .where(activeMealLogsForUser(userId))
     .orderBy(desc(mealLogs.cookedAt))
-    .limit(10);
+    .limit(recentLimit);
 
   const [mostCookedStats, neglectedStats] = await Promise.all([
     db
@@ -87,7 +92,12 @@ export async function getDashboardMeals(userId: string): Promise<DashboardMeals>
     .slice(0, 6)
     .map(toMealStat);
 
-  return withSuggestions(recentMeals as RecentMeal[], mostCookedMeals, neglectedMeals);
+  return withSuggestions(
+    recentMeals as RecentMeal[],
+    mostCookedMeals,
+    neglectedMeals,
+    options?.suggestionLimit
+  );
 }
 
 export async function createMealLog(userId: string, input: MealLogInput): Promise<{
