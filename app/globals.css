@@ -123,3 +123,13 @@ select {
 .font-mono-brand {
   font-family: var(--font-mono-val);
 }
+
+/* Suppress iOS auto-zoom on input focus.
+   Safari zooms when a focused field is < 16px; force 16px on phone widths. */
+@media (max-width: 599px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

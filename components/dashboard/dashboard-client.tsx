@@ -47,7 +47,7 @@ export function DashboardClient({
       <section className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
         {/* Hero card */}
         <div
-          className="relative overflow-hidden rounded-[20px] border bg-[var(--surface)] p-7 sm:p-8"
+          className="relative overflow-hidden rounded-[20px] border bg-[var(--surface)] p-5 sm:p-7"
           style={{ boxShadow: "var(--shadow-md)" }}
         >
           {/* Decorative radial */}
@@ -70,7 +70,7 @@ export function DashboardClient({
           </span>
 
           {/* Serif headline */}
-          <h1 className="relative mb-[14px] max-w-[520px] font-serif text-[46px] font-normal leading-[1.12] tracking-[-0.015em] max-[820px]:text-[36px]">
+          <h1 className="relative mb-[14px] max-w-[520px] font-serif text-[44px] font-normal leading-[1.12] tracking-[-0.015em] max-[820px]:text-[32px]">
             What should I cook <em className="italic text-primary">tonight?</em>
           </h1>
 
@@ -165,7 +165,7 @@ export function DashboardClient({
 
         {/* Quick log card */}
         <div
-          className="flex flex-col gap-3 rounded-[20px] border bg-[var(--surface)] p-[22px] pb-[18px] lg:sticky lg:top-[76px] lg:self-start"
+          className="flex flex-col gap-3 rounded-[20px] border bg-[var(--surface)] p-[18px] sm:p-[22px] sm:pb-[18px] lg:sticky lg:top-[76px] lg:self-start"
           style={{ boxShadow: "var(--shadow-md)" }}
         >
           <div className="flex items-center justify-between gap-2">

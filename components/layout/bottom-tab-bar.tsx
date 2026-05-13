@@ -82,6 +82,7 @@ function TabLink({ tab, active }: { tab: TabItem; active: boolean }) {
   return (
     <Link
       href={tab.href}
+      aria-current={active ? "page" : undefined}
       className={cn(
         "flex flex-col items-center gap-[3px] rounded-[9px] py-1.5 text-[10.5px] font-medium",
         active ? "text-primary" : "text-muted-foreground",
