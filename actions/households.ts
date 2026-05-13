@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
-import { households } from "@/db/schema";
-import { requireCurrentUser, requireCurrentUserWithHousehold } from "@/lib/auth/session";
-import { db } from "@/lib/db/client";
+import {
+  requireCurrentUser,
+  requireCurrentUserWithHousehold,
+  requireHouseholdOwner
+} from "@/lib/auth/session";
 import { dispatchTransactionalEmail } from "@/lib/email/transactional";
 import { getServerEnv } from "@/lib/env/server";
 import {
@@ -104,21 +105,20 @@ export async function createInvitationAction(
 
   const { user, household } = await requireCurrentUserWithHousehold();
 
-  // Ownership check: only the household owner can invite. We could push this
-  // into the service, but verifying here keeps the rate-limit check below
-  // from running for non-owners (a small surface-reduction win).
-  const [owner] = await db
-    .select({ ownerId: households.ownerId })
-    .from(households)
-    .where(eq(households.id, household.id))
-    .limit(1);
-
-  if (owner?.ownerId !== user.id) {
-    return {
-      ok: false,
-      code: "NOT_OWNER",
-      message: "Only the household owner can invite members."
-    };
+  // Ownership check: only the household owner can invite. Done before
+  // the rate-limit check so a non-owner doesn't burn their meal-mutation
+  // budget on an action that would have failed anyway.
+  try {
+    await requireHouseholdOwner(user.id, household.id);
+  } catch (error) {
+    if (error instanceof NotHouseholdOwnerError) {
+      return {
+        ok: false,
+        code: "NOT_OWNER",
+        message: "Only the household owner can invite members."
+      };
+    }
+    throw error;
   }
 
   try {
@@ -285,18 +285,17 @@ export async function revokeInvitationAction(
 
   const { user, household } = await requireCurrentUserWithHousehold();
 
-  const [owner] = await db
-    .select({ ownerId: households.ownerId })
-    .from(households)
-    .where(eq(households.id, household.id))
-    .limit(1);
-
-  if (owner?.ownerId !== user.id) {
-    return {
-      ok: false,
-      code: "NOT_OWNER",
-      message: "Only the household owner can revoke invitations."
-    };
+  try {
+    await requireHouseholdOwner(user.id, household.id);
+  } catch (error) {
+    if (error instanceof NotHouseholdOwnerError) {
+      return {
+        ok: false,
+        code: "NOT_OWNER",
+        message: "Only the household owner can revoke invitations."
+      };
+    }
+    throw error;
   }
 
   try {

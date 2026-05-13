@@ -10,6 +10,7 @@ import { getServerEnv } from "@/lib/env/server";
 import { logger } from "@/lib/observability/logger";
 import { getRequestId } from "@/lib/observability/request-id";
 import { householdMembers, households, users } from "@/db/schema";
+import { NotHouseholdOwnerError } from "@/lib/errors/households";
 import { ensureHouseholdForUser } from "@/services/households";
 import type { UserRole } from "@/types";
 
@@ -200,6 +201,37 @@ export const requireHouseholdMember = cache(
         requestedHouseholdId: householdId
       });
       throw new Error("Not authorized for this household.");
+    }
+  }
+);
+
+/**
+ * Verifies the user is the owner of the given household. Throws
+ * `NotHouseholdOwnerError` if not. Centralizes the inline
+ * `households.ownerId !== userId` comparisons that had spread across the
+ * action layer. Same memoization story as `requireHouseholdMember`.
+ *
+ * Treats "household doesn't exist" as a NOT_OWNER outcome rather than a
+ * separate error — callers are always passing a household id they
+ * resolved via `requireCurrentUserWithHousehold`, so the row must exist
+ * for the calling user; a missing row is either a race or an attack.
+ */
+export const requireHouseholdOwner = cache(
+  async (userId: string, householdId: string): Promise<void> => {
+    const [row] = await db
+      .select({ ownerId: households.ownerId })
+      .from(households)
+      .where(eq(households.id, householdId))
+      .limit(1);
+
+    if (!row || row.ownerId !== userId) {
+      logger.error("unauthorized_household_owner_access", {
+        requestId: (await getRequestId()) ?? undefined,
+        userId,
+        requestedHouseholdId: householdId,
+        actualOwnerId: row?.ownerId ?? null
+      });
+      throw new NotHouseholdOwnerError();
     }
   }
 );

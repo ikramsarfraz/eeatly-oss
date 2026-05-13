@@ -7,6 +7,12 @@ import type { MealSuggestion } from "@/types";
 
 type SupportedMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
 
+// Fallback timeout intentionally longer than the primary's (7s on OpenAI).
+// We've already paid the primary's failure latency before this fires, so
+// "fail fast" doesn't help — we'd rather wait the full budget for an
+// answer than show "both providers down" for a transient blip.
+const FALLBACK_TIMEOUT_MS = 15_000;
+
 const suggestMealTool = {
   name: "suggest_meal",
   description: "Return a structured meal suggestion extracted from the provided image or text.",
@@ -65,7 +71,7 @@ export async function suggestMealFromImage(imageBase64: string, mediaType: strin
         }
       ]
     },
-    { signal: AbortSignal.timeout(15_000) }
+    { signal: AbortSignal.timeout(FALLBACK_TIMEOUT_MS) }
   );
 
   logger.info("ai_provider_tokens", {
@@ -90,7 +96,7 @@ export async function suggestMealFromText(text: string): Promise<MealSuggestion>
       tool_choice: { type: "tool", name: "suggest_meal" },
       messages: [{ role: "user", content: `${SUGGEST_FROM_TEXT_PROMPT}\n\n${text}` }]
     },
-    { signal: AbortSignal.timeout(15_000) }
+    { signal: AbortSignal.timeout(FALLBACK_TIMEOUT_MS) }
   );
 
   logger.info("ai_provider_tokens", {
@@ -122,7 +128,7 @@ export async function generateShareText(
         { role: "user", content: buildSharePrompt(mealName, recipeText, notes, householdName) }
       ]
     },
-    { signal: AbortSignal.timeout(15_000) }
+    { signal: AbortSignal.timeout(FALLBACK_TIMEOUT_MS) }
   );
 
   logger.info("ai_provider_tokens", {

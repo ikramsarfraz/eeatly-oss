@@ -45,8 +45,8 @@ export default async function SettingsPage() {
     .limit(1);
   const isOwner = ownerRow?.ownerId === user.id;
   const [members, invitations] = await Promise.all([
-    listHouseholdMembers(household.id),
-    isOwner ? listPendingInvitations(household.id) : Promise.resolve([])
+    listHouseholdMembers(user.id, household.id),
+    isOwner ? listPendingInvitations(user.id, household.id) : Promise.resolve([])
   ]);
 
   return (

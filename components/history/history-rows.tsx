@@ -4,6 +4,7 @@ import { format, formatDistanceToNow, parseISO } from "date-fns";
 import { EffortPill } from "@/components/history/effort-pill";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { MealThumb } from "@/components/dashboard/meal-thumb";
+import { attributionLabel } from "@/lib/meals/attribution";
 import type { HistoryRow } from "@/services/meals";
 
 export function HistoryRows({
@@ -43,11 +44,12 @@ export function HistoryRows({
                   <div className="truncate text-[14px] font-medium text-foreground">
                     {row.mealName}
                   </div>
-                  {row.cookedByName && row.cookedByUserId !== currentUserId ? (
-                    <div className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
-                      by {row.cookedByName}
-                    </div>
-                  ) : null}
+                  {(() => {
+                    const a = attributionLabel(row.cookedByUserId, row.cookedByName, currentUserId);
+                    return a ? (
+                      <div className="mt-0.5 truncate text-[11.5px] text-muted-foreground">{a}</div>
+                    ) : null;
+                  })()}
                   {row.notes ? (
                     <div className="mt-0.5 truncate text-[12px] text-muted-foreground">
                       {row.notes}

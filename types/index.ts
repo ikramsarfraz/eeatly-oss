@@ -14,9 +14,14 @@ export type RecentMeal = {
   effortLevel: EffortLevel;
   notes: string | null;
   photoUrl: string | null;
-  /** Round-4 attribution: who logged this cook. Present on log rows. */
-  cookedByUserId: string;
-  cookedByName: string;
+  /**
+   * Round-4 attribution: who logged this cook. Both null when the cook's
+   * account has been deleted — the log survives via `ON DELETE SET NULL`
+   * (Round 4.7 / migration 0017) so household history stays intact, and
+   * the UI renders "Former member" in place of the name.
+   */
+  cookedByUserId: string | null;
+  cookedByName: string | null;
 };
 
 export type MealStat = {

@@ -1,0 +1,171 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// Short-circuit the env-validation chain (lib/auth → lib/db/client). The
+// action only needs `requireCurrentUser` at runtime, and the service
+// surfaces are mocked below.
+vi.mock("@/lib/auth", () => ({
+  auth: { api: { getSession: async () => null } }
+}));
+
+vi.mock("@/lib/auth/session", () => ({
+  requireCurrentUser: async () => ({
+    id: "u-1",
+    name: "Alex",
+    email: "alex@example.com",
+    image: null,
+    role: "root_app_user" as const
+  }),
+  requireCurrentUserWithHousehold: async () => ({
+    user: {
+      id: "u-1",
+      name: "Alex",
+      email: "alex@example.com",
+      image: null,
+      role: "root_app_user" as const
+    },
+    household: { id: "h-1", name: "Alex's Kitchen" }
+  })
+}));
+
+const rateLimitMock = vi.hoisted(() => ({
+  checkAiCallLimit: vi.fn<(userId: string) => Promise<void>>()
+}));
+vi.mock("@/lib/security/rate-limit", () => rateLimitMock);
+
+const serviceMock = vi.hoisted(() => ({
+  suggestMealFromImage: vi.fn(),
+  suggestMealFromText: vi.fn(),
+  generateShareableRecipe: vi.fn()
+}));
+vi.mock("@/services/ai", () => serviceMock);
+
+import {
+  suggestFromImageAction,
+  suggestFromTextAction,
+  type SuggestResult
+} from "./ai";
+
+beforeEach(() => {
+  rateLimitMock.checkAiCallLimit.mockReset();
+  rateLimitMock.checkAiCallLimit.mockResolvedValue();
+  serviceMock.suggestMealFromImage.mockReset();
+  serviceMock.suggestMealFromText.mockReset();
+});
+
+function makeImageFormData(opts: { size?: number; type?: string } = {}): FormData {
+  const fd = new FormData();
+  const size = opts.size ?? 64;
+  const type = opts.type ?? "image/jpeg";
+  fd.append("image", new File([new Uint8Array(size)], "x.jpg", { type }));
+  return fd;
+}
+
+describe("suggestFromImageAction discriminated-union surface", () => {
+  it("returns INVALID_INPUT when no file is attached", async () => {
+    const result = await suggestFromImageAction(new FormData());
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("INVALID_INPUT");
+    expect(serviceMock.suggestMealFromImage).not.toHaveBeenCalled();
+  });
+
+  it("returns INVALID_INPUT when the file exceeds the 10 MB cap", async () => {
+    const result = await suggestFromImageAction(
+      makeImageFormData({ size: 11 * 1024 * 1024 })
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("INVALID_INPUT");
+      expect(result.message).toMatch(/under 10 MB/);
+    }
+    expect(serviceMock.suggestMealFromImage).not.toHaveBeenCalled();
+  });
+
+  it("returns RATE_LIMITED when the AI call budget is exhausted", async () => {
+    rateLimitMock.checkAiCallLimit.mockRejectedValueOnce(new Error("rate"));
+    const result = await suggestFromImageAction(makeImageFormData());
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("RATE_LIMITED");
+    // Service must not be called when the limit fires — that's the
+    // entire point of the throttle.
+    expect(serviceMock.suggestMealFromImage).not.toHaveBeenCalled();
+  });
+
+  it("returns INVALID_INPUT for an unsupported media type (service-throw → typed code)", async () => {
+    // The service throws an error containing "unsupported image type" for
+    // non-image MIME types. The action maps that specific message to
+    // INVALID_INPUT (user mistake, not provider failure).
+    serviceMock.suggestMealFromImage.mockRejectedValueOnce(
+      new Error("Unsupported image type: image/tiff")
+    );
+    const result = await suggestFromImageAction(
+      makeImageFormData({ type: "image/tiff" })
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("INVALID_INPUT");
+  });
+
+  it("returns AI_PROVIDER_ERROR when the service throws for non-input reasons", async () => {
+    serviceMock.suggestMealFromImage.mockRejectedValueOnce(
+      new Error("both providers down")
+    );
+    const result = await suggestFromImageAction(makeImageFormData());
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("AI_PROVIDER_ERROR");
+      // We deliberately don't surface the raw provider message to users —
+      // verify the action wrote a generic one.
+      expect(result.message).not.toContain("both providers down");
+    }
+  });
+
+  it("returns ok with the suggestion on success", async () => {
+    const suggestion = {
+      name: "Soy ginger noodles",
+      effortGuess: "easy" as const,
+      notes: "",
+      recipeText: "",
+      confidence: "high" as const
+    };
+    serviceMock.suggestMealFromImage.mockResolvedValueOnce(suggestion);
+
+    const result: SuggestResult = await suggestFromImageAction(makeImageFormData());
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data).toEqual(suggestion);
+  });
+});
+
+describe("suggestFromTextAction discriminated-union surface", () => {
+  it("returns INVALID_INPUT for empty/whitespace text", async () => {
+    const result = await suggestFromTextAction("   ");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("INVALID_INPUT");
+    expect(serviceMock.suggestMealFromText).not.toHaveBeenCalled();
+  });
+
+  it("returns RATE_LIMITED when the budget is exhausted", async () => {
+    rateLimitMock.checkAiCallLimit.mockRejectedValueOnce(new Error("rate"));
+    const result = await suggestFromTextAction("legitimate text");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("RATE_LIMITED");
+  });
+
+  it("returns AI_PROVIDER_ERROR when the service throws", async () => {
+    serviceMock.suggestMealFromText.mockRejectedValueOnce(new Error("provider down"));
+    const result = await suggestFromTextAction("legitimate text");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("AI_PROVIDER_ERROR");
+  });
+
+  it("returns ok with the suggestion on success", async () => {
+    serviceMock.suggestMealFromText.mockResolvedValueOnce({
+      name: "Lasagna",
+      effortGuess: "medium",
+      notes: "",
+      recipeText: "",
+      confidence: "medium"
+    });
+    const result = await suggestFromTextAction("a paragraph about lasagna");
+    expect(result.ok).toBe(true);
+  });
+});
