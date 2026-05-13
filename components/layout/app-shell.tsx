@@ -30,8 +30,8 @@ export function AppShell({
           <QuickLogProvider>
             <AppSidebar user={user} />
             <SidebarInset>
-              <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-                <SidebarTrigger className="-ml-1" />
+              <header className="sticky top-0 z-20 flex h-[60px] shrink-0 items-center gap-2 border-b bg-[color-mix(in_oklab,var(--background)_92%,transparent)] px-4 backdrop-blur-md sm:px-6">
+                <SidebarTrigger className="-ml-1" aria-label="Toggle navigation" />
                 <Separator orientation="vertical" className="mr-2 h-4" />
                 <AppBreadcrumb />
               </header>
