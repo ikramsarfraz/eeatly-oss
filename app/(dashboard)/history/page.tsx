@@ -1,54 +1,105 @@
-import { HistoryTable } from "@/components/dashboard/history-table";
-import { MealStatsList } from "@/components/dashboard/meal-stats-list";
+import type { Metadata } from "next";
+import { requireCurrentUser } from "@/lib/auth/session";
 import {
-  BaseTabs,
-  BaseTabsList,
-  BaseTabsPanel,
-  BaseTabsTab
-} from "@/components/ui/base-tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getDashboardMealsAction } from "@/actions/meals";
+  getHistoryRows,
+  getHistoryStats,
+  type HistoryTab,
+  type HistorySortDir,
+  type HistorySortField
+} from "@/services/meals";
+import { HistoryClient, type HistoryFilters } from "@/components/history/history-client";
+import type { EffortLevel } from "@/types";
 
-export default async function HistoryPage() {
-  // The dashboard's 10-log cap is too tight for the dedicated history page.
-  // 100 covers active users for months; proper paginated load-more is a
-  // follow-up once we see real usage past 100.
-  const meals = await getDashboardMealsAction({ recentMealsLimit: 100 });
+export const metadata: Metadata = {
+  title: "History"
+};
+
+const EFFORT_VALUES: ReadonlyArray<EffortLevel> = ["quick", "easy", "medium", "high_effort"];
+
+function parseTab(raw: string | undefined): HistoryTab {
+  if (raw === "most" || raw === "neglected") return raw;
+  return "recent";
+}
+
+function parseSort(raw: string | undefined): HistorySortField {
+  return raw === "name" ? "name" : "date";
+}
+
+function parseDir(raw: string | undefined): HistorySortDir {
+  return raw === "asc" ? "asc" : "desc";
+}
+
+function parseEffort(raw: string | undefined): EffortLevel[] {
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((v) => v.trim())
+    .filter((v): v is EffortLevel => EFFORT_VALUES.includes(v as EffortLevel));
+}
+
+function parseRange(raw: string | undefined): number | null {
+  if (!raw) return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.min(3650, Math.floor(n));
+}
+
+function parsePage(raw: string | undefined): number {
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1;
+}
+
+export default async function HistoryPage(props: {
+  searchParams: Promise<{
+    tab?: string;
+    sort?: string;
+    dir?: string;
+    q?: string;
+    effort?: string;
+    range?: string;
+    page?: string;
+  }>;
+}) {
+  const user = await requireCurrentUser();
+  const sp = await props.searchParams;
+
+  const filters: HistoryFilters = {
+    tab: parseTab(sp.tab),
+    sort: parseSort(sp.sort),
+    dir: parseDir(sp.dir),
+    q: typeof sp.q === "string" ? sp.q : "",
+    effortLevels: parseEffort(sp.effort),
+    rangeDays: parseRange(sp.range)
+  };
+  const page = parsePage(sp.page);
+
+  const [rowsResult, stats] = await Promise.all([
+    getHistoryRows(user.id, {
+      tab: filters.tab,
+      sort: filters.sort,
+      dir: filters.dir,
+      effortLevels: filters.effortLevels,
+      rangeDays: filters.rangeDays,
+      q: filters.q,
+      page,
+      pageSize: 20
+    }),
+    getHistoryStats(user.id)
+  ]);
 
   return (
-    <div className="grid gap-4 pb-20 md:gap-5 md:pb-0">
-      <div>
-        <p className="text-sm font-medium text-muted-foreground">Cooking history</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-normal">Your meal memory</h1>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Review what you have cooked, spot reliable repeats, and log old favorites again
-          when they come back into rotation.
-        </p>
-      </div>
-
-      <BaseTabs defaultValue="recent">
-        <BaseTabsList>
-          <BaseTabsTab value="recent">Recent</BaseTabsTab>
-          <BaseTabsTab value="most">Most cooked</BaseTabsTab>
-          <BaseTabsTab value="neglected">Neglected</BaseTabsTab>
-        </BaseTabsList>
-        <BaseTabsPanel value="recent">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent logs</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <HistoryTable meals={meals.recentMeals} />
-            </CardContent>
-          </Card>
-        </BaseTabsPanel>
-        <BaseTabsPanel value="most">
-          <MealStatsList title="Most cooked meals" meals={meals.mostCookedMeals} />
-        </BaseTabsPanel>
-        <BaseTabsPanel value="neglected">
-          <MealStatsList title="Meals not cooked recently" meals={meals.neglectedMeals} />
-        </BaseTabsPanel>
-      </BaseTabs>
-    </div>
+    <HistoryClient
+      initialRows={rowsResult.rows}
+      total={rowsResult.total}
+      page={rowsResult.page}
+      pageSize={rowsResult.pageSize}
+      filters={filters}
+      stats={{
+        thisYear: stats.thisYear,
+        thisMonth: stats.thisMonth,
+        neglectedCount: stats.neglectedCount
+      }}
+      counts={stats.counts}
+    />
   );
 }
