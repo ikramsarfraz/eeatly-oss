@@ -94,6 +94,7 @@ export function MealStatsList({
                   mealName={meal.mealName}
                   variant="default"
                   compact
+                  iconOnly
                 />
               )}
             </div>
