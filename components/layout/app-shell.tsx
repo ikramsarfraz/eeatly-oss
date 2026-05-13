@@ -13,6 +13,7 @@ import { BreadcrumbLabelProvider } from "@/components/breadcrumb-label-provider"
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AppBreadcrumb } from "@/components/layout/app-breadcrumb";
 import { BottomTabBar } from "@/components/layout/bottom-tab-bar";
+import { QuickLogDialog } from "@/components/dashboard/quick-log-dialog";
 import type { AppUser } from "@/lib/auth/session";
 
 export function AppShell({
@@ -22,6 +23,20 @@ export function AppShell({
   user: AppUser;
   children: React.ReactNode;
 }) {
+  const [quickLogOpen, setQuickLogOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "e" && event.key !== "E") return;
+      if (!(event.metaKey || event.ctrlKey)) return;
+      if (event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      setQuickLogOpen((open) => !open);
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   return (
     <TooltipProvider>
       <BreadcrumbLabelProvider>
@@ -37,6 +52,7 @@ export function AppShell({
               {children}
             </main>
             <BottomTabBar />
+            <QuickLogDialog open={quickLogOpen} onOpenChange={setQuickLogOpen} />
           </SidebarInset>
         </SidebarProvider>
       </BreadcrumbLabelProvider>
