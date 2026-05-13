@@ -101,22 +101,27 @@ export function RediscoverySuggestions({
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between gap-2 border-t border-[var(--border)] pt-3">
-              {suggestion.daysSinceCooked !== null ? (
-                <div className="flex items-center gap-[5px] text-[11.5px] text-[var(--subtle-fg,#8b948e)]">
-                  <Clock className="h-[11px] w-[11px]" />
-                  Last cooked {formatDaysAgo(suggestion.daysSinceCooked)}
-                </div>
-              ) : (
-                <span />
-              )}
-              <div className="flex flex-wrap items-center gap-2">
-                <LogAgainButton
-                  mealName={suggestion.mealName}
-                  effortLevel={suggestion.effortLevel}
-                  variant="default"
-                  size="sm"
-                />
+            <div className="grid gap-3 border-t border-[var(--border)] pt-3">
+              <LogAgainButton
+                mealName={suggestion.mealName}
+                effortLevel={suggestion.effortLevel}
+                variant="default"
+                size="default"
+                className="w-full"
+                compact
+              />
+              <div className="flex items-center justify-between gap-2">
+                {suggestion.daysSinceCooked !== null ? (
+                  <div className="flex flex-col text-[11.5px] text-[var(--subtle-fg,#8b948e)]">
+                    <span className="flex items-center gap-[5px]">
+                      <Clock className="h-[11px] w-[11px]" />
+                      Last cooked
+                    </span>
+                    <span>{formatDaysAgo(suggestion.daysSinceCooked)}</span>
+                  </div>
+                ) : (
+                  <span />
+                )}
                 <RediscoveryTrackButton suggestion={suggestion} />
               </div>
             </div>
