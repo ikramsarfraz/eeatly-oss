@@ -59,7 +59,7 @@ Core tables live in `db/schema/`:
 - `mealLogs` — one log per cooking event; has `effortLevel` enum: `quick | easy | medium | high_effort`
 - `analytics_events` — in-house event tracking
 - `email_delivery` — Resend webhook delivery receipts
-- `tenants` / `tenant_members` — multi-tenant scaffold present in schema but not active in product logic
+- `users.preferredTenantId` — scaffold column for future multi-tenancy; always null in current product logic. No `tenants` or `tenant_members` table exists yet.
 
 Always run `pnpm db:generate` then `pnpm db:migrate` after schema changes. Never hand-edit files in `drizzle/` (auto-generated migration history).
 

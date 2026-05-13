@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getServerEnv } from "@/lib/env/server";
+import { logger } from "@/lib/observability/logger";
 import type { UserRole } from "@/types";
 
 export type AppUser = {
@@ -31,7 +32,13 @@ export async function getCurrentUser(): Promise<AppUser | null> {
       image: session.user.image,
       role: (session.user.role as UserRole | undefined) ?? "root_app_user"
     };
-  } catch {
+  } catch (error) {
+    // Distinguish "no session" (returns null naturally above) from a real
+    // failure (DB outage, corrupted cookie, Better Auth internal crash).
+    // Silently swallowing both makes outages look like sign-outs.
+    logger.warn("session_lookup_failed", {
+      error: error instanceof Error ? error.message : String(error)
+    });
     return null;
   }
 }
