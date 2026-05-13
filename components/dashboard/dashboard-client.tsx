@@ -209,7 +209,7 @@ export function DashboardClient({
             Your <em className="italic text-[var(--muted-foreground)]">kitchen</em>
           </h2>
         </div>
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <RecentHistoryList meals={meals.recentMeals} />
           <MealStatsList title="Most cooked" meals={meals.mostCookedMeals} />
           <MealStatsList title="Not cooked recently" meals={meals.neglectedMeals} />

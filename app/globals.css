@@ -1,6 +1,14 @@
 @import "tailwindcss";
 
 @theme inline {
+  /* Responsive shell breakpoints from CookLoop Responsive handoff.
+     sm:600 (phablet boundary) / md:820 (sidebar↔sheet, tab bar)
+     / lg:1080 (hero & panels promote) / xl:1280 (desktop). */
+  --breakpoint-sm: 600px;
+  --breakpoint-md: 820px;
+  --breakpoint-lg: 1080px;
+  --breakpoint-xl: 1280px;
+
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-border: var(--sidebar-border);
