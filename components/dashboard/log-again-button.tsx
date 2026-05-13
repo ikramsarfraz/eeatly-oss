@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, RotateCcw } from "lucide-react";
+import { Check, Loader2, RotateCcw } from "lucide-react";
 import { useToast } from "@/components/providers/toast-provider";
 import { Button } from "@/components/ui/button";
 import { useCreateMealLog } from "@/hooks/use-dashboard-meals";
@@ -12,13 +12,19 @@ type LogAgainButtonProps = {
   effortLevel?: EffortLevel | null;
   variant?: "default" | "secondary" | "outline" | "ghost";
   size?: "default" | "sm";
+  compact?: boolean;
+  label?: string;
+  icon?: "rotate" | "check";
 };
 
 export function LogAgainButton({
   mealName,
   effortLevel = "easy",
   variant = "outline",
-  size = "sm"
+  size = "sm",
+  compact = false,
+  label = "Log again",
+  icon = "rotate"
 }: LogAgainButtonProps) {
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const mutation = useCreateMealLog({ source: "log_again" });
@@ -69,17 +75,21 @@ export function LogAgainButton({
       >
         {mutation.isPending ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : icon === "check" ? (
+          <Check className="h-3.5 w-3.5" />
         ) : (
           <RotateCcw className="h-3.5 w-3.5" />
         )}
-        Log again
+        {label}
       </Button>
-      {errorMessage ? (
-        <p className="text-xs text-destructive" role="status">
-          {errorMessage}
-        </p>
-      ) : (
-        <p className="text-[11px] text-muted-foreground">Defaults to today with your last-known effort.</p>
+      {!compact && (
+        errorMessage ? (
+          <p className="text-xs text-destructive" role="status">
+            {errorMessage}
+          </p>
+        ) : (
+          <p className="text-[11px] text-muted-foreground">Defaults to today with your last-known effort.</p>
+        )
       )}
     </div>
   );

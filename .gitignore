@@ -9,3 +9,4 @@ pnpm-lock.yaml.tmp
 dist/
 coverage/
 *.tsbuildinfo
+.vercel

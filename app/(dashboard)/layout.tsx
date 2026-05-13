@@ -15,7 +15,7 @@ export default async function DashboardLayout({
   return (
     <QueryProvider>
       <ToastProvider>
-        <AppShell user={user} canWrite>
+        <AppShell user={user}>
           {children}
         </AppShell>
       </ToastProvider>

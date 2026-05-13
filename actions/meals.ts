@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { requireCurrentUser } from "@/lib/auth/session";
 import { trackMealLogLifecycleEvent } from "@/lib/observability/funnel";
 import { logger } from "@/lib/observability/logger";
-import { checkRateLimit } from "@/lib/security/rate-limit";
-import { createMealLog, getDashboardMeals } from "@/services/meals";
+import { checkMealMutationLimit } from "@/lib/security/rate-limit";
+import { createMealLog, deleteMealLog, getDashboardMeals } from "@/services/meals";
 import type { MealLogInput } from "@/lib/validators/meals";
 
 export async function getDashboardMealsAction() {
@@ -19,15 +19,7 @@ export async function createMealLogAction(
   options?: { source?: "quick_log" | "log_again" }
 ) {
   const user = await requireCurrentUser();
-  const rateLimit = await checkRateLimit({
-    key: `meal-log:${user.id}`,
-    limit: 30,
-    windowMs: 60_000
-  });
-
-  if (!rateLimit.success) {
-    throw new Error("Too many meal logs. Please wait a moment and try again.");
-  }
+  await checkMealMutationLimit(user.id);
 
   const { mealLog, mealLogCount } = await createMealLog(user.id, input);
 
@@ -42,4 +34,11 @@ export async function createMealLogAction(
   });
 
   return { mealLog: { id: mealLog?.id } };
+}
+
+export async function deleteMealLogAction(logId: string): Promise<void> {
+  const user = await requireCurrentUser();
+  await deleteMealLog(user.id, logId);
+  revalidatePath("/dashboard");
+  revalidatePath("/history");
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createMealLogAction, getDashboardMealsAction } from "@/actions/meals";
+import { createMealLogAction, deleteMealLogAction, getDashboardMealsAction } from "@/actions/meals";
 import { queryKeys } from "@/lib/query/keys";
 import type { MealLogInput } from "@/lib/validators/meals";
 import type { DashboardMeals, MealStat, RecentMeal } from "@/types";
@@ -50,7 +50,9 @@ export function useCreateMealLog(options?: { source?: "quick_log" | "log_again" 
               mealName: input.mealName,
               cookCount: 1,
               lastCookedAt: input.cookedDate,
-              photoUrl: input.photoUrl || null
+              photoUrl: input.photoUrl || null,
+              recipeText: null,
+              recipeSourceUrl: null
             };
 
         queryClient.setQueryData<DashboardMeals>(queryKeys.meals.dashboard(), {
@@ -68,6 +70,48 @@ export function useCreateMealLog(options?: { source?: "quick_log" | "log_again" 
       return { previous };
     },
     onError: (_error, _input, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKeys.meals.dashboard(), context.previous);
+      }
+    },
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.meals.all });
+    }
+  });
+}
+
+export function useDeleteMealLog() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (logId: string) => deleteMealLogAction(logId),
+    onMutate: async (logId) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.meals.dashboard() });
+      const previous = queryClient.getQueryData<DashboardMeals>(queryKeys.meals.dashboard());
+
+      if (previous) {
+        const deletedLog = previous.recentMeals.find((m) => m.id === logId);
+
+        const updateStats = (stats: MealStat[]) => {
+          if (!deletedLog) return stats;
+          return stats
+            .map((m) =>
+              m.mealId === deletedLog.mealId ? { ...m, cookCount: m.cookCount - 1 } : m
+            )
+            .filter((m) => m.cookCount > 0);
+        };
+
+        queryClient.setQueryData<DashboardMeals>(queryKeys.meals.dashboard(), {
+          ...previous,
+          recentMeals: previous.recentMeals.filter((m) => m.id !== logId),
+          mostCookedMeals: updateStats(previous.mostCookedMeals),
+          neglectedMeals: updateStats(previous.neglectedMeals)
+        });
+      }
+
+      return { previous };
+    },
+    onError: (_error, _logId, context) => {
       if (context?.previous) {
         queryClient.setQueryData(queryKeys.meals.dashboard(), context.previous);
       }

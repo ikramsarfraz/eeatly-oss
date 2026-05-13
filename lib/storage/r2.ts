@@ -1,13 +1,14 @@
 import "server-only";
 
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { S3Client } from "@aws-sdk/client-s3";
+import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 import { randomUUID } from "node:crypto";
 import { getServerEnv, hasR2Env } from "@/lib/env/server";
 import type { PresignedUploadInput } from "@/lib/validators/meals";
 
 export type PresignedUpload = {
-  uploadUrl: string;
+  url: string;
+  fields: Record<string, string>;
   publicUrl: string;
   key: string;
 };
@@ -41,17 +42,18 @@ export async function createPresignedPhotoUpload(
 
   const extension = input.filename.split(".").pop()?.toLowerCase() ?? "jpg";
   const key = `users/${userId}/meal-photos/${randomUUID()}.${extension}`;
-  const command = new PutObjectCommand({
-    Bucket: env.R2_BUCKET,
+
+  const { url, fields } = await createPresignedPost(getR2Client(), {
+    Bucket: env.R2_BUCKET!,
     Key: key,
-    ContentType: input.contentType
+    Conditions: [
+      ["content-length-range", 1, 10 * 1024 * 1024],
+      ["starts-with", "$Content-Type", "image/"]
+    ],
+    Expires: 60
   });
-  const uploadUrl = await getSignedUrl(getR2Client(), command, { expiresIn: 60 });
+
   const publicUrl = `${env.R2_PUBLIC_BASE_URL!.replace(/\/$/, "")}/${key}`;
 
-  return {
-    uploadUrl,
-    publicUrl,
-    key
-  };
+  return { url, fields, publicUrl, key };
 }

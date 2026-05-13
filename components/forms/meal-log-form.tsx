@@ -4,20 +4,25 @@
 
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Camera, CheckCircle2, Loader2, Plus } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Camera, CheckCircle2, ChevronDown, Loader2, Plus } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { AiSuggestDialog } from "@/components/forms/ai-suggest-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateMealLog } from "@/hooks/use-dashboard-meals";
 import { endpoints, type PresignUploadResponse } from "@/lib/api/endpoints";
+import { queryKeys } from "@/lib/query/keys";
 import { mealLogInputSchema, type MealLogInput } from "@/lib/validators/meals";
 import { cn } from "@/lib/utils";
+import type { DashboardMeals, MealSuggestion } from "@/types";
 
 type MealLogFormProps = {
-  canWrite: boolean;
   onSuccess?: () => void;
+  initialMealName?: string;
+  autoFocusRecipe?: boolean;
 };
 
 const effortOptions: Array<{ value: MealLogInput["effortLevel"]; label: string }> = [
@@ -44,26 +49,76 @@ async function uploadPhoto(file: File) {
     throw new Error(error.error ?? "Photo upload is not available yet.");
   }
 
-  const upload = (await presignResponse.json()) as PresignUploadResponse;
-  const uploadResponse = await fetch(upload.uploadUrl, {
-    method: "PUT",
-    body: file,
-    headers: {
-      "Content-Type": file.type
-    }
+  const { url, fields, publicUrl } = (await presignResponse.json()) as PresignUploadResponse;
+
+  const formData = new FormData();
+  for (const [name, value] of Object.entries(fields)) {
+    formData.append(name, value);
+  }
+  // Content-Type must be an explicit field to satisfy the policy condition.
+  // The file must be appended last — S3/R2 presigned POST requires it.
+  formData.append("Content-Type", file.type);
+  formData.append("file", file);
+
+  const uploadResponse = await fetch(url, {
+    method: "POST",
+    body: formData
   });
 
   if (!uploadResponse.ok) {
     throw new Error("Unable to upload photo.");
   }
 
-  return upload.publicUrl;
+  return publicUrl;
 }
 
-export function MealLogForm({ canWrite, onSuccess }: MealLogFormProps) {
+export function MealLogForm({ onSuccess, initialMealName, autoFocusRecipe }: MealLogFormProps) {
+  const datalistId = React.useId();
+  const queryClient = useQueryClient();
   const [photoFile, setPhotoFile] = React.useState<File | null>(null);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
+  const [isRecipeOpen, setIsRecipeOpen] = React.useState(false);
+  const [aiNotice, setAiNotice] = React.useState<{ confidence: MealSuggestion["confidence"] } | null>(null);
+  const aiNoticeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recipeTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
+
+  const { mealNameSuggestions, mealDetailsByName } = React.useMemo(() => {
+    const cached = queryClient.getQueryData<DashboardMeals>(queryKeys.meals.dashboard());
+    if (!cached) return { mealNameSuggestions: [], mealDetailsByName: new Map<string, { recipeText: string | null; recipeSourceUrl: string | null }>() };
+
+    const seen = new Set<string>();
+    const names: string[] = [];
+    const detailsMap = new Map<string, { recipeText: string | null; recipeSourceUrl: string | null }>();
+
+    const add = (meal: { mealName: string; recipeText?: string | null; recipeSourceUrl?: string | null }) => {
+      const key = meal.mealName.trim().toLowerCase();
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        names.push(meal.mealName);
+      }
+      if (!detailsMap.has(key) && (meal.recipeText !== undefined || meal.recipeSourceUrl !== undefined)) {
+        detailsMap.set(key, {
+          recipeText: meal.recipeText ?? null,
+          recipeSourceUrl: meal.recipeSourceUrl ?? null
+        });
+      }
+    };
+
+    for (const meal of cached.mostCookedMeals) add(meal);
+    for (const meal of cached.neglectedMeals) add(meal);
+    // recentMeals are per-log (no recipe data), add names only
+    for (const meal of cached.recentMeals) {
+      const key = meal.mealName.trim().toLowerCase();
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        names.push(meal.mealName);
+      }
+    }
+
+    return { mealNameSuggestions: names, mealDetailsByName: detailsMap };
+  }, [queryClient]);
+
   const form = useForm<MealLogInput>({
     resolver: zodResolver(mealLogInputSchema),
     defaultValues: {
@@ -71,9 +126,60 @@ export function MealLogForm({ canWrite, onSuccess }: MealLogFormProps) {
       effortLevel: "easy",
       notes: "",
       cookedDate: new Date().toISOString().slice(0, 10),
-      photoUrl: ""
+      photoUrl: "",
+      recipeText: "",
+      recipeSourceUrl: ""
     }
   });
+
+  const mealName = form.watch("mealName");
+
+  function handleSuggestion(suggestion: MealSuggestion) {
+    form.setValue("mealName", suggestion.name, { shouldValidate: true });
+    form.setValue("effortLevel", suggestion.effortGuess, { shouldValidate: true });
+    if (suggestion.notes) form.setValue("notes", suggestion.notes);
+    if (suggestion.recipeText) {
+      form.setValue("recipeText", suggestion.recipeText);
+      setIsRecipeOpen(true);
+    }
+
+    if (aiNoticeTimerRef.current) clearTimeout(aiNoticeTimerRef.current);
+    setAiNotice({ confidence: suggestion.confidence });
+    aiNoticeTimerRef.current = setTimeout(() => setAiNotice(null), 5000);
+  }
+
+  React.useEffect(() => {
+    return () => {
+      if (aiNoticeTimerRef.current) clearTimeout(aiNoticeTimerRef.current);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (initialMealName) {
+      form.setValue("mealName", initialMealName, { shouldValidate: true });
+    }
+  }, [initialMealName, form]);
+
+  React.useEffect(() => {
+    if (autoFocusRecipe) {
+      setIsRecipeOpen(true);
+      const timer = setTimeout(() => recipeTextareaRef.current?.focus(), 80);
+      return () => clearTimeout(timer);
+    }
+  }, [autoFocusRecipe]);
+
+  // Prefill recipe from cache when meal name matches an existing meal
+  React.useEffect(() => {
+    const key = mealName?.trim().toLowerCase();
+    if (!key) return;
+    const details = mealDetailsByName.get(key);
+    if (!details) return;
+    form.setValue("recipeText", details.recipeText ?? "");
+    form.setValue("recipeSourceUrl", details.recipeSourceUrl ?? "");
+    if (details.recipeText || details.recipeSourceUrl) {
+      setIsRecipeOpen(true);
+    }
+  }, [mealName, mealDetailsByName, form]);
 
   const mutation = useCreateMealLog();
   const isSubmitting = form.formState.isSubmitting || mutation.isPending;
@@ -85,10 +191,15 @@ export function MealLogForm({ canWrite, onSuccess }: MealLogFormProps) {
       effortLevel: "easy",
       notes: "",
       cookedDate: new Date().toISOString().slice(0, 10),
-      photoUrl: ""
+      photoUrl: "",
+      recipeText: "",
+      recipeSourceUrl: ""
     });
     setPhotoFile(null);
     setFormError(null);
+    setIsRecipeOpen(false);
+    setAiNotice(null);
+    if (aiNoticeTimerRef.current) clearTimeout(aiNoticeTimerRef.current);
     setSuccessMessage("Logged! Your meal has been saved.");
     onSuccess?.();
   }
@@ -135,11 +246,25 @@ export function MealLogForm({ canWrite, onSuccess }: MealLogFormProps) {
         void handlePersist();
       }}
     >
-      {!canWrite ? (
-        <div className="rounded-lg border bg-muted/60 p-3 text-sm text-muted-foreground">
-          Meal logging isn&apos;t available right now.
+      {/* AI prefill */}
+      <AiSuggestDialog onSuggestion={handleSuggestion} />
+
+      {/* AI notice */}
+      {aiNotice && (
+        <div
+          role="status"
+          className={cn(
+            "rounded-lg border px-3 py-2 text-[12.5px]",
+            aiNotice.confidence === "low"
+              ? "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
+              : "border-primary/20 bg-primary/10 text-primary"
+          )}
+        >
+          {aiNotice.confidence === "low"
+            ? "AI wasn't very confident — please double-check the fields."
+            : "AI-suggested — please review before saving."}
         </div>
-      ) : null}
+      )}
 
       {/* Meal name */}
       <div className="grid gap-[5px]">
@@ -152,9 +277,17 @@ export function MealLogForm({ canWrite, onSuccess }: MealLogFormProps) {
         <Input
           id="mealName"
           placeholder="Lemon herb chicken bowls"
-          disabled={!canWrite || isSubmitting}
+          list={mealNameSuggestions.length > 0 ? datalistId : undefined}
+          disabled={isSubmitting}
           {...form.register("mealName")}
         />
+        {mealNameSuggestions.length > 0 && (
+          <datalist id={datalistId}>
+            {mealNameSuggestions.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+        )}
         {form.formState.errors.mealName ? (
           <p className="text-sm text-destructive">{form.formState.errors.mealName.message}</p>
         ) : null}
@@ -170,7 +303,7 @@ export function MealLogForm({ canWrite, onSuccess }: MealLogFormProps) {
             <button
               key={opt.value}
               type="button"
-              disabled={!canWrite || isSubmitting}
+              disabled={isSubmitting}
               onClick={() =>
                 form.setValue("effortLevel", opt.value, { shouldValidate: true })
               }
@@ -179,7 +312,7 @@ export function MealLogForm({ canWrite, onSuccess }: MealLogFormProps) {
                 selectedEffort === opt.value
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-[var(--border)] bg-[var(--background)] text-[var(--muted-foreground)] hover:border-[var(--border-strong,#cfccc0)] hover:text-foreground",
-                (!canWrite || isSubmitting) && "pointer-events-none opacity-50"
+                isSubmitting && "pointer-events-none opacity-50"
               )}
             >
               <span className="h-[5px] w-[5px] rounded-full bg-current opacity-60" />
@@ -206,7 +339,7 @@ export function MealLogForm({ canWrite, onSuccess }: MealLogFormProps) {
           <Input
             id="cookedDate"
             type="date"
-            disabled={!canWrite || isSubmitting}
+            disabled={isSubmitting}
             {...form.register("cookedDate")}
           />
           {form.formState.errors.cookedDate ? (
@@ -227,7 +360,7 @@ export function MealLogForm({ canWrite, onSuccess }: MealLogFormProps) {
             htmlFor="photo"
             className={cn(
               "flex h-10 cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground ring-offset-background transition-colors hover:border-[var(--border-strong,#cfccc0)] focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
-              (!canWrite || isSubmitting) && "pointer-events-none opacity-50"
+              isSubmitting && "pointer-events-none opacity-50"
             )}
           >
             <Camera className="h-3.5 w-3.5 shrink-0" />
@@ -239,7 +372,7 @@ export function MealLogForm({ canWrite, onSuccess }: MealLogFormProps) {
             id="photo"
             type="file"
             accept="image/*"
-            disabled={!canWrite || isSubmitting}
+            disabled={isSubmitting}
             className="sr-only"
             onChange={(event) => setPhotoFile(event.target.files?.[0] ?? null)}
           />
@@ -260,13 +393,91 @@ export function MealLogForm({ canWrite, onSuccess }: MealLogFormProps) {
         <Textarea
           id="qlNotes"
           placeholder="What made it worth remembering?"
-          disabled={!canWrite || isSubmitting}
+          disabled={isSubmitting}
           className="min-h-[56px] resize-y"
           {...form.register("notes")}
         />
         {form.formState.errors.notes ? (
           <p className="text-sm text-destructive">{form.formState.errors.notes.message}</p>
         ) : null}
+      </div>
+
+      {/* Recipe — collapsible */}
+      <div className="rounded-md border border-[var(--border)]">
+        <button
+          type="button"
+          onClick={() => setIsRecipeOpen((prev) => !prev)}
+          className="flex w-full items-center justify-between px-3 py-2.5 text-left"
+          aria-expanded={isRecipeOpen}
+        >
+          <span className="text-[11.5px] font-medium tracking-[0.02em] text-[var(--muted-foreground)]">
+            Recipe{" "}
+            <span className="font-normal" style={{ color: "var(--subtle-fg, #8b948e)" }}>
+              — optional
+            </span>
+          </span>
+          <ChevronDown
+            className={cn(
+              "h-3.5 w-3.5 text-[var(--muted-foreground)] transition-transform duration-150",
+              isRecipeOpen && "rotate-180"
+            )}
+          />
+        </button>
+
+        {isRecipeOpen && (
+          <div className="grid gap-3 border-t border-[var(--border)] px-3 pb-3 pt-3">
+            <div className="grid gap-[5px]">
+              <label
+                htmlFor="recipeText"
+                className="text-[11.5px] font-medium tracking-[0.02em] text-[var(--muted-foreground)]"
+              >
+                Recipe
+              </label>
+              <Textarea
+                id="recipeText"
+                placeholder="Paste or type the recipe here — ingredients, steps, anything useful."
+                disabled={isSubmitting}
+                className="min-h-[120px] resize-y font-mono text-[12.5px]"
+                {...(() => {
+                  const { ref, ...rest } = form.register("recipeText");
+                  return {
+                    ...rest,
+                    ref: (el: HTMLTextAreaElement | null) => {
+                      ref(el);
+                      recipeTextareaRef.current = el;
+                    }
+                  };
+                })()}
+              />
+              {form.formState.errors.recipeText ? (
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.recipeText.message}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="grid gap-[5px]">
+              <label
+                htmlFor="recipeSourceUrl"
+                className="text-[11.5px] font-medium tracking-[0.02em] text-[var(--muted-foreground)]"
+              >
+                Source URL
+              </label>
+              <Input
+                id="recipeSourceUrl"
+                type="url"
+                placeholder="https://example.com/recipe"
+                disabled={isSubmitting}
+                {...form.register("recipeSourceUrl")}
+              />
+              {form.formState.errors.recipeSourceUrl ? (
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.recipeSourceUrl.message}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        )}
       </div>
 
       {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
@@ -280,7 +491,7 @@ export function MealLogForm({ canWrite, onSuccess }: MealLogFormProps) {
         </div>
       ) : null}
 
-      <Button type="submit" disabled={!canWrite || isSubmitting} className="mt-1">
+      <Button type="submit" disabled={isSubmitting} className="mt-1">
         {isSubmitting ? (
           <Loader2 className="h-4 w-4 animate-spin" />
         ) : (

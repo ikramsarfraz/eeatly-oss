@@ -20,8 +20,10 @@ export type MealStat = {
   mealId: string;
   mealName: string;
   cookCount: number;
-  lastCookedAt: string;
+  lastCookedAt: string | null;
   photoUrl: string | null;
+  recipeText: string | null;
+  recipeSourceUrl: string | null;
 };
 
 export type RediscoverySuggestion = {
@@ -35,6 +37,18 @@ export type RediscoverySuggestion = {
   daysSinceCooked: number | null;
   effortLevel: EffortLevel | null;
   photoUrl: string | null;
+};
+
+export type ShareActionResult =
+  | { ok: true; text: string }
+  | { ok: false; code: "RECIPE_MISSING" | "RATE_LIMITED" | "AI_ERROR"; message: string };
+
+export type MealSuggestion = {
+  name: string;
+  effortGuess: "quick" | "easy" | "medium" | "high_effort";
+  notes: string;
+  recipeText: string;
+  confidence: "high" | "medium" | "low";
 };
 
 export type DashboardMeals = {

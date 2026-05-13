@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
+import type { Route } from "next";
 import { differenceInCalendarDays, parseISO } from "date-fns";
-import { AlertCircle, BookOpen, Check, Loader2, TrendingUp } from "lucide-react";
+import { AlertCircle, BookOpen, Loader2, Sparkles } from "lucide-react";
+import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { MealLogForm } from "@/components/forms/meal-log-form";
 import { OnboardingCard } from "@/components/dashboard/onboarding-card";
 import { RediscoverySuggestions } from "@/components/dashboard/rediscovery-suggestions";
@@ -11,11 +14,9 @@ import { useDashboardMeals } from "@/hooks/use-dashboard-meals";
 import type { DashboardMeals } from "@/types";
 
 export function DashboardClient({
-  initialData,
-  canWrite
+  initialData
 }: {
   initialData: DashboardMeals;
-  canWrite: boolean;
 }) {
   const { data, isError, isFetching } = useDashboardMeals(initialData);
   const meals = data ?? initialData;
@@ -74,23 +75,33 @@ export function DashboardClient({
             What should I cook <em className="italic text-primary">tonight?</em>
           </h1>
 
-          <p className="relative mb-[22px] max-w-[480px] text-[15px] leading-[1.55] text-[var(--muted-foreground)]">
+          <p className="relative mb-[18px] max-w-[480px] text-[15px] leading-[1.55] text-[var(--muted-foreground)]">
             {topSuggestion
               ? `${topSuggestion.mealName} is worth considering — ${topSuggestion.description}`
               : "eeatly gets useful after a few quick logs. Add what you cooked, then come back here when you need an easy answer."}
           </p>
 
           {/* CTAs */}
-          {hasMeals && topSuggestion ? (
-            <div className="relative flex flex-wrap gap-[10px]">
-              <button type="button" className="inline-flex items-center gap-2 rounded-[10px] bg-primary px-[14px] py-[10px] text-[13.5px] font-medium text-primary-foreground transition-colors hover:bg-[#265a48]">
-                <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                Cook this tonight
-              </button>
-              <button type="button" className="inline-flex items-center gap-2 rounded-[8px] px-[10px] py-[7px] text-[13px] text-foreground hover:bg-[var(--surface-2)]">
-                <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
-                Show more ideas
-              </button>
+          {topSuggestion ? (
+            <div className="relative mb-2 flex flex-wrap items-center gap-2">
+              <LogAgainButton
+                mealName={topSuggestion.mealName}
+                effortLevel={topSuggestion.effortLevel}
+                variant="default"
+                size="default"
+                label="Cook this tonight"
+                icon="check"
+                compact
+              />
+              {meals.suggestions.length > 1 ? (
+                <Link
+                  href={"/dashboard#ideas" as Route}
+                  className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-[13px] text-foreground transition-colors hover:bg-[var(--surface-2)]"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Show {meals.suggestions.length - 1} more {meals.suggestions.length - 1 === 1 ? "idea" : "ideas"}
+                </Link>
+              ) : null}
             </div>
           ) : null}
 
@@ -170,15 +181,15 @@ export function DashboardClient({
               ⌘ + Enter
             </span>
           </div>
-          <MealLogForm canWrite={canWrite} />
+          <MealLogForm />
         </div>
       </section>
 
       {/* Rediscovery suggestions */}
       {hasMeals && meals.suggestions.length > 0 ? (
-        <section>
+        <section id="ideas" className="scroll-mt-20">
           <div className="mb-[14px] mt-1 flex items-baseline justify-between">
-            <h2 className="font-serif text-[26px] font-normal tracking-[-0.005em]">
+            <h2 className="font-serif text-[26px] font-normal tracking-[-0.005em] max-md:text-[22px]">
               Ideas <em className="italic text-[var(--muted-foreground)]">for tonight</em>
             </h2>
             <div className="flex items-center gap-3 text-[12px] text-[var(--muted-foreground)]">
@@ -192,7 +203,7 @@ export function DashboardClient({
       {/* Three panels */}
       <section>
         <div className="mb-[14px] mt-1 flex items-baseline justify-between">
-          <h2 className="font-serif text-[26px] font-normal tracking-[-0.005em]">
+          <h2 className="font-serif text-[26px] font-normal tracking-[-0.005em] max-md:text-[22px]">
             Your <em className="italic text-[var(--muted-foreground)]">kitchen</em>
           </h2>
         </div>
