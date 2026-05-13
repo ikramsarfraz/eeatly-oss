@@ -48,7 +48,9 @@ Server Actions handle auth checks, input validation (Zod), rate limiting, path r
 
 ### Auth
 
-Magic links only — no password auth. Session is cached for 5 minutes server-side via Better Auth's cookie cache. Admin access checks `user.role === 'platform_admin'` plus an optional `PLATFORM_ADMIN_HOST` subdomain match. When changing the Better Auth config, run `pnpm auth:generate` to keep the schema in sync.
+Magic links (always on) plus optional Google OAuth. Session is cached for 5 minutes server-side via Better Auth's cookie cache. Admin access checks `user.role === 'platform_admin'` plus an optional `PLATFORM_ADMIN_HOST` subdomain match. When changing the Better Auth config, run `pnpm auth:generate` to keep the schema in sync.
+
+Google sign-in is gated on `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` — the button only renders when both are present. To enable: register an OAuth 2.0 Web client in [Google Cloud Console](https://console.cloud.google.com/apis/credentials), add `<BETTER_AUTH_URL>/api/auth/callback/google` as an authorized redirect URI (one entry per environment), then set the two env vars.
 
 ### Database schema
 
@@ -74,6 +76,7 @@ Four vars are required at runtime; the rest enable optional features:
 | `RESEND_API_KEY` + `EMAIL_FROM` | optional | Magic link email; falls back to console.log |
 | `RESEND_WEBHOOK_SECRET` | optional | Email delivery tracking |
 | R2 group (5 vars) | optional | Photo uploads — **all five must be set or none** |
+| `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` | optional | Enables "Continue with Google" on sign-in/sign-up — **both or neither** |
 | `PLATFORM_ADMIN_HOST` | optional | Restricts `/admin/*` to a specific subdomain |
 
 All server-side env access goes through `lib/env/server.ts` → `getServerEnv()`, which validates and caches at startup. Never read `process.env` directly in server code.

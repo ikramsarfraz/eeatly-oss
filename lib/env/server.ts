@@ -31,7 +31,9 @@ const serverEnvSchema = z.object({
   UPSTASH_REDIS_REST_URL: z.string().url("UPSTASH_REDIS_REST_URL must be a valid URL."),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1, "UPSTASH_REDIS_REST_TOKEN is required."),
   ANTHROPIC_API_KEY: z.string().min(1, "ANTHROPIC_API_KEY is required."),
-  OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required.")
+  OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required."),
+  GOOGLE_CLIENT_ID: optionalString,
+  GOOGLE_CLIENT_SECRET: optionalString
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
@@ -66,4 +68,8 @@ export function hasR2Env(env = getServerEnv()) {
       env.R2_BUCKET &&
       env.R2_PUBLIC_BASE_URL
   );
+}
+
+export function hasGoogleAuthEnv(env = getServerEnv()) {
+  return Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
 }
