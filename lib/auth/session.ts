@@ -10,6 +10,7 @@ import { getServerEnv } from "@/lib/env/server";
 import { logger } from "@/lib/observability/logger";
 import { getRequestId } from "@/lib/observability/request-id";
 import { householdMembers, households, users } from "@/db/schema";
+import { ensureHouseholdForUser } from "@/services/households";
 import type { UserRole } from "@/types";
 
 export type CurrentHousehold = {
@@ -149,11 +150,24 @@ export const getCurrentHousehold = cache(
       return member;
     }
 
-    logger.error("household_resolution_missing", {
+    // No membership — this happens for users that predated the 0015 backfill
+    // OR new sign-ups if the Better Auth user.create hook ever fails. Rather
+    // than throwing (which boots the user to an error page they can't
+    // recover from), auto-create their solo household here. The helper is
+    // idempotent and race-safe.
+    const [userRowForName] = await db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    const created = await ensureHouseholdForUser(userId, userRowForName?.name ?? null);
+    logger.warn("household_resolution_self_healed", {
       requestId: (await getRequestId()) ?? undefined,
-      userId
+      userId,
+      householdId: created.id,
+      newlyCreated: created.created
     });
-    throw new Error("Your account isn't linked to a household — contact support.");
+    return { id: created.id, name: created.name };
   }
 );
 
