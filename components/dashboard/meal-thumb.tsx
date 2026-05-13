@@ -22,8 +22,11 @@ type MealThumbProps = {
  * fallback. Closes the previously-half-implemented photo feature: photos
  * were uploaded and persisted, but no view rendered them.
  *
- * Uses a plain <img> for the moment — switch to next/image once R2 public
- * host is in next.config remotePatterns.
+ * Uses a plain <img> intentionally — the project's policy is to skip
+ * next/image to avoid Vercel's Image Optimization billing. Photos are
+ * served straight from R2's public CDN with `loading="lazy"` for laziness
+ * and `object-cover` for sizing. Don't migrate to next/image without an
+ * explicit decision.
  */
 export function MealThumb({
   photoUrl,

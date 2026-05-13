@@ -5,7 +5,13 @@ import { requireCurrentUser } from "@/lib/auth/session";
 import { trackMealLogLifecycleEvent } from "@/lib/observability/funnel";
 import { logger } from "@/lib/observability/logger";
 import { checkMealMutationLimit } from "@/lib/security/rate-limit";
-import { createMealLog, deleteMealLog, getDashboardMeals } from "@/services/meals";
+import {
+  createMealLog,
+  deleteMealLog,
+  getDashboardMeals,
+  getHistoryRows,
+  type HistoryListOptions
+} from "@/services/meals";
 import type { MealLogInput } from "@/lib/validators/meals";
 
 export async function getDashboardMealsAction(options?: {
@@ -15,6 +21,11 @@ export async function getDashboardMealsAction(options?: {
   const user = await requireCurrentUser();
 
   return getDashboardMeals(user.id, options);
+}
+
+export async function getHistoryRowsAction(options?: HistoryListOptions) {
+  const user = await requireCurrentUser();
+  return getHistoryRows(user.id, options);
 }
 
 export async function createMealLogAction(

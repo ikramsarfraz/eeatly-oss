@@ -32,8 +32,11 @@ export function AuthEmailForm({ mode }: AuthEmailFormProps) {
       const result = await authClient.signIn.magicLink({
         email,
         name,
+        // Returning users land on the dashboard. New users go through the
+        // multi-step onboarding first; the dashboard layout redirects them
+        // there anyway, but starting on /onboarding skips the extra hop.
         callbackURL: "/dashboard",
-        newUserCallbackURL: "/dashboard"
+        newUserCallbackURL: "/onboarding"
       });
 
       if (result.error) {

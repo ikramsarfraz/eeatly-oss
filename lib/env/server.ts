@@ -33,7 +33,8 @@ const serverEnvSchema = z.object({
   ANTHROPIC_API_KEY: z.string().min(1, "ANTHROPIC_API_KEY is required."),
   OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required."),
   GOOGLE_CLIENT_ID: optionalString,
-  GOOGLE_CLIENT_SECRET: optionalString
+  GOOGLE_CLIENT_SECRET: optionalString,
+  CRON_SECRET: optionalString
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
