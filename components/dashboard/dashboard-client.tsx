@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
+import type { Route } from "next";
 import { differenceInCalendarDays, parseISO } from "date-fns";
-import { AlertCircle, BookOpen, Loader2 } from "lucide-react";
+import { AlertCircle, BookOpen, Loader2, Sparkles } from "lucide-react";
+import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { MealLogForm } from "@/components/forms/meal-log-form";
 import { OnboardingCard } from "@/components/dashboard/onboarding-card";
 import { RediscoverySuggestions } from "@/components/dashboard/rediscovery-suggestions";
@@ -72,12 +75,35 @@ export function DashboardClient({
             What should I cook <em className="italic text-primary">tonight?</em>
           </h1>
 
-          <p className="relative mb-[22px] max-w-[480px] text-[15px] leading-[1.55] text-[var(--muted-foreground)]">
+          <p className="relative mb-[18px] max-w-[480px] text-[15px] leading-[1.55] text-[var(--muted-foreground)]">
             {topSuggestion
               ? `${topSuggestion.mealName} is worth considering — ${topSuggestion.description}`
               : "eeatly gets useful after a few quick logs. Add what you cooked, then come back here when you need an easy answer."}
           </p>
 
+          {/* CTAs */}
+          {topSuggestion ? (
+            <div className="relative mb-2 flex flex-wrap items-center gap-2">
+              <LogAgainButton
+                mealName={topSuggestion.mealName}
+                effortLevel={topSuggestion.effortLevel}
+                variant="default"
+                size="default"
+                label="Cook this tonight"
+                icon="check"
+                compact
+              />
+              {meals.suggestions.length > 1 ? (
+                <Link
+                  href={"/dashboard#ideas" as Route}
+                  className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-[13px] text-foreground transition-colors hover:bg-[var(--surface-2)]"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Show {meals.suggestions.length - 1} more {meals.suggestions.length - 1 === 1 ? "idea" : "ideas"}
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
 
           {/* Stats */}
           {hasMeals ? (
