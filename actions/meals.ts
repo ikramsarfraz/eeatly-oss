@@ -12,6 +12,7 @@ import {
   getHistoryRows,
   type HistoryListOptions
 } from "@/services/meals";
+import { createNotification } from "@/services/notifications";
 import type { MealLogInput } from "@/lib/validators/meals";
 
 export async function getDashboardMealsAction(options?: {
@@ -47,6 +48,40 @@ export async function createMealLogAction(
     effortLevel: input.effortLevel,
     source: options?.source === "log_again" ? "log_again" : "quick_log"
   });
+
+  // Milestone notifications — first and second meal are activation
+  // signals worth surfacing in the bell. Fire-and-forget so the create
+  // path doesn't block on the notification write; log + swallow on
+  // failure (the user got the meal logged either way).
+  if (mealLogCount === 1) {
+    void createNotification({
+      userId: user.id,
+      type: "system",
+      title: "First meal logged",
+      body: "eeatly will get more useful with every log. Tap to see your kitchen.",
+      href: "/dashboard"
+    }).catch((error) => {
+      logger.warn("milestone_notification_failed", {
+        userId: user.id,
+        milestone: "first_meal",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    });
+  } else if (mealLogCount === 2) {
+    void createNotification({
+      userId: user.id,
+      type: "system",
+      title: "Two cooks logged",
+      body: "Once you log a few more, eeatly starts surfacing what's worth cooking again.",
+      href: "/ideas"
+    }).catch((error) => {
+      logger.warn("milestone_notification_failed", {
+        userId: user.id,
+        milestone: "second_meal",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    });
+  }
 
   return { mealLog: { id: mealLog?.id } };
 }

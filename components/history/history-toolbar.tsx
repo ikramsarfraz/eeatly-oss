@@ -158,6 +158,32 @@ function SearchInput({
 }) {
   const widthClass =
     bp === "desktop" ? "md:max-w-[380px]" : bp === "tablet" ? "md:max-w-[260px]" : "";
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  // ⌘K / Ctrl+K focuses the search. Skip on mobile (no keyboard) and skip
+  // when the user is already typing in some other editable surface — we
+  // don't want to yank focus mid-sentence in a dialog. ⌘K re-pressed inside
+  // the search input selects-all so a second tap can start a fresh query.
+  React.useEffect(() => {
+    if (bp === "mobile") return;
+    function handler(event: KeyboardEvent) {
+      if (event.key !== "k" && event.key !== "K") return;
+      if (!(event.metaKey || event.ctrlKey)) return;
+      if (event.shiftKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      const inEditable =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable;
+      if (inEditable && target !== inputRef.current) return;
+      event.preventDefault();
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [bp]);
+
   return (
     <div
       className={cn(
@@ -167,6 +193,7 @@ function SearchInput({
     >
       <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       <input
+        ref={inputRef}
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -174,6 +201,14 @@ function SearchInput({
         className="flex-1 border-0 bg-transparent text-[14px] text-foreground outline-none placeholder:text-muted-foreground"
         aria-label="Search history"
       />
+      {bp !== "mobile" && !value ? (
+        <kbd
+          aria-hidden="true"
+          className="hidden font-mono-brand text-[10.5px] text-muted-foreground sm:inline-flex"
+        >
+          ⌘K
+        </kbd>
+      ) : null}
       {value ? (
         <button
           type="button"
