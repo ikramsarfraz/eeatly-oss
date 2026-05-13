@@ -1,6 +1,6 @@
 import "server-only";
 
-import { eq, and, count, lte, gte, inArray, notExists, sql } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import { ONBOARDING_ANALYTICS_EVENT_NAMES } from "@/lib/analytics/onboarding-events";
 import { analyticsEvents, betaFeedback, mealLogs, users } from "@/db/schema";
 import type { BetaCohort } from "@/types";
@@ -28,8 +28,6 @@ export type OperationalListOptions = {
   segment?: RetentionStatus | "all";
   limit?: number;
 };
-
-const daysAgoDate = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
 async function onboardingUserIds() {
   const rows = await db
@@ -150,125 +148,6 @@ export function summarizeRetentionBuckets(rows: UserOperationalRow[]) {
   }
 
   return buckets;
-}
-
-export async function queryUsersZeroMealsAfterSignupDays(daysSinceSignup: number) {
-  const cutoff = daysAgoDate(daysSinceSignup);
-
-  return db
-    .select({
-      userId: users.id,
-      email: users.email,
-      createdAt: users.createdAt
-    })
-    .from(users)
-    .where(
-      and(
-        lte(users.createdAt, cutoff),
-        notExists(
-          db.select({ _: sql`1` }).from(mealLogs).where(eq(mealLogs.userId, users.id))
-        )
-      )
-    );
-}
-
-export async function queryUsersInactiveWithMealsForDays(minDays: number) {
-  const cutoff = daysAgoDate(minDays);
-
-  const mealAgg = db
-    .select({
-      userId: mealLogs.userId,
-      mealCount: sql<number>`count(*)::int`,
-      lastMealAt: sql<Date>`max(${mealLogs.createdAt})`
-    })
-    .from(mealLogs)
-    .groupBy(mealLogs.userId)
-    .as("meal_agg");
-
-  return db
-    .select({
-      userId: users.id,
-      email: users.email,
-      mealCount: mealAgg.mealCount,
-      lastMealAt: mealAgg.lastMealAt
-    })
-    .from(users)
-    .innerJoin(mealAgg, eq(users.id, mealAgg.userId))
-    .where(and(gte(mealAgg.mealCount, 1), lte(mealAgg.lastMealAt, cutoff)));
-}
-
-export async function queryUsersWithExactlyOneMeal() {
-  const once = db
-    .select({
-      userId: mealLogs.userId,
-      mealCount: sql<number>`count(${mealLogs.id})::int`
-    })
-    .from(mealLogs)
-    .groupBy(mealLogs.userId)
-    .having(eq(count(mealLogs.id), 1))
-    .as("once");
-
-  return db
-    .select({
-      userId: users.id,
-      email: users.email,
-      mealCount: once.mealCount
-    })
-    .from(users)
-    .innerJoin(once, eq(users.id, once.userId));
-}
-
-export async function queryHighlyEngagedUsers(minMeals = 5, activeWithinDays = 14) {
-  const activeCutoff = daysAgoDate(activeWithinDays);
-
-  const engaged = db
-    .select({
-      userId: mealLogs.userId,
-      mealCount: sql<number>`count(*)::int`,
-      lastMealAt: sql<Date>`max(${mealLogs.createdAt})`
-    })
-    .from(mealLogs)
-    .groupBy(mealLogs.userId)
-    .as("engaged");
-
-  return db
-    .select({
-      userId: users.id,
-      email: users.email,
-      mealCount: engaged.mealCount,
-      lastMealAt: engaged.lastMealAt
-    })
-    .from(users)
-    .innerJoin(engaged, eq(users.id, engaged.userId))
-    .where(
-      and(
-        gte(engaged.mealCount, minMeals),
-        gte(engaged.lastMealAt, activeCutoff)
-      )
-    );
-}
-
-export async function queryRecentlyActivatedUsers(firstMealWithinDays = 3) {
-  const cutoff = daysAgoDate(firstMealWithinDays);
-
-  const firstLog = db
-    .select({
-      userId: mealLogs.userId,
-      firstAt: sql<Date>`min(${mealLogs.createdAt})`
-    })
-    .from(mealLogs)
-    .groupBy(mealLogs.userId)
-    .as("first_log");
-
-  return db
-    .select({
-      userId: users.id,
-      email: users.email,
-      firstMealAt: firstLog.firstAt
-    })
-    .from(users)
-    .innerJoin(firstLog, eq(users.id, firstLog.userId))
-    .where(gte(firstLog.firstAt, cutoff));
 }
 
 export async function updateUserBetaCohort(userId: string, cohort: BetaCohort | null) {
