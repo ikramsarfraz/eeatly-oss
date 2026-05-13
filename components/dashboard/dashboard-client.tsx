@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import type { Route } from "next";
 import { differenceInCalendarDays, parseISO } from "date-fns";
 import { AlertCircle, BookOpen, Loader2, Sparkles } from "lucide-react";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
@@ -95,7 +94,7 @@ export function DashboardClient({
               />
               {meals.suggestions.length > 1 ? (
                 <Link
-                  href={"/dashboard#ideas" as Route}
+                  href="/ideas"
                   className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-[13px] text-foreground transition-colors hover:bg-[var(--surface-2)]"
                 >
                   <Sparkles className="h-3.5 w-3.5" />
@@ -187,16 +186,19 @@ export function DashboardClient({
 
       {/* Rediscovery suggestions */}
       {hasMeals && meals.suggestions.length > 0 ? (
-        <section id="ideas" className="scroll-mt-20">
+        <section>
           <div className="mb-[14px] mt-1 flex items-baseline justify-between">
             <h2 className="font-serif text-[26px] font-normal tracking-[-0.005em] max-md:text-[22px]">
               Ideas <em className="italic text-[var(--muted-foreground)]">for tonight</em>
             </h2>
-            <div className="flex items-center gap-3 text-[12px] text-[var(--muted-foreground)]">
-              <span>{meals.suggestions.length} ideas</span>
-            </div>
+            <Link
+              href="/ideas"
+              className="text-[12px] font-medium text-primary hover:underline"
+            >
+              See all →
+            </Link>
           </div>
-          <RediscoverySuggestions suggestions={meals.suggestions} />
+          <RediscoverySuggestions suggestions={meals.suggestions.slice(0, 4)} />
         </section>
       ) : null}
 

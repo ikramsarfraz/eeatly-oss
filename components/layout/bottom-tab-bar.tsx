@@ -31,10 +31,10 @@ const tabs: TabItem[] = [
     match: (p) => p.startsWith("/history"),
   },
   {
-    href: "/dashboard#ideas" as Route,
+    href: "/ideas",
     label: "Ideas",
     icon: Sparkles,
-    match: () => false,
+    match: (p) => p.startsWith("/ideas"),
   },
 ];
 
@@ -62,7 +62,7 @@ export function BottomTabBar() {
         <Plus className="h-5 w-5" strokeWidth={2.25} />
       </button>
 
-      <TabLink tab={tabs[2]} active={false} />
+      <TabLink tab={tabs[2]} active={tabs[2].match(pathname)} />
 
       <button
         type="button"
