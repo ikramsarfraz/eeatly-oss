@@ -77,6 +77,7 @@ export function RecentHistoryList({ meals }: { meals: RecentMeal[] }) {
               effortLevel={meal.effortLevel}
               variant="default"
               compact
+              iconOnly
             />
           </div>
         ))}
