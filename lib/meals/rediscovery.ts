@@ -78,9 +78,19 @@ function classifyCopy(
   };
 }
 
+/**
+ * Default suggestion cap. Set high so callers like /ideas can render the
+ * long tail without re-fetching; the dashboard teaser slices to 4 client-side.
+ * Keeping the default generous also means client-cache refetches (which call
+ * the action without args) don't accidentally truncate a page that needed
+ * more than 4.
+ */
+const DEFAULT_SUGGESTION_LIMIT = 24;
+
 export function buildRediscoverySuggestions(
   stats: MealStat[],
-  recentMeals: RecentMeal[]
+  recentMeals: RecentMeal[],
+  limit: number = DEFAULT_SUGGESTION_LIMIT
 ): RediscoverySuggestion[] {
   const lastEffortByMeal = new Map<string, RecentMeal["effortLevel"]>(
     recentMeals.map((log) => [log.mealId, log.effortLevel])
@@ -116,7 +126,7 @@ export function buildRediscoverySuggestions(
 
       return bDays - aDays;
     })
-    .slice(0, 4);
+    .slice(0, Math.max(0, limit));
 
   return ranked.map((meal, index) => ({
     mealId: meal.mealId,
@@ -135,7 +145,8 @@ export function buildRediscoverySuggestions(
 export function withSuggestions(
   recentMeals: RecentMeal[],
   mostCookedMeals: MealStat[],
-  neglectedMeals: MealStat[]
+  neglectedMeals: MealStat[],
+  suggestionLimit?: number
 ): DashboardMeals {
   const mergedStats = [...neglectedMeals, ...mostCookedMeals];
   const uniqueStats = Array.from(new Map(mergedStats.map((m) => [m.mealId, m])).values());
@@ -144,6 +155,6 @@ export function withSuggestions(
     recentMeals,
     mostCookedMeals,
     neglectedMeals,
-    suggestions: buildRediscoverySuggestions(uniqueStats, recentMeals)
+    suggestions: buildRediscoverySuggestions(uniqueStats, recentMeals, suggestionLimit)
   };
 }

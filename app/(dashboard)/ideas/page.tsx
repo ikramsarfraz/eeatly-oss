@@ -8,6 +8,8 @@ export const metadata: Metadata = {
 };
 
 export default async function IdeasPage() {
-  const meals = await getDashboardMealsAction();
+  // Lift the dashboard's teaser cap (4) so the dedicated Ideas page surfaces
+  // the long tail of rediscovery candidates.
+  const meals = await getDashboardMealsAction({ suggestionLimit: 24 });
   return <IdeasClient initialData={meals} />;
 }
