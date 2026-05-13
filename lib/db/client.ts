@@ -1,14 +1,29 @@
 import "server-only";
 
 import { Pool } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-serverless";
+import { drizzle, type NeonDatabase } from "drizzle-orm/neon-serverless";
 import * as schema from "@/db/schema";
 import { getServerEnv } from "@/lib/env/server";
 
-const { DATABASE_URL } = getServerEnv();
+type DbInstance = NeonDatabase<typeof schema>;
 
-const pool = new Pool({ connectionString: DATABASE_URL });
+let cached: DbInstance | undefined;
 
-export const db = drizzle(pool, { schema });
+function initDb(): DbInstance {
+  const pool = new Pool({ connectionString: getServerEnv().DATABASE_URL });
+  return drizzle(pool, { schema });
+}
 
-export type Database = typeof db;
+// Lazy-initialized Drizzle instance. The Proxy defers Pool creation until
+// first property access — importing `db` is free at module-parse time, which
+// matters for Turbopack dev where the server module graph is walked
+// aggressively and top-level work multiplies across HMR passes.
+export const db = new Proxy({} as DbInstance, {
+  get(_target, prop) {
+    cached ??= initDb();
+    const value = Reflect.get(cached, prop, cached);
+    return typeof value === "function" ? value.bind(cached) : value;
+  }
+});
+
+export type Database = DbInstance;
