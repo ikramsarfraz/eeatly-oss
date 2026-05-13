@@ -15,6 +15,7 @@ type LogAgainButtonProps = {
   compact?: boolean;
   label?: string;
   icon?: "rotate" | "check";
+  className?: string;
 };
 
 export function LogAgainButton({
@@ -24,7 +25,8 @@ export function LogAgainButton({
   size = "sm",
   compact = false,
   label = "Log again",
-  icon = "rotate"
+  icon = "rotate",
+  className
 }: LogAgainButtonProps) {
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const mutation = useCreateMealLog({ source: "log_again" });
@@ -72,6 +74,7 @@ export function LogAgainButton({
         size={size}
         onClick={logAgain}
         disabled={mutation.isPending}
+        className={className}
       >
         {mutation.isPending ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
