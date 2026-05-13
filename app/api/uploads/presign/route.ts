@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApiUser } from "@/lib/auth/session";
 import { logger } from "@/lib/observability/logger";
+import { getRequestId } from "@/lib/observability/request-id";
 import { checkUploadPresignLimit } from "@/lib/security/rate-limit";
 import { createPresignedPhotoUpload } from "@/lib/storage/r2";
 import { presignedUploadInputSchema } from "@/lib/validators/meals";
@@ -37,6 +38,7 @@ export async function POST(request: Request) {
   } catch (error) {
     // Log internal detail server-side; return a generic message to the client.
     logger.error("upload_presign_failed", {
+      requestId: (await getRequestId()) ?? undefined,
       userId: user.id,
       error: error instanceof Error ? error.message : String(error)
     });

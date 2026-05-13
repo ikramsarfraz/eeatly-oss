@@ -1,4 +1,9 @@
 import type { NextConfig } from "next";
+import nextBundleAnalyzer from "@next/bundle-analyzer";
+
+const withBundleAnalyzer = nextBundleAnalyzer({
+  enabled: process.env.ANALYZE === "true"
+});
 
 // Conservative Content-Security-Policy.
 // Intentionally narrow: only adds directives that don't risk breaking React's
@@ -45,4 +50,4 @@ const nextConfig: NextConfig = {
   }
 };
 
-export default nextConfig;
+export default withBundleAnalyzer(nextConfig);

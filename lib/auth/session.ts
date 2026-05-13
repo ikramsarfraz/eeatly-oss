@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getServerEnv } from "@/lib/env/server";
 import { logger } from "@/lib/observability/logger";
+import { getRequestId } from "@/lib/observability/request-id";
 import type { UserRole } from "@/types";
 
 export type AppUser = {
@@ -37,6 +38,7 @@ export async function getCurrentUser(): Promise<AppUser | null> {
     // failure (DB outage, corrupted cookie, Better Auth internal crash).
     // Silently swallowing both makes outages look like sign-outs.
     logger.warn("session_lookup_failed", {
+      requestId: (await getRequestId()) ?? undefined,
       error: error instanceof Error ? error.message : String(error)
     });
     return null;

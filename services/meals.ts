@@ -22,23 +22,27 @@ export async function getDashboardMeals(
 ): Promise<DashboardMeals> {
   const recentLimit = options?.recentMealsLimit ?? 10;
 
-  const recentMeals = await db
-    .select({
-      id: mealLogs.id,
-      mealId: meals.id,
-      mealName: meals.name,
-      cookedAt: mealLogs.cookedAt,
-      effortLevel: mealLogs.effortLevel,
-      notes: mealLogs.notes,
-      photoUrl: sql<string | null>`coalesce(${mealLogs.photoUrl}, ${meals.photoUrl})`
-    })
-    .from(mealLogs)
-    .innerJoin(meals, eq(mealLogs.mealId, meals.id))
-    .where(activeMealLogsForUser(userId))
-    .orderBy(desc(mealLogs.cookedAt))
-    .limit(recentLimit);
+  // Run all three independent queries in parallel — the original code
+  // awaited recentMeals first, which blocked the most/neglected pair from
+  // starting and added one DB round-trip's worth of latency to every
+  // dashboard render.
+  const [recentMeals, mostCookedStats, neglectedStats] = await Promise.all([
+    db
+      .select({
+        id: mealLogs.id,
+        mealId: meals.id,
+        mealName: meals.name,
+        cookedAt: mealLogs.cookedAt,
+        effortLevel: mealLogs.effortLevel,
+        notes: mealLogs.notes,
+        photoUrl: sql<string | null>`coalesce(${mealLogs.photoUrl}, ${meals.photoUrl})`
+      })
+      .from(mealLogs)
+      .innerJoin(meals, eq(mealLogs.mealId, meals.id))
+      .where(activeMealLogsForUser(userId))
+      .orderBy(desc(mealLogs.cookedAt))
+      .limit(recentLimit),
 
-  const [mostCookedStats, neglectedStats] = await Promise.all([
     db
       .select({
         mealId: meals.id,

@@ -20,7 +20,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
           </Link>
         </nav>
       </header>
-      {children}
+      <main id="main" tabIndex={-1}>{children}</main>
       <footer className="border-t">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
           <p>eeatly helps you remember meals worth making again.</p>

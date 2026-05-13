@@ -42,8 +42,10 @@ export async function createMealLogAction(
 
 export async function deleteMealLogAction(logId: string): Promise<void> {
   const user = await requireCurrentUser();
+  await checkMealMutationLimit(user.id);
   await deleteMealLog(user.id, logId);
   revalidatePath("/dashboard");
   revalidatePath("/history");
   revalidatePath("/ideas");
+  logger.info("meal_log_deleted", { userId: user.id, logId });
 }

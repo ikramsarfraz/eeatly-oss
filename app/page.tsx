@@ -124,7 +124,7 @@ export default function HomePage() {
   };
 
   return (
-    <main className="min-h-screen">
+    <main id="main" tabIndex={-1} className="min-h-screen">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
