@@ -1,13 +1,16 @@
 import "server-only";
 
+import { differenceInDays } from "date-fns";
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
+import { dispatchTransactionalEmail } from "@/lib/email/transactional";
 import { logger } from "@/lib/observability/logger";
 import { createNotificationIfNotRecent } from "@/services/notifications";
 
 export type LifecycleCronResult = {
   scanned: number;
   notifiedInactive: number;
+  emailed: number;
   errors: number;
 };
 
@@ -18,6 +21,8 @@ const NUDGE_DEDUPE_HOURS = 24 * 6;
 
 type InactiveUser = {
   user_id: string;
+  email: string;
+  name: string;
   last_meal_at: Date | null;
   meal_count: number;
 };
@@ -40,6 +45,8 @@ export async function runLifecycleNudges(): Promise<LifecycleCronResult> {
   const result = await db.execute<InactiveUser>(sql`
     select
       u.id as user_id,
+      u.email as email,
+      u.name as name,
       max(ml.cooked_at::timestamp) as last_meal_at,
       count(ml.id)::int as meal_count
     from "user" u
@@ -59,6 +66,7 @@ export async function runLifecycleNudges(): Promise<LifecycleCronResult> {
 
   let scanned = 0;
   let notifiedInactive = 0;
+  let emailed = 0;
   let errors = 0;
 
   for (const row of rows) {
@@ -74,7 +82,42 @@ export async function runLifecycleNudges(): Promise<LifecycleCronResult> {
         },
         NUDGE_DEDUPE_HOURS
       );
-      if (created) notifiedInactive += 1;
+
+      if (!created) {
+        // In-app dedup hit — skip email too. Both surfaces share the same
+        // cadence so a user doesn't get hit on one channel while we
+        // suppressed the other.
+        continue;
+      }
+
+      notifiedInactive += 1;
+
+      // Email goes out alongside the in-app notification. `dispatchTransactionalEmail`
+      // skips internally when RESEND_API_KEY / EMAIL_FROM aren't configured —
+      // useful for the cron run during a dry-run deploy.
+      const daysQuiet = row.last_meal_at
+        ? Math.max(INACTIVE_DAYS, differenceInDays(new Date(), row.last_meal_at))
+        : INACTIVE_DAYS;
+
+      try {
+        const dispatch = await dispatchTransactionalEmail({
+          template: "inactive_reminder",
+          toEmail: row.email,
+          toName: row.name,
+          userId: row.user_id,
+          daysQuiet,
+          trackDispatch: true
+        });
+        if (!dispatch.skipped) emailed += 1;
+      } catch (error) {
+        // Email failure shouldn't break the cron — log + move on. The
+        // in-app notification still gives the user a path back in.
+        errors += 1;
+        logger.warn("lifecycle_cron_email_failed", {
+          userId: row.user_id,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
     } catch (error) {
       errors += 1;
       logger.warn("lifecycle_cron_notify_failed", {
@@ -84,5 +127,5 @@ export async function runLifecycleNudges(): Promise<LifecycleCronResult> {
     }
   }
 
-  return { scanned, notifiedInactive, errors };
+  return { scanned, notifiedInactive, emailed, errors };
 }
