@@ -72,7 +72,12 @@ export function RecentHistoryList({ meals }: { meals: RecentMeal[] }) {
             </div>
 
             {/* Action */}
-            <LogAgainButton mealName={meal.mealName} effortLevel={meal.effortLevel} />
+            <LogAgainButton
+              mealName={meal.mealName}
+              effortLevel={meal.effortLevel}
+              variant="default"
+              compact
+            />
           </div>
         ))}
       </div>

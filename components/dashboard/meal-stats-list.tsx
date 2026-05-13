@@ -90,7 +90,11 @@ export function MealStatsList({
                   {meal.cookCount}×
                 </span>
               ) : (
-                <LogAgainButton mealName={meal.mealName} />
+                <LogAgainButton
+                  mealName={meal.mealName}
+                  variant="default"
+                  compact
+                />
               )}
             </div>
           );
