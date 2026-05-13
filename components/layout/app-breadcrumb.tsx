@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 
 const SEGMENT_LABELS: Record<string, string> = {
   dashboard: "Tonight",
+  ideas: "Ideas",
   history: "History",
   settings: "Settings",
 };

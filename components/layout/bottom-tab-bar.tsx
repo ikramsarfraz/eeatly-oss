@@ -31,10 +31,10 @@ const tabs: TabItem[] = [
     match: (p) => p.startsWith("/history"),
   },
   {
-    href: "/dashboard#ideas" as Route,
+    href: "/ideas",
     label: "Ideas",
     icon: Sparkles,
-    match: () => false,
+    match: (p) => p.startsWith("/ideas"),
   },
 ];
 
@@ -62,7 +62,7 @@ export function BottomTabBar() {
         <Plus className="h-5 w-5" strokeWidth={2.25} />
       </button>
 
-      <TabLink tab={tabs[2]} active={false} />
+      <TabLink tab={tabs[2]} active={tabs[2].match(pathname)} />
 
       <button
         type="button"
@@ -82,6 +82,7 @@ function TabLink({ tab, active }: { tab: TabItem; active: boolean }) {
   return (
     <Link
       href={tab.href}
+      aria-current={active ? "page" : undefined}
       className={cn(
         "flex flex-col items-center gap-[3px] rounded-[9px] py-1.5 text-[10.5px] font-medium",
         active ? "text-primary" : "text-muted-foreground",

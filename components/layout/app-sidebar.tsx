@@ -10,6 +10,7 @@ import {
   Moon,
   Plus,
   Settings,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
@@ -39,6 +40,7 @@ type NavItem = {
 
 const cookingNav: NavItem[] = [
   { href: "/dashboard", label: "Tonight", icon: Moon },
+  { href: "/ideas", label: "Ideas", icon: Sparkles },
   { href: "/history", label: "History", icon: Clock3 },
 ];
 

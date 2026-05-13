@@ -5,11 +5,21 @@ import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { magicLink } from "better-auth/plugins";
 import { db } from "@/lib/db/client";
 import * as schema from "@/db/schema";
-import { getServerEnv } from "@/lib/env/server";
+import { getServerEnv, hasGoogleAuthEnv } from "@/lib/env/server";
 import { sendMagicLinkEmail } from "@/lib/email/resend";
 
 const env = getServerEnv();
 const appUrl = env.BETTER_AUTH_URL;
+
+const socialProviders =
+  hasGoogleAuthEnv(env) && env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+    ? {
+        google: {
+          clientId: env.GOOGLE_CLIENT_ID,
+          clientSecret: env.GOOGLE_CLIENT_SECRET
+        }
+      }
+    : undefined;
 
 /**
  * Better Auth rejects server actions from origins not listed here.
@@ -60,6 +70,7 @@ export const auth = betterAuth({
       }
     })
   ],
+  ...(socialProviders ? { socialProviders } : {}),
   user: {
     additionalFields: {
       role: {

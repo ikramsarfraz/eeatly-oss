@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import type { Route } from "next";
 import { differenceInCalendarDays, parseISO } from "date-fns";
 import { AlertCircle, BookOpen, Loader2, Sparkles } from "lucide-react";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
@@ -48,7 +47,7 @@ export function DashboardClient({
       <section className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
         {/* Hero card */}
         <div
-          className="relative overflow-hidden rounded-[20px] border bg-[var(--surface)] p-7 sm:p-8"
+          className="relative overflow-hidden rounded-[20px] border bg-[var(--surface)] p-5 sm:p-7"
           style={{ boxShadow: "var(--shadow-md)" }}
         >
           {/* Decorative radial */}
@@ -71,7 +70,7 @@ export function DashboardClient({
           </span>
 
           {/* Serif headline */}
-          <h1 className="relative mb-[14px] max-w-[520px] font-serif text-[46px] font-normal leading-[1.12] tracking-[-0.015em] max-[820px]:text-[36px]">
+          <h1 className="relative mb-[14px] max-w-[520px] font-serif text-[44px] font-normal leading-[1.12] tracking-[-0.015em] max-[820px]:text-[32px]">
             What should I cook <em className="italic text-primary">tonight?</em>
           </h1>
 
@@ -95,7 +94,7 @@ export function DashboardClient({
               />
               {meals.suggestions.length > 1 ? (
                 <Link
-                  href={"/dashboard#ideas" as Route}
+                  href="/ideas"
                   className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-[13px] text-foreground transition-colors hover:bg-[var(--surface-2)]"
                 >
                   <Sparkles className="h-3.5 w-3.5" />
@@ -166,7 +165,7 @@ export function DashboardClient({
 
         {/* Quick log card */}
         <div
-          className="flex flex-col gap-3 rounded-[20px] border bg-[var(--surface)] p-[22px] pb-[18px] lg:sticky lg:top-[76px] lg:self-start"
+          className="flex flex-col gap-3 rounded-[20px] border bg-[var(--surface)] p-[18px] sm:p-[22px] sm:pb-[18px] lg:sticky lg:top-[76px] lg:self-start"
           style={{ boxShadow: "var(--shadow-md)" }}
         >
           <div className="flex items-center justify-between gap-2">
@@ -187,16 +186,19 @@ export function DashboardClient({
 
       {/* Rediscovery suggestions */}
       {hasMeals && meals.suggestions.length > 0 ? (
-        <section id="ideas" className="scroll-mt-20">
+        <section>
           <div className="mb-[14px] mt-1 flex items-baseline justify-between">
             <h2 className="font-serif text-[26px] font-normal tracking-[-0.005em] max-md:text-[22px]">
               Ideas <em className="italic text-[var(--muted-foreground)]">for tonight</em>
             </h2>
-            <div className="flex items-center gap-3 text-[12px] text-[var(--muted-foreground)]">
-              <span>{meals.suggestions.length} ideas</span>
-            </div>
+            <Link
+              href="/ideas"
+              className="text-[12px] font-medium text-primary hover:underline"
+            >
+              See all →
+            </Link>
           </div>
-          <RediscoverySuggestions suggestions={meals.suggestions} />
+          <RediscoverySuggestions suggestions={meals.suggestions.slice(0, 4)} />
         </section>
       ) : null}
 
@@ -207,7 +209,7 @@ export function DashboardClient({
             Your <em className="italic text-[var(--muted-foreground)]">kitchen</em>
           </h2>
         </div>
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <RecentHistoryList meals={meals.recentMeals} />
           <MealStatsList title="Most cooked" meals={meals.mostCookedMeals} />
           <MealStatsList title="Not cooked recently" meals={meals.neglectedMeals} />
