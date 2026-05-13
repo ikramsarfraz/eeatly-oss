@@ -48,3 +48,42 @@ export class OwnerAccountDeletionBlockedError extends Error {
     this.name = "OwnerAccountDeletionBlockedError";
   }
 }
+
+/**
+ * Round 4.5 member-removal errors. The action layer translates each `.code`
+ * into a discriminated-union result so the UI can branch without
+ * stringifying.
+ */
+export class NotHouseholdOwnerError extends Error {
+  readonly code = "NOT_OWNER" as const;
+  constructor() {
+    super("Only the household owner can remove members.");
+    this.name = "NotHouseholdOwnerError";
+  }
+}
+
+export class CannotRemoveSelfError extends Error {
+  readonly code = "CANNOT_REMOVE_SELF" as const;
+  constructor() {
+    super(
+      "Owners can't remove themselves — transfer ownership first, then ask the new owner to remove you."
+    );
+    this.name = "CannotRemoveSelfError";
+  }
+}
+
+export class CannotRemoveOwnerError extends Error {
+  readonly code = "CANNOT_REMOVE_OWNER" as const;
+  constructor() {
+    super("Cannot remove the household owner.");
+    this.name = "CannotRemoveOwnerError";
+  }
+}
+
+export class NotMemberError extends Error {
+  readonly code = "NOT_MEMBER" as const;
+  constructor() {
+    super("That person isn't a member of this household.");
+    this.name = "NotMemberError";
+  }
+}

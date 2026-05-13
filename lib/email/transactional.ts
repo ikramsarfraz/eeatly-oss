@@ -7,6 +7,7 @@ import { eeatlyEmailTags, recordOutboundEmailFromApiSend } from "@/services/emai
 import { getResendClient } from "@/lib/email/resend-client";
 import { FirstMealEncouragementEmail } from "@/lib/email/templates/first-meal-encouragement-email";
 import { HouseholdInvitationEmail } from "@/lib/email/templates/household-invitation-email";
+import { HouseholdMemberRemovedEmail } from "@/lib/email/templates/household-member-removed-email";
 import { InactiveReminderEmail } from "@/lib/email/templates/inactive-reminder-email";
 import { WelcomeEmail } from "@/lib/email/templates/welcome-email";
 import { WeeklyRecapEmail } from "@/lib/email/templates/weekly-recap-email";
@@ -18,7 +19,8 @@ export type TransactionalTemplate =
   | "first_meal_encouragement"
   | "inactive_reminder"
   | "weekly_recap_placeholder"
-  | "household_invitation";
+  | "household_invitation"
+  | "household_member_removed";
 
 export type TransactionalEmailResult = {
   skipped: boolean;
@@ -42,6 +44,10 @@ export type DispatchTransactionalEmailInput = {
     householdName: string;
     inviteUrl: string;
     expiresInDays: number;
+  };
+  /** For household_member_removed — passed straight into the template. */
+  removal?: {
+    householdName: string;
   };
   /**
    * When true, record `reminder_email_sent` for analytics (non-blocking).
@@ -125,6 +131,21 @@ export async function dispatchTransactionalEmail(
       }
       subject = `${input.invitation.inviterName} invited you to ${input.invitation.householdName} on eeatly`;
       element = React.createElement(HouseholdInvitationEmail, input.invitation);
+      break;
+    }
+
+    case "household_member_removed": {
+      if (!input.removal) {
+        logger.error("transactional_email_removal_missing_payload", {
+          toEmail: input.toEmail
+        });
+        return { skipped: true, detail: "Removal payload missing" };
+      }
+      subject = `You've been removed from ${input.removal.householdName} on eeatly`;
+      element = React.createElement(HouseholdMemberRemovedEmail, {
+        name: input.toName,
+        householdName: input.removal.householdName
+      });
       break;
     }
 

@@ -1,7 +1,18 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, MailPlus, Trash2, Users } from "lucide-react";
+import { Loader2, MailPlus, Trash2, UserMinus, Users } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
+} from "@/components/ui/alert-dialog";
 import {
   Card,
   CardContent,
@@ -17,6 +28,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/providers/toast-provider";
 import {
   createInvitationAction,
+  removeMemberAction,
   revokeInvitationAction
 } from "@/actions/households";
 
@@ -54,6 +66,29 @@ export function HouseholdCard({
   const [email, setEmail] = React.useState("");
   const [pendingInvite, setPendingInvite] = React.useState(false);
   const [revokingId, setRevokingId] = React.useState<string | null>(null);
+  const [removingUserId, setRemovingUserId] = React.useState<string | null>(null);
+
+  async function handleRemove(targetUserId: string, targetName: string) {
+    if (removingUserId) return;
+    setRemovingUserId(targetUserId);
+    try {
+      const result = await removeMemberAction({ targetUserId });
+      if (result.ok) {
+        showToast({
+          variant: "success",
+          title: `Removed ${result.removedUserName}`
+        });
+      } else {
+        showToast({
+          variant: "error",
+          title: `Couldn't remove ${targetName}`,
+          description: result.message
+        });
+      }
+    } finally {
+      setRemovingUserId(null);
+    }
+  }
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
@@ -118,26 +153,74 @@ export function HouseholdCard({
             Members
           </h3>
           <ul className="grid gap-2">
-            {members.map((member) => (
-              <li
-                key={member.userId}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-background/60 p-3"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">
-                      {member.userId === currentUserId ? `${member.name} (you)` : member.name}
-                    </span>
-                    {member.role === "owner" ? (
-                      <Badge variant="secondary" className="text-xs">
-                        Owner
-                      </Badge>
-                    ) : null}
+            {members.map((member) => {
+              // Only the owner can remove anyone, and only non-owner
+              // members can be removed (never the owner, never self).
+              const canRemove =
+                isOwner &&
+                member.role !== "owner" &&
+                member.userId !== currentUserId;
+              return (
+                <li
+                  key={member.userId}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-background/60 p-3"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium">
+                        {member.userId === currentUserId ? `${member.name} (you)` : member.name}
+                      </span>
+                      {member.role === "owner" ? (
+                        <Badge variant="secondary" className="text-xs">
+                          Owner
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <p className="truncate text-sm text-muted-foreground">{member.email}</p>
                   </div>
-                  <p className="truncate text-sm text-muted-foreground">{member.email}</p>
-                </div>
-              </li>
-            ))}
+                  {canRemove ? (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={removingUserId === member.userId}
+                          aria-label={`Remove ${member.name} from ${householdName}`}
+                        >
+                          {removingUserId === member.userId ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <UserMinus className="h-4 w-4" />
+                          )}
+                          Remove
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>
+                            Remove {member.name} from {householdName}?
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            They&apos;ll lose access to all shared recipes. Their
+                            cooking history stays in this household.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleRemove(member.userId, member.name)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Remove
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         </section>
 

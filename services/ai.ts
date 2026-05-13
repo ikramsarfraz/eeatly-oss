@@ -5,7 +5,7 @@ import { db } from "@/lib/db/client";
 import { withFallback } from "@/lib/ai/providers";
 import * as anthropic from "@/lib/ai/providers/anthropic";
 import * as openai from "@/lib/ai/providers/openai";
-import { mealLogs, meals } from "@/db/schema";
+import { households, mealLogs, meals } from "@/db/schema";
 import type { MealSuggestion, ShareActionResult } from "@/types";
 
 const SUPPORTED_MEDIA_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
@@ -44,16 +44,28 @@ export async function generateShareableRecipe(
   householdId: string
 ): Promise<ShareActionResult> {
   // Round 4: scope by household, not user. Any member can generate a
-  // share text for a meal that belongs to their household.
-  const meal = await db.query.meals.findFirst({
-    where: and(eq(meals.id, mealId), eq(meals.householdId, householdId), isNull(meals.archivedAt))
-  });
+  // share text for a meal that belongs to their household. The household
+  // name is woven into the share-message attribution line, so we pull
+  // both in one query rather than a second round-trip.
+  const [mealRow] = await db
+    .select({
+      id: meals.id,
+      name: meals.name,
+      recipeText: meals.recipeText,
+      householdName: households.name
+    })
+    .from(meals)
+    .innerJoin(households, eq(households.id, meals.householdId))
+    .where(
+      and(eq(meals.id, mealId), eq(meals.householdId, householdId), isNull(meals.archivedAt))
+    )
+    .limit(1);
 
-  if (!meal) {
+  if (!mealRow) {
     return { ok: false, code: "AI_ERROR", message: "Meal not found." };
   }
 
-  if (!meal.recipeText?.trim()) {
+  if (!mealRow.recipeText?.trim()) {
     return { ok: false, code: "RECIPE_MISSING", message: "This meal doesn't have a recipe saved yet." };
   }
 
@@ -64,8 +76,20 @@ export async function generateShareableRecipe(
 
   try {
     const { text } = await withFallback(
-      () => openai.generateShareText(meal.name, meal.recipeText!, latestLog?.notes),
-      () => anthropic.generateShareText(meal.name, meal.recipeText!, latestLog?.notes),
+      () =>
+        openai.generateShareText(
+          mealRow.name,
+          mealRow.recipeText!,
+          latestLog?.notes,
+          mealRow.householdName
+        ),
+      () =>
+        anthropic.generateShareText(
+          mealRow.name,
+          mealRow.recipeText!,
+          latestLog?.notes,
+          mealRow.householdName
+        ),
       { operation: "generate_share_text" }
     );
     return { ok: true, text };

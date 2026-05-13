@@ -29,3 +29,15 @@ export const revokeInvitationSchema = z.object({
 });
 
 export type RevokeInvitationInput = z.infer<typeof revokeInvitationSchema>;
+
+// Target user ids are Better Auth ids (text, not uuid). We accept any
+// non-empty string ≤ 128 chars — the service performs the real existence
+// + role checks.
+export const removeMemberSchema = z.object({
+  targetUserId: z
+    .string()
+    .min(1, "Missing member id.")
+    .max(128, "Invalid member id.")
+});
+
+export type RemoveMemberInput = z.infer<typeof removeMemberSchema>;
