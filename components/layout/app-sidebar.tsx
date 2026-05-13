@@ -26,7 +26,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { QuickLogDialog } from "@/components/dashboard/quick-log-dialog";
+import { useQuickLog } from "@/components/dashboard/quick-log-provider";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog";
 import { UserMenu } from "@/components/layout/user-menu";
 import type { AppUser } from "@/lib/auth/session";
@@ -52,6 +52,7 @@ type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
 
 export function AppSidebar({ user, ...props }: AppSidebarProps) {
   const pathname = usePathname() ?? "";
+  const { open: openQuickLog } = useQuickLog();
 
   const isActive = (href: string) =>
     href === "/dashboard"
@@ -81,20 +82,18 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
 
         <SidebarMenu>
           <SidebarMenuItem>
-            <QuickLogDialog
-              trigger={
-                <SidebarMenuButton
-                  className="bg-foreground text-background hover:bg-[#2a3431] hover:text-background active:bg-[#2a3431] active:text-background"
-                  tooltip="Log a meal"
-                >
-                  <Plus className="h-4 w-4 shrink-0" />
-                  <span>Log a meal</span>
-                  <span className="ml-auto rounded bg-white/[0.06] px-[5px] py-px font-mono-brand text-[10.5px] text-[#b8c4be] group-data-[collapsible=icon]:hidden">
-                    ⌘E
-                  </span>
-                </SidebarMenuButton>
-              }
-            />
+            <SidebarMenuButton
+              onClick={openQuickLog}
+              aria-haspopup="dialog"
+              className="bg-foreground text-background hover:bg-[#2a3431] hover:text-background active:bg-[#2a3431] active:text-background"
+              tooltip="Log a meal"
+            >
+              <Plus className="h-4 w-4 shrink-0" />
+              <span>Log a meal</span>
+              <span className="ml-auto rounded bg-white/[0.06] px-[5px] py-px font-mono-brand text-[10.5px] text-[#b8c4be] group-data-[collapsible=icon]:hidden">
+                ⌘E
+              </span>
+            </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
