@@ -161,9 +161,9 @@ export function DashboardClient({
 
       {/* Rediscovery suggestions */}
       {hasMeals && meals.suggestions.length > 0 ? (
-        <section>
+        <section id="ideas" className="scroll-mt-20">
           <div className="mb-[14px] mt-1 flex items-baseline justify-between">
-            <h2 className="font-serif text-[26px] font-normal tracking-[-0.005em]">
+            <h2 className="font-serif text-[26px] font-normal tracking-[-0.005em] max-md:text-[22px]">
               Ideas <em className="italic text-[var(--muted-foreground)]">for tonight</em>
             </h2>
             <div className="flex items-center gap-3 text-[12px] text-[var(--muted-foreground)]">
@@ -177,7 +177,7 @@ export function DashboardClient({
       {/* Three panels */}
       <section>
         <div className="mb-[14px] mt-1 flex items-baseline justify-between">
-          <h2 className="font-serif text-[26px] font-normal tracking-[-0.005em]">
+          <h2 className="font-serif text-[26px] font-normal tracking-[-0.005em] max-md:text-[22px]">
             Your <em className="italic text-[var(--muted-foreground)]">kitchen</em>
           </h2>
         </div>

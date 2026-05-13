@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { BreadcrumbLabelProvider } from "@/components/breadcrumb-label-provider";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AppBreadcrumb } from "@/components/layout/app-breadcrumb";
+import { BottomTabBar } from "@/components/layout/bottom-tab-bar";
 import type { AppUser } from "@/lib/auth/session";
 
 export function AppShell({
@@ -32,9 +33,10 @@ export function AppShell({
               <Separator orientation="vertical" className="mr-2 h-4" />
               <AppBreadcrumb />
             </header>
-            <main className="flex-1 px-8 py-7 pb-20 max-md:px-4 max-md:py-5">
+            <main className="flex-1 px-8 py-7 pb-20 max-md:px-4 max-md:py-5 max-md:pb-28">
               {children}
             </main>
+            <BottomTabBar />
           </SidebarInset>
         </SidebarProvider>
       </BreadcrumbLabelProvider>
