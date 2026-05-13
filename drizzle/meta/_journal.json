@@ -78,6 +78,13 @@
       "when": 1778681206473,
       "tag": "0010_bent_tarot",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1778683944881,
+      "tag": "0011_dry_hannibal_king",
+      "breakpoints": true
     }
   ]
 }

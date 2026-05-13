@@ -4,7 +4,8 @@ import {
   pgEnum,
   pgTable,
   text,
-  timestamp
+  timestamp,
+  uniqueIndex
 } from "drizzle-orm/pg-core";
 
 export const userRoleEnum = pgEnum("user_role", [
@@ -76,7 +77,14 @@ export const accounts = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
   },
   (table) => ({
-    userIdIdx: index("account_user_id_idx").on(table.userId)
+    userIdIdx: index("account_user_id_idx").on(table.userId),
+    // Better Auth enforces this uniqueness in application code, but the DB
+    // should back it up — without this, an application bug could end up
+    // with two `account` rows pointing at the same OAuth identity.
+    providerAccountUnique: uniqueIndex("account_provider_account_unique").on(
+      table.providerId,
+      table.accountId
+    )
   })
 );
 
