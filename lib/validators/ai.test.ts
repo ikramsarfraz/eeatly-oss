@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { classifyYoutubeUrl, youtubeUrlSchema } from "./ai";
+import {
+  audioInputSchema,
+  classifyYoutubeUrl,
+  isSupportedAudioMediaType,
+  MAX_AUDIO_UPLOAD_BYTES,
+  youtubeUrlSchema
+} from "./ai";
 
 describe("classifyYoutubeUrl", () => {
   it("accepts /watch?v=<id> variants", () => {
@@ -75,6 +81,49 @@ describe("classifyYoutubeUrl", () => {
     expect(classifyYoutubeUrl("https://www.youtube.com/watch?v=").kind).toBe(
       "invalid"
     );
+  });
+});
+
+describe("audioInputSchema (Round 8)", () => {
+  it("accepts each browser/WhatsApp media type we support", () => {
+    const types = [
+      "audio/mpeg",
+      "audio/mp3",
+      "audio/mp4",
+      "audio/m4a",
+      "audio/x-m4a",
+      "audio/ogg",
+      "audio/opus",
+      "audio/wav",
+      "audio/x-wav",
+      "audio/webm",
+      "audio/flac"
+    ];
+    for (const mediaType of types) {
+      const parsed = audioInputSchema.parse({ mediaType, size: 1024 });
+      expect(parsed.mediaType).toBe(mediaType);
+    }
+  });
+
+  it("rejects unsupported media types with a friendly message", () => {
+    expect(() => audioInputSchema.parse({ mediaType: "audio/aiff", size: 1024 })).toThrow(
+      /Unsupported audio format/
+    );
+  });
+
+  it("rejects empty audio (size 0)", () => {
+    expect(() => audioInputSchema.parse({ mediaType: "audio/webm", size: 0 })).toThrow();
+  });
+
+  it("rejects audio above the 25 MB cap", () => {
+    expect(() =>
+      audioInputSchema.parse({ mediaType: "audio/webm", size: MAX_AUDIO_UPLOAD_BYTES + 1 })
+    ).toThrow(/25 MB/);
+  });
+
+  it("isSupportedAudioMediaType narrows the type", () => {
+    expect(isSupportedAudioMediaType("audio/webm")).toBe(true);
+    expect(isSupportedAudioMediaType("text/plain")).toBe(false);
   });
 });
 

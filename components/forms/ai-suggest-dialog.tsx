@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Camera, FileText, Loader2, Sparkles, Youtube } from "lucide-react";
+import { Camera, FileText, Loader2, Mic, Sparkles, Square, Upload, Youtube } from "lucide-react";
 import {
+  suggestFromAudioAction,
   suggestFromImageAction,
   suggestFromTextAction,
   suggestFromYouTubeAction
@@ -19,10 +20,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { classifyYoutubeUrl } from "@/lib/validators/ai";
+import {
+  classifyYoutubeUrl,
+  isSupportedAudioMediaType,
+  MAX_AUDIO_UPLOAD_BYTES,
+  SUPPORTED_AUDIO_MEDIA_TYPES
+} from "@/lib/validators/ai";
 import type { MealSuggestion } from "@/types";
 
-type Tab = "photo" | "text" | "youtube";
+type Tab = "photo" | "text" | "youtube" | "voice";
+type VoiceMode = "record" | "upload";
 
 type AiSuggestDialogProps = {
   onSuggestion: (suggestion: MealSuggestion) => void;
@@ -56,6 +63,28 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
     return () => window.clearTimeout(handle);
   }, [isPending]);
 
+  // Voice tab state. Two sub-modes — "record" uses MediaRecorder,
+  // "upload" accepts a file. The record path is hidden entirely if the
+  // browser doesn't support MediaRecorder (older iOS, some embedded
+  // webviews) and we auto-switch to upload mode.
+  const [voiceMode, setVoiceMode] = React.useState<VoiceMode>("record");
+  const [recordingState, setRecordingState] = React.useState<
+    "idle" | "requesting" | "recording" | "ready" | "denied" | "error"
+  >("idle");
+  const [recordedBlob, setRecordedBlob] = React.useState<Blob | null>(null);
+  const [recordedUrl, setRecordedUrl] = React.useState<string | null>(null);
+  const [recordSeconds, setRecordSeconds] = React.useState(0);
+  const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = React.useRef<Blob[]>([]);
+  const recordTimerRef = React.useRef<number | null>(null);
+  const recorderSupported = React.useMemo(
+    () => typeof window !== "undefined" && typeof window.MediaRecorder !== "undefined",
+    []
+  );
+
+  const [audioFile, setAudioFile] = React.useState<File | null>(null);
+  const audioInputRef = React.useRef<HTMLInputElement>(null);
+
   // Client-side URL classification — only enables the Suggest button
   // when the input looks reachable. Server still validates.
   const youtubeClassification = React.useMemo(
@@ -64,6 +93,120 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
   );
   const youtubeUrlReady =
     youtubeClassification !== null && youtubeClassification.kind === "watch";
+
+  function resetVoiceState() {
+    // Stop any in-flight recording + release the mic. MediaRecorder.stop
+    // is a no-op if not recording, but the tracks need an explicit stop
+    // so the browser's red mic indicator goes away.
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch {
+        // Already stopped — ignore.
+      }
+    }
+    mediaRecorderRef.current?.stream.getTracks().forEach((t) => t.stop());
+    mediaRecorderRef.current = null;
+    recordedChunksRef.current = [];
+    if (recordTimerRef.current) {
+      window.clearInterval(recordTimerRef.current);
+      recordTimerRef.current = null;
+    }
+    if (recordedUrl) URL.revokeObjectURL(recordedUrl);
+    setRecordedBlob(null);
+    setRecordedUrl(null);
+    setRecordSeconds(0);
+    setRecordingState("idle");
+    setAudioFile(null);
+    if (audioInputRef.current) audioInputRef.current.value = "";
+  }
+
+  async function startRecording() {
+    if (!recorderSupported) {
+      setRecordingState("error");
+      setError("Recording isn't supported in this browser. Try uploading a file instead.");
+      return;
+    }
+    setError(null);
+    setRecordingState("requesting");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      recordedChunksRef.current = [];
+      recorder.addEventListener("dataavailable", (event) => {
+        if (event.data.size > 0) recordedChunksRef.current.push(event.data);
+      });
+      recorder.addEventListener("stop", () => {
+        // `recorder.mimeType` is the browser's chosen container (typically
+        // "audio/webm;codecs=opus" on Chrome/Firefox, "audio/mp4" on
+        // recent Safari). Strip codec params for the Blob's type so the
+        // server-side validator sees a recognized MIME.
+        const rawMime = recorder.mimeType || "audio/webm";
+        const cleanMime = rawMime.split(";")[0]?.trim() || "audio/webm";
+        const blob = new Blob(recordedChunksRef.current, { type: cleanMime });
+        if (recordedUrl) URL.revokeObjectURL(recordedUrl);
+        setRecordedBlob(blob);
+        setRecordedUrl(URL.createObjectURL(blob));
+        setRecordingState("ready");
+        stream.getTracks().forEach((t) => t.stop());
+        if (recordTimerRef.current) {
+          window.clearInterval(recordTimerRef.current);
+          recordTimerRef.current = null;
+        }
+      });
+      recorder.start();
+      setRecordingState("recording");
+      setRecordSeconds(0);
+      recordTimerRef.current = window.setInterval(
+        () => setRecordSeconds((s) => s + 1),
+        1000
+      );
+    } catch {
+      // Permission denied or unavailable mic — surface the path that
+      // recovers (upload). NotAllowedError, SecurityError, NotFoundError
+      // all converge here; the user-facing message is the same.
+      setRecordingState("denied");
+      setError(
+        "We need microphone access to record. You can switch to upload mode instead."
+      );
+    }
+  }
+
+  function stopRecording() {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.stop();
+    }
+  }
+
+  function cancelRecording() {
+    resetVoiceState();
+  }
+
+  function handleAudioFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    setError(null);
+    if (!file) {
+      setAudioFile(null);
+      return;
+    }
+    if (file.size === 0) {
+      setError("That file is empty.");
+      setAudioFile(null);
+      return;
+    }
+    if (file.size > MAX_AUDIO_UPLOAD_BYTES) {
+      setError("That file is too large. Try a shorter voice note (max 25 MB).");
+      setAudioFile(null);
+      return;
+    }
+    if (!isSupportedAudioMediaType(file.type)) {
+      setError("Unsupported audio format. Try a different file (mp3, m4a, ogg, wav, webm).");
+      setAudioFile(null);
+      return;
+    }
+    setAudioFile(file);
+  }
 
   function handlePhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;
@@ -91,6 +234,7 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
       setError(null);
       setIsPending(false);
       if (photoInputRef.current) photoInputRef.current.value = "";
+      resetVoiceState();
     }
   }
 
@@ -114,9 +258,17 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
         setError("Paste a YouTube video link.");
         return;
       }
+      if (activeTab === "voice" && !voicePayloadReady) {
+        setError(
+          voiceMode === "record"
+            ? "Record a voice note first."
+            : "Upload a voice note first."
+        );
+        return;
+      }
 
       // Each tab has a distinct result-shape (YouTube has 6 extra
-      // codes). Branch first, then handle each result's union.
+      // codes, Voice has 4). Branch first, then handle each result's union.
       if (activeTab === "photo" && photoFile) {
         const formData = new FormData();
         formData.append("image", photoFile);
@@ -127,11 +279,30 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
         handleYouTubeResult(
           await suggestFromYouTubeAction({ url: youtubeUrl.trim() })
         );
+      } else if (activeTab === "voice") {
+        const formData = new FormData();
+        if (voiceMode === "record" && recordedBlob) {
+          // Recorded blob's MIME comes from MediaRecorder's chosen container.
+          // Pass it through as a File so the server reads `.type` + `.name`.
+          const extension = mimeToExtension(recordedBlob.type);
+          formData.append(
+            "audio",
+            new File([recordedBlob], `voice-note.${extension}`, {
+              type: recordedBlob.type
+            })
+          );
+        } else if (voiceMode === "upload" && audioFile) {
+          formData.append("audio", audioFile);
+        }
+        handleVoiceResult(await suggestFromAudioAction(formData));
       }
     } finally {
       setIsPending(false);
     }
   }
+
+  const voicePayloadReady =
+    voiceMode === "record" ? recordedBlob !== null : audioFile !== null;
 
   function handleSuggestResult(
     result: Awaited<ReturnType<typeof suggestFromImageAction>>
@@ -208,6 +379,46 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
     }
   }
 
+  function handleVoiceResult(
+    result: Awaited<ReturnType<typeof suggestFromAudioAction>>
+  ) {
+    if (result.ok) {
+      setOpen(false);
+      onSuggestion(result.data);
+      return;
+    }
+    switch (result.code) {
+      case "AUDIO_TOO_LARGE":
+        setError("That file is too large. Try a shorter voice note (max 25 MB).");
+        break;
+      case "AUDIO_INVALID_FORMAT":
+        setError("Unsupported audio format. Try a different file.");
+        break;
+      case "AUDIO_TRANSCRIPTION_FAILED":
+        setError("Couldn't process the audio right now. Try again in a minute.");
+        break;
+      case "AUDIO_TOO_SHORT_OR_EMPTY":
+        setError(
+          "We couldn't hear a recipe in that audio. Try a longer recording or upload a different file."
+        );
+        break;
+      case "INVALID_INPUT":
+        setError(result.message ?? "Record or upload a voice note first.");
+        break;
+      case "RATE_LIMITED":
+        setError(result.message ?? "You've hit your daily AI limit.");
+        break;
+      case "UPGRADE_REQUIRED":
+        setError(
+          "Voice notes are part of eeatly Plus. Visit /pricing to see what's included."
+        );
+        break;
+      case "AI_PROVIDER_ERROR":
+        setError(result.message ?? "Something went wrong. Please try again.");
+        break;
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
@@ -219,20 +430,20 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
 
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Fill from photo, text, or YouTube</DialogTitle>
+          <DialogTitle>Fill from photo, text, video, or voice</DialogTitle>
           <DialogDescription>
-            Upload a photo, paste recipe text, or drop a YouTube cooking video
-            link. AI suggests the fields.
+            Upload a photo, paste recipe text, drop a YouTube cooking video link,
+            or share a voice note. AI suggests the fields.
           </DialogDescription>
         </DialogHeader>
 
         {/* Tab switcher */}
-        <div className="flex gap-1 rounded-lg border border-[var(--border)] bg-[var(--muted)] p-1">
+        <div className="flex flex-wrap gap-1 rounded-lg border border-[var(--border)] bg-[var(--muted)] p-1">
           <button
             type="button"
             onClick={() => handleTabChange("photo")}
             className={cn(
-              "flex flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12.5px] font-medium transition-all",
+              "flex min-w-[64px] flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12.5px] font-medium transition-all",
               activeTab === "photo"
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
@@ -245,7 +456,7 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
             type="button"
             onClick={() => handleTabChange("text")}
             className={cn(
-              "flex flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12.5px] font-medium transition-all",
+              "flex min-w-[64px] flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12.5px] font-medium transition-all",
               activeTab === "text"
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
@@ -258,7 +469,7 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
             type="button"
             onClick={() => handleTabChange("youtube")}
             className={cn(
-              "flex flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12.5px] font-medium transition-all",
+              "flex min-w-[64px] flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12.5px] font-medium transition-all",
               activeTab === "youtube"
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
@@ -266,6 +477,24 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
           >
             <Youtube className="h-3.5 w-3.5" />
             YouTube
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              handleTabChange("voice");
+              // If the browser can't record, prefer upload mode by default
+              // so the user isn't stuck staring at a disabled mic button.
+              if (!recorderSupported) setVoiceMode("upload");
+            }}
+            className={cn(
+              "flex min-w-[64px] flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12.5px] font-medium transition-all",
+              activeTab === "voice"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Mic className="h-3.5 w-3.5" />
+            Voice
           </button>
         </div>
 
@@ -354,6 +583,165 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
           </div>
         )}
 
+        {/* Voice tab */}
+        {activeTab === "voice" && (
+          <div className="grid gap-3">
+            {recorderSupported && (
+              <div className="flex gap-1 rounded-md border border-[var(--border)] bg-[var(--muted)] p-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVoiceMode("record");
+                    setError(null);
+                  }}
+                  className={cn(
+                    "flex flex-1 items-center justify-center gap-1.5 rounded-sm px-2 py-1 text-[12px] font-medium transition-all",
+                    voiceMode === "record"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Mic className="h-3 w-3" />
+                  Record
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVoiceMode("upload");
+                    setError(null);
+                  }}
+                  className={cn(
+                    "flex flex-1 items-center justify-center gap-1.5 rounded-sm px-2 py-1 text-[12px] font-medium transition-all",
+                    voiceMode === "upload"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Upload className="h-3 w-3" />
+                  Upload
+                </button>
+              </div>
+            )}
+
+            {!recorderSupported && (
+              <p className="text-[11.5px] text-muted-foreground">
+                Recording isn&apos;t supported in this browser — upload a voice
+                note file instead.
+              </p>
+            )}
+
+            {voiceMode === "record" && recorderSupported && (
+              <div className="grid place-items-center gap-3 rounded-lg border border-dashed border-[var(--border)] bg-[var(--muted)] px-4 py-6">
+                {recordingState === "idle" && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={startRecording}
+                      className="grid h-20 w-20 place-items-center rounded-full bg-primary text-primary-foreground shadow-md transition-transform hover:scale-[1.03] active:scale-[0.98]"
+                      aria-label="Start recording"
+                    >
+                      <Mic className="h-8 w-8" />
+                    </button>
+                    <p className="text-center text-[12px] text-muted-foreground">
+                      Tap to record a voice note. Describe the recipe in your
+                      own words.
+                    </p>
+                  </>
+                )}
+
+                {recordingState === "requesting" && (
+                  <p className="text-[12.5px] text-muted-foreground">
+                    Requesting microphone access…
+                  </p>
+                )}
+
+                {recordingState === "recording" && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={stopRecording}
+                      className="grid h-20 w-20 place-items-center rounded-full bg-destructive text-destructive-foreground shadow-md transition-transform hover:scale-[1.03] active:scale-[0.98] animate-pulse"
+                      aria-label="Stop recording"
+                    >
+                      <Square className="h-7 w-7" fill="currentColor" />
+                    </button>
+                    <p className="text-center text-[14px] font-medium tabular-nums">
+                      {formatDuration(recordSeconds)}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={cancelRecording}
+                      className="text-[11.5px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                )}
+
+                {recordingState === "ready" && recordedUrl && (
+                  <>
+                    <audio src={recordedUrl} controls className="w-full" />
+                    <p className="text-[11.5px] text-muted-foreground">
+                      {formatDuration(recordSeconds)} recorded
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        resetVoiceState();
+                        startRecording();
+                      }}
+                      className="text-[11.5px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                    >
+                      Re-record
+                    </button>
+                  </>
+                )}
+
+                {recordingState === "denied" && (
+                  <button
+                    type="button"
+                    onClick={() => setVoiceMode("upload")}
+                    className="text-[12px] underline-offset-2 hover:underline"
+                  >
+                    Switch to upload mode
+                  </button>
+                )}
+              </div>
+            )}
+
+            {voiceMode === "upload" && (
+              <div className="grid gap-2">
+                <label
+                  htmlFor="ai-audio-input"
+                  className="flex min-h-[100px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-[var(--border)] bg-[var(--muted)] px-4 py-4 text-muted-foreground transition-colors hover:border-[var(--border-strong,#cfccc0)] hover:text-foreground"
+                >
+                  <Upload className="h-6 w-6 opacity-40" />
+                  <span className="text-[12.5px]">
+                    {audioFile ? audioFile.name : "Tap to choose an audio file"}
+                  </span>
+                  {audioFile && (
+                    <span className="text-[11px] opacity-70">
+                      {formatFileSize(audioFile.size)}
+                    </span>
+                  )}
+                </label>
+                <input
+                  ref={audioInputRef}
+                  id="ai-audio-input"
+                  type="file"
+                  accept={SUPPORTED_AUDIO_MEDIA_TYPES.join(",")}
+                  className="sr-only"
+                  onChange={handleAudioFileChange}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  WhatsApp voice notes (mp3, m4a, opus, ogg) and regular audio
+                  files up to 25 MB.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         {error && (
           <p className="text-[12.5px] text-destructive">{error}</p>
         )}
@@ -367,14 +755,20 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
               ? !photoFile
               : activeTab === "text"
                 ? !pastedText.trim()
-                : !youtubeUrlReady)
+                : activeTab === "youtube"
+                  ? !youtubeUrlReady
+                  : !voicePayloadReady)
           }
           className="w-full"
         >
           {isPending ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              {activeTab === "youtube" ? "Reading the video…" : "Thinking…"}
+              {activeTab === "youtube"
+                ? "Reading the video…"
+                : activeTab === "voice"
+                  ? "Listening…"
+                  : "Thinking…"}
             </>
           ) : (
             <>
@@ -390,6 +784,12 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
           </p>
         ) : null}
 
+        {isPending && activeTab === "voice" && slowLoading ? (
+          <p className="text-center text-[11px] text-muted-foreground">
+            Long voice notes take a bit longer.
+          </p>
+        ) : null}
+
         <p className="text-center text-[11px] text-muted-foreground">
           Inputs are sent to AI providers (OpenAI primary, Anthropic fallback).
           Always review before saving.
@@ -397,4 +797,30 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
       </DialogContent>
     </Dialog>
   );
+}
+
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// MediaRecorder picks the container based on browser support — map back
+// to a sensible extension for the uploaded filename. Whisper uses the
+// extension when the MIME is ambiguous, and the server-side validator
+// expects a recognized type. Default to `webm` for unknown — that's the
+// Chrome/Firefox default and the server-side validator accepts it.
+function mimeToExtension(mime: string): string {
+  if (mime.includes("webm")) return "webm";
+  if (mime.includes("mp4")) return "mp4";
+  if (mime.includes("ogg")) return "ogg";
+  if (mime.includes("wav")) return "wav";
+  if (mime.includes("mpeg") || mime.includes("mp3")) return "mp3";
+  return "webm";
 }

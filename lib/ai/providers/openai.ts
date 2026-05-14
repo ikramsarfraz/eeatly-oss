@@ -1,10 +1,11 @@
 import "server-only";
 
-import OpenAI from "openai";
+import OpenAI, { toFile } from "openai";
 import {
   buildSharePrompt,
   SUGGEST_FROM_IMAGE_PROMPT,
   SUGGEST_FROM_TEXT_PROMPT,
+  SUGGEST_FROM_VOICE_NOTE_PROMPT,
   SUGGEST_FROM_YOUTUBE_PROMPT
 } from "@/lib/ai/prompts";
 import { logger } from "@/lib/observability/logger";
@@ -159,6 +160,86 @@ export async function suggestMealFromTranscript(transcript: string): Promise<Mea
   const content = response.choices[0]?.message?.content;
   if (!content) throw new Error("OpenAI returned an empty response.");
   return parseSuggestion(JSON.parse(content) as Record<string, unknown>);
+}
+
+export async function suggestMealFromVoiceTranscript(
+  transcript: string
+): Promise<MealSuggestion> {
+  const client = getClient();
+  // Voice notes typically run shorter than YouTube transcripts but
+  // wordier than pasted text — ramble, corrections, asides. Same
+  // output budget as YouTube; the prompt is responsible for compressing
+  // filler back out.
+  const response = await client.chat.completions.create(
+    {
+      model: MODEL,
+      max_tokens: 1500,
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: "meal_suggestion", strict: true, schema: SUGGESTION_SCHEMA }
+      },
+      messages: [
+        { role: "user", content: `${SUGGEST_FROM_VOICE_NOTE_PROMPT}\n\n${transcript}` }
+      ]
+    },
+    { signal: AbortSignal.timeout(PRIMARY_TIMEOUT_MS) }
+  );
+
+  const usage = response.usage;
+  logger.info("ai_provider_tokens", {
+    provider: "openai",
+    operation: "suggest_meal_from_voice",
+    input_tokens: usage?.prompt_tokens ?? null,
+    output_tokens: usage?.completion_tokens ?? null
+  });
+
+  const content = response.choices[0]?.message?.content;
+  if (!content) throw new Error("OpenAI returned an empty response.");
+  return parseSuggestion(JSON.parse(content) as Record<string, unknown>);
+}
+
+// Whisper-specific timeout — Whisper is materially slower than chat
+// completions (10–20s on long voice notes is normal). The 7s primary
+// budget the other paths use would time out essentially every call.
+const WHISPER_TIMEOUT_MS = 30_000;
+
+/**
+ * Round 8 — Whisper transcription. Returns the raw transcript text;
+ * caller is responsible for feeding it to the extraction prompt.
+ *
+ * Whisper auto-detects language (no `language` param) — it handles
+ * Urdu/Hindi/English code-switching well, which is the primary use
+ * case for our audience.
+ *
+ * Whisper is the only transcription provider — no Anthropic fallback
+ * for v1 (different model class, complicates the contract). If
+ * Whisper is down, the service throws `AudioTranscriptionFailedError`.
+ */
+export async function transcribeAudio(
+  audioBuffer: Buffer,
+  mediaType: string,
+  fileName: string
+): Promise<string> {
+  const client = getClient();
+  const file = await toFile(audioBuffer, fileName, { type: mediaType });
+  const start = Date.now();
+  const response = await client.audio.transcriptions.create(
+    {
+      file,
+      model: "whisper-1",
+      response_format: "json"
+    },
+    { signal: AbortSignal.timeout(WHISPER_TIMEOUT_MS) }
+  );
+  logger.info("ai_provider_call", {
+    provider: "openai",
+    operation: "transcribe_audio",
+    success: true,
+    latencyMs: Date.now() - start
+  });
+  // `response_format: 'json'` narrows the typed response to
+  // `Transcription` — the `text` field is always present.
+  return (response as { text: string }).text;
 }
 
 export async function generateShareText(

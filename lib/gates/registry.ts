@@ -55,6 +55,10 @@ export const FEATURE_REGISTRY = {
   ai_suggest_youtube: {
     description: "Turn YouTube cooking videos into saved recipes",
     defaultRule: "beta_or_paid" as GateRule
+  },
+  ai_suggest_voice: {
+    description: "Extract recipes from voice notes",
+    defaultRule: "beta_or_paid" as GateRule
   }
 } as const satisfies Record<string, { description: string; defaultRule: GateRule }>;
 

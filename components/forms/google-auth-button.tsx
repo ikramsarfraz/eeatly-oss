@@ -7,9 +7,12 @@ import { authClient } from "@/lib/auth/client";
 
 type GoogleAuthButtonProps = {
   mode: "sign-in" | "sign-up";
+  /** Override the post-auth redirect — used by the invite handoff so
+   *  the user lands back at /invite/[token]. Falls back to /dashboard. */
+  callbackURL?: string;
 };
 
-export function GoogleAuthButton({ mode }: GoogleAuthButtonProps) {
+export function GoogleAuthButton({ mode, callbackURL }: GoogleAuthButtonProps) {
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -19,7 +22,7 @@ export function GoogleAuthButton({ mode }: GoogleAuthButtonProps) {
     try {
       await authClient.signIn.social({
         provider: "google",
-        callbackURL: "/dashboard"
+        callbackURL: callbackURL ?? "/dashboard"
       });
     } catch {
       setError("Google sign-in is temporarily unavailable. Please try again.");
