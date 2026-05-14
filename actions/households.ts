@@ -8,8 +8,12 @@ import { db } from "@/lib/db/client";
 import { dispatchTransactionalEmail } from "@/lib/email/transactional";
 import { getServerEnv } from "@/lib/env/server";
 import {
+  CannotRemoveOwnerError,
+  CannotRemoveSelfError,
   InvitationInvalidError,
   MealNameCollisionError,
+  NotHouseholdOwnerError,
+  NotMemberError,
   OwnershipTransferRequiredError
 } from "@/lib/errors/households";
 import { logger } from "@/lib/observability/logger";
@@ -17,15 +21,18 @@ import { checkInvitationLimit, checkMealMutationLimit } from "@/lib/security/rat
 import {
   acceptInvitationSchema,
   createInvitationSchema,
+  removeMemberSchema,
   revokeInvitationSchema,
   type AcceptInvitationInput,
   type CreateInvitationInput,
+  type RemoveMemberInput,
   type RevokeInvitationInput
 } from "@/lib/validators/households";
 import { createNotification } from "@/services/notifications";
 import {
   acceptHouseholdInvitation,
   createHouseholdInvitation,
+  removeMemberFromHousehold,
   revokeHouseholdInvitation
 } from "@/services/households";
 
@@ -59,6 +66,20 @@ export type AcceptInvitationResult =
 export type RevokeInvitationResult =
   | { ok: true }
   | { ok: false; code: "VALIDATION" | "NOT_OWNER" | "ERROR"; message: string };
+
+export type RemoveMemberResult =
+  | { ok: true; removedUserName: string }
+  | {
+      ok: false;
+      code:
+        | "VALIDATION"
+        | "NOT_OWNER"
+        | "CANNOT_REMOVE_SELF"
+        | "CANNOT_REMOVE_OWNER"
+        | "NOT_MEMBER"
+        | "ERROR";
+      message: string;
+    };
 
 function buildInviteUrl(token: string): string {
   const base = getServerEnv().NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
@@ -284,6 +305,93 @@ export async function revokeInvitationAction(
     return { ok: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Couldn't revoke invitation.";
+    return { ok: false, code: "ERROR", message };
+  }
+}
+
+/**
+ * Owner-only: remove a member from the current household. Defense-in-depth
+ * — the service re-checks ownership and the four membership invariants
+ * (self / owner / non-member). On success, fire-and-forget a notification +
+ * email to the removed user; failures log but don't block the removal.
+ *
+ * The removed user lands in a fresh personal household on their next
+ * session via the existing `ensureHouseholdForUser` self-heal path.
+ */
+export async function removeMemberAction(
+  input: RemoveMemberInput
+): Promise<RemoveMemberResult> {
+  const parsed = removeMemberSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      code: "VALIDATION",
+      message: parsed.error.issues[0]?.message ?? "Invalid request."
+    };
+  }
+
+  const { user, household } = await requireCurrentUserWithHousehold();
+  // Reuse the meal-mutation budget as the brute-force throttle. Member
+  // removals are rare events; a dedicated limiter would be over-built.
+  await checkMealMutationLimit(user.id);
+
+  try {
+    const result = await removeMemberFromHousehold(
+      user.id,
+      parsed.data.targetUserId,
+      household.id
+    );
+
+    // Fire-and-forget post-mutation side effects. Same pattern as
+    // milestone notifications: the removal is committed regardless.
+    void createNotification({
+      userId: result.removedUserId,
+      type: "system",
+      title: `You were removed from ${result.householdName}`,
+      body: "You'll land in a fresh personal kitchen the next time you sign in.",
+      href: "/dashboard"
+    }).catch((error) => {
+      logger.warn("removal_notification_failed", {
+        actorId: user.id,
+        removedUserId: result.removedUserId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    });
+
+    void dispatchTransactionalEmail({
+      template: "household_member_removed",
+      toEmail: result.removedUserEmail,
+      toName: result.removedUserName,
+      userId: result.removedUserId,
+      removal: { householdName: result.householdName }
+    }).catch((error) => {
+      logger.warn("removal_email_dispatch_failed", {
+        actorId: user.id,
+        removedUserId: result.removedUserId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    });
+
+    revalidatePath("/settings");
+    revalidatePath("/dashboard");
+    revalidatePath("/history");
+
+    return { ok: true, removedUserName: result.removedUserName };
+  } catch (error) {
+    if (error instanceof NotHouseholdOwnerError) {
+      return { ok: false, code: error.code, message: error.message };
+    }
+    if (error instanceof CannotRemoveSelfError) {
+      return { ok: false, code: error.code, message: error.message };
+    }
+    if (error instanceof CannotRemoveOwnerError) {
+      return { ok: false, code: error.code, message: error.message };
+    }
+    if (error instanceof NotMemberError) {
+      return { ok: false, code: error.code, message: error.message };
+    }
+    const message = error instanceof Error ? error.message : "Couldn't remove member.";
+    logger.warn("remove_member_failed", { actorId: user.id, error: message });
     return { ok: false, code: "ERROR", message };
   }
 }

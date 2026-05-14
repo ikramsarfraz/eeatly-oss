@@ -32,26 +32,40 @@ export function DeleteAccountCard() {
     if (!phraseMatches) return;
     setPending(true);
     try {
-      // The action redirects on success — control normally won't return.
-      await deleteAccountAction(phrase);
-    } catch (error) {
-      // The NEXT_REDIRECT thrown by `redirect()` is intentionally not a
-      // user-facing error. Let it bubble silently.
-      const message = error instanceof Error ? error.message : String(error);
-      if (message.includes("NEXT_REDIRECT")) return;
-
+      // The action redirects on success — control normally won't return
+      // with `ok: true`. Failure cases come back as a discriminated-union
+      // result; the UI branches on `code` rather than parsing strings.
+      const result = await deleteAccountAction(phrase);
+      if (result.ok) {
+        // Unreachable in practice (redirect short-circuits). Defensive
+        // no-op so the type-narrowing stays exhaustive.
+        return;
+      }
       setPending(false);
-      // Round-4 guard: owners of multi-member households get a dedicated
-      // toast pointing at the resolution path. The action throws
-      // `OwnerAccountDeletionBlockedError`, but server actions don't
-      // preserve the class across the boundary — match on the message
-      // prefix the class uses.
-      const isOwnerBlocked = message.startsWith("You own a household");
+      if (result.code === "OWNER_BLOCK") {
+        showToast({
+          variant: "error",
+          title: "Can't delete your account yet",
+          description:
+            "You own a household with other members. Transfer ownership before deleting — for now, contact support to make the change (the in-product transfer flow is coming)."
+        });
+        return;
+      }
       showToast({
         variant: "error",
-        title: isOwnerBlocked
-          ? "Can't delete your account yet"
-          : "Couldn't delete your account",
+        title: "Couldn't delete your account",
+        description: result.message
+      });
+    } catch (error) {
+      // The NEXT_REDIRECT thrown by `redirect()` is intentionally not a
+      // user-facing error. Let it bubble silently. Any other throw is
+      // an infra failure (rate limit, signOut crash) — surface generic.
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes("NEXT_REDIRECT")) return;
+      setPending(false);
+      showToast({
+        variant: "error",
+        title: "Couldn't delete your account",
         description: message
       });
     }

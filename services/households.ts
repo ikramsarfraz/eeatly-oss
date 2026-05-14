@@ -12,8 +12,12 @@ import {
 } from "@/db/schema";
 import { db } from "@/lib/db/client";
 import {
+  CannotRemoveOwnerError,
+  CannotRemoveSelfError,
   InvitationInvalidError,
   MealNameCollisionError,
+  NotHouseholdOwnerError,
+  NotMemberError,
   OwnershipTransferRequiredError
 } from "@/lib/errors/households";
 import { logger } from "@/lib/observability/logger";
@@ -492,6 +496,116 @@ export async function acceptHouseholdInvitation(
       inviterName: inviterRow?.name ?? "",
       mealsMoved: mealsMoved.length,
       logsMoved: logsMoved.length
+    };
+  });
+}
+
+export type RemoveMemberResult = {
+  removedUserId: string;
+  removedUserName: string;
+  removedUserEmail: string;
+  householdName: string;
+};
+
+/**
+ * Owner-only removal of a member from a household. Performs four guards
+ * before the mutation:
+ *
+ *   1. Actor is the owner of the household (via households.ownerId).
+ *      → NotHouseholdOwnerError
+ *   2. Target isn't the actor (the action layer never renders the button
+ *      for self-removal, but the service defends in case the action is
+ *      called directly). → CannotRemoveSelfError
+ *   3. Target isn't the owner (defense — the unique constraint that owner
+ *      is always a member should mean only one row has role='owner', but
+ *      a divergent state shouldn't silently remove the owner row).
+ *      → CannotRemoveOwnerError
+ *   4. Target is currently a member. → NotMemberError
+ *
+ * The transaction deletes the household_members row and nulls the target's
+ * preferred_household_id. cookedByUserId / createdByUserId on meals and
+ * meal_logs intentionally untouched — the attribution stays so history
+ * still reads as "by <name>" until the user is fully gone (e.g., on
+ * account deletion). On their next session, the auth layer's self-heal
+ * creates a fresh personal household.
+ *
+ * Returns context the action uses to fire the post-removal notification +
+ * email (fire-and-forget; failures don't block the removal).
+ */
+export async function removeMemberFromHousehold(
+  actorId: string,
+  targetUserId: string,
+  householdId: string
+): Promise<RemoveMemberResult> {
+  return db.transaction(async (tx) => {
+    const [household] = await tx
+      .select({ id: households.id, name: households.name, ownerId: households.ownerId })
+      .from(households)
+      .where(eq(households.id, householdId))
+      .limit(1);
+    if (!household) {
+      throw new NotHouseholdOwnerError();
+    }
+    if (household.ownerId !== actorId) {
+      logger.error("remove_member_non_owner", { actorId, householdId, targetUserId });
+      throw new NotHouseholdOwnerError();
+    }
+
+    if (actorId === targetUserId) {
+      throw new CannotRemoveSelfError();
+    }
+    if (household.ownerId === targetUserId) {
+      throw new CannotRemoveOwnerError();
+    }
+
+    const [target] = await tx
+      .select({
+        memberId: householdMembers.id,
+        name: users.name,
+        email: users.email
+      })
+      .from(householdMembers)
+      .innerJoin(users, eq(users.id, householdMembers.userId))
+      .where(
+        and(
+          eq(householdMembers.householdId, householdId),
+          eq(householdMembers.userId, targetUserId)
+        )
+      )
+      .limit(1);
+    if (!target) {
+      throw new NotMemberError();
+    }
+
+    await tx
+      .delete(householdMembers)
+      .where(
+        and(
+          eq(householdMembers.householdId, householdId),
+          eq(householdMembers.userId, targetUserId)
+        )
+      );
+
+    // Clear the removed user's preferred pointer so their next session
+    // triggers ensureHouseholdForUser → fresh personal household. We
+    // could also re-seed it here, but the self-heal path is the single
+    // source of truth and we don't want two write paths.
+    await tx
+      .update(users)
+      .set({ preferredHouseholdId: null, updatedAt: new Date() })
+      .where(eq(users.id, targetUserId));
+
+    logger.info("household_member_removed", {
+      actorId,
+      householdId,
+      removedUserId: targetUserId
+    });
+
+    return {
+      removedUserId: targetUserId,
+      removedUserName: target.name,
+      removedUserEmail: target.email,
+      householdName: household.name
     };
   });
 }

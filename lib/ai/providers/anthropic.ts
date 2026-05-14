@@ -108,7 +108,8 @@ export async function suggestMealFromText(text: string): Promise<MealSuggestion>
 export async function generateShareText(
   mealName: string,
   recipeText: string,
-  notes: string | null | undefined
+  notes: string | null | undefined,
+  householdName?: string | null
 ): Promise<{ text: string }> {
   const client = getAnthropicClient();
   const response = await client.messages.create(
@@ -117,7 +118,9 @@ export async function generateShareText(
       max_tokens: 600,
       system:
         "You write friendly, plain-text recipe messages for sharing on WhatsApp or iMessage. No markdown, no asterisks, no dashes, no formatting symbols of any kind — just plain text and line breaks.",
-      messages: [{ role: "user", content: buildSharePrompt(mealName, recipeText, notes) }]
+      messages: [
+        { role: "user", content: buildSharePrompt(mealName, recipeText, notes, householdName) }
+      ]
     },
     { signal: AbortSignal.timeout(15_000) }
   );

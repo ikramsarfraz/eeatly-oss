@@ -18,8 +18,20 @@ Set confidence to "high" if the image is clear and the identification is certain
 
 Return your answer in the required format.`;
 
-export function buildSharePrompt(mealName: string, recipeText: string, notes?: string | null): string {
+export function buildSharePrompt(
+  mealName: string,
+  recipeText: string,
+  notes?: string | null,
+  householdName?: string | null
+): string {
   const notesSection = notes?.trim() ? `\nCook's notes: ${notes.trim()}` : "";
+  // Household names follow the default "<Name>'s Kitchen" / "My Kitchen"
+  // pattern. The instruction is a literal-string requirement so the model
+  // doesn't paraphrase "Saved in Alex's Kitchen" into "Saved in the Alex's
+  // Kitchen kitchen" — phrasings that read awkwardly with the default.
+  const attributionRule = householdName?.trim()
+    ? `\n- End the message with one final line, by itself, exactly: Saved in ${householdName.trim()} · eeatly.app`
+    : "";
   return `Turn the following recipe into a friendly WhatsApp message to share with family.
 
 Rules:
@@ -27,7 +39,7 @@ Rules:
 - List ingredients on separate lines (no bullet symbols, no asterisks, no dashes)
 - Number each step on its own line
 - If there are cook's notes, weave them in naturally after the steps as a tip
-- Close with a brief warm sign-off suitable for family sharing
+- Close with a brief warm sign-off suitable for family sharing${attributionRule}
 - Plain text ONLY — absolutely no markdown, no asterisks, no bold, no headers, no symbols
 - Total length: under 1500 characters
 

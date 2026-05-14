@@ -117,7 +117,8 @@ export async function suggestMealFromText(text: string): Promise<MealSuggestion>
 export async function generateShareText(
   mealName: string,
   recipeText: string,
-  notes: string | null | undefined
+  notes: string | null | undefined,
+  householdName?: string | null
 ): Promise<{ text: string }> {
   const client = getClient();
   const response = await client.chat.completions.create(
@@ -130,7 +131,7 @@ export async function generateShareText(
           content:
             "You write friendly, plain-text recipe messages for sharing on WhatsApp or iMessage. No markdown, no asterisks, no dashes, no formatting symbols of any kind — just plain text and line breaks."
         },
-        { role: "user", content: buildSharePrompt(mealName, recipeText, notes) }
+        { role: "user", content: buildSharePrompt(mealName, recipeText, notes, householdName) }
       ]
     },
     { signal: AbortSignal.timeout(15_000) }
