@@ -1,42 +1,165 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import type { Route } from "next";
 import { Card, CardContent } from "@/components/ui/card";
 
 export const metadata: Metadata = {
   title: "Help",
-  description: "Learn how to use eeatly to remember and rediscover your meals."
+  description:
+    "How to log meals, capture recipes from photos / text / YouTube / voice, share with family, and manage your account."
 };
 
-const topics = [
-  {
-    question: "What is eeatly?",
-    answer:
-      "eeatly is a personal meal memory. It helps you remember what you have cooked, notice which meals you come back to most, and rediscover dinners you have not made in a while. It is not a recipe app — it is a memory for the meals you already cook."
-  },
+type Topic = {
+  question: string;
+  /** Rendered as ReactNode so answers can include inline links. */
+  answer: React.ReactNode;
+};
+
+const topics: Topic[] = [
   {
     question: "How do I log a meal?",
-    answer:
-      'Tap "Log a meal" in the sidebar or use the ⌘N shortcut on a keyboard. Type the meal name, pick an effort level (quick, easy, medium, or high), choose the date, and add any notes you want to remember. Tap "Log meal" and you are done. The whole thing takes under a minute.'
+    answer: (
+      <>
+        Open your dashboard and tap{" "}
+        <span className="font-medium text-foreground">Log a meal</span>. Type
+        the dish name, pick an effort level (quick, easy, medium, or high),
+        choose the date, and add any notes. That&apos;s it — the whole thing
+        takes under a minute. If you cooked something you&apos;ve made
+        before, use <span className="font-medium text-foreground">Log again</span>{" "}
+        from the meal&apos;s detail page to save it with today&apos;s date
+        in one tap.
+      </>
+    )
   },
   {
-    question: 'What does "Log again" do?',
-    answer:
-      '"Log again" is a shortcut for meals you have cooked before. It saves the meal with today\'s date and the same effort level as last time. Use it when you make the same thing again and do not want to type anything new.'
+    question: "How does the AI suggest feature work?",
+    answer: (
+      <>
+        On any meal form, tap{" "}
+        <span className="font-medium text-foreground">Help me fill this out</span>.
+        Four inputs work:
+        <ul className="mt-2 list-inside list-disc grid gap-1">
+          <li>
+            <span className="text-foreground">Photo</span> — snap the dish
+            or a recipe card; we&apos;ll name it and pull the recipe text
+            when there is one.
+          </li>
+          <li>
+            <span className="text-foreground">Text</span> — paste a recipe
+            or just a paragraph about the dish.
+          </li>
+          <li>
+            <span className="text-foreground">YouTube</span> — drop a link
+            to a cooking video; we read the captions and extract the recipe.
+          </li>
+          <li>
+            <span className="text-foreground">Voice note</span> — record in
+            the browser or upload a WhatsApp voice note. Speaking in Urdu,
+            Hindi, English, or any mix works.
+          </li>
+        </ul>
+        The AI fills the form fields — always review before saving. Your
+        voice and audio are processed in-memory and never stored on our
+        servers (more in our{" "}
+        <Link href={"/privacy" as Route} className="underline underline-offset-4 hover:text-foreground">
+          privacy page
+        </Link>
+        ).
+      </>
+    )
   },
   {
-    question: "How do suggestions work?",
-    answer:
-      "eeatly looks at your own meal history to suggest what to cook tonight. It considers meals you have not made in a while, meals you cook often, and meals that do not take much effort. Everything it suggests comes from your own history — not a recipe database or trend list."
+    question: "How do I share a recipe with someone?",
+    answer: (
+      <>
+        Open the meal&apos;s detail page and tap{" "}
+        <span className="font-medium text-foreground">Share</span>. We&apos;ll
+        generate a public link you can send over WhatsApp, iMessage, or
+        anywhere else. The recipient doesn&apos;t need an eeatly account
+        to view it. You can revoke the link any time from the same
+        screen.
+      </>
+    )
   },
   {
-    question: "How do I send feedback?",
-    answer:
-      'Tap "Feedback" in the sidebar, or open it from the Settings page. Tell us what felt confusing, broken, or missing. You can also send a quick note to say something is working well. We read every message.'
+    question: "How do I invite my family to my kitchen?",
+    answer: (
+      <>
+        Go to <span className="font-medium text-foreground">Settings</span>{" "}
+        and find your kitchen. Tap{" "}
+        <span className="font-medium text-foreground">Invite</span>, enter
+        an email, and we&apos;ll send them a link. Once they accept, their
+        meals show up alongside yours and theirs alongside yours — recipes
+        are shared, attribution is preserved.
+      </>
+    )
   },
   {
-    question: "How do I sign out?",
-    answer:
-      'Go to Settings (in the sidebar under "You"), scroll to the bottom, and tap "Sign out." This signs you out on this device only. Your cooking history stays saved to your account.'
+    question: "Can I use eeatly if I'm not South Asian?",
+    answer: (
+      <>
+        Yes. eeatly works for any family that cooks together. The product
+        is built to feel especially natural for South Asian families
+        (Urdu/Hindi voice notes, traditional dish names preserved) but
+        nothing about it is exclusive. Western, East Asian, Latin
+        American, North African — any family kitchen fits.
+      </>
+    )
+  },
+  {
+    question: "What if my family lives in a different time zone?",
+    answer: (
+      <>
+        eeatly is async by design — no real-time calls, no presence
+        indicators. Mom in Karachi logs Sunday&apos;s biryani while
+        you&apos;re asleep in Toronto; you see it when you wake up. The
+        whole product is built around &ldquo;kept safe across continents&rdquo;
+        as a first principle, not an afterthought.
+      </>
+    )
+  },
+  {
+    question: "How do I cancel my subscription?",
+    answer: (
+      <>
+        Go to <span className="font-medium text-foreground">Settings → Subscription</span>{" "}
+        and tap <span className="font-medium text-foreground">Manage billing</span>.
+        That opens the Stripe billing portal where you can cancel, change
+        plan, or update your card. Cancellation takes effect at the end of
+        your current billing period — you keep Plus features until then.
+      </>
+    )
+  },
+  {
+    question: "How is my data kept private?",
+    answer: (
+      <>
+        Short version: only what you log is saved, audio is never persisted
+        on our servers, and there are no ad cookies or third-party
+        analytics. The long version lives on the{" "}
+        <Link href={"/privacy" as Route} className="underline underline-offset-4 hover:text-foreground">
+          privacy page
+        </Link>
+        .
+      </>
+    )
+  },
+  {
+    question: "I found a bug or want to send feedback",
+    answer: (
+      <>
+        Inside the app, tap <span className="font-medium text-foreground">Feedback</span>{" "}
+        in the sidebar — we read every message. If you&apos;re not signed
+        in yet, the fastest path is to{" "}
+        <Link
+          href="/sign-up"
+          className="underline underline-offset-4 hover:text-foreground"
+        >
+          create a free account
+        </Link>{" "}
+        and send the note from inside the app so we can write back.
+      </>
+    )
   }
 ];
 
@@ -45,31 +168,53 @@ export default function HelpPage() {
     <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6 lg:px-8">
       <h1 className="text-3xl font-semibold tracking-tight">Help</h1>
       <p className="mt-3 text-muted-foreground">
-        New to eeatly? Here is what you need to know.
+        Short answers to the questions that come up most. If yours
+        isn&apos;t here,{" "}
+        <Link
+          href="/sign-up"
+          className="underline underline-offset-4 hover:text-foreground"
+        >
+          sign up
+        </Link>{" "}
+        and send us a note from the Feedback button inside the app.
       </p>
 
       <div className="mt-10 grid gap-6">
         {topics.map((topic) => (
-          <div key={topic.question} className="grid gap-2 border-b pb-6 last:border-b-0 last:pb-0">
+          <div
+            key={topic.question}
+            className="grid gap-2 border-b pb-6 last:border-b-0 last:pb-0"
+          >
             <h2 className="text-lg font-semibold">{topic.question}</h2>
-            <p className="text-sm text-muted-foreground">{topic.answer}</p>
+            <div className="text-sm text-muted-foreground">{topic.answer}</div>
           </div>
         ))}
       </div>
 
       <Card className="mt-10">
         <CardContent className="p-5">
-          <p className="text-sm font-medium">Still stuck?</p>
+          <p className="text-sm font-medium">See also</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Send us a message through the Feedback button in the app. If you are not signed
-            in yet,{" "}
+            <Link
+              href={"/privacy" as Route}
+              className="underline underline-offset-4 hover:text-foreground"
+            >
+              Privacy
+            </Link>{" "}
+            ·{" "}
+            <Link
+              href={"/pricing" as Route}
+              className="underline underline-offset-4 hover:text-foreground"
+            >
+              Pricing
+            </Link>{" "}
+            ·{" "}
             <Link
               href="/sign-up"
               className="underline underline-offset-4 hover:text-foreground"
             >
-              create your free account
-            </Link>{" "}
-            and then use Feedback from the sidebar.
+              Create your free account
+            </Link>
           </p>
         </CardContent>
       </Card>

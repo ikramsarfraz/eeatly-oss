@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { requireCurrentUser } from "@/lib/auth/session";
+import { sendAccountDeletedEmail } from "@/lib/email/transactional";
 import { logger } from "@/lib/observability/logger";
 import { getRequestId } from "@/lib/observability/request-id";
 import { checkMealMutationLimit } from "@/lib/security/rate-limit";
@@ -72,6 +73,21 @@ export async function deleteAccountAction(
 
   const requestId = (await getRequestId()) ?? undefined;
   logger.info("account_delete_requested", { userId: user.id, requestId });
+
+  // Round 9 — send the confirmation email BEFORE tearing down the row.
+  // After deletion, the user's email + name are gone (the row cascades
+  // through every reference), so we'd have nothing to send to. The send
+  // is best-effort: a failure here can't block the deletion the user
+  // actually requested.
+  try {
+    await sendAccountDeletedEmail(user.email, user.name ?? "there", user.id);
+  } catch (error) {
+    logger.warn("account_delete_confirmation_email_failed", {
+      userId: user.id,
+      requestId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
 
   // Sign out before deleting so the session is invalidated even if the
   // delete itself fails — leaves the user logged out rather than zombie-

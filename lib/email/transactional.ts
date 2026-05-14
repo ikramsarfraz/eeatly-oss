@@ -5,6 +5,7 @@ import { getServerEnv } from "@/lib/env/server";
 import { logEmailDelivery } from "@/lib/email/delivery-log";
 import { eeatlyEmailTags, recordOutboundEmailFromApiSend } from "@/services/email-delivery";
 import { getResendClient } from "@/lib/email/resend-client";
+import { AccountDeletedEmail } from "@/lib/email/templates/account-deleted-email";
 import { FirstMealEncouragementEmail } from "@/lib/email/templates/first-meal-encouragement-email";
 import { HouseholdInvitationEmail } from "@/lib/email/templates/household-invitation-email";
 import { HouseholdMemberRemovedEmail } from "@/lib/email/templates/household-member-removed-email";
@@ -20,7 +21,8 @@ export type TransactionalTemplate =
   | "inactive_reminder"
   | "weekly_recap_placeholder"
   | "household_invitation"
-  | "household_member_removed";
+  | "household_member_removed"
+  | "account_deleted";
 
 export type TransactionalEmailResult = {
   skipped: boolean;
@@ -36,6 +38,10 @@ export type DispatchTransactionalEmailInput = {
   appUrl?: string;
   /** For inactive reminder — shown in copy */
   daysQuiet?: number | null;
+  /** For inactive reminder — up to ~3 dish names to surface as
+   *  "worth bringing back". Optional; the template renders fine when
+   *  empty (general "log a meal" CTA, no list). */
+  neglectedMealNames?: readonly string[];
   /** Weekly recap placeholder line */
   recapTeaser?: string;
   /** For household_invitation — passed straight into the template. */
@@ -88,12 +94,15 @@ export async function dispatchTransactionalEmail(
 
   switch (input.template) {
     case "welcome":
-      subject = "Welcome to eeatly";
-      element = React.createElement(WelcomeEmail, { name: input.toName });
+      subject = "Welcome to eeatly — your family's food memory";
+      element = React.createElement(WelcomeEmail, {
+        name: input.toName,
+        dashboardUrl: href
+      });
       break;
 
     case "first_meal_encouragement":
-      subject = "Log your first meal on eeatly";
+      subject = "That's one meal saved — here's what to try next";
       element = React.createElement(FirstMealEncouragementEmail, {
         name: input.toName,
         dashboardUrl: href
@@ -101,11 +110,20 @@ export async function dispatchTransactionalEmail(
       break;
 
     case "inactive_reminder":
-      subject = "We miss seeing your cooks on eeatly";
+      subject = "A few dishes worth bringing back";
       element = React.createElement(InactiveReminderEmail, {
         name: input.toName,
         dashboardUrl: href,
-        daysQuiet: input.daysQuiet ?? null
+        daysQuiet: input.daysQuiet ?? null,
+        neglectedMealNames: input.neglectedMealNames ?? []
+      });
+      break;
+
+    case "account_deleted":
+      subject = "Your eeatly account has been deleted";
+      element = React.createElement(AccountDeletedEmail, {
+        name: input.toName,
+        contactEmail: EMAIL_FROM
       });
       break;
 
@@ -262,6 +280,27 @@ export function scheduleTransactionalEmail(input: DispatchTransactionalEmailInpu
 export async function sendWelcomeEmail(email: string, name: string, userId?: string) {
   return dispatchTransactionalEmail({
     template: "welcome",
+    toEmail: email,
+    toName: name,
+    userId,
+    trackDispatch: Boolean(userId)
+  });
+}
+
+/**
+ * Round 9 — sent during the account deletion flow, BEFORE the user row
+ * tears down. After tear-down the `userId` is gone, so the dispatch call
+ * still records analytics keyed to the (now-deleted) user; that's fine
+ * — the events table keeps `user_id` rows after the user is gone, just
+ * deidentified.
+ */
+export async function sendAccountDeletedEmail(
+  email: string,
+  name: string,
+  userId?: string
+) {
+  return dispatchTransactionalEmail({
+    template: "account_deleted",
     toEmail: email,
     toName: name,
     userId,
