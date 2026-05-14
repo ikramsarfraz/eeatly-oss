@@ -16,33 +16,64 @@ export type InactiveReminderEmailProps = {
   name: string;
   dashboardUrl: string;
   daysQuiet: number | null;
+  /** Up to ~3 dish names from this user's neglected/least-recently-cooked
+   *  meals. Empty array = the user has logs but we have nothing fresh to
+   *  surface (rare); we still send the email but skip the list. */
+  neglectedMealNames?: readonly string[];
 };
 
-export function InactiveReminderEmail({ name, dashboardUrl, daysQuiet }: InactiveReminderEmailProps) {
+export function InactiveReminderEmail({
+  name,
+  dashboardUrl,
+  daysQuiet,
+  neglectedMealNames = []
+}: InactiveReminderEmailProps) {
   const quietLine =
     typeof daysQuiet === "number" && daysQuiet > 0
-      ? `It has been about ${daysQuiet} days since your last log.`
-      : "We noticed you have not logged lately.";
+      ? `It's been about ${daysQuiet} days since you logged a meal.`
+      : "It's been a little while since you logged a meal.";
+
+  const hasSuggestions = neglectedMealNames.length > 0;
 
   return (
     <Html>
       <Head />
-      <Preview>Your cooking history misses you</Preview>
+      <Preview>A few dishes worth bringing back</Preview>
       <Body style={emailBody}>
         <Container style={emailContainer}>
           <Section>
-            <Heading style={emailHeading}>Missing your kitchen notes, {name}</Heading>
+            <Heading style={emailHeading}>Anything good cooking, {name}?</Heading>
             <Text style={emailText}>{quietLine}</Text>
-            <Text style={emailText}>
-              eeatly stays useful when you toss in quick wins — same repeat dinners are perfect.
-            </Text>
-            <Section style={{ marginTop: "24px" }}>
+            {hasSuggestions ? (
+              <>
+                <Text style={emailText}>
+                  Here are a few dishes from your kitchen that might be worth
+                  bringing back:
+                </Text>
+                <Section style={{ margin: "8px 0 12px", paddingLeft: "4px" }}>
+                  {neglectedMealNames.map((mealName) => (
+                    <Text
+                      key={mealName}
+                      style={{ ...emailText, margin: "2px 0", fontWeight: 500 }}
+                    >
+                      · {mealName}
+                    </Text>
+                  ))}
+                </Section>
+              </>
+            ) : (
+              <Text style={emailText}>
+                Even a quick one-line log keeps the thread going — weeknight
+                repeats count.
+              </Text>
+            )}
+            <Section style={{ marginTop: "20px" }}>
               <Button href={dashboardUrl} style={emailButton}>
-                Log tonight’s meal
+                Open your kitchen
               </Button>
             </Section>
-            <Text style={{ ...emailText, marginTop: "20px", fontSize: "13px", color: "#4a5246" }}>
-              Shortcut link:{" "}
+            <Text style={{ ...emailText, fontSize: "13px", color: "#4a5246", marginTop: "20px" }}>
+              Direct link:{" "}
               <Link href={dashboardUrl} style={{ color: "#3d4f3a" }}>
                 {dashboardUrl}
               </Link>

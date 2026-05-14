@@ -32,6 +32,14 @@ vi.mock("@/lib/security/rate-limit", () => ({
   checkMealMutationLimit: async () => undefined
 }));
 
+// Round 9: deleteAccountAction now sends a confirmation email pre-delete.
+// Mock at the boundary so the test doesn't drag the Resend/transactional
+// chain (which validates env at module load).
+const emailMock = vi.hoisted(() => ({
+  sendAccountDeletedEmail: vi.fn<(email: string, name: string, userId?: string) => Promise<unknown>>()
+}));
+vi.mock("@/lib/email/transactional", () => emailMock);
+
 const householdMock = vi.hoisted(() => ({
   userOwnsMultiMemberHousehold: vi.fn<(userId: string) => Promise<boolean>>()
 }));
@@ -42,6 +50,8 @@ import { deleteAccountAction } from "./account";
 
 beforeEach(() => {
   householdMock.userOwnsMultiMemberHousehold.mockReset();
+  emailMock.sendAccountDeletedEmail.mockReset();
+  emailMock.sendAccountDeletedEmail.mockResolvedValue({ skipped: false });
 });
 
 describe("deleteAccountAction discriminated-union surface", () => {

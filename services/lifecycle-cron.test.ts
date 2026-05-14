@@ -7,21 +7,29 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const cronState = vi.hoisted(() => {
   type ExecuteResult = { rows: unknown[] };
-  let executeRows: unknown[] = [];
+  // Round 9: lifecycle-cron now issues a second `db.execute` per inactive
+  // user (the neglected-meal-names lookup). The queue lets tests script
+  // multiple shaped responses per run; calls after the queue is empty fall
+  // back to `[]` (consistent with the helper's catch-and-empty behavior).
+  const queue: ExecuteResult[] = [];
 
   return {
     setExecuteRows(rows: unknown[]) {
-      executeRows = rows;
+      queue.length = 0;
+      queue.push({ rows });
     },
-    getExecuteRows(): ExecuteResult {
-      return { rows: executeRows };
+    queueExecuteRows(rows: unknown[]) {
+      queue.push({ rows });
+    },
+    consumeExecuteRows(): ExecuteResult {
+      return queue.shift() ?? { rows: [] };
     }
   };
 });
 
 vi.mock("@/lib/db/client", () => ({
   db: {
-    execute: vi.fn(async () => cronState.getExecuteRows())
+    execute: vi.fn(async () => cronState.consumeExecuteRows())
   }
 }));
 
@@ -158,5 +166,40 @@ describe("runLifecycleNudges", () => {
     await runLifecycleNudges();
     const call = emailMock.dispatchTransactionalEmail.mock.calls[0]?.[0];
     expect(call?.daysQuiet).toBeGreaterThanOrEqual(40);
+  });
+
+  it("forwards neglectedMealNames from the per-user lookup into the email dispatch", async () => {
+    // First db.execute: the inactive-users scan.
+    cronState.setExecuteRows([inactiveRow()]);
+    // Second db.execute: the per-user neglected meals lookup.
+    cronState.queueExecuteRows([
+      { meal_name: "Chicken karahi" },
+      { meal_name: "Daal chawal" },
+      { meal_name: "Aloo gosht" }
+    ]);
+    notificationsMock.createNotificationIfNotRecent.mockResolvedValueOnce({ id: "n-1" });
+    emailMock.dispatchTransactionalEmail.mockResolvedValueOnce({ skipped: false });
+
+    await runLifecycleNudges();
+    const call = emailMock.dispatchTransactionalEmail.mock.calls[0]?.[0];
+    expect(call?.neglectedMealNames).toEqual([
+      "Chicken karahi",
+      "Daal chawal",
+      "Aloo gosht"
+    ]);
+  });
+
+  it("still dispatches the email when the neglected-meals lookup returns nothing", async () => {
+    cronState.setExecuteRows([inactiveRow()]);
+    // Empty result for the per-user lookup — the template gracefully
+    // degrades to the general "log a meal" copy.
+    cronState.queueExecuteRows([]);
+    notificationsMock.createNotificationIfNotRecent.mockResolvedValueOnce({ id: "n-1" });
+    emailMock.dispatchTransactionalEmail.mockResolvedValueOnce({ skipped: false });
+
+    const result = await runLifecycleNudges();
+    expect(result.emailed).toBe(1);
+    const call = emailMock.dispatchTransactionalEmail.mock.calls[0]?.[0];
+    expect(call?.neglectedMealNames).toEqual([]);
   });
 });

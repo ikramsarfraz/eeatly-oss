@@ -19,7 +19,8 @@ import {
 } from "@/actions/onboarding";
 import { createMealLogAction } from "@/actions/meals";
 
-type Step = 1 | 2 | 3 | 4;
+type FreshStep = 1 | 2 | 3 | 4;
+type InvitedStep = 1 | 2 | 3;
 
 type Habits = {
   cooksPerWeek: number | null;
@@ -33,16 +34,31 @@ const EFFORT_OPTIONS: { value: EffortLevel; label: string; helper: string }[] = 
   { value: "high_effort", label: "Project", helper: "An hour or more" }
 ];
 
-export function OnboardingFlow({
-  name,
-  initialHabits
-}: {
+export type OnboardingFlowProps = {
   name: string;
   initialHabits: Habits;
-}) {
+  /** Round 9: invited users get a shorter flow with kitchen-aware copy.
+   *  Fresh = standard 4-step flow (welcome → habits → first meal → done).
+   *  Invited = 3-step flow (welcome → habits → done) ending with a
+   *  dashboard toast naming their kitchen. */
+  path: "fresh" | "invited";
+  /** The kitchen name. Used in invited-path copy + the post-onboarding
+   *  toast. Null on the fresh path or if unavailable. */
+  householdName: string | null;
+};
+
+export function OnboardingFlow({
+  name,
+  initialHabits,
+  path,
+  householdName
+}: OnboardingFlowProps) {
   const router = useRouter();
   const { showToast } = useToast();
-  const [step, setStep] = React.useState<Step>(1);
+  const isInvited = path === "invited";
+  const totalSteps = isInvited ? 3 : 4;
+
+  const [step, setStep] = React.useState<FreshStep | InvitedStep>(1);
   const [habits, setHabits] = React.useState<Habits>(initialHabits);
   const [firstMealName, setFirstMealName] = React.useState("");
   const [pending, setPending] = React.useState(false);
@@ -55,7 +71,9 @@ export function OnboardingFlow({
         cooksPerWeek: habits.cooksPerWeek,
         weeknightEffort: habits.weeknightEffort
       });
-      setStep(3);
+      // Invited path skips the first-meal step — the kitchen already
+      // has content, asking them to log "their first meal" feels off.
+      setStep(isInvited ? 3 : 3);
     } catch (error) {
       showToast({
         variant: "error",
@@ -99,14 +117,12 @@ export function OnboardingFlow({
   async function handleFinish() {
     setPending(true);
     try {
-      // Server action redirects to /dashboard on success — control may not
-      // return here.
       await completeOnboardingAction();
-      router.replace("/dashboard");
+      router.replace(buildPostOnboardingHref({ path, householdName }));
     } catch {
-      // redirect() throws a special NEXT_REDIRECT that we deliberately don't
-      // catch separately — anything else lands us in the toast path.
-      router.replace("/dashboard");
+      // completeOnboardingAction's redirect() throws NEXT_REDIRECT —
+      // any other failure still lands us at the dashboard with the toast.
+      router.replace(buildPostOnboardingHref({ path, householdName }));
     } finally {
       setPending(false);
     }
@@ -115,11 +131,13 @@ export function OnboardingFlow({
   return (
     <Card className="w-full max-w-[480px]">
       <CardContent className="grid gap-6 p-6 sm:p-8">
-        <StepIndicator current={step} total={4} />
+        <StepIndicator current={step} total={totalSteps} />
 
         {step === 1 ? (
           <StepWelcome
             name={name}
+            path={path}
+            householdName={householdName}
             onContinue={() => setStep(2)}
             pending={pending}
           />
@@ -134,7 +152,18 @@ export function OnboardingFlow({
           />
         ) : null}
 
-        {step === 3 ? (
+        {/* Invited path: step 3 = done.
+            Fresh path: step 3 = first-meal, step 4 = done. */}
+        {step === 3 && isInvited ? (
+          <StepDone
+            path={path}
+            householdName={householdName}
+            onFinish={handleFinish}
+            pending={pending}
+          />
+        ) : null}
+
+        {step === 3 && !isInvited ? (
           <StepFirstMeal
             value={firstMealName}
             onChange={setFirstMealName}
@@ -145,11 +174,33 @@ export function OnboardingFlow({
         ) : null}
 
         {step === 4 ? (
-          <StepDone onFinish={handleFinish} pending={pending} />
+          <StepDone
+            path={path}
+            householdName={householdName}
+            onFinish={handleFinish}
+            pending={pending}
+          />
         ) : null}
       </CardContent>
     </Card>
   );
+}
+
+function buildPostOnboardingHref({
+  path,
+  householdName
+}: {
+  path: "fresh" | "invited";
+  householdName: string | null;
+}): "/dashboard" | `/dashboard?${string}` {
+  // Welcome toast surfaces on the dashboard. The query params are
+  // stripped after the toast fires (see components/dashboard/welcome-toast.tsx)
+  // so the URL stays clean for subsequent visits.
+  const params = new URLSearchParams({ welcome: path });
+  if (path === "invited" && householdName) {
+    params.set("kitchen", householdName);
+  }
+  return `/dashboard?${params.toString()}` as `/dashboard?${string}`;
 }
 
 function StepIndicator({ current, total }: { current: number; total: number }) {
@@ -177,30 +228,47 @@ function StepIndicator({ current, total }: { current: number; total: number }) {
 
 function StepWelcome({
   name,
+  path,
+  householdName,
   onContinue,
   pending
 }: {
   name: string;
+  path: "fresh" | "invited";
+  householdName: string | null;
   onContinue: () => void;
   pending: boolean;
 }) {
   // Trim long names and avoid the awkward "eeatly user" greeting when no
   // name was inferable.
   const greeting = name && !name.startsWith("eeatly") ? `Hi ${name.split(" ")[0]},` : "Welcome,";
+  const isInvited = path === "invited";
+
   return (
     <div className="grid gap-4">
       <span className="inline-flex w-fit items-center gap-[7px] rounded-full bg-[var(--primary-soft)] px-[10px] py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-primary">
         <Sparkles className="h-3 w-3" />
-        Welcome
+        {isInvited ? "You're in" : "Welcome"}
       </span>
       <h1 className="font-serif text-[36px] font-normal leading-[1.1] tracking-[-0.01em]">
         {greeting}
         <br />
-        let&apos;s set up your <em className="italic text-primary">cooking memory.</em>
+        {isInvited && householdName ? (
+          <>
+            welcome to{" "}
+            <em className="italic text-primary">{householdName}.</em>
+          </>
+        ) : (
+          <>
+            let&apos;s set up your{" "}
+            <em className="italic text-primary">cooking memory.</em>
+          </>
+        )}
       </h1>
       <p className="text-[14px] leading-[1.55] text-muted-foreground">
-        eeatly remembers what you cook and surfaces the right meal when
-        you&apos;re tired of deciding. Three quick questions, then you&apos;re in.
+        {isInvited
+          ? "Your family's kitchen is already full of meals. A couple of quick questions and you're in."
+          : "eeatly remembers what you cook and surfaces the right meal when you're tired of deciding. A couple of quick questions, then you're in."}
       </p>
       <Button type="button" onClick={onContinue} disabled={pending} className="w-full">
         Let&apos;s go
@@ -231,7 +299,7 @@ function StepHabits({
           A quick read on how you cook
         </h2>
         <p className="text-[13.5px] leading-[1.55] text-muted-foreground">
-          Helps us tune what we surface — no exact answer needed.
+          Helps us tune what we surface. No exact answer needed.
         </p>
       </header>
 
@@ -327,7 +395,8 @@ function StepFirstMeal({
           What did you cook recently?
         </h2>
         <p className="text-[13.5px] leading-[1.55] text-muted-foreground">
-          One real meal gets eeatly useful. Skip if you&apos;d rather start fresh.
+          One real meal makes eeatly useful right away. Skip if you&apos;d
+          rather start with a blank page — you can log later.
         </p>
       </header>
 
@@ -359,21 +428,34 @@ function StepFirstMeal({
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Log it
         </Button>
+        {/* Skip is intentionally a visible secondary button, not buried —
+            first meal is genuinely optional. */}
         <Button
           type="button"
-          variant="ghost"
+          variant="outline"
           onClick={onSkip}
           disabled={pending}
           className="w-full"
         >
-          Skip for now
+          Skip — I&apos;ll log later
         </Button>
       </div>
     </div>
   );
 }
 
-function StepDone({ onFinish, pending }: { onFinish: () => void; pending: boolean }) {
+function StepDone({
+  path,
+  householdName,
+  onFinish,
+  pending
+}: {
+  path: "fresh" | "invited";
+  householdName: string | null;
+  onFinish: () => void;
+  pending: boolean;
+}) {
+  const isInvited = path === "invited";
   return (
     <div className="grid gap-4">
       <span className="inline-flex w-fit items-center gap-[7px] rounded-full bg-[var(--primary-soft)] px-[10px] py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-primary">
@@ -381,12 +463,21 @@ function StepDone({ onFinish, pending }: { onFinish: () => void; pending: boolea
         You&apos;re set
       </span>
       <h2 className="font-serif text-[30px] font-normal leading-[1.1] tracking-[-0.01em]">
-        Ready when you are.
+        {isInvited && householdName
+          ? `Welcome to ${householdName}.`
+          : "Ready when you are."}
       </h2>
       <p className="text-[14px] leading-[1.55] text-muted-foreground">
-        Log a meal each time you cook. eeatly will start surfacing ideas
-        worth bringing back after a few logs.
+        {isInvited
+          ? "Your family's recent meals are waiting on the dashboard. Log a meal of your own whenever you cook."
+          : "Log a meal each time you cook. eeatly starts surfacing dishes worth bringing back after a few logs."}
       </p>
+      {!isInvited ? (
+        <p className="text-[13px] leading-[1.5] text-muted-foreground">
+          When you&apos;re ready, you can invite family to share your
+          kitchen from Settings — no rush.
+        </p>
+      ) : null}
       <Button type="button" onClick={onFinish} disabled={pending} className="w-full">
         {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         Open eeatly

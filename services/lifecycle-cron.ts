@@ -99,6 +99,12 @@ export async function runLifecycleNudges(): Promise<LifecycleCronResult> {
         ? Math.max(INACTIVE_DAYS, differenceInDays(new Date(), row.last_meal_at))
         : INACTIVE_DAYS;
 
+      // Round 9: surface a few specific dishes worth bringing back. We
+      // pick from the user's OWN logs (cooked_by_user_id) so the email
+      // is "your kitchen", not the household's; the rest of the email
+      // is per-user-toned the same way.
+      const neglectedMealNames = await getUserNeglectedMealNames(row.user_id, 3);
+
       try {
         const dispatch = await dispatchTransactionalEmail({
           template: "inactive_reminder",
@@ -106,6 +112,7 @@ export async function runLifecycleNudges(): Promise<LifecycleCronResult> {
           toName: row.name,
           userId: row.user_id,
           daysQuiet,
+          neglectedMealNames,
           trackDispatch: true
         });
         if (!dispatch.skipped) emailed += 1;
@@ -128,4 +135,44 @@ export async function runLifecycleNudges(): Promise<LifecycleCronResult> {
   }
 
   return { scanned, notifiedInactive, emailed, errors };
+}
+
+type NeglectedMealRow = { meal_name: string };
+
+/**
+ * Round 9 — pull the top N dish names the user has cooked least recently
+ * (lowest `max(cooked_at)` per meal) from their own logs. Used in the
+ * inactive-reminder email to surface concrete dishes worth bringing back.
+ *
+ * Per-user query inside the cron loop is fine at beta scale. At larger
+ * volumes, lift into a single batch JOIN keyed on user_id LATERAL.
+ */
+export async function getUserNeglectedMealNames(
+  userId: string,
+  limit: number
+): Promise<readonly string[]> {
+  try {
+    const result = await db.execute<NeglectedMealRow>(sql`
+      select m.name as meal_name
+      from meals m
+      inner join meal_logs ml on ml.meal_id = m.id and ml.deleted_at is null
+      where ml.cooked_by_user_id = ${userId}
+        and m.archived_at is null
+      group by m.id, m.name
+      order by max(ml.cooked_at) asc nulls first
+      limit ${limit}
+    `);
+    const rows: NeglectedMealRow[] =
+      (result as unknown as { rows?: NeglectedMealRow[] }).rows
+      ?? (Array.isArray(result) ? (result as NeglectedMealRow[]) : []);
+    return rows.map((r) => r.meal_name).filter(Boolean);
+  } catch (error) {
+    // A failure to fetch the dish list shouldn't block the email — the
+    // template renders fine with an empty array (general CTA, no list).
+    logger.warn("neglected_meal_names_lookup_failed", {
+      userId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    return [];
+  }
 }
