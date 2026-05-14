@@ -4,7 +4,7 @@ export type UserRole = "root_app_user" | "tenant_user" | "platform_admin";
 
 export type TenantRole = "owner" | "admin" | "member";
 
-export type BetaCohort = "alpha" | "beta_wave_1" | "beta_wave_2" | "internal";
+export type BetaCohort = "alpha" | "beta_wave_1" | "beta_wave_2" | "internal" | "beta_2026";
 
 export type RecentMeal = {
   id: string;
@@ -49,7 +49,15 @@ export type RediscoverySuggestion = {
 
 export type ShareActionResult =
   | { ok: true; text: string }
-  | { ok: false; code: "RECIPE_MISSING" | "RATE_LIMITED" | "AI_ERROR"; message: string };
+  | {
+      ok: false;
+      // Round 6: added UPGRADE_REQUIRED for the paid-tier gate. `feature`
+      // is populated only on that branch so the UI knows which prompt to
+      // render.
+      code: "RECIPE_MISSING" | "RATE_LIMITED" | "AI_ERROR" | "UPGRADE_REQUIRED";
+      message: string;
+      feature?: string;
+    };
 
 export type MealSuggestion = {
   name: string;

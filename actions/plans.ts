@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
+import { FeatureGateDeniedError } from "@/lib/errors/gates";
 import { logger } from "@/lib/observability/logger";
 import { checkMealMutationLimit } from "@/lib/security/rate-limit";
 import {
@@ -41,8 +42,14 @@ export type CreatePlanResult =
   | { ok: true; planId: string }
   | {
       ok: false;
-      code: "VALIDATION" | "RATE_LIMITED" | "NOT_AUTHORIZED" | "ERROR";
+      code:
+        | "VALIDATION"
+        | "RATE_LIMITED"
+        | "NOT_AUTHORIZED"
+        | "UPGRADE_REQUIRED"
+        | "ERROR";
       message: string;
+      feature?: string;
     };
 
 export async function createPlanAction(
@@ -77,6 +84,14 @@ export async function createPlanAction(
     revalidatePath("/plans");
     return { ok: true, planId: plan.id };
   } catch (error) {
+    if (error instanceof FeatureGateDeniedError) {
+      return {
+        ok: false,
+        code: "UPGRADE_REQUIRED",
+        message: error.message,
+        feature: error.feature
+      };
+    }
     const message = error instanceof Error ? error.message : "Couldn't create plan.";
     logger.warn("plan_create_failed", { userId: user.id, error: message });
     return { ok: false, code: "ERROR", message };
@@ -344,8 +359,9 @@ export type ClonePlanActionResult =
     }
   | {
       ok: false;
-      code: "VALIDATION" | "RATE_LIMITED" | "NOT_FOUND" | "ERROR";
+      code: "VALIDATION" | "RATE_LIMITED" | "NOT_FOUND" | "UPGRADE_REQUIRED" | "ERROR";
       message: string;
+      feature?: string;
     };
 
 export async function clonePlanFromPastAction(
@@ -379,6 +395,14 @@ export async function clonePlanFromPastAction(
       previousAnnotations: result.previousAnnotations
     };
   } catch (error) {
+    if (error instanceof FeatureGateDeniedError) {
+      return {
+        ok: false,
+        code: "UPGRADE_REQUIRED",
+        message: error.message,
+        feature: error.feature
+      };
+    }
     const message = error instanceof Error ? error.message : "Couldn't clone plan.";
     if (message.includes("not found")) {
       return { ok: false, code: "NOT_FOUND", message };

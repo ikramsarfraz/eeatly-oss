@@ -7,6 +7,7 @@ import * as anthropic from "@/lib/ai/providers/anthropic";
 import * as openai from "@/lib/ai/providers/openai";
 import { households, mealLogs, meals } from "@/db/schema";
 import { requireHouseholdMember } from "@/lib/auth/session";
+import { requireFeatureAccess } from "@/lib/gates/resolver";
 import type { MealSuggestion, ShareActionResult } from "@/types";
 
 const SUPPORTED_MEDIA_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
@@ -51,6 +52,10 @@ export async function generateShareableRecipe(
   // accidentally bypass the gate. Memoized via React cache() so the
   // extra call costs nothing within the same request.
   await requireHouseholdMember(userId, householdId);
+  // Round 6 feature gate. Beta cohorts pass through; non-beta non-paid
+  // users get a typed `FeatureGateDeniedError`, which the action layer
+  // translates to `{ ok: false, code: 'UPGRADE_REQUIRED' }`.
+  await requireFeatureAccess(userId, "ai_share_recipe");
 
   // Round 4: scope by household, not user. Any member can generate a
   // share text for a meal that belongs to their household. The household

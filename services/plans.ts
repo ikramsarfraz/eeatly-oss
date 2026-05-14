@@ -3,6 +3,7 @@ import "server-only";
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { requireHouseholdMember } from "@/lib/auth/session";
+import { requireFeatureAccess } from "@/lib/gates/resolver";
 import { logger } from "@/lib/observability/logger";
 import { mealLogs, meals, planDishes, plans, users, type Verdict } from "@/db/schema";
 
@@ -58,6 +59,7 @@ export type CreatePlanArgs = {
 
 export async function createPlan(args: CreatePlanArgs): Promise<PlanRow> {
   await requireHouseholdMember(args.userId, args.householdId);
+  await requireFeatureAccess(args.userId, "plans_create");
 
   // Empty / whitespace-only notes resolve to null so we don't store a
   // surface that renders as a vacant box in the UI.
@@ -401,6 +403,7 @@ export async function clonePlanFromPast(args: {
 }): Promise<ClonePlanResult> {
   const source = await loadPlanOrThrow(args.sourcePlanId);
   await requireHouseholdMember(args.userId, source.householdId);
+  await requireFeatureAccess(args.userId, "plans_clone");
 
   return db.transaction(async (tx) => {
     const sourceDishes = await tx

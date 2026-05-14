@@ -141,6 +141,27 @@
       "when": 1778691605000,
       "tag": "0019_plans",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1778691606000,
+      "tag": "0020_feature_overrides",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1778691607000,
+      "tag": "0021_subscriptions",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1778691608000,
+      "tag": "0022_backfill_beta_cohort",
+      "breakpoints": true
     }
   ]
 }

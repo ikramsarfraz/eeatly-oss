@@ -107,6 +107,14 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
         case "AI_PROVIDER_ERROR":
           setError(result.message ?? "Something went wrong. Please try again.");
           break;
+        case "UPGRADE_REQUIRED":
+          // Round 6: the gate denied access. Show a tasteful upgrade
+          // prompt instead of a generic error — keeps the dialog open
+          // so the user can click through to /pricing.
+          setError(
+            "AI assist is part of eeatly Plus. Visit /pricing to see what's included."
+          );
+          break;
       }
     } finally {
       setIsPending(false);

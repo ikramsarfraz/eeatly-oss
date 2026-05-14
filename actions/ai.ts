@@ -1,6 +1,9 @@
 "use server";
 
 import { requireCurrentUser, requireCurrentUserWithHousehold } from "@/lib/auth/session";
+import { FeatureGateDeniedError } from "@/lib/errors/gates";
+import type { FeatureKey } from "@/lib/gates/registry";
+import { requireFeatureAccess } from "@/lib/gates/resolver";
 import { logger } from "@/lib/observability/logger";
 import { checkAiCallLimit } from "@/lib/security/rate-limit";
 import { generateShareableRecipe, suggestMealFromImage, suggestMealFromText } from "@/services/ai";
@@ -25,12 +28,31 @@ export type SuggestResult =
   | { ok: true; data: MealSuggestion }
   | {
       ok: false;
-      code: "INVALID_INPUT" | "RATE_LIMITED" | "AI_PROVIDER_ERROR";
+      code: "INVALID_INPUT" | "RATE_LIMITED" | "AI_PROVIDER_ERROR" | "UPGRADE_REQUIRED";
       message?: string;
+      /** Present when code === "UPGRADE_REQUIRED". UI keys upgrade-prompt
+       *  copy off this. */
+      feature?: FeatureKey;
     };
 
 export async function suggestFromImageAction(formData: FormData): Promise<SuggestResult> {
   const user = await requireCurrentUser();
+
+  // Gate first — don't burn a rate-limit slot for a user who can't reach
+  // the feature anyway. FeatureGateDeniedError is the typed error; map
+  // to the UPGRADE_REQUIRED code so the UI can render the upgrade card.
+  try {
+    await requireFeatureAccess(user.id, "ai_suggest_image");
+  } catch (error) {
+    if (error instanceof FeatureGateDeniedError) {
+      return {
+        ok: false,
+        code: "UPGRADE_REQUIRED",
+        feature: error.feature
+      };
+    }
+    throw error;
+  }
 
   try {
     await checkAiCallLimit(user.id);
@@ -82,6 +104,15 @@ export async function suggestFromTextAction(text: string): Promise<SuggestResult
   const user = await requireCurrentUser();
 
   try {
+    await requireFeatureAccess(user.id, "ai_suggest_text");
+  } catch (error) {
+    if (error instanceof FeatureGateDeniedError) {
+      return { ok: false, code: "UPGRADE_REQUIRED", feature: error.feature };
+    }
+    throw error;
+  }
+
+  try {
     await checkAiCallLimit(user.id);
   } catch {
     return {
@@ -124,7 +155,17 @@ export async function generateShareAction(mealId: string): Promise<ShareActionRe
 
   try {
     return await generateShareableRecipe(user.id, household.id, mealId);
-  } catch {
+  } catch (error) {
+    // Gate-denied is service-thrown — translate to UPGRADE_REQUIRED so
+    // the UI can render the upgrade prompt instead of a generic error.
+    if (error instanceof FeatureGateDeniedError) {
+      return {
+        ok: false,
+        code: "UPGRADE_REQUIRED",
+        message: error.message,
+        feature: error.feature
+      };
+    }
     return { ok: false, code: "AI_ERROR", message: "Something went wrong. Please try again." };
   }
 }

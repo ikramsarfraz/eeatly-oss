@@ -11,12 +11,15 @@ import {
 import { DeleteAccountCard } from "@/components/account/delete-account-card";
 import { ExportDataCard } from "@/components/account/export-data-card";
 import { HouseholdCard } from "@/components/account/household-card";
+import { SubscriptionCard } from "@/components/account/subscription-card";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog";
 import { PreferencesCard } from "@/components/account/preferences-card";
 import { SignOutButton } from "@/components/layout/sign-out-button";
 import { households, users } from "@/db/schema";
 import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
 import { db } from "@/lib/db/client";
+import { hasStripeEnv } from "@/lib/env/server";
+import { getSubscriptionState } from "@/services/billing";
 import {
   listHouseholdMembers,
   listPendingInvitations
@@ -25,17 +28,25 @@ import {
 export default async function SettingsPage() {
   const { user, household } = await requireCurrentUserWithHousehold();
 
-  // Pull the captured onboarding habits so the preferences card can show
-  // them. A null row would mean a user predating the columns — UI treats
-  // both as "unset" and lets them pick.
+  // Pull the captured onboarding habits + beta cohort so the
+  // preferences and subscription cards can render. Beta cohort
+  // surfaces a subtle indicator on the SubscriptionCard.
   const [prefsRow] = await db
     .select({
       cooksPerWeek: users.cooksPerWeek,
-      weeknightEffort: users.weeknightEffort
+      weeknightEffort: users.weeknightEffort,
+      betaCohort: users.betaCohort
     })
     .from(users)
     .where(eq(users.id, user.id))
     .limit(1);
+
+  // Stripe-side state for the SubscriptionCard. Returns null for free-
+  // tier users; the component branches on the shape.
+  const billingConfigured = hasStripeEnv();
+  const subscription = billingConfigured
+    ? await getSubscriptionState({ userId: user.id })
+    : null;
 
   // Household data: owner pointer, members, pending invitations.
   const [ownerRow] = await db
@@ -74,6 +85,20 @@ export default async function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <SubscriptionCard
+        subscription={
+          subscription
+            ? {
+                status: subscription.status,
+                currentPeriodEnd: subscription.currentPeriodEnd,
+                cancelAtPeriodEnd: subscription.cancelAtPeriodEnd
+              }
+            : null
+        }
+        isBetaCohort={Boolean(prefsRow?.betaCohort)}
+        billingConfigured={billingConfigured}
+      />
 
       <PreferencesCard
         cooksPerWeek={prefsRow?.cooksPerWeek ?? null}

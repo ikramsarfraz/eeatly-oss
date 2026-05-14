@@ -59,6 +59,15 @@ const sessionMock = vi.hoisted(() => ({
 
 vi.mock("@/lib/auth/session", () => sessionMock);
 
+// Round 6: generateShareableRecipe also calls requireFeatureAccess.
+// Permissive stub; the feature-gate behavior is exercised in
+// lib/gates/resolver.test.ts.
+const gateMock = vi.hoisted(() => ({
+  requireFeatureAccess: vi.fn<(userId: string, feature: string) => Promise<void>>(),
+  can: vi.fn<(userId: string, feature: string) => Promise<boolean>>()
+}));
+vi.mock("@/lib/gates/resolver", () => gateMock);
+
 // withFallback returns whatever the primary resolves to — short-circuit it
 // so this test doesn't reach the OpenAI/Anthropic providers (and so this
 // test doesn't need OPENAI_API_KEY). We don't exercise the provider path
@@ -85,6 +94,10 @@ beforeEach(() => {
   dbState.queue.length = 0;
   sessionMock.requireHouseholdMember.mockReset();
   sessionMock.requireHouseholdMember.mockResolvedValue();
+  gateMock.requireFeatureAccess.mockReset();
+  gateMock.requireFeatureAccess.mockResolvedValue();
+  gateMock.can.mockReset();
+  gateMock.can.mockResolvedValue(true);
 });
 
 afterEach(() => {
