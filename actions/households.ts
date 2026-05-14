@@ -8,6 +8,7 @@ import {
 } from "@/lib/auth/session";
 import { dispatchTransactionalEmail } from "@/lib/email/transactional";
 import { getServerEnv } from "@/lib/env/server";
+import { FeatureGateDeniedError } from "@/lib/errors/gates";
 import {
   CannotRemoveOwnerError,
   CannotRemoveSelfError,
@@ -39,7 +40,12 @@ import {
 
 export type CreateInvitationResult =
   | { ok: true; invitationId: string; expiresAt: string }
-  | { ok: false; code: "VALIDATION" | "NOT_OWNER" | "RATE_LIMITED" | "ERROR"; message: string };
+  | {
+      ok: false;
+      code: "VALIDATION" | "NOT_OWNER" | "RATE_LIMITED" | "UPGRADE_REQUIRED" | "ERROR";
+      message: string;
+      feature?: string;
+    };
 
 export type AcceptInvitationResult =
   | {
@@ -174,6 +180,14 @@ export async function createInvitationAction(
       expiresAt: result.expiresAt.toISOString()
     };
   } catch (error) {
+    if (error instanceof FeatureGateDeniedError) {
+      return {
+        ok: false,
+        code: "UPGRADE_REQUIRED",
+        message: error.message,
+        feature: error.feature
+      };
+    }
     const message = error instanceof Error ? error.message : "Couldn't send invitation.";
     logger.warn("invitation_create_failed", {
       userId: user.id,

@@ -55,6 +55,16 @@ const sessionMock = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/auth/session", () => sessionMock);
 
+// Round 6: services now call `requireFeatureAccess` at their gated
+// entries. Tests focus on service logic, not on the gate behavior
+// (that's in lib/gates/resolver.test.ts); the permissive stub keeps
+// the existing assertions stable.
+const gateMock = vi.hoisted(() => ({
+  requireFeatureAccess: vi.fn<(userId: string, feature: string) => Promise<void>>(),
+  can: vi.fn<(userId: string, feature: string) => Promise<boolean>>()
+}));
+vi.mock("@/lib/gates/resolver", () => gateMock);
+
 import {
   addDishToPlan,
   clonePlanFromPast,
@@ -74,6 +84,10 @@ beforeEach(() => {
   sessionMock.requireHouseholdMember.mockReset();
   sessionMock.requireHouseholdMember.mockResolvedValue();
   sessionMock.requireHouseholdOwner.mockReset();
+  gateMock.requireFeatureAccess.mockReset();
+  gateMock.requireFeatureAccess.mockResolvedValue();
+  gateMock.can.mockReset();
+  gateMock.can.mockResolvedValue(true);
   sessionMock.requireHouseholdOwner.mockResolvedValue();
 });
 

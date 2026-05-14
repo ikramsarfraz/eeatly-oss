@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Route } from "next";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -16,6 +17,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <a className="hover:text-foreground" href="/admin/feedback">
           Feedback
         </a>
+        {/* `as Route` cast — Next typed-routes hasn't regenerated for
+            this route yet. Same convention as /plans in app-sidebar. */}
+        <Link className="hover:text-foreground" href={"/admin/features" as Route}>
+          Features
+        </Link>
       </nav>
       {children}
     </div>

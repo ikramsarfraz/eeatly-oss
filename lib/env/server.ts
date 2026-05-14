@@ -34,7 +34,19 @@ const serverEnvSchema = z.object({
   OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required."),
   GOOGLE_CLIENT_ID: optionalString,
   GOOGLE_CLIENT_SECRET: optionalString,
-  CRON_SECRET: optionalString
+  CRON_SECRET: optionalString,
+  // Round 6 — Stripe paid tier. Optional individually (all-or-none
+  // enforced via `hasStripeEnv` below); the pricing page surfaces
+  // "Coming soon" when missing instead of crashing.
+  STRIPE_SECRET_KEY: optionalString,
+  STRIPE_PUBLISHABLE_KEY: optionalString,
+  STRIPE_WEBHOOK_SECRET: optionalString,
+  STRIPE_PRICE_MONTHLY: optionalString,
+  STRIPE_PRICE_ANNUAL: optionalString,
+  // Separate human-readable display strings — kept out of the price IDs
+  // so the marketing copy doesn't depend on a Stripe API call at render.
+  STRIPE_PRICE_MONTHLY_DISPLAY: optionalString,
+  STRIPE_PRICE_ANNUAL_DISPLAY: optionalString
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
@@ -73,4 +85,26 @@ export function hasR2Env(env = getServerEnv()) {
 
 export function hasGoogleAuthEnv(env = getServerEnv()) {
   return Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
+}
+
+/**
+ * All-or-none guard for the Stripe paid tier. Returns true only when
+ * every required value is set. The pricing page checks this and shows
+ * a "Coming soon" placeholder when false; billing actions throw a typed
+ * `BillingNotConfiguredError` (Task 3) so callers can't accidentally
+ * fall through to a half-wired Stripe path.
+ *
+ * `STRIPE_PUBLISHABLE_KEY` is technically client-safe (used in the
+ * future for embedded checkout / pricing-table widgets) but it's
+ * required here too — if you only have the secret half, you're
+ * mid-configuration.
+ */
+export function hasStripeEnv(env = getServerEnv()) {
+  return Boolean(
+    env.STRIPE_SECRET_KEY &&
+      env.STRIPE_PUBLISHABLE_KEY &&
+      env.STRIPE_WEBHOOK_SECRET &&
+      env.STRIPE_PRICE_MONTHLY &&
+      env.STRIPE_PRICE_ANNUAL
+  );
 }

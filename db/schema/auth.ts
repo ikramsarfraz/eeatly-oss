@@ -26,7 +26,24 @@ export const betaCohortEnum = pgEnum("beta_cohort", [
   "alpha",
   "beta_wave_1",
   "beta_wave_2",
-  "internal"
+  "internal",
+  // Round 6: backfill cohort for all users who existed before the paid
+  // tier launched. The gate resolver treats any non-null beta cohort as
+  // "unlocked" via the `beta_or_paid` default rule.
+  "beta_2026"
+]);
+
+// Round 6 — subscription status mirrors Stripe's status strings exactly.
+// Order in this array is non-load-bearing; the column type is text-enum
+// either way. DO rename a value (drop + add) if Stripe ever does.
+export const subscriptionStatusEnum = pgEnum("subscription_status", [
+  "active",
+  "past_due",
+  "canceled",
+  "incomplete",
+  "incomplete_expired",
+  "trialing",
+  "unpaid"
 ]);
 
 export const users = pgTable("user", {
@@ -53,6 +70,15 @@ export const users = pgTable("user", {
   // without answering these (skipped path).
   cooksPerWeek: integer("cooks_per_week"),
   weeknightEffort: effortLevelEnum("weeknight_effort"),
+  // Round 6: Stripe denormalization. The full `subscriptions` row lives
+  // in db/schema/subscriptions.ts; these three columns are mirrored on
+  // `user` so the gate resolver doesn't join on every page render. Kept
+  // in sync inside the Stripe webhook handler (one transaction).
+  stripeCustomerId: text("stripe_customer_id").unique(),
+  subscriptionStatus: subscriptionStatusEnum("subscription_status"),
+  subscriptionCurrentPeriodEnd: timestamp("subscription_current_period_end", {
+    withTimezone: true
+  }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
 });

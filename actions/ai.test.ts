@@ -39,6 +39,15 @@ const serviceMock = vi.hoisted(() => ({
 }));
 vi.mock("@/services/ai", () => serviceMock);
 
+// Round 6: actions now call requireFeatureAccess for the AI gates.
+// The default-permissive stub keeps the existing test assertions
+// stable; one new test below pins the UPGRADE_REQUIRED branch.
+const gateMock = vi.hoisted(() => ({
+  requireFeatureAccess: vi.fn<(userId: string, feature: string) => Promise<void>>(),
+  can: vi.fn<(userId: string, feature: string) => Promise<boolean>>()
+}));
+vi.mock("@/lib/gates/resolver", () => gateMock);
+
 import {
   suggestFromImageAction,
   suggestFromTextAction,
@@ -50,6 +59,10 @@ beforeEach(() => {
   rateLimitMock.checkAiCallLimit.mockResolvedValue();
   serviceMock.suggestMealFromImage.mockReset();
   serviceMock.suggestMealFromText.mockReset();
+  gateMock.requireFeatureAccess.mockReset();
+  gateMock.requireFeatureAccess.mockResolvedValue();
+  gateMock.can.mockReset();
+  gateMock.can.mockResolvedValue(true);
 });
 
 function makeImageFormData(opts: { size?: number; type?: string } = {}): FormData {
@@ -167,5 +180,48 @@ describe("suggestFromTextAction discriminated-union surface", () => {
     });
     const result = await suggestFromTextAction("a paragraph about lasagna");
     expect(result.ok).toBe(true);
+  });
+});
+
+describe("Round 6 — UPGRADE_REQUIRED gate translation", () => {
+  it("suggestFromImageAction returns UPGRADE_REQUIRED with the feature key when the gate denies", async () => {
+    // Use the actual error class so the action's `instanceof` check
+    // fires. Imported here rather than at the top because the test
+    // file's import chain otherwise drags lib/gates/registry; the
+    // gateMock above intercepts the resolver module, but the error
+    // class lives in lib/errors/gates so the regular import works.
+    const { FeatureGateDeniedError } = await import("@/lib/errors/gates");
+    gateMock.requireFeatureAccess.mockRejectedValueOnce(
+      new FeatureGateDeniedError("ai_suggest_image")
+    );
+
+    const result = await suggestFromImageAction(makeImageFormData());
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("UPGRADE_REQUIRED");
+      expect(result.feature).toBe("ai_suggest_image");
+    }
+    // Rate-limit check must NOT fire when the gate denies — gate runs
+    // first so we don't burn a slot for a user who can't use the
+    // feature anyway.
+    expect(rateLimitMock.checkAiCallLimit).not.toHaveBeenCalled();
+    expect(serviceMock.suggestMealFromImage).not.toHaveBeenCalled();
+  });
+
+  it("suggestFromTextAction returns UPGRADE_REQUIRED with the feature key when the gate denies", async () => {
+    const { FeatureGateDeniedError } = await import("@/lib/errors/gates");
+    gateMock.requireFeatureAccess.mockRejectedValueOnce(
+      new FeatureGateDeniedError("ai_suggest_text")
+    );
+
+    const result = await suggestFromTextAction("legitimate text");
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("UPGRADE_REQUIRED");
+      expect(result.feature).toBe("ai_suggest_text");
+    }
+    expect(serviceMock.suggestMealFromText).not.toHaveBeenCalled();
   });
 });
