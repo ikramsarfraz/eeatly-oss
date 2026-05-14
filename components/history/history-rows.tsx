@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import type { Route } from "next";
 import { format, formatDistanceToNow, parseISO } from "date-fns";
 import { EffortPill } from "@/components/history/effort-pill";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
@@ -41,9 +43,12 @@ export function HistoryRows({
                   fallbackIndex={idx}
                 />
                 <div className="min-w-0">
-                  <div className="truncate text-[14px] font-medium text-foreground">
+                  <Link
+                    href={`/meal/${row.mealId}` as Route}
+                    className="block truncate text-[14px] font-medium text-foreground underline-offset-2 hover:underline"
+                  >
                     {row.mealName}
-                  </div>
+                  </Link>
                   {(() => {
                     const a = attributionLabel(row.cookedByUserId, row.cookedByName, currentUserId);
                     return a ? (

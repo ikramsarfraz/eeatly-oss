@@ -13,6 +13,7 @@ import {
   AudioTooShortOrEmptyError,
   AudioTranscriptionFailedError
 } from "@/lib/errors/audio";
+import { NoRecipeTextError } from "@/lib/errors/ingredients";
 import {
   YoutubePlaylistUnsupportedError,
   YoutubeShortsUnsupportedError
@@ -130,6 +131,78 @@ export async function generateShareableRecipe(
   } catch {
     return { ok: false, code: "AI_ERROR", message: "AI did not generate a recipe. Try again." };
   }
+}
+
+/**
+ * Round 10 — extract ingredients on demand for a meal that already
+ * has a `recipeText` saved but no `ingredients` array (legacy meals
+ * from before Round 10, or AI sources that didn't surface ingredients
+ * the first time around). Persists the result back to `meals.ingredients`.
+ *
+ * Authz layers, in order:
+ *   1. `requireHouseholdMember` — only members can extract for their
+ *      household's meals. Throws "Not authorized" for cross-household.
+ *   2. `requireFeatureAccess('ai_suggest_text')` — same gate the
+ *      paste-text flow uses. Beta cohorts pass, free non-beta users
+ *      get FeatureGateDeniedError. Rate limiting is the action layer's
+ *      responsibility (same as the other suggest flows).
+ *
+ * Re-running on a meal that already has ingredients overwrites them.
+ * v1 ships this without a confirmation: keeping the action surface
+ * single-shot. If the user complains about lost edits, add a confirm
+ * step in the UI rather than complicating the action contract.
+ */
+export async function extractIngredientsForMeal(args: {
+  userId: string;
+  householdId: string;
+  mealId: string;
+}): Promise<string[]> {
+  await requireHouseholdMember(args.userId, args.householdId);
+  await requireFeatureAccess(args.userId, "ai_suggest_text");
+
+  const [mealRow] = await db
+    .select({ id: meals.id, recipeText: meals.recipeText })
+    .from(meals)
+    .where(
+      and(eq(meals.id, args.mealId), eq(meals.householdId, args.householdId), isNull(meals.archivedAt))
+    )
+    .limit(1);
+
+  if (!mealRow) {
+    // Treat missing/archived/cross-household the same way as the page
+    // does — 404 surface, no leakage about WHY.
+    throw new NoRecipeTextError();
+  }
+
+  const recipeText = mealRow.recipeText?.trim();
+  if (!recipeText) {
+    throw new NoRecipeTextError();
+  }
+
+  const ingredients = await withFallback(
+    () => openai.extractIngredientsFromText(recipeText),
+    () => anthropic.extractIngredientsFromText(recipeText),
+    { operation: "extract_ingredients_from_text" }
+  );
+
+  // Coerce to the same shape createMealLog persists: drop empties,
+  // null out when the model returned nothing usable. Persisting `[]`
+  // would semantically claim "the AI saw zero ingredients," which is
+  // a real outcome — but the UI empty state treats null and `[]` the
+  // same, so we collapse to null to keep the row cleaner.
+  const cleaned = ingredients
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  await db
+    .update(meals)
+    .set({
+      ingredients: cleaned.length > 0 ? cleaned : null,
+      updatedAt: new Date()
+    })
+    .where(eq(meals.id, args.mealId));
+
+  return cleaned;
 }
 
 // Round 7 — YouTube transcript extraction.

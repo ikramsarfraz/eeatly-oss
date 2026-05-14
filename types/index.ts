@@ -65,6 +65,11 @@ export type MealSuggestion = {
   notes: string;
   recipeText: string;
   confidence: "high" | "medium" | "low";
+  // Round 10: ordered list of ingredient lines as the AI extracted them.
+  // Empty array when the source has no parseable ingredients (a photo of
+  // a finished dish, a recipe-less voice note, etc.). Optional so older
+  // call-sites and legacy provider responses still typecheck.
+  ingredients?: string[];
 };
 
 export type DashboardMeals = {

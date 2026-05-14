@@ -4,6 +4,7 @@ import {
   classifyYoutubeUrl,
   isSupportedAudioMediaType,
   MAX_AUDIO_UPLOAD_BYTES,
+  mealSuggestionSchema,
   youtubeUrlSchema
 } from "./ai";
 
@@ -124,6 +125,45 @@ describe("audioInputSchema (Round 8)", () => {
   it("isSupportedAudioMediaType narrows the type", () => {
     expect(isSupportedAudioMediaType("audio/webm")).toBe(true);
     expect(isSupportedAudioMediaType("text/plain")).toBe(false);
+  });
+});
+
+describe("mealSuggestionSchema (Round 10)", () => {
+  const minimal = {
+    name: "Chicken karahi",
+    effortGuess: "medium" as const,
+    notes: "",
+    recipeText: "ingredients\nsteps",
+    confidence: "high" as const
+  };
+
+  it("accepts a response WITHOUT ingredients (legacy / pre-Round-10 fixtures)", () => {
+    const parsed = mealSuggestionSchema.parse(minimal);
+    expect(parsed.ingredients).toBeUndefined();
+    expect(parsed.name).toBe("Chicken karahi");
+  });
+
+  it("accepts a response WITH an ingredients array", () => {
+    const parsed = mealSuggestionSchema.parse({
+      ...minimal,
+      ingredients: ["1 cup basmati rice", "2 tbsp ghee", "1 tsp cardamom pods"]
+    });
+    expect(parsed.ingredients).toEqual([
+      "1 cup basmati rice",
+      "2 tbsp ghee",
+      "1 tsp cardamom pods"
+    ]);
+  });
+
+  it("accepts an empty ingredients array (the AI saw no ingredients)", () => {
+    const parsed = mealSuggestionSchema.parse({ ...minimal, ingredients: [] });
+    expect(parsed.ingredients).toEqual([]);
+  });
+
+  it("rejects non-array ingredients values", () => {
+    expect(() =>
+      mealSuggestionSchema.parse({ ...minimal, ingredients: "rice, ghee" })
+    ).toThrow();
   });
 });
 

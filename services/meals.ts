@@ -135,6 +135,17 @@ export async function createMealLog(
   const notes = payload.notes || null;
   const recipeText = payload.recipeText !== undefined ? (payload.recipeText.trim() || null) : undefined;
   const recipeSourceUrl = payload.recipeSourceUrl !== undefined ? (payload.recipeSourceUrl.trim() || null) : undefined;
+  // Round 10: pass-through. `undefined` = caller didn't touch ingredients
+  // (preserve whatever the existing meal already has); empty array also
+  // means "no ingredients to save" so we coerce to null on persist to
+  // match the recipeText convention.
+  const ingredients = (() => {
+    if (payload.ingredients === undefined) return undefined;
+    const cleaned = payload.ingredients
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    return cleaned.length > 0 ? cleaned : null;
+  })();
 
   return db.transaction(async (tx) => {
     // Match against the household's existing meal by normalized name —
@@ -160,6 +171,7 @@ export async function createMealLog(
             photoUrl,
             recipeText: recipeText ?? null,
             recipeSourceUrl: recipeSourceUrl ?? null,
+            ingredients: ingredients ?? null,
             updatedAt: new Date()
           })
           .returning()
@@ -176,6 +188,7 @@ export async function createMealLog(
           photoUrl: photoUrl && !existingMeal.photoUrl ? photoUrl : existingMeal.photoUrl,
           ...(recipeText !== undefined && { recipeText }),
           ...(recipeSourceUrl !== undefined && { recipeSourceUrl }),
+          ...(ingredients !== undefined && { ingredients }),
           updatedAt: new Date()
         })
         .where(eq(meals.id, existingMeal.id));
@@ -489,6 +502,98 @@ export async function getHistoryStats(
       most: mostCount,
       neglected: neglectedCount
     }
+  };
+}
+
+/**
+ * Round 10 — recipe view (`/meal/[id]`). Returns everything the page
+ * needs in a single round-trip: the meal row, the household member's
+ * attribution for the original add, the most-recent cook timestamp,
+ * the cook count, and the cooker's name on the most recent log.
+ *
+ * Returns `null` when the meal doesn't exist OR is archived OR doesn't
+ * belong to the caller's household. We don't distinguish those at the
+ * service layer — the page renders the same `notFound()` for all three
+ * to avoid leaking which other households a stranger could enumerate.
+ *
+ * Authz: `requireHouseholdMember` runs first. A non-member calling with
+ * a guessed (mealId, householdId) tuple lands in the "Not authorized"
+ * logged-error branch, NOT the silent null branch.
+ */
+export type MealDetailView = {
+  id: string;
+  name: string;
+  photoUrl: string | null;
+  recipeText: string | null;
+  recipeSourceUrl: string | null;
+  ingredients: string[] | null;
+  notes: string | null;
+  createdByUserId: string | null;
+  createdByName: string | null;
+  cookCount: number;
+  lastCookedAt: string | null;
+  createdAt: string;
+};
+
+export async function getMealDetail(
+  userId: string,
+  householdId: string,
+  mealId: string
+): Promise<MealDetailView | null> {
+  await requireHouseholdMember(userId, householdId);
+
+  const [row] = await db
+    .select({
+      id: meals.id,
+      name: meals.name,
+      photoUrl: meals.photoUrl,
+      recipeText: meals.recipeText,
+      recipeSourceUrl: meals.recipeSourceUrl,
+      ingredients: meals.ingredients,
+      notes: meals.notes,
+      createdAt: meals.createdAt,
+      createdByUserId: meals.createdByUserId,
+      createdByName: users.name
+    })
+    .from(meals)
+    .leftJoin(users, eq(users.id, meals.createdByUserId))
+    .where(
+      and(eq(meals.id, mealId), eq(meals.householdId, householdId), isNull(meals.archivedAt))
+    )
+    .limit(1);
+
+  if (!row) return null;
+
+  // Cook count + last-cooked roll-up. Joined separately so the meal row
+  // returns even when there are no logs (a meal can be added without
+  // being logged via legacy paths or via Task 5 re-extract flows).
+  const [stats] = await db
+    .select({
+      cookCount: count(mealLogs.id),
+      lastCookedAt: max(mealLogs.cookedAt)
+    })
+    .from(mealLogs)
+    .where(
+      and(
+        eq(mealLogs.mealId, mealId),
+        eq(mealLogs.householdId, householdId),
+        isNull(mealLogs.deletedAt)
+      )
+    );
+
+  return {
+    id: row.id,
+    name: row.name,
+    photoUrl: row.photoUrl,
+    recipeText: row.recipeText,
+    recipeSourceUrl: row.recipeSourceUrl,
+    ingredients: row.ingredients,
+    notes: row.notes,
+    createdByUserId: row.createdByUserId,
+    createdByName: row.createdByName,
+    cookCount: Number(stats?.cookCount ?? 0),
+    lastCookedAt: stats?.lastCookedAt ?? null,
+    createdAt: row.createdAt.toISOString()
   };
 }
 

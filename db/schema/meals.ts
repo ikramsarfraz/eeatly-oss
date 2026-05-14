@@ -47,6 +47,11 @@ export const meals = pgTable(
     notes: text("notes"),
     recipeText: text("recipe_text"),
     recipeSourceUrl: text("recipe_source_url"),
+    // Round 10: structured ingredient list. Each element is one
+    // ingredient line as the AI extracted it ("1 cup basmati rice") —
+    // free-text, intentionally not parsed into {name, quantity, unit}.
+    // Pantry-state matching is a separate, much larger feature.
+    ingredients: text("ingredients").array(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     archivedAt: timestamp("archived_at", { withTimezone: true })

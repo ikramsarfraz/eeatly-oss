@@ -76,7 +76,7 @@ vi.mock("@/lib/ai/providers", () => ({
   withFallback: vi.fn(async (primary: () => Promise<unknown>) => primary())
 }));
 
-vi.mock("@/lib/ai/providers/openai", () => ({
+const openaiMock = vi.hoisted(() => ({
   generateShareText: vi.fn(async () => ({ text: "share text" })),
   suggestMealFromTranscript: vi.fn(async () => ({
     name: "Chicken karahi",
@@ -92,8 +92,10 @@ vi.mock("@/lib/ai/providers/openai", () => ({
     recipeText: "ingredients\nsteps",
     confidence: "high"
   })),
-  transcribeAudio: vi.fn(async () => "raw whisper output")
+  transcribeAudio: vi.fn(async () => "raw whisper output"),
+  extractIngredientsFromText: vi.fn(async () => ["1 cup basmati rice", "2 tbsp ghee"])
 }));
+vi.mock("@/lib/ai/providers/openai", () => openaiMock);
 
 vi.mock("@/lib/ai/providers/anthropic", () => ({
   generateShareText: vi.fn(async () => ({ text: "share text" })),
@@ -110,10 +112,12 @@ vi.mock("@/lib/ai/providers/anthropic", () => ({
     notes: "Sear the masala before adding water.",
     recipeText: "ingredients\nsteps",
     confidence: "high"
-  }))
+  })),
+  extractIngredientsFromText: vi.fn(async () => ["1 cup basmati rice", "2 tbsp ghee"])
 }));
 
 import {
+  extractIngredientsForMeal,
   generateShareableRecipe,
   suggestMealFromAudio,
   suggestMealFromYouTubeUrl,
@@ -125,6 +129,7 @@ import {
   AudioTooShortOrEmptyError,
   AudioTranscriptionFailedError
 } from "@/lib/errors/audio";
+import { NoRecipeTextError } from "@/lib/errors/ingredients";
 import {
   YoutubeNoTranscriptError,
   YoutubePlaylistUnsupportedError,
@@ -450,5 +455,110 @@ describe("suggestMealFromAudio", () => {
       "audio/m4a",
       "voice-note-from-mom.m4a"
     );
+  });
+});
+
+describe("extractIngredientsForMeal (Round 10)", () => {
+  beforeEach(() => {
+    openaiMock.extractIngredientsFromText.mockClear();
+    openaiMock.extractIngredientsFromText.mockResolvedValue([
+      "1 cup basmati rice",
+      "2 tbsp ghee"
+    ]);
+  });
+
+  it("rejects non-members BEFORE the gate or meal lookup runs", async () => {
+    sessionMock.requireHouseholdMember.mockRejectedValueOnce(
+      new Error("Not authorized for this household.")
+    );
+
+    await expect(
+      extractIngredientsForMeal({
+        userId: "u-stranger",
+        householdId: "h-other",
+        mealId: "m-1"
+      })
+    ).rejects.toThrow(/Not authorized/);
+
+    expect(gateMock.requireFeatureAccess).not.toHaveBeenCalled();
+    expect(openaiMock.extractIngredientsFromText).not.toHaveBeenCalled();
+    expect(dbState.queue).toHaveLength(0);
+  });
+
+  it("rejects on a denied feature gate BEFORE touching the AI provider", async () => {
+    gateMock.requireFeatureAccess.mockRejectedValueOnce(new Error("gated"));
+
+    await expect(
+      extractIngredientsForMeal({
+        userId: "u-free",
+        householdId: "h-a",
+        mealId: "m-1"
+      })
+    ).rejects.toThrow(/gated/);
+
+    expect(openaiMock.extractIngredientsFromText).not.toHaveBeenCalled();
+    expect(dbState.queue).toHaveLength(0);
+  });
+
+  it("throws NoRecipeTextError when the meal row is missing", async () => {
+    queue([]); // meal lookup returns []
+
+    await expect(
+      extractIngredientsForMeal({
+        userId: "u-member",
+        householdId: "h-a",
+        mealId: "m-missing"
+      })
+    ).rejects.toBeInstanceOf(NoRecipeTextError);
+
+    expect(openaiMock.extractIngredientsFromText).not.toHaveBeenCalled();
+  });
+
+  it("throws NoRecipeTextError when the meal exists but has no recipeText", async () => {
+    queue([{ id: "m-1", recipeText: null }]);
+
+    await expect(
+      extractIngredientsForMeal({
+        userId: "u-member",
+        householdId: "h-a",
+        mealId: "m-1"
+      })
+    ).rejects.toBeInstanceOf(NoRecipeTextError);
+
+    expect(openaiMock.extractIngredientsFromText).not.toHaveBeenCalled();
+  });
+
+  it("extracts, persists the cleaned list, and returns it on the happy path", async () => {
+    queue([{ id: "m-1", recipeText: "1 cup rice. 2 tbsp ghee. Cook." }]);
+    queue([{ id: "m-1" }]); // the update returning row
+
+    const result = await extractIngredientsForMeal({
+      userId: "u-member",
+      householdId: "h-a",
+      mealId: "m-1"
+    });
+
+    expect(result).toEqual(["1 cup basmati rice", "2 tbsp ghee"]);
+    expect(openaiMock.extractIngredientsFromText).toHaveBeenCalledWith(
+      "1 cup rice. 2 tbsp ghee. Cook."
+    );
+  });
+
+  it("filters empty entries and trims whitespace before persisting", async () => {
+    queue([{ id: "m-1", recipeText: "method here" }]);
+    queue([{ id: "m-1" }]);
+    openaiMock.extractIngredientsFromText.mockResolvedValueOnce([
+      "  ",
+      "  1 cup rice  ",
+      ""
+    ]);
+
+    const result = await extractIngredientsForMeal({
+      userId: "u-member",
+      householdId: "h-a",
+      mealId: "m-1"
+    });
+
+    expect(result).toEqual(["1 cup rice"]);
   });
 });

@@ -3,6 +3,7 @@ import "server-only";
 import OpenAI, { toFile } from "openai";
 import {
   buildSharePrompt,
+  EXTRACT_INGREDIENTS_FROM_TEXT_PROMPT,
   SUGGEST_FROM_IMAGE_PROMPT,
   SUGGEST_FROM_TEXT_PROMPT,
   SUGGEST_FROM_VOICE_NOTE_PROMPT,
@@ -31,6 +32,10 @@ const MODEL = "gpt-4o-mini";
 // down" for a transient blip.
 const PRIMARY_TIMEOUT_MS = 7_000;
 
+// Strict JSON-schema mode on OpenAI requires every property in `properties`
+// to also be listed in `required`. We instruct the model in the prompt to
+// return an empty array when no ingredients are present rather than omit
+// the field — keeps the wire contract simple and strict-compatible.
 const SUGGESTION_SCHEMA = {
   type: "object",
   properties: {
@@ -38,9 +43,10 @@ const SUGGESTION_SCHEMA = {
     effortGuess: { type: "string", enum: ["quick", "easy", "medium", "high_effort"] },
     notes: { type: "string" },
     recipeText: { type: "string" },
+    ingredients: { type: "array", items: { type: "string" } },
     confidence: { type: "string", enum: ["high", "medium", "low"] }
   },
-  required: ["name", "effortGuess", "notes", "recipeText", "confidence"],
+  required: ["name", "effortGuess", "notes", "recipeText", "ingredients", "confidence"],
   additionalProperties: false
 } as const;
 
@@ -58,8 +64,24 @@ function parseSuggestion(raw: Record<string, unknown>): MealSuggestion {
     effortGuess,
     notes: typeof raw.notes === "string" ? raw.notes.trim() : "",
     recipeText: typeof raw.recipeText === "string" ? raw.recipeText.trim() : "",
+    ingredients: coerceIngredients(raw.ingredients),
     confidence
   };
+}
+
+// Backward-compat: pre-Round-10 fixtures and any model that ignored the
+// ingredients instruction land in `coerceIngredients` and become `[]`
+// rather than `undefined`, so callers (and the type contract) can rely
+// on a concrete array.
+function coerceIngredients(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const out: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "string") continue;
+    const trimmed = entry.trim();
+    if (trimmed) out.push(trimmed);
+  }
+  return out;
 }
 
 export async function suggestMealFromImage(imageBase64: string, mediaType: string): Promise<MealSuggestion> {
@@ -196,6 +218,56 @@ export async function suggestMealFromVoiceTranscript(
   const content = response.choices[0]?.message?.content;
   if (!content) throw new Error("OpenAI returned an empty response.");
   return parseSuggestion(JSON.parse(content) as Record<string, unknown>);
+}
+
+/**
+ * Round 10 — ingredient-only extraction for legacy meals. Cheaper
+ * call shape than the full suggest schema: one field, no enums. Reuses
+ * the strict JSON-schema response_format so we get a deterministic
+ * `{ ingredients: string[] }` back without parsing prose.
+ */
+const INGREDIENTS_SCHEMA = {
+  type: "object",
+  properties: {
+    ingredients: { type: "array", items: { type: "string" } }
+  },
+  required: ["ingredients"],
+  additionalProperties: false
+} as const;
+
+export async function extractIngredientsFromText(recipeText: string): Promise<string[]> {
+  const client = getClient();
+  const response = await client.chat.completions.create(
+    {
+      model: MODEL,
+      max_tokens: 800,
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "ingredient_extraction",
+          strict: true,
+          schema: INGREDIENTS_SCHEMA
+        }
+      },
+      messages: [
+        { role: "user", content: `${EXTRACT_INGREDIENTS_FROM_TEXT_PROMPT}\n\n${recipeText}` }
+      ]
+    },
+    { signal: AbortSignal.timeout(PRIMARY_TIMEOUT_MS) }
+  );
+
+  const usage = response.usage;
+  logger.info("ai_provider_tokens", {
+    provider: "openai",
+    operation: "extract_ingredients_from_text",
+    input_tokens: usage?.prompt_tokens ?? null,
+    output_tokens: usage?.completion_tokens ?? null
+  });
+
+  const content = response.choices[0]?.message?.content;
+  if (!content) throw new Error("OpenAI returned an empty response.");
+  const parsed = JSON.parse(content) as { ingredients?: unknown };
+  return coerceIngredients(parsed.ingredients);
 }
 
 // Whisper-specific timeout — Whisper is materially slower than chat

@@ -79,6 +79,43 @@ describe("mealLogInputSchema", () => {
       mealLogInputSchema.parse({ ...valid, recipeText: "x".repeat(10001) })
     ).toThrow(/under 10,000 characters/);
   });
+
+  it("accepts a payload without ingredients (backward-compat for legacy callers)", () => {
+    const parsed = mealLogInputSchema.parse(valid);
+    expect(parsed.ingredients).toBeUndefined();
+  });
+
+  it("accepts an empty ingredients array", () => {
+    const parsed = mealLogInputSchema.parse({ ...valid, ingredients: [] });
+    expect(parsed.ingredients).toEqual([]);
+  });
+
+  it("accepts an ingredients array of strings", () => {
+    const parsed = mealLogInputSchema.parse({
+      ...valid,
+      ingredients: ["1 cup basmati rice", "2 tbsp ghee", "1 tsp cardamom pods"]
+    });
+    expect(parsed.ingredients).toEqual([
+      "1 cup basmati rice",
+      "2 tbsp ghee",
+      "1 tsp cardamom pods"
+    ]);
+  });
+
+  it("rejects ingredient lines over 200 characters", () => {
+    expect(() =>
+      mealLogInputSchema.parse({ ...valid, ingredients: ["x".repeat(201)] })
+    ).toThrow(/Ingredient line is too long/);
+  });
+
+  it("rejects more than 100 ingredient lines", () => {
+    expect(() =>
+      mealLogInputSchema.parse({
+        ...valid,
+        ingredients: Array.from({ length: 101 }, (_, i) => `line ${i}`)
+      })
+    ).toThrow(/more than 100 ingredient lines/);
+  });
 });
 
 describe("presignedUploadInputSchema", () => {
