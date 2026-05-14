@@ -47,6 +47,14 @@ export const FEATURE_REGISTRY = {
   plans_clone: {
     description: "Clone past plans with annotation hints",
     defaultRule: "beta_or_paid" as GateRule
+  },
+  recipe_share_create: {
+    description: "Share recipes with anyone via a public link",
+    defaultRule: "beta_or_paid" as GateRule
+  },
+  ai_suggest_youtube: {
+    description: "Turn YouTube cooking videos into saved recipes",
+    defaultRule: "beta_or_paid" as GateRule
   }
 } as const satisfies Record<string, { description: string; defaultRule: GateRule }>;
 

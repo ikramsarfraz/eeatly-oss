@@ -1,8 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { Camera, FileText, Loader2, Sparkles } from "lucide-react";
-import { suggestFromImageAction, suggestFromTextAction } from "@/actions/ai";
+import { Camera, FileText, Loader2, Sparkles, Youtube } from "lucide-react";
+import {
+  suggestFromImageAction,
+  suggestFromTextAction,
+  suggestFromYouTubeAction
+} from "@/actions/ai";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,11 +16,13 @@ import {
   DialogTitle,
   DialogTrigger
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { classifyYoutubeUrl } from "@/lib/validators/ai";
 import type { MealSuggestion } from "@/types";
 
-type Tab = "photo" | "text";
+type Tab = "photo" | "text" | "youtube";
 
 type AiSuggestDialogProps = {
   onSuggestion: (suggestion: MealSuggestion) => void;
@@ -35,6 +41,29 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
 
   // Text tab state
   const [pastedText, setPastedText] = React.useState("");
+
+  // YouTube tab state. `slowLoading` flips true after 5s of pending —
+  // transcript fetches are slow when YouTube is degraded; honest copy
+  // beats a stuck "Thinking…" spinner. The effect only schedules the
+  // flip; the false-reset happens explicitly at the start of
+  // `handleSuggest` (a setState inside the effect would trigger the
+  // `set-state-in-effect` lint rule).
+  const [youtubeUrl, setYoutubeUrl] = React.useState("");
+  const [slowLoading, setSlowLoading] = React.useState(false);
+  React.useEffect(() => {
+    if (!isPending) return;
+    const handle = window.setTimeout(() => setSlowLoading(true), 5000);
+    return () => window.clearTimeout(handle);
+  }, [isPending]);
+
+  // Client-side URL classification — only enables the Suggest button
+  // when the input looks reachable. Server still validates.
+  const youtubeClassification = React.useMemo(
+    () => (youtubeUrl ? classifyYoutubeUrl(youtubeUrl) : null),
+    [youtubeUrl]
+  );
+  const youtubeUrlReady =
+    youtubeClassification !== null && youtubeClassification.kind === "watch";
 
   function handlePhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;
@@ -58,6 +87,7 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
       if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
       setPhotoPreviewUrl(null);
       setPastedText("");
+      setYoutubeUrl("");
       setError(null);
       setIsPending(false);
       if (photoInputRef.current) photoInputRef.current.value = "";
@@ -66,6 +96,7 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
 
   async function handleSuggest() {
     setError(null);
+    setSlowLoading(false);
     setIsPending(true);
 
     try {
@@ -79,45 +110,101 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
         setError("Please paste some text first.");
         return;
       }
+      if (activeTab === "youtube" && !youtubeUrlReady) {
+        setError("Paste a YouTube video link.");
+        return;
+      }
 
-      let result: Awaited<ReturnType<typeof suggestFromImageAction>>;
+      // Each tab has a distinct result-shape (YouTube has 6 extra
+      // codes). Branch first, then handle each result's union.
       if (activeTab === "photo" && photoFile) {
         const formData = new FormData();
         formData.append("image", photoFile);
-        result = await suggestFromImageAction(formData);
-      } else {
-        result = await suggestFromTextAction(pastedText);
-      }
-
-      if (result.ok) {
-        setOpen(false);
-        onSuggestion(result.data);
-        return;
-      }
-      // Discriminated union — branch on .code rather than parsing message
-      // strings. Round 4.7 unified the action surface; the UI no longer
-      // peeks at error shapes from the server.
-      switch (result.code) {
-        case "RATE_LIMITED":
-          setError(result.message ?? "You've hit your daily AI limit.");
-          break;
-        case "INVALID_INPUT":
-          setError(result.message ?? "We couldn't read that input.");
-          break;
-        case "AI_PROVIDER_ERROR":
-          setError(result.message ?? "Something went wrong. Please try again.");
-          break;
-        case "UPGRADE_REQUIRED":
-          // Round 6: the gate denied access. Show a tasteful upgrade
-          // prompt instead of a generic error — keeps the dialog open
-          // so the user can click through to /pricing.
-          setError(
-            "AI assist is part of eeatly Plus. Visit /pricing to see what's included."
-          );
-          break;
+        handleSuggestResult(await suggestFromImageAction(formData));
+      } else if (activeTab === "text") {
+        handleSuggestResult(await suggestFromTextAction(pastedText));
+      } else if (activeTab === "youtube") {
+        handleYouTubeResult(
+          await suggestFromYouTubeAction({ url: youtubeUrl.trim() })
+        );
       }
     } finally {
       setIsPending(false);
+    }
+  }
+
+  function handleSuggestResult(
+    result: Awaited<ReturnType<typeof suggestFromImageAction>>
+  ) {
+    if (result.ok) {
+      setOpen(false);
+      onSuggestion(result.data);
+      return;
+    }
+    switch (result.code) {
+      case "RATE_LIMITED":
+        setError(result.message ?? "You've hit your daily AI limit.");
+        break;
+      case "INVALID_INPUT":
+        setError(result.message ?? "We couldn't read that input.");
+        break;
+      case "AI_PROVIDER_ERROR":
+        setError(result.message ?? "Something went wrong. Please try again.");
+        break;
+      case "UPGRADE_REQUIRED":
+        setError(
+          "AI assist is part of eeatly Plus. Visit /pricing to see what's included."
+        );
+        break;
+    }
+  }
+
+  function handleYouTubeResult(
+    result: Awaited<ReturnType<typeof suggestFromYouTubeAction>>
+  ) {
+    if (result.ok) {
+      setOpen(false);
+      onSuggestion(result.data);
+      return;
+    }
+    // Each YouTube error code gets tailored copy. Generic "try again"
+    // would be wrong here — Shorts won't work no matter how many times
+    // the user retries.
+    switch (result.code) {
+      case "YOUTUBE_NO_TRANSCRIPT":
+        setError(
+          "This video doesn't have captions we can read. Try a different video, or paste the recipe text manually."
+        );
+        break;
+      case "YOUTUBE_SHORTS_UNSUPPORTED":
+        setError("YouTube Shorts don't work yet — try a regular video.");
+        break;
+      case "YOUTUBE_PLAYLIST_UNSUPPORTED":
+        setError("This is a playlist link. Open one video and try its URL.");
+        break;
+      case "YOUTUBE_UNAVAILABLE":
+        setError("Video isn't available — it may be private or removed.");
+        break;
+      case "YOUTUBE_AGE_RESTRICTED":
+        setError("Age-restricted videos can't be read.");
+        break;
+      case "YOUTUBE_FETCH_FAILED":
+        setError("Couldn't load the video right now. Try again in a minute.");
+        break;
+      case "INVALID_INPUT":
+        setError(result.message ?? "That doesn't look like a YouTube link.");
+        break;
+      case "RATE_LIMITED":
+        setError(result.message ?? "You've hit your daily AI limit.");
+        break;
+      case "UPGRADE_REQUIRED":
+        setError(
+          "YouTube recipe extraction is part of eeatly Plus. Visit /pricing to see what's included."
+        );
+        break;
+      case "AI_PROVIDER_ERROR":
+        setError(result.message ?? "Something went wrong. Please try again.");
+        break;
     }
   }
 
@@ -132,9 +219,10 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
 
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Fill from photo or text</DialogTitle>
+          <DialogTitle>Fill from photo, text, or YouTube</DialogTitle>
           <DialogDescription>
-            Upload a photo of the dish or recipe, or paste text. Claude will suggest the fields.
+            Upload a photo, paste recipe text, or drop a YouTube cooking video
+            link. AI suggests the fields.
           </DialogDescription>
         </DialogHeader>
 
@@ -144,7 +232,7 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
             type="button"
             onClick={() => handleTabChange("photo")}
             className={cn(
-              "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-all",
+              "flex flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12.5px] font-medium transition-all",
               activeTab === "photo"
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
@@ -157,14 +245,27 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
             type="button"
             onClick={() => handleTabChange("text")}
             className={cn(
-              "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-all",
+              "flex flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12.5px] font-medium transition-all",
               activeTab === "text"
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
             <FileText className="h-3.5 w-3.5" />
-            Paste text
+            Text
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTabChange("youtube")}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12.5px] font-medium transition-all",
+              activeTab === "youtube"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Youtube className="h-3.5 w-3.5" />
+            YouTube
           </button>
         </div>
 
@@ -222,6 +323,37 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
           </div>
         )}
 
+        {/* YouTube tab */}
+        {activeTab === "youtube" && (
+          <div className="grid gap-2">
+            <Input
+              type="url"
+              inputMode="url"
+              placeholder="https://www.youtube.com/watch?v=…"
+              value={youtubeUrl}
+              onChange={(e) => {
+                setYoutubeUrl(e.target.value);
+                setError(null);
+              }}
+              disabled={isPending}
+              autoComplete="off"
+            />
+            {youtubeClassification?.kind === "shorts" ? (
+              <p className="text-[11.5px] text-amber-700">
+                Shorts don&apos;t have captions we can read — try a regular video.
+              </p>
+            ) : youtubeClassification?.kind === "playlist" ? (
+              <p className="text-[11.5px] text-amber-700">
+                That&apos;s a playlist — open one video and use its URL.
+              </p>
+            ) : (
+              <p className="text-[11.5px] text-muted-foreground">
+                Works best on full cooking videos. Shorts and playlists don&apos;t work.
+              </p>
+            )}
+          </div>
+        )}
+
         {error && (
           <p className="text-[12.5px] text-destructive">{error}</p>
         )}
@@ -229,13 +361,20 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
         <Button
           type="button"
           onClick={handleSuggest}
-          disabled={isPending || (activeTab === "photo" ? !photoFile : !pastedText.trim())}
+          disabled={
+            isPending ||
+            (activeTab === "photo"
+              ? !photoFile
+              : activeTab === "text"
+                ? !pastedText.trim()
+                : !youtubeUrlReady)
+          }
           className="w-full"
         >
           {isPending ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Thinking…
+              {activeTab === "youtube" ? "Reading the video…" : "Thinking…"}
             </>
           ) : (
             <>
@@ -245,8 +384,15 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
           )}
         </Button>
 
+        {isPending && activeTab === "youtube" && slowLoading ? (
+          <p className="text-center text-[11px] text-muted-foreground">
+            This sometimes takes a moment for longer videos.
+          </p>
+        ) : null}
+
         <p className="text-center text-[11px] text-muted-foreground">
-          Photo and text are sent to AI providers (OpenAI, with Anthropic as fallback). Always review before saving.
+          Inputs are sent to AI providers (OpenAI primary, Anthropic fallback).
+          Always review before saving.
         </p>
       </DialogContent>
     </Dialog>

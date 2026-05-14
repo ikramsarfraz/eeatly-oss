@@ -38,6 +38,7 @@ import { AnnotationEditor } from "@/components/plans/annotation-editor";
 import { ClonePlanDialog } from "@/components/plans/clone-plan-dialog";
 import { EffortAggregateChip } from "@/components/plans/effort-aggregate-chip";
 import { HintBadge, type HintData } from "@/components/plans/hint-badge";
+import { ShareButton } from "@/components/shares/share-button";
 import {
   archivePlanAction,
   removeDishFromPlanAction,
@@ -345,6 +346,11 @@ export function PlanDetail({
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
+                    <ShareButton
+                      mealId={dish.mealId}
+                      mealName={dish.mealName}
+                      variant="icon"
+                    />
                     <Button
                       type="button"
                       variant="ghost"

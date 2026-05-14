@@ -49,6 +49,17 @@ Recipe:
 ${recipeText}${notesSection}`;
 }
 
+export const SUGGEST_FROM_YOUTUBE_PROMPT = `The text below is a transcript of a cooking video. It may include intro chatter, repetitions, ad reads, and informal language. Extract a clean, useful recipe from it.
+
+Return:
+- name: the dish name, concise (2–5 words). If the dish has a traditional Urdu/Hindi/regional name, lead with English but mention the traditional name in notes.
+- effortGuess: cooking effort — quick (under 15 min), easy (15–30 min), medium (30–60 min), high_effort (over 60 min or technically complex)
+- notes: 1–2 sentences of cook's-eye observations worth remembering — non-obvious technique, why a step matters, common mistakes the cook flagged. Don't summarize the recipe — that goes in recipeText. Empty string if nothing stands out.
+- recipeText: a CLEAN recipe. List ingredients with rough quantities (best-guess if the speaker was vague). Number the steps. Strip filler ("welcome back", "don't forget to subscribe", brand mentions). Plain text only.
+- confidence: "high" if the transcript clearly described a complete recipe, "medium" if some details required inference, "low" if the transcript was fragmented or barely recipe-shaped.
+
+Transcript:`;
+
 export const SUGGEST_FROM_TEXT_PROMPT = `The user has pasted text about a meal or recipe. Extract the following information:
 
 - name: the dish name, concise (2–5 words)

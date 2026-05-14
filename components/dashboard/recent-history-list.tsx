@@ -2,6 +2,7 @@ import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { MealThumb } from "@/components/dashboard/meal-thumb";
+import { ShareButton } from "@/components/shares/share-button";
 import { attributionLabel } from "@/lib/meals/attribution";
 import type { RecentMeal } from "@/types";
 
@@ -79,14 +80,20 @@ export function RecentHistoryList({
               </div>
             </div>
 
-            {/* Action */}
-            <LogAgainButton
-              mealName={meal.mealName}
-              effortLevel={meal.effortLevel}
-              variant="default"
-              compact
-              iconOnly
-            />
+            {/* Actions — share (subtle) + log again. The icon-only
+                share keeps the row visually quiet while still being
+                discoverable for the killer "mom shares Eid recipe to
+                family WhatsApp" flow. */}
+            <div className="flex items-center gap-1">
+              <ShareButton mealId={meal.mealId} mealName={meal.mealName} variant="icon" />
+              <LogAgainButton
+                mealName={meal.mealName}
+                effortLevel={meal.effortLevel}
+                variant="default"
+                compact
+                iconOnly
+              />
+            </div>
           </div>
           );
         })}
