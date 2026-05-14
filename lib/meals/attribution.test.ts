@@ -31,4 +31,20 @@ describe("attributionLabel", () => {
   it("attributes by name even when ids look unusual (defensive against id-format drift)", () => {
     expect(attributionLabel("abc-not-a-uuid", "Sam", VIEWER)).toBe("by Sam");
   });
+
+  // Round 5 Task 0: meals.created_by_user_id now also drops to NULL when
+  // the creator deletes their account (post-0018 migration matches the
+  // post-0017 behavior on meal_logs.cooked_by_user_id). The helper is
+  // field-agnostic; this test documents that a UI surface displaying
+  // creator attribution would use the same helper with createdBy* fields
+  // and get the same "Former member" fallback. No service currently
+  // surfaces creator attribution, so this is intent-documentation; if a
+  // future surface adds it (e.g., meal detail page "Added by X"), the
+  // helper already handles the null case.
+  it("renders 'by Former member' for a deleted recipe creator (same shape as deleted cook)", () => {
+    // (createdByUserId, createdByName, viewer) — same call signature.
+    const createdByUserId: string | null = null;
+    const createdByName: string | null = null;
+    expect(attributionLabel(createdByUserId, createdByName, VIEWER)).toBe("by Former member");
+  });
 });

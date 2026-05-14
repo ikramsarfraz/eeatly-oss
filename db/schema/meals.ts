@@ -34,7 +34,10 @@ export const meals = pgTable(
     // Attribution: who first added this recipe to the household. Set on
     // insert only; never overwritten when other members cook the meal.
     // ON DELETE SET NULL so removing a member doesn't cascade-delete
-    // recipes other members still want.
+    // recipes other members still want. POST-0018: nullable in DB too —
+    // 0016 had tightened it to NOT NULL which contradicted the SET NULL
+    // FK and silently broke account deletion. UI renders "Former member"
+    // via lib/meals/attribution.ts when this is null.
     createdByUserId: text("created_by_user_id").references(() => users.id, {
       onDelete: "set null"
     }),

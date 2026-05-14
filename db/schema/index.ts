@@ -5,3 +5,4 @@ export * from "./analytics";
 export * from "./email-delivery";
 export * from "./notifications";
 export * from "./households";
+export * from "./plans";

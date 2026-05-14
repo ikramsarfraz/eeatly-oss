@@ -127,6 +127,20 @@
       "when": 1778691603000,
       "tag": "0017_cooked_by_set_null",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1778691604000,
+      "tag": "0018_created_by_nullable",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1778691605000,
+      "tag": "0019_plans",
+      "breakpoints": true
     }
   ]
 }
