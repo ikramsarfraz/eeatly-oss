@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { Route } from "next";
 import { useToast } from "@/components/providers/toast-provider";
 
 /**
@@ -51,12 +52,17 @@ export function WelcomeToast() {
     firedRef.current = true;
 
     // Strip the welcome params so a refresh doesn't re-fire the toast.
-    // Preserve any other params the dashboard may use later.
+    // Preserve any other params the dashboard may use later. The cast
+    // to `Route` is required because Next 16's typed-routes statically
+    // checks router.replace's argument; the URL we construct here is
+    // an internal app path so the cast is safe.
     const params = new URLSearchParams(searchParams.toString());
     params.delete("welcome");
     params.delete("kitchen");
     const cleanQuery = params.toString();
-    router.replace(`${pathname}${cleanQuery ? `?${cleanQuery}` : ""}`);
+    router.replace(
+      `${pathname}${cleanQuery ? `?${cleanQuery}` : ""}` as Route
+    );
   }, [pathname, router, searchParams, showToast]);
 
   return null;
