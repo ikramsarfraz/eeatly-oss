@@ -36,6 +36,7 @@ const serviceMock = vi.hoisted(() => ({
   suggestMealFromImage: vi.fn(),
   suggestMealFromText: vi.fn(),
   suggestMealFromYouTubeUrl: vi.fn(),
+  suggestMealFromAudio: vi.fn(),
   generateShareableRecipe: vi.fn()
 }));
 vi.mock("@/services/ai", () => serviceMock);
@@ -50,6 +51,7 @@ const gateMock = vi.hoisted(() => ({
 vi.mock("@/lib/gates/resolver", () => gateMock);
 
 import {
+  suggestFromAudioAction,
   suggestFromImageAction,
   suggestFromTextAction,
   suggestFromYouTubeAction,
@@ -62,6 +64,7 @@ beforeEach(() => {
   serviceMock.suggestMealFromImage.mockReset();
   serviceMock.suggestMealFromText.mockReset();
   serviceMock.suggestMealFromYouTubeUrl.mockReset();
+  serviceMock.suggestMealFromAudio.mockReset();
   gateMock.requireFeatureAccess.mockReset();
   gateMock.requireFeatureAccess.mockResolvedValue();
   gateMock.can.mockReset();
@@ -312,5 +315,118 @@ describe("suggestFromYouTubeAction — discriminated-union surface", () => {
     });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.data.name).toBe("Chicken karahi");
+  });
+});
+
+describe("suggestFromAudioAction — discriminated-union surface", () => {
+  function makeAudioFormData(
+    opts: { size?: number; type?: string; name?: string } = {}
+  ): FormData {
+    const fd = new FormData();
+    const size = opts.size ?? 2048;
+    const type = opts.type ?? "audio/webm";
+    const name = opts.name ?? "voice-note.webm";
+    fd.append("audio", new File([new Uint8Array(size)], name, { type }));
+    return fd;
+  }
+
+  it("returns INVALID_INPUT when no file is attached", async () => {
+    const result = await suggestFromAudioAction(new FormData());
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("INVALID_INPUT");
+    expect(serviceMock.suggestMealFromAudio).not.toHaveBeenCalled();
+  });
+
+  it("returns AUDIO_TOO_LARGE for files above 25 MB", async () => {
+    const result = await suggestFromAudioAction(
+      makeAudioFormData({ size: 26 * 1024 * 1024 })
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("AUDIO_TOO_LARGE");
+    expect(serviceMock.suggestMealFromAudio).not.toHaveBeenCalled();
+  });
+
+  it("returns AUDIO_INVALID_FORMAT for unsupported media types", async () => {
+    const result = await suggestFromAudioAction(
+      makeAudioFormData({ type: "audio/aiff" })
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("AUDIO_INVALID_FORMAT");
+    expect(serviceMock.suggestMealFromAudio).not.toHaveBeenCalled();
+  });
+
+  it("returns RATE_LIMITED when the daily AI budget is exhausted", async () => {
+    rateLimitMock.checkAiCallLimit.mockRejectedValueOnce(new Error("rate"));
+    const result = await suggestFromAudioAction(makeAudioFormData());
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("RATE_LIMITED");
+    expect(serviceMock.suggestMealFromAudio).not.toHaveBeenCalled();
+  });
+
+  it("maps each typed audio error to its discriminated-union code", async () => {
+    const audioErrors = await import("@/lib/errors/audio");
+    const cases: Array<{
+      ErrorClass: new () => Error;
+      expectedCode:
+        | "AUDIO_TOO_LARGE"
+        | "AUDIO_INVALID_FORMAT"
+        | "AUDIO_TRANSCRIPTION_FAILED"
+        | "AUDIO_TOO_SHORT_OR_EMPTY";
+    }> = [
+      { ErrorClass: audioErrors.AudioTooLargeError, expectedCode: "AUDIO_TOO_LARGE" },
+      {
+        ErrorClass: audioErrors.AudioInvalidFormatError as unknown as new () => Error,
+        expectedCode: "AUDIO_INVALID_FORMAT"
+      },
+      {
+        ErrorClass: audioErrors.AudioTranscriptionFailedError,
+        expectedCode: "AUDIO_TRANSCRIPTION_FAILED"
+      },
+      {
+        ErrorClass: audioErrors.AudioTooShortOrEmptyError,
+        expectedCode: "AUDIO_TOO_SHORT_OR_EMPTY"
+      }
+    ];
+    for (const { ErrorClass, expectedCode } of cases) {
+      serviceMock.suggestMealFromAudio.mockRejectedValueOnce(new ErrorClass());
+      const result = await suggestFromAudioAction(makeAudioFormData());
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe(expectedCode);
+    }
+  });
+
+  it("returns UPGRADE_REQUIRED when the gate denies", async () => {
+    const { FeatureGateDeniedError } = await import("@/lib/errors/gates");
+    serviceMock.suggestMealFromAudio.mockRejectedValueOnce(
+      new FeatureGateDeniedError("ai_suggest_voice")
+    );
+    const result = await suggestFromAudioAction(makeAudioFormData());
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("UPGRADE_REQUIRED");
+      expect(result.feature).toBe("ai_suggest_voice");
+    }
+  });
+
+  it("returns ok with the suggestion on success and forwards file metadata to the service", async () => {
+    serviceMock.suggestMealFromAudio.mockResolvedValueOnce({
+      name: "Chicken karahi",
+      effortGuess: "medium",
+      notes: "",
+      recipeText: "ingredients\nsteps",
+      confidence: "high"
+    });
+    const result = await suggestFromAudioAction(
+      makeAudioFormData({ type: "audio/m4a", name: "voice-note-from-mom.m4a" })
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data.name).toBe("Chicken karahi");
+    expect(serviceMock.suggestMealFromAudio).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mediaType: "audio/m4a",
+        fileName: "voice-note-from-mom.m4a",
+        userId: "u-1"
+      })
+    );
   });
 });

@@ -92,6 +92,55 @@ export function classifyYoutubeUrl(raw: string): YoutubeUrlClass {
   return { kind: "invalid" };
 }
 
+/**
+ * Round 8 — voice notes. Validates the audio's MIME type + size before
+ * the service hits Whisper. The set mirrors Whisper's accepted formats
+ * (mp3/mp4/m4a/mpeg/mpga/ogg/opus/wav/webm/flac); we accept the same
+ * with both `audio/mp3` and `audio/mpeg` because browsers disagree on
+ * the canonical MIME (Chrome on macOS reports `audio/mp3` for `.mp3`).
+ *
+ * `audio/m4a` is a non-standard but real-world MIME that some iOS
+ * exports use; included so WhatsApp voice-note uploads on iOS don't
+ * get rejected at the validator.
+ */
+export const SUPPORTED_AUDIO_MEDIA_TYPES = [
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/mp4",
+  "audio/m4a",
+  "audio/x-m4a",
+  "audio/ogg",
+  "audio/opus",
+  "audio/wav",
+  "audio/x-wav",
+  "audio/webm",
+  "audio/flac"
+] as const;
+
+export type SupportedAudioMediaType = (typeof SUPPORTED_AUDIO_MEDIA_TYPES)[number];
+
+export const MAX_AUDIO_UPLOAD_BYTES = 25 * 1024 * 1024;
+
+export function isSupportedAudioMediaType(value: string): value is SupportedAudioMediaType {
+  return (SUPPORTED_AUDIO_MEDIA_TYPES as readonly string[]).includes(value);
+}
+
+export const audioInputSchema = z.object({
+  mediaType: z
+    .string()
+    .min(1, "Missing audio mediaType.")
+    .refine(isSupportedAudioMediaType, {
+      message: "Unsupported audio format."
+    }),
+  size: z
+    .number()
+    .int()
+    .positive("Audio file is empty.")
+    .max(MAX_AUDIO_UPLOAD_BYTES, "Audio file exceeds the 25 MB limit.")
+});
+
+export type AudioInput = z.infer<typeof audioInputSchema>;
+
 export const youtubeUrlSchema = z.object({
   url: z
     .string()

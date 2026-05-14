@@ -10,9 +10,17 @@ import { authClient } from "@/lib/auth/client";
 
 type AuthEmailFormProps = {
   mode: "sign-in" | "sign-up";
+  /** Prefill the email input (set when arriving from an invite link). */
+  initialEmail?: string;
+  /** Override the post-verification redirect for returning users.
+   *  When an invite link sends a signed-out user here, the page passes
+   *  `/invite/[token]` so Better Auth returns them to the accept dialog
+   *  instead of the dashboard. New users still onboard first; the
+   *  invite token survives via the cookie set on click. */
+  callbackURL?: string;
 };
 
-export function AuthEmailForm({ mode }: AuthEmailFormProps) {
+export function AuthEmailForm({ mode, initialEmail, callbackURL }: AuthEmailFormProps) {
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [submittedEmail, setSubmittedEmail] = React.useState<string | null>(null);
@@ -32,10 +40,11 @@ export function AuthEmailForm({ mode }: AuthEmailFormProps) {
       const result = await authClient.signIn.magicLink({
         email,
         name,
-        // Returning users land on the dashboard. New users go through the
-        // multi-step onboarding first; the dashboard layout redirects them
-        // there anyway, but starting on /onboarding skips the extra hop.
-        callbackURL: "/dashboard",
+        // Returning users land on the dashboard by default. New users go
+        // through the multi-step onboarding first. When an invite link
+        // forwarded a callbackURL, that wins — Better Auth honors the
+        // parameter and returns the user to /invite/[token].
+        callbackURL: callbackURL ?? "/dashboard",
         newUserCallbackURL: "/onboarding"
       });
 
@@ -81,7 +90,14 @@ export function AuthEmailForm({ mode }: AuthEmailFormProps) {
     <form className="grid gap-4" onSubmit={onSubmit}>
       <div className="grid gap-2">
         <Label htmlFor="email">Email</Label>
-        <Input id="email" name="email" type="email" placeholder="you@example.com" required />
+        <Input
+          id="email"
+          name="email"
+          type="email"
+          placeholder="you@example.com"
+          required
+          defaultValue={initialEmail ?? ""}
+        />
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <Button type="submit" disabled={pending}>

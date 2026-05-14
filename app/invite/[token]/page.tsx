@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AcceptInvitationCard } from "@/components/account/accept-invitation-card";
+import { InviteEmailMismatch } from "@/components/account/invite-email-mismatch";
+import { buildAuthCallbackHref } from "@/lib/auth/callback-url";
 import { getCurrentUser, type AppUser } from "@/lib/auth/session";
 import {
   findInvitationContextByToken,
@@ -116,14 +118,19 @@ function InvitationView({
     );
   }
 
-  // Signed-out: instruct the user to sign in as the invited email. The
-  // magic-link flow lands on /dashboard, so we keep the instruction
-  // explicit rather than building a callback handoff in this round.
+  // Signed-out: pass the invite path through as `callbackURL` so Better
+  // Auth returns the user to /invite/[token] after magic-link verification
+  // and the accept dialog renders without a second click.
   if (!user) {
-    const signUpHref =
-      `/sign-up?email=${encodeURIComponent(invitation.email)}` as Route;
-    const signInHref =
-      `/sign-in?email=${encodeURIComponent(invitation.email)}` as Route;
+    const callback = `/invite/${token}`;
+    const signInHref = buildAuthCallbackHref("/sign-in", {
+      email: invitation.email,
+      callbackURL: callback
+    }) as Route;
+    const signUpHref = buildAuthCallbackHref("/sign-up", {
+      email: invitation.email,
+      callbackURL: callback
+    }) as Route;
     return (
       <Card>
         <CardHeader>
@@ -133,12 +140,12 @@ function InvitationView({
           <CardDescription>
             Sign in (or sign up) as{" "}
             <span className="font-medium text-foreground">{invitation.email}</span>{" "}
-            and reopen this invitation link to join.
+            to accept this invitation.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-2">
           <Button asChild>
-            <Link href={signInHref}>Sign in</Link>
+            <Link href={signInHref}>Sign in to accept</Link>
           </Button>
           <Button asChild variant="outline">
             <Link href={signUpHref}>Create an account</Link>
@@ -148,27 +155,22 @@ function InvitationView({
     );
   }
 
-  // Signed-in but the email doesn't match. Surface clearly — don't let the
-  // accept action throw with a generic error.
+  // Signed-in but the email doesn't match. One-click "sign out and
+  // continue as <invited_email>" — Round 8 papercut fix. The
+  // post-signout redirect target is pre-built on the server (so the
+  // client can't tamper with it) and routes through the same
+  // callbackURL handoff the signed-out branch uses.
   if (user.email.trim().toLowerCase() !== invitation.email.trim().toLowerCase()) {
+    const postSignOutTarget = buildAuthCallbackHref("/sign-in", {
+      email: invitation.email,
+      callbackURL: `/invite/${token}`
+    });
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>This invitation is for a different email</CardTitle>
-          <CardDescription>
-            This invite was sent to{" "}
-            <span className="font-medium text-foreground">{invitation.email}</span>,
-            but you&apos;re signed in as{" "}
-            <span className="font-medium text-foreground">{user.email}</span>. Sign
-            out and sign in with the invited email to accept.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button asChild variant="outline">
-            <Link href={"/settings" as Route}>Go to settings</Link>
-          </Button>
-        </CardContent>
-      </Card>
+      <InviteEmailMismatch
+        invitedEmail={invitation.email}
+        currentEmail={user.email}
+        redirectTo={postSignOutTarget}
+      />
     );
   }
 

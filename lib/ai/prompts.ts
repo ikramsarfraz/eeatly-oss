@@ -60,6 +60,18 @@ Return:
 
 Transcript:`;
 
+export const SUGGEST_FROM_VOICE_NOTE_PROMPT = `This is a transcript of a voice note describing a recipe. The speaker may have rambled, corrected themselves, repeated ingredients, or shared asides ("you know, like my mother used to make"). Extract:
+
+- name: the dish's name as commonly known. If the dish has a traditional Urdu/Hindi/regional name, prefer that (e.g., "Chicken Karahi" not "Chicken Curry"); concise (2–5 words).
+- effortGuess: cooking effort — quick (under 15 min), easy (15–30 min), medium (30–60 min), high_effort (over 60 min or technically complex).
+- notes: cooking tips worth remembering, max 2 sentences. Corrections and asides often contain these — surface non-obvious technique or a specific tip the speaker emphasized. Empty string if nothing stands out.
+- recipeText: ingredients then steps, cleaned up into a readable recipe — preserve quantities and methods, drop fillers, repetitions, and tangents. Plain text only.
+- confidence: "high" if the transcript clearly described a complete recipe, "medium" if some details required inference, "low" if the transcript was fragmented or barely recipe-shaped.
+
+If the transcript is in Urdu/Hindi/mixed, produce the recipe in English while keeping the traditional dish name in the name field.
+
+Transcript:`;
+
 export const SUGGEST_FROM_TEXT_PROMPT = `The user has pasted text about a meal or recipe. Extract the following information:
 
 - name: the dish name, concise (2–5 words)

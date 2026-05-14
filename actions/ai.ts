@@ -1,6 +1,12 @@
 "use server";
 
 import { requireCurrentUser, requireCurrentUserWithHousehold } from "@/lib/auth/session";
+import {
+  AudioInvalidFormatError,
+  AudioTooLargeError,
+  AudioTooShortOrEmptyError,
+  AudioTranscriptionFailedError
+} from "@/lib/errors/audio";
 import { FeatureGateDeniedError } from "@/lib/errors/gates";
 import {
   YoutubeAgeRestrictedError,
@@ -15,12 +21,18 @@ import { requireFeatureAccess } from "@/lib/gates/resolver";
 import { logger } from "@/lib/observability/logger";
 import { checkAiCallLimit } from "@/lib/security/rate-limit";
 import {
+  suggestMealFromAudio,
   generateShareableRecipe,
   suggestMealFromImage,
   suggestMealFromText,
   suggestMealFromYouTubeUrl
 } from "@/services/ai";
-import { youtubeUrlSchema, type YoutubeUrlInput } from "@/lib/validators/ai";
+import {
+  audioInputSchema,
+  MAX_AUDIO_UPLOAD_BYTES,
+  youtubeUrlSchema,
+  type YoutubeUrlInput
+} from "@/lib/validators/ai";
 import type { MealSuggestion, ShareActionResult } from "@/types";
 
 // Match the 10 MB cap enforced server-side by R2 presigned-post conditions.
@@ -181,6 +193,94 @@ export async function generateShareAction(mealId: string): Promise<ShareActionRe
       };
     }
     return { ok: false, code: "AI_ERROR", message: "Something went wrong. Please try again." };
+  }
+}
+
+/**
+ * Round 8 — voice notes. Distinct result shape from `SuggestResult`
+ * because the audio path has four typed failure codes the UI maps to
+ * tailored copy. Same success payload as the other paths.
+ */
+export type VoiceSuggestResult =
+  | { ok: true; data: MealSuggestion }
+  | {
+      ok: false;
+      code:
+        | "INVALID_INPUT"
+        | "RATE_LIMITED"
+        | "UPGRADE_REQUIRED"
+        | "AUDIO_TOO_LARGE"
+        | "AUDIO_INVALID_FORMAT"
+        | "AUDIO_TRANSCRIPTION_FAILED"
+        | "AUDIO_TOO_SHORT_OR_EMPTY"
+        | "AI_PROVIDER_ERROR";
+      message?: string;
+      feature?: FeatureKey;
+    };
+
+export async function suggestFromAudioAction(formData: FormData): Promise<VoiceSuggestResult> {
+  const file = formData.get("audio");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, code: "INVALID_INPUT", message: "Please record or upload a voice note." };
+  }
+
+  // Early size/format gate — the schema runs before we touch the user
+  // record so a malicious 100 MB upload doesn't even hit the rate limiter.
+  const parsed = audioInputSchema.safeParse({ mediaType: file.type, size: file.size });
+  if (!parsed.success) {
+    const message = parsed.error.issues[0]?.message ?? "Unsupported audio.";
+    // Distinguish format vs size at the action layer so the UI can show
+    // tailored copy without parsing the message string.
+    const code = file.size > MAX_AUDIO_UPLOAD_BYTES ? "AUDIO_TOO_LARGE" : "AUDIO_INVALID_FORMAT";
+    return { ok: false, code, message };
+  }
+
+  const user = await requireCurrentUser();
+
+  try {
+    await checkAiCallLimit(user.id);
+  } catch {
+    return {
+      ok: false,
+      code: "RATE_LIMITED",
+      message: "You've hit your daily AI limit. Try again tomorrow."
+    };
+  }
+
+  const arrayBuffer = await file.arrayBuffer();
+  const audioBuffer = Buffer.from(arrayBuffer);
+
+  try {
+    const suggestion = await suggestMealFromAudio({
+      audioBuffer,
+      mediaType: file.type,
+      fileName: file.name,
+      userId: user.id
+    });
+    return { ok: true, data: suggestion };
+  } catch (error) {
+    if (error instanceof FeatureGateDeniedError) {
+      return { ok: false, code: "UPGRADE_REQUIRED", message: error.message, feature: error.feature };
+    }
+    if (error instanceof AudioTooLargeError) {
+      return { ok: false, code: "AUDIO_TOO_LARGE", message: error.message };
+    }
+    if (error instanceof AudioInvalidFormatError) {
+      return { ok: false, code: "AUDIO_INVALID_FORMAT", message: error.message };
+    }
+    if (error instanceof AudioTranscriptionFailedError) {
+      return { ok: false, code: "AUDIO_TRANSCRIPTION_FAILED", message: error.message };
+    }
+    if (error instanceof AudioTooShortOrEmptyError) {
+      return { ok: false, code: "AUDIO_TOO_SHORT_OR_EMPTY", message: error.message };
+    }
+    const message = error instanceof Error ? error.message : "Unknown provider error.";
+    logger.warn("ai_suggest_from_audio_failed", { userId: user.id, error: message });
+    return {
+      ok: false,
+      code: "AI_PROVIDER_ERROR",
+      message: "We couldn't read that audio. Please try again."
+    };
   }
 }
 

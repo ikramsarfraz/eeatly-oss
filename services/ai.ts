@@ -8,6 +8,12 @@ import * as openai from "@/lib/ai/providers/openai";
 import { households, mealLogs, meals } from "@/db/schema";
 import { requireHouseholdMember } from "@/lib/auth/session";
 import {
+  AudioInvalidFormatError,
+  AudioTooLargeError,
+  AudioTooShortOrEmptyError,
+  AudioTranscriptionFailedError
+} from "@/lib/errors/audio";
+import {
   YoutubePlaylistUnsupportedError,
   YoutubeShortsUnsupportedError
 } from "@/lib/errors/youtube";
@@ -16,7 +22,12 @@ import {
   youtubeTranscriptFetcher,
   type TranscriptFetcher
 } from "@/lib/ai/youtube-transcript";
-import { classifyYoutubeUrl } from "@/lib/validators/ai";
+import {
+  classifyYoutubeUrl,
+  isSupportedAudioMediaType,
+  MAX_AUDIO_UPLOAD_BYTES
+} from "@/lib/validators/ai";
+import { logger } from "@/lib/observability/logger";
 import type { MealSuggestion, ShareActionResult } from "@/types";
 
 const SUPPORTED_MEDIA_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
@@ -175,6 +186,113 @@ export async function suggestMealFromYouTubeUrl(
     () => anthropic.suggestMealFromTranscript(truncated),
     { operation: "suggest_meal_from_youtube" }
   );
+}
+
+// Round 8 — voice notes.
+
+// Voice-note transcripts shorter than this almost never produce a real
+// recipe — usually it's mic test ("hello? hello?") or a fragment
+// captured by accident. We bail with a typed error so the UI can ask
+// for a longer recording rather than burning a provider call.
+const MIN_TRANSCRIPT_CHARS = 30;
+
+/**
+ * Round 8 — transcriber boundary. The default `whisperTranscriber`
+ * wraps the OpenAI Whisper SDK call; tests inject a stub. Mirrors
+ * the `TranscriptFetcher` pattern from the YouTube path so the
+ * service stays library-agnostic and unit-testable.
+ */
+export interface AudioTranscriber {
+  transcribe(audioBuffer: Buffer, mediaType: string, fileName: string): Promise<string>;
+}
+
+export const whisperTranscriber: AudioTranscriber = {
+  transcribe: (audioBuffer, mediaType, fileName) =>
+    openai.transcribeAudio(audioBuffer, mediaType, fileName)
+};
+
+/**
+ * Round 8 — extract a meal suggestion from a voice note. Pipeline:
+ *   1. Gate check (`ai_suggest_voice`)
+ *   2. Validate mediaType + size (typed errors before any provider call)
+ *   3. Whisper transcription (no Anthropic fallback — see lib/errors/audio.ts)
+ *   4. Validate transcript length (typed error if too short/empty)
+ *   5. AI extraction via the OpenAI → Anthropic fallback chain
+ *
+ * No audio persistence. The buffer lives only inside this call's
+ * stack frame — Whisper returns text, the recipe is extracted, and
+ * the audio bytes are eligible for GC the moment the function returns.
+ */
+export async function suggestMealFromAudio(
+  args: {
+    audioBuffer: Buffer;
+    mediaType: string;
+    fileName?: string;
+    userId: string;
+  },
+  deps: { transcriber?: AudioTranscriber } = {}
+): Promise<MealSuggestion> {
+  await requireFeatureAccess(args.userId, "ai_suggest_voice");
+
+  if (!isSupportedAudioMediaType(args.mediaType)) {
+    throw new AudioInvalidFormatError(args.mediaType);
+  }
+  if (args.audioBuffer.byteLength > MAX_AUDIO_UPLOAD_BYTES) {
+    throw new AudioTooLargeError();
+  }
+  if (args.audioBuffer.byteLength === 0) {
+    throw new AudioTooShortOrEmptyError();
+  }
+
+  const transcriber = deps.transcriber ?? whisperTranscriber;
+  // Whisper's required `filename` is used for format detection — pass
+  // a sensible default with the right extension if the caller didn't
+  // provide one. Most uploads carry the original filename through.
+  const fileName = args.fileName ?? defaultFileNameFor(args.mediaType);
+
+  let transcript: string;
+  try {
+    transcript = await transcriber.transcribe(args.audioBuffer, args.mediaType, fileName);
+  } catch (error) {
+    logger.warn("ai_audio_transcription_failed", {
+      userId: args.userId,
+      mediaType: args.mediaType,
+      bytes: args.audioBuffer.byteLength,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    throw new AudioTranscriptionFailedError();
+  }
+
+  const trimmed = transcript.trim();
+  if (trimmed.length < MIN_TRANSCRIPT_CHARS) {
+    throw new AudioTooShortOrEmptyError();
+  }
+
+  return withFallback(
+    () => openai.suggestMealFromVoiceTranscript(trimmed),
+    () => anthropic.suggestMealFromVoiceTranscript(trimmed),
+    { operation: "suggest_meal_from_voice" }
+  );
+}
+
+function defaultFileNameFor(mediaType: string): string {
+  // Whisper uses the file extension when the MIME type is ambiguous,
+  // so we map our supported set to canonical extensions. Unknown types
+  // would already have been rejected by `isSupportedAudioMediaType`.
+  const extByType: Record<string, string> = {
+    "audio/mpeg": "audio.mp3",
+    "audio/mp3": "audio.mp3",
+    "audio/mp4": "audio.mp4",
+    "audio/m4a": "audio.m4a",
+    "audio/x-m4a": "audio.m4a",
+    "audio/ogg": "audio.ogg",
+    "audio/opus": "audio.opus",
+    "audio/wav": "audio.wav",
+    "audio/x-wav": "audio.wav",
+    "audio/webm": "audio.webm",
+    "audio/flac": "audio.flac"
+  };
+  return extByType[mediaType] ?? "audio.bin";
 }
 
 function segmentsToTranscriptText(

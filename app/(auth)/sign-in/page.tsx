@@ -10,14 +10,25 @@ import {
   CardTitle
 } from "@/components/ui/card";
 import { hasGoogleAuthEnv } from "@/lib/env/server";
+import { sanitizeCallbackURL } from "@/lib/auth/callback-url";
 
 export const metadata: Metadata = {
   title: "Sign in",
   description: "Sign in to your private eeatly meal memory."
 };
 
-export default function SignInPage() {
+export default async function SignInPage({
+  searchParams
+}: {
+  searchParams: Promise<{ email?: string; callbackURL?: string }>;
+}) {
   const googleEnabled = hasGoogleAuthEnv();
+  const { email, callbackURL } = await searchParams;
+  // Sanitize at the page boundary — callbackURL comes from a URL the
+  // user followed (e.g. from an invite link). Open-redirect protection
+  // lives in sanitizeCallbackURL.
+  const safeCallback = sanitizeCallbackURL(callbackURL);
+  const initialEmail = typeof email === "string" ? email.trim().toLowerCase() : undefined;
 
   return (
     <Card>
@@ -30,7 +41,7 @@ export default function SignInPage() {
       <CardContent className="grid gap-4">
         {googleEnabled ? (
           <>
-            <GoogleAuthButton mode="sign-in" />
+            <GoogleAuthButton mode="sign-in" callbackURL={safeCallback} />
             <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
               <span className="h-px flex-1 bg-border" />
               or
@@ -38,7 +49,11 @@ export default function SignInPage() {
             </div>
           </>
         ) : null}
-        <AuthEmailForm mode="sign-in" />
+        <AuthEmailForm
+          mode="sign-in"
+          initialEmail={initialEmail}
+          callbackURL={safeCallback}
+        />
         <p className="text-center text-sm text-muted-foreground">
           New here?{" "}
           <Link className="font-medium text-primary hover:underline" href="/sign-up">

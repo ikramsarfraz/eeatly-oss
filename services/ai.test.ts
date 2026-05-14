@@ -84,7 +84,15 @@ vi.mock("@/lib/ai/providers/openai", () => ({
     notes: "",
     recipeText: "ingredients\nsteps",
     confidence: "high"
-  }))
+  })),
+  suggestMealFromVoiceTranscript: vi.fn(async () => ({
+    name: "Chicken karahi",
+    effortGuess: "medium",
+    notes: "Sear the masala before adding water.",
+    recipeText: "ingredients\nsteps",
+    confidence: "high"
+  })),
+  transcribeAudio: vi.fn(async () => "raw whisper output")
 }));
 
 vi.mock("@/lib/ai/providers/anthropic", () => ({
@@ -95,14 +103,28 @@ vi.mock("@/lib/ai/providers/anthropic", () => ({
     notes: "",
     recipeText: "ingredients\nsteps",
     confidence: "high"
+  })),
+  suggestMealFromVoiceTranscript: vi.fn(async () => ({
+    name: "Chicken karahi",
+    effortGuess: "medium",
+    notes: "Sear the masala before adding water.",
+    recipeText: "ingredients\nsteps",
+    confidence: "high"
   }))
 }));
 
 import {
   generateShareableRecipe,
+  suggestMealFromAudio,
   suggestMealFromYouTubeUrl,
   truncateForBudget
 } from "./ai";
+import {
+  AudioInvalidFormatError,
+  AudioTooLargeError,
+  AudioTooShortOrEmptyError,
+  AudioTranscriptionFailedError
+} from "@/lib/errors/audio";
 import {
   YoutubeNoTranscriptError,
   YoutubePlaylistUnsupportedError,
@@ -292,5 +314,141 @@ describe("suggestMealFromYouTubeUrl", () => {
       expect(out.startsWith("x".repeat(35_000))).toBe(true);
       expect(out.endsWith("x".repeat(10_000))).toBe(true);
     });
+  });
+});
+
+describe("suggestMealFromAudio", () => {
+  // Re-using the existing module-level mocks for providers + gate.
+  // A "transcriber" stub is injected per-test via the `deps` argument so
+  // we exercise the service flow without touching the OpenAI SDK.
+
+  function tinyBuffer(bytes: number): Buffer {
+    return Buffer.alloc(bytes, 0x01);
+  }
+
+  it("fails the gate check before touching the transcriber", async () => {
+    const transcriber = { transcribe: vi.fn() };
+    gateMock.requireFeatureAccess.mockRejectedValueOnce(new Error("gated"));
+
+    await expect(
+      suggestMealFromAudio(
+        {
+          audioBuffer: tinyBuffer(1024),
+          mediaType: "audio/webm",
+          userId: "u-free"
+        },
+        { transcriber }
+      )
+    ).rejects.toThrow(/gated/);
+
+    expect(transcriber.transcribe).not.toHaveBeenCalled();
+  });
+
+  it("throws AudioInvalidFormatError for an unsupported media type", async () => {
+    const transcriber = { transcribe: vi.fn() };
+    await expect(
+      suggestMealFromAudio(
+        {
+          audioBuffer: tinyBuffer(1024),
+          mediaType: "audio/aiff",
+          userId: "u-1"
+        },
+        { transcriber }
+      )
+    ).rejects.toBeInstanceOf(AudioInvalidFormatError);
+    expect(transcriber.transcribe).not.toHaveBeenCalled();
+  });
+
+  it("throws AudioTooLargeError when the buffer exceeds 25 MB", async () => {
+    const transcriber = { transcribe: vi.fn() };
+    // Build a buffer just over the 25 MB cap. Skip the allocation if
+    // memory is tight by patching `byteLength` — but in practice Buffer
+    // allocs of this size are fine on test runners. 25 * 1024 * 1024 + 1.
+    const oversized = Buffer.alloc(25 * 1024 * 1024 + 1, 0x01);
+    await expect(
+      suggestMealFromAudio(
+        { audioBuffer: oversized, mediaType: "audio/mpeg", userId: "u-1" },
+        { transcriber }
+      )
+    ).rejects.toBeInstanceOf(AudioTooLargeError);
+    expect(transcriber.transcribe).not.toHaveBeenCalled();
+  });
+
+  it("throws AudioTooShortOrEmptyError for an empty buffer (zero bytes)", async () => {
+    const transcriber = { transcribe: vi.fn() };
+    await expect(
+      suggestMealFromAudio(
+        { audioBuffer: Buffer.alloc(0), mediaType: "audio/webm", userId: "u-1" },
+        { transcriber }
+      )
+    ).rejects.toBeInstanceOf(AudioTooShortOrEmptyError);
+    expect(transcriber.transcribe).not.toHaveBeenCalled();
+  });
+
+  it("throws AudioTranscriptionFailedError when Whisper rejects", async () => {
+    const transcriber = {
+      transcribe: vi.fn(async () => {
+        throw new Error("whisper 500");
+      })
+    };
+    await expect(
+      suggestMealFromAudio(
+        { audioBuffer: tinyBuffer(2048), mediaType: "audio/webm", userId: "u-1" },
+        { transcriber }
+      )
+    ).rejects.toBeInstanceOf(AudioTranscriptionFailedError);
+    expect(transcriber.transcribe).toHaveBeenCalledOnce();
+  });
+
+  it("throws AudioTooShortOrEmptyError when Whisper returns a transcript that's too short", async () => {
+    const transcriber = { transcribe: vi.fn(async () => "hi") };
+    await expect(
+      suggestMealFromAudio(
+        { audioBuffer: tinyBuffer(2048), mediaType: "audio/webm", userId: "u-1" },
+        { transcriber }
+      )
+    ).rejects.toBeInstanceOf(AudioTooShortOrEmptyError);
+  });
+
+  it("passes the trimmed transcript to the extraction provider and returns the suggestion", async () => {
+    const transcriber = {
+      transcribe: vi.fn(
+        async () =>
+          "  Today I'll make chicken karahi — first heat ghee in a heavy pan and add tomatoes...   "
+      )
+    };
+    const result = await suggestMealFromAudio(
+      { audioBuffer: tinyBuffer(2048), mediaType: "audio/webm", userId: "u-1" },
+      { transcriber }
+    );
+    expect(result.name).toBe("Chicken karahi");
+    expect(transcriber.transcribe).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      "audio/webm",
+      expect.stringMatching(/\.webm$/)
+    );
+  });
+
+  it("uses the caller-supplied fileName when present (passes through to transcriber)", async () => {
+    const transcriber = {
+      transcribe: vi.fn(
+        async () =>
+          "Today I'll make chicken karahi — heat ghee, add tomatoes, simmer for 20 minutes."
+      )
+    };
+    await suggestMealFromAudio(
+      {
+        audioBuffer: tinyBuffer(2048),
+        mediaType: "audio/m4a",
+        fileName: "voice-note-from-mom.m4a",
+        userId: "u-1"
+      },
+      { transcriber }
+    );
+    expect(transcriber.transcribe).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      "audio/m4a",
+      "voice-note-from-mom.m4a"
+    );
   });
 });

@@ -10,14 +10,22 @@ import {
   CardTitle
 } from "@/components/ui/card";
 import { hasGoogleAuthEnv } from "@/lib/env/server";
+import { sanitizeCallbackURL } from "@/lib/auth/callback-url";
 
 export const metadata: Metadata = {
   title: "Start your cooking memory",
   description: "Create a private eeatly account with an email magic link."
 };
 
-export default function SignUpPage() {
+export default async function SignUpPage({
+  searchParams
+}: {
+  searchParams: Promise<{ email?: string; callbackURL?: string }>;
+}) {
   const googleEnabled = hasGoogleAuthEnv();
+  const { email, callbackURL } = await searchParams;
+  const safeCallback = sanitizeCallbackURL(callbackURL);
+  const initialEmail = typeof email === "string" ? email.trim().toLowerCase() : undefined;
 
   return (
     <Card>
@@ -30,7 +38,7 @@ export default function SignUpPage() {
       <CardContent className="grid gap-4">
         {googleEnabled ? (
           <>
-            <GoogleAuthButton mode="sign-up" />
+            <GoogleAuthButton mode="sign-up" callbackURL={safeCallback} />
             <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
               <span className="h-px flex-1 bg-border" />
               or
@@ -38,7 +46,11 @@ export default function SignUpPage() {
             </div>
           </>
         ) : null}
-        <AuthEmailForm mode="sign-up" />
+        <AuthEmailForm
+          mode="sign-up"
+          initialEmail={initialEmail}
+          callbackURL={safeCallback}
+        />
         <p className="text-center text-sm text-muted-foreground">
           Already have an account?{" "}
           <Link className="font-medium text-primary hover:underline" href="/sign-in">
