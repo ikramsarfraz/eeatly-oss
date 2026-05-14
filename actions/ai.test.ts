@@ -35,6 +35,7 @@ vi.mock("@/lib/security/rate-limit", () => rateLimitMock);
 const serviceMock = vi.hoisted(() => ({
   suggestMealFromImage: vi.fn(),
   suggestMealFromText: vi.fn(),
+  suggestMealFromYouTubeUrl: vi.fn(),
   generateShareableRecipe: vi.fn()
 }));
 vi.mock("@/services/ai", () => serviceMock);
@@ -51,6 +52,7 @@ vi.mock("@/lib/gates/resolver", () => gateMock);
 import {
   suggestFromImageAction,
   suggestFromTextAction,
+  suggestFromYouTubeAction,
   type SuggestResult
 } from "./ai";
 
@@ -59,6 +61,7 @@ beforeEach(() => {
   rateLimitMock.checkAiCallLimit.mockResolvedValue();
   serviceMock.suggestMealFromImage.mockReset();
   serviceMock.suggestMealFromText.mockReset();
+  serviceMock.suggestMealFromYouTubeUrl.mockReset();
   gateMock.requireFeatureAccess.mockReset();
   gateMock.requireFeatureAccess.mockResolvedValue();
   gateMock.can.mockReset();
@@ -223,5 +226,91 @@ describe("Round 6 — UPGRADE_REQUIRED gate translation", () => {
       expect(result.feature).toBe("ai_suggest_text");
     }
     expect(serviceMock.suggestMealFromText).not.toHaveBeenCalled();
+  });
+});
+
+describe("suggestFromYouTubeAction — discriminated-union surface", () => {
+  it("rejects malformed URLs at the Zod layer with INVALID_INPUT", async () => {
+    const result = await suggestFromYouTubeAction({ url: "https://vimeo.com/1" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("INVALID_INPUT");
+    expect(serviceMock.suggestMealFromYouTubeUrl).not.toHaveBeenCalled();
+  });
+
+  it("returns RATE_LIMITED when the daily AI budget is exhausted", async () => {
+    rateLimitMock.checkAiCallLimit.mockRejectedValueOnce(new Error("rate"));
+    const result = await suggestFromYouTubeAction({
+      url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("RATE_LIMITED");
+    expect(serviceMock.suggestMealFromYouTubeUrl).not.toHaveBeenCalled();
+  });
+
+  it("maps each typed YouTube error to its discriminated-union code", async () => {
+    const cases: Array<{
+      errorName:
+        | "YoutubeShortsUnsupportedError"
+        | "YoutubePlaylistUnsupportedError"
+        | "YoutubeNoTranscriptError"
+        | "YoutubeUnavailableError"
+        | "YoutubeAgeRestrictedError"
+        | "YoutubeFetchFailedError";
+      expectedCode:
+        | "YOUTUBE_SHORTS_UNSUPPORTED"
+        | "YOUTUBE_PLAYLIST_UNSUPPORTED"
+        | "YOUTUBE_NO_TRANSCRIPT"
+        | "YOUTUBE_UNAVAILABLE"
+        | "YOUTUBE_AGE_RESTRICTED"
+        | "YOUTUBE_FETCH_FAILED";
+    }> = [
+      { errorName: "YoutubeShortsUnsupportedError", expectedCode: "YOUTUBE_SHORTS_UNSUPPORTED" },
+      { errorName: "YoutubePlaylistUnsupportedError", expectedCode: "YOUTUBE_PLAYLIST_UNSUPPORTED" },
+      { errorName: "YoutubeNoTranscriptError", expectedCode: "YOUTUBE_NO_TRANSCRIPT" },
+      { errorName: "YoutubeUnavailableError", expectedCode: "YOUTUBE_UNAVAILABLE" },
+      { errorName: "YoutubeAgeRestrictedError", expectedCode: "YOUTUBE_AGE_RESTRICTED" },
+      { errorName: "YoutubeFetchFailedError", expectedCode: "YOUTUBE_FETCH_FAILED" }
+    ];
+
+    const errors = await import("@/lib/errors/youtube");
+    for (const { errorName, expectedCode } of cases) {
+      const ErrorClass = errors[errorName] as new () => Error;
+      serviceMock.suggestMealFromYouTubeUrl.mockRejectedValueOnce(new ErrorClass());
+      const result = await suggestFromYouTubeAction({
+        url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+      });
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe(expectedCode);
+    }
+  });
+
+  it("returns UPGRADE_REQUIRED when the gate denies", async () => {
+    const { FeatureGateDeniedError } = await import("@/lib/errors/gates");
+    serviceMock.suggestMealFromYouTubeUrl.mockRejectedValueOnce(
+      new FeatureGateDeniedError("ai_suggest_youtube")
+    );
+    const result = await suggestFromYouTubeAction({
+      url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("UPGRADE_REQUIRED");
+      expect(result.feature).toBe("ai_suggest_youtube");
+    }
+  });
+
+  it("returns ok with the suggestion on success", async () => {
+    serviceMock.suggestMealFromYouTubeUrl.mockResolvedValueOnce({
+      name: "Chicken karahi",
+      effortGuess: "medium",
+      notes: "",
+      recipeText: "ingredients\nsteps",
+      confidence: "high"
+    });
+    const result = await suggestFromYouTubeAction({
+      url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data.name).toBe("Chicken karahi");
   });
 });

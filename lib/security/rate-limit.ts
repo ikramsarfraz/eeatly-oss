@@ -10,6 +10,7 @@ let _aiCallLimiter: Ratelimit | null = null;
 let _uploadPresignLimiter: Ratelimit | null = null;
 let _feedbackLimiter: Ratelimit | null = null;
 let _invitationLimiter: Ratelimit | null = null;
+let _shareCreationLimiter: Ratelimit | null = null;
 
 function getRedis(): Redis {
   if (!_redis) {
@@ -114,5 +115,28 @@ export async function checkInvitationLimit(userId: string): Promise<void> {
   const { success } = await getInvitationLimiter().limit(userId);
   if (!success) {
     throw new Error("Too many invitations sent in a short time. Please try again later.");
+  }
+}
+
+function getShareCreationLimiter(): Ratelimit {
+  if (!_shareCreationLimiter) {
+    // Round 7: public share-link creation. `createRecipeShare` is
+    // idempotent per (meal, non-revoked) tuple — re-clicking on the
+    // same meal returns the existing share. Spam is bounded by household
+    // meal count; 20 per day is conservative against scripted abuse
+    // without being noticeable for legitimate cooking-burst days.
+    _shareCreationLimiter = new Ratelimit({
+      redis: getRedis(),
+      limiter: Ratelimit.slidingWindow(20, "1 d"),
+      prefix: "rl:share-create"
+    });
+  }
+  return _shareCreationLimiter;
+}
+
+export async function checkShareCreationLimit(userId: string): Promise<void> {
+  const { success } = await getShareCreationLimiter().limit(userId);
+  if (!success) {
+    throw new Error("Too many share links created today. Try again tomorrow.");
   }
 }

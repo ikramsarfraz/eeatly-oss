@@ -1,7 +1,12 @@
 import "server-only";
 
 import OpenAI from "openai";
-import { buildSharePrompt, SUGGEST_FROM_IMAGE_PROMPT, SUGGEST_FROM_TEXT_PROMPT } from "@/lib/ai/prompts";
+import {
+  buildSharePrompt,
+  SUGGEST_FROM_IMAGE_PROMPT,
+  SUGGEST_FROM_TEXT_PROMPT,
+  SUGGEST_FROM_YOUTUBE_PROMPT
+} from "@/lib/ai/prompts";
 import { logger } from "@/lib/observability/logger";
 import { getServerEnv } from "@/lib/env/server";
 import type { MealSuggestion } from "@/types";
@@ -113,6 +118,40 @@ export async function suggestMealFromText(text: string): Promise<MealSuggestion>
   logger.info("ai_provider_tokens", {
     provider: "openai",
     operation: "suggest_meal_from_text",
+    input_tokens: usage?.prompt_tokens ?? null,
+    output_tokens: usage?.completion_tokens ?? null
+  });
+
+  const content = response.choices[0]?.message?.content;
+  if (!content) throw new Error("OpenAI returned an empty response.");
+  return parseSuggestion(JSON.parse(content) as Record<string, unknown>);
+}
+
+export async function suggestMealFromTranscript(transcript: string): Promise<MealSuggestion> {
+  const client = getClient();
+  // YouTube transcripts can be long. The model has its own input cap;
+  // services/ai.ts:suggestMealFromYouTubeUrl truncates before calling
+  // this. Bigger output budget than the text path — transcript recipes
+  // tend to be wordier (ingredients spread across the talk track).
+  const response = await client.chat.completions.create(
+    {
+      model: MODEL,
+      max_tokens: 1500,
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: "meal_suggestion", strict: true, schema: SUGGESTION_SCHEMA }
+      },
+      messages: [
+        { role: "user", content: `${SUGGEST_FROM_YOUTUBE_PROMPT}\n\n${transcript}` }
+      ]
+    },
+    { signal: AbortSignal.timeout(PRIMARY_TIMEOUT_MS) }
+  );
+
+  const usage = response.usage;
+  logger.info("ai_provider_tokens", {
+    provider: "openai",
+    operation: "suggest_meal_from_youtube",
     input_tokens: usage?.prompt_tokens ?? null,
     output_tokens: usage?.completion_tokens ?? null
   });

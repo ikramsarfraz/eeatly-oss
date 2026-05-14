@@ -77,14 +77,37 @@ vi.mock("@/lib/ai/providers", () => ({
 }));
 
 vi.mock("@/lib/ai/providers/openai", () => ({
-  generateShareText: vi.fn(async () => ({ text: "share text" }))
+  generateShareText: vi.fn(async () => ({ text: "share text" })),
+  suggestMealFromTranscript: vi.fn(async () => ({
+    name: "Chicken karahi",
+    effortGuess: "medium",
+    notes: "",
+    recipeText: "ingredients\nsteps",
+    confidence: "high"
+  }))
 }));
 
 vi.mock("@/lib/ai/providers/anthropic", () => ({
-  generateShareText: vi.fn(async () => ({ text: "share text" }))
+  generateShareText: vi.fn(async () => ({ text: "share text" })),
+  suggestMealFromTranscript: vi.fn(async () => ({
+    name: "Chicken karahi",
+    effortGuess: "medium",
+    notes: "",
+    recipeText: "ingredients\nsteps",
+    confidence: "high"
+  }))
 }));
 
-import { generateShareableRecipe } from "./ai";
+import {
+  generateShareableRecipe,
+  suggestMealFromYouTubeUrl,
+  truncateForBudget
+} from "./ai";
+import {
+  YoutubeNoTranscriptError,
+  YoutubePlaylistUnsupportedError,
+  YoutubeShortsUnsupportedError
+} from "@/lib/errors/youtube";
 
 function queue<T>(value: T) {
   dbState.queue.push(async () => value);
@@ -137,5 +160,137 @@ describe("generateShareableRecipe service-layer authz", () => {
 
     expect(result).toEqual({ ok: true, text: "share text" });
     expect(sessionMock.requireHouseholdMember).toHaveBeenCalledWith("u-member", "h-a");
+  });
+});
+
+describe("suggestMealFromYouTubeUrl", () => {
+  it("rejects YouTube Shorts URLs with a typed error before fetching anything", async () => {
+    const fetcher = { fetch: vi.fn() };
+    await expect(
+      suggestMealFromYouTubeUrl(
+        {
+          userId: "u-1",
+          url: "https://www.youtube.com/shorts/dQw4w9WgXcQ"
+        },
+        { fetcher }
+      )
+    ).rejects.toBeInstanceOf(YoutubeShortsUnsupportedError);
+
+    expect(fetcher.fetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects playlist URLs with a typed error", async () => {
+    const fetcher = { fetch: vi.fn() };
+    await expect(
+      suggestMealFromYouTubeUrl(
+        {
+          userId: "u-1",
+          url: "https://www.youtube.com/playlist?list=PLxxx"
+        },
+        { fetcher }
+      )
+    ).rejects.toBeInstanceOf(YoutubePlaylistUnsupportedError);
+    expect(fetcher.fetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-YouTube URLs early with a generic error", async () => {
+    const fetcher = { fetch: vi.fn() };
+    await expect(
+      suggestMealFromYouTubeUrl(
+        { userId: "u-1", url: "https://vimeo.com/1" },
+        { fetcher }
+      )
+    ).rejects.toThrow(/Not a YouTube URL/);
+    expect(fetcher.fetch).not.toHaveBeenCalled();
+  });
+
+  it("fails the gate check before touching the fetcher", async () => {
+    const fetcher = { fetch: vi.fn() };
+    gateMock.requireFeatureAccess.mockRejectedValueOnce(
+      // The real FeatureGateDeniedError is imported in actions/ai.test.ts
+      // for the action-layer round-trip; here we only need to verify
+      // that ANY rejection from the gate short-circuits the fetcher.
+      new Error("gated")
+    );
+    await expect(
+      suggestMealFromYouTubeUrl(
+        {
+          userId: "u-free",
+          url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        },
+        { fetcher }
+      )
+    ).rejects.toThrow(/gated/);
+    expect(fetcher.fetch).not.toHaveBeenCalled();
+  });
+
+  it("propagates the fetcher's typed errors (e.g., no transcript) unchanged", async () => {
+    const fetcher = {
+      fetch: vi.fn(async () => {
+        throw new YoutubeNoTranscriptError();
+      })
+    };
+    await expect(
+      suggestMealFromYouTubeUrl(
+        {
+          userId: "u-1",
+          url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        },
+        { fetcher }
+      )
+    ).rejects.toBeInstanceOf(YoutubeNoTranscriptError);
+  });
+
+  it("normalizes the URL before passing it to the fetcher (youtu.be → www.youtube.com)", async () => {
+    const fetcher = {
+      fetch: vi.fn(async () => [{ text: "ingredients first then steps" } as never])
+    };
+    await suggestMealFromYouTubeUrl(
+      {
+        userId: "u-1",
+        url: "https://youtu.be/dQw4w9WgXcQ"
+      },
+      { fetcher }
+    );
+    expect(fetcher.fetch).toHaveBeenCalledWith(
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    );
+  });
+
+  it("joins segment text and passes it to the AI provider via withFallback", async () => {
+    const fetcher = {
+      fetch: vi.fn(async () => [
+        { text: "Welcome back" } as never,
+        { text: "today we make karahi" } as never
+      ])
+    };
+    const result = await suggestMealFromYouTubeUrl(
+      {
+        userId: "u-1",
+        url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+      },
+      { fetcher }
+    );
+    expect(result.name).toBe("Chicken karahi");
+  });
+
+  describe("truncateForBudget", () => {
+    it("returns the input unchanged when within the budget", () => {
+      const short = "hello world";
+      expect(truncateForBudget(short)).toBe(short);
+    });
+
+    it("preserves head + tail with a marker when the transcript exceeds the budget", () => {
+      // Build a string just over the 50_000 char cap so the truncation
+      // path fires.
+      const long = "x".repeat(60_000);
+      const out = truncateForBudget(long);
+      expect(out.length).toBeLessThan(long.length);
+      expect(out).toContain("[…transcript middle omitted");
+      // Head + tail = 70% + 20% = 90% of the budget — the marker
+      // accounts for the rest.
+      expect(out.startsWith("x".repeat(35_000))).toBe(true);
+      expect(out.endsWith("x".repeat(10_000))).toBe(true);
+    });
   });
 });
