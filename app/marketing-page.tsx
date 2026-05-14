@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { useEffect, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { Fragment, useEffect, useState } from "react";
+import { motion, useReducedMotion, type Variants } from "framer-motion";
 import {
   ArrowRight,
   ChefHat,
@@ -28,12 +28,12 @@ const SUBHEAD =
 /* Animation Variants                                                        */
 /* ────────────────────────────────────────────────────────────────────────── */
 
-const fadeUp = {
+const fadeUp: Variants = {
   hidden: { opacity: 0, y: 24 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } }
 };
 
-const staggerContainer = {
+const staggerContainer: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -372,19 +372,22 @@ const FEATURES = [
     icon: Users,
     title: "One kitchen for your whole family",
     description:
-      "Invite mom, your sister, your daughter. Everyone's recipes in one shared library. Every dish credited to whoever added it."
+      "Invite mom, your sister, your daughter. Everyone's recipes in one shared library. Every dish credited to whoever added it.",
+    highlight: false
   },
   {
     icon: CalendarDays,
     title: "Plan the meals that matter",
     description:
-      "Eid menu. Diwali dinner. Sunday rotation. Build a plan once, and next year's plan carries forward last year's notes."
+      "Eid menu. Diwali dinner. Sunday rotation. Build a plan once, and next year's plan carries forward last year's notes.",
+    highlight: false
   },
   {
     icon: Share2,
     title: "Share a recipe with anyone",
     description:
-      "One link. Works in WhatsApp, text, anywhere. No account needed to view. Revoke the link whenever you want it private again."
+      "One link. Works in WhatsApp, text, anywhere. No account needed to view. Revoke the link whenever you want it private again.",
+    highlight: false
   }
 ] as const;
 
@@ -684,15 +687,13 @@ function PricingTeaser({ monthlyPriceDisplay, prefersReducedMotion }: { monthlyP
 
                 {/* Rows */}
                 {PLAN_COMPARISON.map((row, i) => (
-                  <>
+                  <Fragment key={row.feature}>
                     <div
-                      key={`${row.feature}-name`}
                       className={`p-4 text-muted-foreground ${i < PLAN_COMPARISON.length - 1 ? "border-b" : ""}`}
                     >
                       {row.feature}
                     </div>
                     <div
-                      key={`${row.feature}-free`}
                       className={`flex items-center justify-center border-l p-4 ${i < PLAN_COMPARISON.length - 1 ? "border-b" : ""}`}
                     >
                       {row.free ? (
@@ -702,7 +703,6 @@ function PricingTeaser({ monthlyPriceDisplay, prefersReducedMotion }: { monthlyP
                       )}
                     </div>
                     <div
-                      key={`${row.feature}-plus`}
                       className={`flex items-center justify-center border-l bg-primary/[0.02] p-4 ${i < PLAN_COMPARISON.length - 1 ? "border-b" : ""}`}
                     >
                       {row.plus ? (
@@ -711,7 +711,7 @@ function PricingTeaser({ monthlyPriceDisplay, prefersReducedMotion }: { monthlyP
                         <X className="h-4 w-4 text-muted-foreground/40" />
                       )}
                     </div>
-                  </>
+                  </Fragment>
                 ))}
               </div>
             </div>
