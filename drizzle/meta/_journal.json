@@ -162,6 +162,13 @@
       "when": 1778691609000,
       "tag": "0023_recipe_shares",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1778691610000,
+      "tag": "0024_meal_ingredients",
+      "breakpoints": true
     }
   ]
 }

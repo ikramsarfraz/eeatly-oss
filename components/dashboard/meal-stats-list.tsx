@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Route } from "next";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { MealThumb } from "@/components/dashboard/meal-thumb";
@@ -56,9 +57,17 @@ export function MealStatsList({
                 fallbackIndex={i}
               />
 
-              {/* Info */}
+              {/* Info — name links to the recipe view (Round 10). The
+                  row's other controls (cook count badge / log-again)
+                  stay outside the link so phone taps on either target
+                  remain unambiguous. */}
               <div className="min-w-0">
-                <div className="truncate text-[13.5px] font-medium">{meal.mealName}</div>
+                <Link
+                  href={`/meal/${meal.mealId}` as Route}
+                  className="block truncate text-[13.5px] font-medium underline-offset-2 hover:underline"
+                >
+                  {meal.mealName}
+                </Link>
                 <div className="mt-0.5 flex items-center gap-2 text-[11.5px] text-muted-foreground">
                   <span>
                     {meal.lastCookedAt

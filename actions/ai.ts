@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { requireCurrentUser, requireCurrentUserWithHousehold } from "@/lib/auth/session";
 import {
   AudioInvalidFormatError,
@@ -8,6 +9,7 @@ import {
   AudioTranscriptionFailedError
 } from "@/lib/errors/audio";
 import { FeatureGateDeniedError } from "@/lib/errors/gates";
+import { NoRecipeTextError } from "@/lib/errors/ingredients";
 import {
   YoutubeAgeRestrictedError,
   YoutubeFetchFailedError,
@@ -21,6 +23,7 @@ import { requireFeatureAccess } from "@/lib/gates/resolver";
 import { logger } from "@/lib/observability/logger";
 import { checkAiCallLimit } from "@/lib/security/rate-limit";
 import {
+  extractIngredientsForMeal,
   suggestMealFromAudio,
   generateShareableRecipe,
   suggestMealFromImage,
@@ -390,6 +393,106 @@ export async function suggestFromYouTubeAction(
       ok: false,
       code: "AI_PROVIDER_ERROR",
       message: "We couldn't read that video. Please try again."
+    };
+  }
+}
+
+/**
+ * Round 10 — on-demand ingredient extraction for legacy meals. Mirrors
+ * the discriminated-union pattern of the other AI actions:
+ *
+ *   - `UPGRADE_REQUIRED` (with `feature`): the user's gate failed —
+ *     same as the paste-text path uses the `ai_suggest_text` gate.
+ *   - `RATE_LIMITED`: AI call budget exceeded for the day.
+ *   - `NO_RECIPE_TEXT`: the meal exists but has nothing to extract
+ *     from. UI prompts the user to log a recipe first.
+ *   - `NOT_FOUND`: meal id missing or cross-household. Service treats
+ *     missing + archived + non-member as the same null surface; this
+ *     code mirrors that.
+ *   - `AI_PROVIDER_ERROR`: provider chain failed.
+ *
+ * Success path returns the persisted ingredient array so the UI can
+ * optimistically update without waiting for the route revalidation
+ * round-trip.
+ */
+export type ExtractIngredientsResult =
+  | { ok: true; ingredients: string[] }
+  | {
+      ok: false;
+      code:
+        | "UPGRADE_REQUIRED"
+        | "RATE_LIMITED"
+        | "NO_RECIPE_TEXT"
+        | "NOT_FOUND"
+        | "AI_PROVIDER_ERROR";
+      message?: string;
+      feature?: FeatureKey;
+    };
+
+export async function extractIngredientsFromExistingRecipeAction(input: {
+  mealId: string;
+}): Promise<ExtractIngredientsResult> {
+  // Light input shape check — `mealId` must be present + a non-empty
+  // string. Deeper UUID validation lives in the DB query (a malformed
+  // id falls through to the not-found branch).
+  if (!input || typeof input.mealId !== "string" || input.mealId.trim().length === 0) {
+    return { ok: false, code: "NOT_FOUND", message: "Meal not found." };
+  }
+
+  const { user, household } = await requireCurrentUserWithHousehold();
+
+  // Rate limit BEFORE the gate so the same budget protects both paid
+  // and beta cohorts. The gate check fires inside the service.
+  try {
+    await checkAiCallLimit(user.id);
+  } catch {
+    return {
+      ok: false,
+      code: "RATE_LIMITED",
+      message: "You've hit your daily AI limit. Try again tomorrow."
+    };
+  }
+
+  try {
+    const ingredients = await extractIngredientsForMeal({
+      userId: user.id,
+      householdId: household.id,
+      mealId: input.mealId
+    });
+    // Revalidate the recipe view so a hard nav back to /meal/[id]
+    // shows the persisted list instead of the stale empty state.
+    // Client-side optimistic update happens in parallel; the
+    // revalidate just keeps the SSR cache honest.
+    revalidatePath(`/meal/${input.mealId}`);
+    return { ok: true, ingredients };
+  } catch (error) {
+    if (error instanceof FeatureGateDeniedError) {
+      return {
+        ok: false,
+        code: "UPGRADE_REQUIRED",
+        message: error.message,
+        feature: error.feature
+      };
+    }
+    if (error instanceof NoRecipeTextError) {
+      return { ok: false, code: "NO_RECIPE_TEXT", message: error.message };
+    }
+    const message = error instanceof Error ? error.message : "Unknown error.";
+    // Cross-household and missing meals come up as "Not authorized"
+    // from requireHouseholdMember. Surface as NOT_FOUND to mirror the
+    // page's 404 stance — no 403/404 leakage.
+    if (message.toLowerCase().includes("not authorized")) {
+      return { ok: false, code: "NOT_FOUND", message: "Meal not found." };
+    }
+    logger.warn("ai_extract_ingredients_failed", {
+      userId: user.id,
+      mealId: input.mealId,
+      error: message
+    });
+    return {
+      ok: false,
+      code: "AI_PROVIDER_ERROR",
+      message: "We couldn't extract ingredients. Please try again."
     };
   }
 }

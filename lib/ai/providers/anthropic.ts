@@ -3,6 +3,7 @@ import "server-only";
 import { getAnthropicClient } from "@/lib/ai/client";
 import {
   buildSharePrompt,
+  EXTRACT_INGREDIENTS_FROM_TEXT_PROMPT,
   SUGGEST_FROM_IMAGE_PROMPT,
   SUGGEST_FROM_TEXT_PROMPT,
   SUGGEST_FROM_VOICE_NOTE_PROMPT,
@@ -33,9 +34,15 @@ const suggestMealTool = {
       },
       notes: { type: "string", description: "Brief tip or observation, 1–2 sentences max, or empty string" },
       recipeText: { type: "string", description: "Full recipe text if a recipe was detected, otherwise empty string" },
+      ingredients: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Ordered ingredient lines as they appear in the source ('1 cup basmati rice'). Empty array if no ingredients were named."
+      },
       confidence: { type: "string", enum: ["high", "medium", "low"], description: "Confidence level in this suggestion" }
     },
-    required: ["name", "effortGuess", "notes", "recipeText", "confidence"]
+    required: ["name", "effortGuess", "notes", "recipeText", "ingredients", "confidence"]
   }
 };
 
@@ -55,8 +62,24 @@ function parseSuggestion(input: unknown): MealSuggestion {
     effortGuess,
     notes: typeof raw.notes === "string" ? raw.notes.trim() : "",
     recipeText: typeof raw.recipeText === "string" ? raw.recipeText.trim() : "",
+    ingredients: coerceIngredients(raw.ingredients),
     confidence
   };
+}
+
+// Tolerate older tool-use responses (and tests) that pre-date Round 10
+// by treating a missing `ingredients` as an empty array. Drops non-string
+// entries and trims whitespace; empty strings are filtered out so the
+// checklist never renders bullet-less rows.
+function coerceIngredients(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const out: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "string") continue;
+    const trimmed = entry.trim();
+    if (trimmed) out.push(trimmed);
+  }
+  return out;
 }
 
 export async function suggestMealFromImage(imageBase64: string, mediaType: string): Promise<MealSuggestion> {
@@ -175,6 +198,59 @@ export async function suggestMealFromVoiceTranscript(
     throw new Error("Anthropic did not return a suggestion.");
   }
   return parseSuggestion(toolBlock.input);
+}
+
+/**
+ * Round 10 — ingredient-only extraction for legacy meals. Tool-use
+ * forces a typed response so we don't parse free-form JSON out of
+ * prose; the tool's only field is `ingredients`, which gives the
+ * model a hard contract.
+ */
+const extractIngredientsTool = {
+  name: "extract_ingredients",
+  description: "Return the ordered ingredient list from a recipe.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      ingredients: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Ordered ingredient lines as they appear in the recipe ('1 cup basmati rice'). Empty array if no ingredients are listed."
+      }
+    },
+    required: ["ingredients"]
+  }
+};
+
+export async function extractIngredientsFromText(recipeText: string): Promise<string[]> {
+  const client = getAnthropicClient();
+  const response = await client.messages.create(
+    {
+      model: "claude-sonnet-4-6",
+      max_tokens: 800,
+      tools: [extractIngredientsTool],
+      tool_choice: { type: "tool", name: "extract_ingredients" },
+      messages: [
+        { role: "user", content: `${EXTRACT_INGREDIENTS_FROM_TEXT_PROMPT}\n\n${recipeText}` }
+      ]
+    },
+    { signal: AbortSignal.timeout(FALLBACK_TIMEOUT_MS) }
+  );
+
+  logger.info("ai_provider_tokens", {
+    provider: "anthropic",
+    operation: "extract_ingredients_from_text",
+    input_tokens: response.usage.input_tokens,
+    output_tokens: response.usage.output_tokens
+  });
+
+  const toolBlock = response.content.find((b) => b.type === "tool_use");
+  if (!toolBlock || toolBlock.type !== "tool_use") {
+    throw new Error("Anthropic did not return an ingredient list.");
+  }
+  const input = toolBlock.input as { ingredients?: unknown };
+  return coerceIngredients(input.ingredients);
 }
 
 export async function generateShareText(

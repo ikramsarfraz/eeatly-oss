@@ -128,7 +128,8 @@ export function MealLogForm({ onSuccess, initialMealName, autoFocusRecipe }: Mea
       cookedDate: new Date().toISOString().slice(0, 10),
       photoUrl: "",
       recipeText: "",
-      recipeSourceUrl: ""
+      recipeSourceUrl: "",
+      ingredients: undefined
     }
   });
 
@@ -141,6 +142,15 @@ export function MealLogForm({ onSuccess, initialMealName, autoFocusRecipe }: Mea
     if (suggestion.recipeText) {
       form.setValue("recipeText", suggestion.recipeText);
       setIsRecipeOpen(true);
+    }
+    // Round 10: AI-extracted ingredients ride alongside recipeText. The
+    // form has no visible field for them — they pass through to the
+    // server action and persist on the meals row, where the recipe-view
+    // checklist (Task 3) reads them. We only set when the AI actually
+    // returned some; empty arrays would null out existing ingredients
+    // on the merge path and surprise the user.
+    if (suggestion.ingredients && suggestion.ingredients.length > 0) {
+      form.setValue("ingredients", suggestion.ingredients);
     }
 
     if (aiNoticeTimerRef.current) clearTimeout(aiNoticeTimerRef.current);
@@ -193,7 +203,8 @@ export function MealLogForm({ onSuccess, initialMealName, autoFocusRecipe }: Mea
       cookedDate: new Date().toISOString().slice(0, 10),
       photoUrl: "",
       recipeText: "",
-      recipeSourceUrl: ""
+      recipeSourceUrl: "",
+      ingredients: undefined
     });
     setPhotoFile(null);
     setFormError(null);

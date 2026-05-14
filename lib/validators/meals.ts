@@ -44,7 +44,14 @@ export const mealLogInputSchema = z.object({
     .max(10000, "Recipe should stay under 10,000 characters.")
     .optional()
     .or(z.literal("")),
-  recipeSourceUrl: httpUrl.optional().or(z.literal(""))
+  recipeSourceUrl: httpUrl.optional().or(z.literal("")),
+  // Round 10: AI-extracted ingredient list. Each entry is one line as
+  // the recipe presents it ("1 cup basmati rice"). Trimmed in the
+  // service before persist; entries that empty out are dropped.
+  ingredients: z
+    .array(z.string().max(200, "Ingredient line is too long."))
+    .max(100, "Recipes shouldn't carry more than 100 ingredient lines.")
+    .optional()
 });
 
 export type MealLogInput = z.infer<typeof mealLogInputSchema>;

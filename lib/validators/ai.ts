@@ -141,6 +141,26 @@ export const audioInputSchema = z.object({
 
 export type AudioInput = z.infer<typeof audioInputSchema>;
 
+/**
+ * Round 10 — canonical shape for an AI-extracted meal suggestion.
+ *
+ * `ingredients` is OPTIONAL on purpose: older provider responses (and
+ * any cached test fixtures) predate the field, so a missing key must
+ * still parse cleanly. The provider-layer parseSuggestion helpers
+ * coerce to `[]` when absent so the type-level contract (`string[]`)
+ * stays honest downstream.
+ */
+export const mealSuggestionSchema = z.object({
+  name: z.string(),
+  effortGuess: z.enum(["quick", "easy", "medium", "high_effort"]),
+  notes: z.string(),
+  recipeText: z.string(),
+  confidence: z.enum(["high", "medium", "low"]),
+  ingredients: z.array(z.string()).optional()
+});
+
+export type MealSuggestionInput = z.infer<typeof mealSuggestionSchema>;
+
 export const youtubeUrlSchema = z.object({
   url: z
     .string()

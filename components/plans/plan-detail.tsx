@@ -322,7 +322,12 @@ export function PlanDetail({
                   />
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="truncate text-sm font-medium">{dish.mealName}</span>
+                      <Link
+                        href={`/meal/${dish.mealId}` as Route}
+                        className="truncate text-sm font-medium underline-offset-2 hover:underline"
+                      >
+                        {dish.mealName}
+                      </Link>
                       {hints?.[dish.mealId] ? (
                         <HintBadge hint={hints[dish.mealId]!} />
                       ) : null}

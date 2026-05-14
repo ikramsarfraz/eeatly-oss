@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import type { Route } from "next";
 import { format, formatDistanceToNow, parseISO } from "date-fns";
 import { EffortPill } from "@/components/history/effort-pill";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
@@ -41,7 +43,12 @@ export function HistoryCards({
                   />
                   <div className="min-w-0 flex-1">
                     <h3 className="truncate text-[14px] font-medium text-foreground">
-                      {row.mealName}
+                      <Link
+                        href={`/meal/${row.mealId}` as Route}
+                        className="underline-offset-2 hover:underline"
+                      >
+                        {row.mealName}
+                      </Link>
                     </h3>
                     <p className="mt-0.5 text-[11.5px] text-muted-foreground">
                       {format(parseISO(row.cookedAt), "MMM d")} ·{" "}
