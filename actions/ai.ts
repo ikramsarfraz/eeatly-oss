@@ -1,6 +1,10 @@
 "use server";
 
 import { requireCurrentUser, requireCurrentUserWithHousehold } from "@/lib/auth/session";
+import { FeatureGateDeniedError } from "@/lib/errors/gates";
+import type { FeatureKey } from "@/lib/gates/registry";
+import { requireFeatureAccess } from "@/lib/gates/resolver";
+import { logger } from "@/lib/observability/logger";
 import { checkAiCallLimit } from "@/lib/security/rate-limit";
 import { generateShareableRecipe, suggestMealFromImage, suggestMealFromText } from "@/services/ai";
 import type { MealSuggestion, ShareActionResult } from "@/types";
@@ -10,30 +14,134 @@ import type { MealSuggestion, ShareActionResult } from "@/types";
 // (and 1.33× more after base64 encoding) before any provider call.
 const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
 
-export async function suggestFromImageAction(formData: FormData): Promise<MealSuggestion> {
+/**
+ * Round 4.7: discriminated-union return matching the Round 4 action pattern.
+ *   - `INVALID_INPUT`: client-side mistake (missing file, empty text, file
+ *     too big, unsupported media type). UI surfaces the action's message.
+ *   - `RATE_LIMITED`: AI call budget exceeded. UI shows a generic
+ *     "try again tomorrow" toast.
+ *   - `AI_PROVIDER_ERROR`: provider chain failed (both OpenAI and
+ *     Anthropic). UI shows a generic "try again" toast; we don't leak
+ *     provider error details to users.
+ */
+export type SuggestResult =
+  | { ok: true; data: MealSuggestion }
+  | {
+      ok: false;
+      code: "INVALID_INPUT" | "RATE_LIMITED" | "AI_PROVIDER_ERROR" | "UPGRADE_REQUIRED";
+      message?: string;
+      /** Present when code === "UPGRADE_REQUIRED". UI keys upgrade-prompt
+       *  copy off this. */
+      feature?: FeatureKey;
+    };
+
+export async function suggestFromImageAction(formData: FormData): Promise<SuggestResult> {
   const user = await requireCurrentUser();
-  await checkAiCallLimit(user.id);
+
+  // Gate first — don't burn a rate-limit slot for a user who can't reach
+  // the feature anyway. FeatureGateDeniedError is the typed error; map
+  // to the UPGRADE_REQUIRED code so the UI can render the upgrade card.
+  try {
+    await requireFeatureAccess(user.id, "ai_suggest_image");
+  } catch (error) {
+    if (error instanceof FeatureGateDeniedError) {
+      return {
+        ok: false,
+        code: "UPGRADE_REQUIRED",
+        feature: error.feature
+      };
+    }
+    throw error;
+  }
+
+  try {
+    await checkAiCallLimit(user.id);
+  } catch {
+    return {
+      ok: false,
+      code: "RATE_LIMITED",
+      message: "You've hit your daily AI limit. Try again tomorrow."
+    };
+  }
 
   const file = formData.get("image");
   if (!(file instanceof File) || file.size === 0) {
-    throw new Error("Please select an image file.");
+    return { ok: false, code: "INVALID_INPUT", message: "Please select an image file." };
   }
 
   if (file.size > MAX_IMAGE_UPLOAD_BYTES) {
-    throw new Error("Image is too large. Please use a photo under 10 MB.");
+    return {
+      ok: false,
+      code: "INVALID_INPUT",
+      message: "Image is too large. Please use a photo under 10 MB."
+    };
   }
 
   const arrayBuffer = await file.arrayBuffer();
   const base64 = Buffer.from(arrayBuffer).toString("base64");
 
-  return suggestMealFromImage(base64, file.type);
+  try {
+    const suggestion = await suggestMealFromImage(base64, file.type);
+    return { ok: true, data: suggestion };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown provider error.";
+    // Unsupported-media-type rejections come up through the service as a
+    // typed Error; surface them as INVALID_INPUT so the UI distinguishes
+    // "user mistake" (retry helps) from "provider down" (retry doesn't).
+    if (message.toLowerCase().includes("unsupported image type")) {
+      return { ok: false, code: "INVALID_INPUT", message };
+    }
+    logger.warn("ai_suggest_from_image_failed", { userId: user.id, error: message });
+    return {
+      ok: false,
+      code: "AI_PROVIDER_ERROR",
+      message: "We couldn't read that photo. Please try again."
+    };
+  }
 }
 
-export async function suggestFromTextAction(text: string): Promise<MealSuggestion> {
+export async function suggestFromTextAction(text: string): Promise<SuggestResult> {
   const user = await requireCurrentUser();
-  await checkAiCallLimit(user.id);
 
-  return suggestMealFromText(text);
+  try {
+    await requireFeatureAccess(user.id, "ai_suggest_text");
+  } catch (error) {
+    if (error instanceof FeatureGateDeniedError) {
+      return { ok: false, code: "UPGRADE_REQUIRED", feature: error.feature };
+    }
+    throw error;
+  }
+
+  try {
+    await checkAiCallLimit(user.id);
+  } catch {
+    return {
+      ok: false,
+      code: "RATE_LIMITED",
+      message: "You've hit your daily AI limit. Try again tomorrow."
+    };
+  }
+
+  if (!text.trim()) {
+    return {
+      ok: false,
+      code: "INVALID_INPUT",
+      message: "Please paste some text before requesting a suggestion."
+    };
+  }
+
+  try {
+    const suggestion = await suggestMealFromText(text);
+    return { ok: true, data: suggestion };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown provider error.";
+    logger.warn("ai_suggest_from_text_failed", { userId: user.id, error: message });
+    return {
+      ok: false,
+      code: "AI_PROVIDER_ERROR",
+      message: "We couldn't read that. Please try again."
+    };
+  }
 }
 
 export async function generateShareAction(mealId: string): Promise<ShareActionResult> {
@@ -46,8 +154,18 @@ export async function generateShareAction(mealId: string): Promise<ShareActionRe
   }
 
   try {
-    return await generateShareableRecipe(mealId, household.id);
-  } catch {
+    return await generateShareableRecipe(user.id, household.id, mealId);
+  } catch (error) {
+    // Gate-denied is service-thrown — translate to UPGRADE_REQUIRED so
+    // the UI can render the upgrade prompt instead of a generic error.
+    if (error instanceof FeatureGateDeniedError) {
+      return {
+        ok: false,
+        code: "UPGRADE_REQUIRED",
+        message: error.message,
+        feature: error.feature
+      };
+    }
     return { ok: false, code: "AI_ERROR", message: "Something went wrong. Please try again." };
   }
 }

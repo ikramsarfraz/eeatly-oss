@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp } from "lucide-react";
 import { EffortPill } from "@/components/history/effort-pill";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { MealThumb } from "@/components/dashboard/meal-thumb";
+import { attributionLabel } from "@/lib/meals/attribution";
 import { cn } from "@/lib/utils";
 import type { HistoryRow, HistorySortDir, HistorySortField } from "@/services/meals";
 
@@ -64,11 +65,16 @@ export function HistoryTable({
                 <div className="truncate text-[14px] font-medium text-foreground">
                   {row.mealName}
                 </div>
-                {row.cookedByName && row.cookedByUserId !== currentUserId ? (
-                  <div className="truncate text-[11.5px] text-muted-foreground">
-                    by {row.cookedByName}
-                  </div>
-                ) : null}
+                {(() => {
+                  const a = attributionLabel(
+                    row.cookedByUserId,
+                    row.cookedByName,
+                    currentUserId
+                  );
+                  return a ? (
+                    <div className="truncate text-[11.5px] text-muted-foreground">{a}</div>
+                  ) : null;
+                })()}
               </div>
               <div className="text-[12.5px]">
                 <div className="font-mono-brand text-foreground">

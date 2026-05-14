@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Route } from "next";
 import {
+  CalendarDays,
   Clock3,
   MessageSquare,
   Moon,
@@ -41,6 +42,9 @@ type NavItem = {
 const cookingNav: NavItem[] = [
   { href: "/dashboard", label: "Tonight", icon: Moon },
   { href: "/ideas", label: "Ideas", icon: Sparkles },
+  // Next typed-routes hasn't regenerated for /plans yet; cast follows
+  // the convention used elsewhere (e.g., bottom-tab-bar's `as Route`).
+  { href: "/plans" as Route, label: "Plans", icon: CalendarDays },
   { href: "/history", label: "History", icon: Clock3 },
 ];
 

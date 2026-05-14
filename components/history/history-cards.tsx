@@ -4,6 +4,7 @@ import { format, formatDistanceToNow, parseISO } from "date-fns";
 import { EffortPill } from "@/components/history/effort-pill";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { MealThumb } from "@/components/dashboard/meal-thumb";
+import { attributionLabel } from "@/lib/meals/attribution";
 import type { HistoryRow } from "@/services/meals";
 
 export function HistoryCards({
@@ -45,9 +46,14 @@ export function HistoryCards({
                     <p className="mt-0.5 text-[11.5px] text-muted-foreground">
                       {format(parseISO(row.cookedAt), "MMM d")} ·{" "}
                       {formatDistanceToNow(parseISO(row.cookedAt), { addSuffix: true })}
-                      {row.cookedByName && row.cookedByUserId !== currentUserId ? (
-                        <span> · by {row.cookedByName}</span>
-                      ) : null}
+                      {(() => {
+                        const a = attributionLabel(
+                          row.cookedByUserId,
+                          row.cookedByName,
+                          currentUserId
+                        );
+                        return a ? <span> · {a}</span> : null;
+                      })()}
                     </p>
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
                       <EffortPill level={row.effortLevel} compact />

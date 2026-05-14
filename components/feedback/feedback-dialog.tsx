@@ -57,8 +57,8 @@ export function FeedbackDialog({ trigger }: FeedbackDialogProps) {
   const isSubmitting = form.formState.isSubmitting;
 
   const handleSend = form.handleSubmit(async (values) => {
-    try {
-      await submitFeedbackAction(values);
+    const result = await submitFeedbackAction(values);
+    if (result.ok) {
       form.reset({ type: "general", message: "", context: pathname });
       setOpen(false);
       showToast({
@@ -66,13 +66,21 @@ export function FeedbackDialog({ trigger }: FeedbackDialogProps) {
         title: "Feedback sent",
         description: "Thanks for sharing — this genuinely helps."
       });
-    } catch (error) {
-      showToast({
-        variant: "error",
-        title: "Unable to send feedback",
-        description: error instanceof Error ? error.message : "Please try again."
-      });
+      return;
     }
+    // Discriminated union — branch on .code. Round 4.7 unified the action
+    // surface; no more string-parsing on caught errors.
+    const description =
+      result.code === "RATE_LIMITED"
+        ? result.message ?? "Too many submissions. Please try again later."
+        : result.code === "INVALID_INPUT"
+          ? result.message ?? "We couldn't read that feedback. Please try again."
+          : result.message ?? "Please try again.";
+    showToast({
+      variant: "error",
+      title: "Unable to send feedback",
+      description
+    });
   });
 
   React.useEffect(() => {

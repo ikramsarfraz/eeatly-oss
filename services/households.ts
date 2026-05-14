@@ -11,6 +11,7 @@ import {
   users
 } from "@/db/schema";
 import { db } from "@/lib/db/client";
+import { requireHouseholdMember } from "@/lib/auth/session";
 import {
   CannotRemoveOwnerError,
   CannotRemoveSelfError,
@@ -20,6 +21,7 @@ import {
   NotMemberError,
   OwnershipTransferRequiredError
 } from "@/lib/errors/households";
+import { requireFeatureAccess } from "@/lib/gates/resolver";
 import { logger } from "@/lib/observability/logger";
 
 const INVITATION_EXPIRES_DAYS = 7;
@@ -89,6 +91,14 @@ export async function createHouseholdInvitation(
   email: string
 ): Promise<CreateInvitationResult> {
   const normalizedEmail = email.trim().toLowerCase();
+
+  // Round 6 gate. Throws FeatureGateDeniedError when the calling user
+  // isn't allowed to send invitations (free tier today, unless they're
+  // beta / admin / paid). The action layer translates this to
+  // UPGRADE_REQUIRED. We deliberately check BEFORE entering the
+  // transaction — the gate-denied path shouldn't open a Postgres
+  // transaction we then have to roll back.
+  await requireFeatureAccess(userId, "household_invite");
 
   return db.transaction(async (tx) => {
     // Resolve household + owner display data inside the transaction so the
@@ -707,9 +717,14 @@ export async function ensureHouseholdForUser(
 /**
  * Cheap count used by the dashboard header. Returns 1 for a single-person
  * household — callers compare against 1 to decide whether to render the
- * subtle "shared" indicator.
+ * subtle "shared" indicator. Round 4.7: service-layer membership check
+ * added so any future caller can't bypass authz.
  */
-export async function countHouseholdMembers(householdId: string): Promise<number> {
+export async function countHouseholdMembers(
+  userId: string,
+  householdId: string
+): Promise<number> {
+  await requireHouseholdMember(userId, householdId);
   const [row] = await db
     .select({ value: count(householdMembers.id) })
     .from(householdMembers)
@@ -726,8 +741,10 @@ export type HouseholdMemberRow = {
 };
 
 export async function listHouseholdMembers(
+  userId: string,
   householdId: string
 ): Promise<HouseholdMemberRow[]> {
+  await requireHouseholdMember(userId, householdId);
   return db
     .select({
       userId: householdMembers.userId,
@@ -744,7 +761,9 @@ export async function listHouseholdMembers(
 
 /**
  * Lightweight query used inline by the spec-required `pending invitations`
- * list on settings. Returns only the columns the UI needs.
+ * list on settings. Returns only the columns the UI needs. Membership
+ * check enforced; the settings page narrows further to owner-only at the
+ * action layer before calling.
  */
 export type PendingInvitationRow = {
   id: string;
@@ -754,8 +773,10 @@ export type PendingInvitationRow = {
 };
 
 export async function listPendingInvitations(
+  userId: string,
   householdId: string
 ): Promise<PendingInvitationRow[]> {
+  await requireHouseholdMember(userId, householdId);
   return db
     .select({
       id: householdInvitations.id,

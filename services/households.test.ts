@@ -59,9 +59,24 @@ const dbState = vi.hoisted(() => {
 
 vi.mock("@/lib/db/client", () => ({ db: dbState.chain }));
 
+// Round 4.7: services/households.ts now imports requireHouseholdMember
+// from lib/auth/session.ts, which transitively loads lib/auth/index.ts
+// and triggers getServerEnv() at module init. Short-circuit the env
+// check with a session mock. Using hoisted vi.fn so individual tests
+// can override the helpers' behavior (e.g., simulate unauthorized).
+const sessionMock = vi.hoisted(() => ({
+  requireHouseholdMember: vi.fn<(userId: string, householdId: string) => Promise<void>>(),
+  requireHouseholdOwner: vi.fn<(userId: string, householdId: string) => Promise<void>>()
+}));
+
+vi.mock("@/lib/auth/session", () => sessionMock);
+
 import {
   acceptHouseholdInvitation,
+  countHouseholdMembers,
   ensureHouseholdForUser,
+  listHouseholdMembers,
+  listPendingInvitations,
   removeMemberFromHousehold
 } from "./households";
 import {
@@ -84,6 +99,10 @@ function queueError(message: string) {
 
 beforeEach(() => {
   dbState.queue.length = 0;
+  sessionMock.requireHouseholdMember.mockReset();
+  sessionMock.requireHouseholdMember.mockResolvedValue();
+  sessionMock.requireHouseholdOwner.mockReset();
+  sessionMock.requireHouseholdOwner.mockResolvedValue();
 });
 
 afterEach(() => {
@@ -347,4 +366,48 @@ describe("removeMemberFromHousehold", () => {
   // The typed error class is kept as forward-defense for a future admin
   // role that could remove members. Covered by code review.
 });
+
+describe("Round 4.7 service-layer authz checks", () => {
+  it("countHouseholdMembers calls requireHouseholdMember and rejects when unauthorized", async () => {
+    sessionMock.requireHouseholdMember.mockRejectedValueOnce(
+      new Error("Not authorized for this household.")
+    );
+
+    await expect(countHouseholdMembers("u-stranger", "h-a")).rejects.toThrow(
+      /Not authorized/
+    );
+    expect(sessionMock.requireHouseholdMember).toHaveBeenCalledWith("u-stranger", "h-a");
+  });
+
+  it("listHouseholdMembers calls requireHouseholdMember and rejects when unauthorized", async () => {
+    sessionMock.requireHouseholdMember.mockRejectedValueOnce(
+      new Error("Not authorized for this household.")
+    );
+
+    await expect(listHouseholdMembers("u-stranger", "h-a")).rejects.toThrow(
+      /Not authorized/
+    );
+    expect(sessionMock.requireHouseholdMember).toHaveBeenCalledWith("u-stranger", "h-a");
+  });
+
+  it("listPendingInvitations calls requireHouseholdMember and rejects when unauthorized", async () => {
+    sessionMock.requireHouseholdMember.mockRejectedValueOnce(
+      new Error("Not authorized for this household.")
+    );
+
+    await expect(listPendingInvitations("u-stranger", "h-a")).rejects.toThrow(
+      /Not authorized/
+    );
+    expect(sessionMock.requireHouseholdMember).toHaveBeenCalledWith("u-stranger", "h-a");
+  });
+
+  it("countHouseholdMembers returns the count when authorized", async () => {
+    // requireHouseholdMember mock resolves by default in beforeEach.
+    queue([{ value: 3 }]);
+    const result = await countHouseholdMembers("u-member", "h-a");
+    expect(result).toBe(3);
+    expect(sessionMock.requireHouseholdMember).toHaveBeenCalledWith("u-member", "h-a");
+  });
+});
+
 

@@ -17,6 +17,14 @@ function getClient(): OpenAI {
 
 const MODEL = "gpt-4o-mini";
 
+// Primary timeout shorter than the fallback (15s on Anthropic). When OpenAI
+// is degraded, we'd rather fail over fast than make users sit through the
+// full 15s before withFallback fires — worst-case perceived latency drops
+// from ~30s to ~22s. Anthropic's longer budget reflects that it's the
+// last line; we'd rather wait for an answer than show "both providers
+// down" for a transient blip.
+const PRIMARY_TIMEOUT_MS = 7_000;
+
 const SUGGESTION_SCHEMA = {
   type: "object",
   properties: {
@@ -68,7 +76,7 @@ export async function suggestMealFromImage(imageBase64: string, mediaType: strin
         }
       ]
     },
-    { signal: AbortSignal.timeout(15_000) }
+    { signal: AbortSignal.timeout(PRIMARY_TIMEOUT_MS) }
   );
 
   const usage = response.usage;
@@ -98,7 +106,7 @@ export async function suggestMealFromText(text: string): Promise<MealSuggestion>
         { role: "user", content: `${SUGGEST_FROM_TEXT_PROMPT}\n\n${text}` }
       ]
     },
-    { signal: AbortSignal.timeout(15_000) }
+    { signal: AbortSignal.timeout(PRIMARY_TIMEOUT_MS) }
   );
 
   const usage = response.usage;
@@ -134,7 +142,7 @@ export async function generateShareText(
         { role: "user", content: buildSharePrompt(mealName, recipeText, notes, householdName) }
       ]
     },
-    { signal: AbortSignal.timeout(15_000) }
+    { signal: AbortSignal.timeout(PRIMARY_TIMEOUT_MS) }
   );
 
   const usage = response.usage;

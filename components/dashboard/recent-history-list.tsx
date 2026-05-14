@@ -2,6 +2,7 @@ import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { MealThumb } from "@/components/dashboard/meal-thumb";
+import { attributionLabel } from "@/lib/meals/attribution";
 import type { RecentMeal } from "@/types";
 
 export function RecentHistoryList({
@@ -38,7 +39,13 @@ export function RecentHistoryList({
             Your latest meals will appear here after the first quick log.
           </div>
         ) : null}
-        {meals.slice(0, 6).map((meal, i) => (
+        {meals.slice(0, 6).map((meal, i) => {
+          const attribution = attributionLabel(
+            meal.cookedByUserId,
+            meal.cookedByName,
+            currentUserId
+          );
+          return (
           <div
             key={meal.id}
             className="grid grid-cols-[44px_1fr_auto] items-center gap-3 border-b px-[18px] py-[11px] last:border-0 hover:bg-[var(--surface-2)]"
@@ -57,10 +64,10 @@ export function RecentHistoryList({
                 <span>{format(parseISO(meal.cookedAt), "MMM d")}</span>
                 <span className="h-0.5 w-0.5 rounded-full bg-current opacity-60" />
                 <span>{meal.effortLevel.replace("_", " ")}</span>
-                {meal.cookedByName && meal.cookedByUserId !== currentUserId ? (
+                {attribution ? (
                   <>
                     <span className="h-0.5 w-0.5 rounded-full bg-current opacity-60" />
-                    <span className="truncate">by {meal.cookedByName}</span>
+                    <span className="truncate">{attribution}</span>
                   </>
                 ) : null}
                 {meal.notes ? (
@@ -81,7 +88,8 @@ export function RecentHistoryList({
               iconOnly
             />
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

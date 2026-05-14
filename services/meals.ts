@@ -35,6 +35,10 @@ export async function getDashboardMeals(
   // starting and added one DB round-trip's worth of latency to every
   // dashboard render.
   const [recentMeals, mostCookedStats, neglectedStats] = await Promise.all([
+    // LEFT JOIN on users because Round 4.7 made cooked_by_user_id nullable
+    // (FK ON DELETE SET NULL preserves the log when the cook is deleted).
+    // INNER JOIN would silently drop rows with null attribution and break
+    // the Round 4.5 contract that cooking history stays in the household.
     db
       .select({
         id: mealLogs.id,
@@ -49,7 +53,7 @@ export async function getDashboardMeals(
       })
       .from(mealLogs)
       .innerJoin(meals, eq(mealLogs.mealId, meals.id))
-      .innerJoin(users, eq(users.id, mealLogs.cookedByUserId))
+      .leftJoin(users, eq(users.id, mealLogs.cookedByUserId))
       .where(activeMealLogsForHousehold(householdId))
       .orderBy(desc(mealLogs.cookedAt))
       .limit(recentLimit),
@@ -299,6 +303,7 @@ export async function getHistoryRows(
           : desc(mealLogs.cookedAt);
 
     const [rowsResult, totalResult] = await Promise.all([
+      // LEFT JOIN on users — see comment on getDashboardMeals recent query.
       db
         .select({
           id: mealLogs.id,
@@ -313,7 +318,7 @@ export async function getHistoryRows(
         })
         .from(mealLogs)
         .innerJoin(meals, eq(mealLogs.mealId, meals.id))
-        .innerJoin(users, eq(users.id, mealLogs.cookedByUserId))
+        .leftJoin(users, eq(users.id, mealLogs.cookedByUserId))
         .where(where)
         .orderBy(orderClause)
         .limit(pageSize)

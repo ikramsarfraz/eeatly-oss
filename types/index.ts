@@ -4,7 +4,7 @@ export type UserRole = "root_app_user" | "tenant_user" | "platform_admin";
 
 export type TenantRole = "owner" | "admin" | "member";
 
-export type BetaCohort = "alpha" | "beta_wave_1" | "beta_wave_2" | "internal";
+export type BetaCohort = "alpha" | "beta_wave_1" | "beta_wave_2" | "internal" | "beta_2026";
 
 export type RecentMeal = {
   id: string;
@@ -14,9 +14,14 @@ export type RecentMeal = {
   effortLevel: EffortLevel;
   notes: string | null;
   photoUrl: string | null;
-  /** Round-4 attribution: who logged this cook. Present on log rows. */
-  cookedByUserId: string;
-  cookedByName: string;
+  /**
+   * Round-4 attribution: who logged this cook. Both null when the cook's
+   * account has been deleted — the log survives via `ON DELETE SET NULL`
+   * (Round 4.7 / migration 0017) so household history stays intact, and
+   * the UI renders "Former member" in place of the name.
+   */
+  cookedByUserId: string | null;
+  cookedByName: string | null;
 };
 
 export type MealStat = {
@@ -44,7 +49,15 @@ export type RediscoverySuggestion = {
 
 export type ShareActionResult =
   | { ok: true; text: string }
-  | { ok: false; code: "RECIPE_MISSING" | "RATE_LIMITED" | "AI_ERROR"; message: string };
+  | {
+      ok: false;
+      // Round 6: added UPGRADE_REQUIRED for the paid-tier gate. `feature`
+      // is populated only on that branch so the UI knows which prompt to
+      // render.
+      code: "RECIPE_MISSING" | "RATE_LIMITED" | "AI_ERROR" | "UPGRADE_REQUIRED";
+      message: string;
+      feature?: string;
+    };
 
 export type MealSuggestion = {
   name: string;

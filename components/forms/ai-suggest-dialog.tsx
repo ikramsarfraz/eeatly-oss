@@ -69,28 +69,53 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
     setIsPending(true);
 
     try {
-      let suggestion: MealSuggestion;
-
-      if (activeTab === "photo") {
-        if (!photoFile) {
-          setError("Please select an image first.");
-          return;
-        }
-        const formData = new FormData();
-        formData.append("image", photoFile);
-        suggestion = await suggestFromImageAction(formData);
-      } else {
-        if (!pastedText.trim()) {
-          setError("Please paste some text first.");
-          return;
-        }
-        suggestion = await suggestFromTextAction(pastedText);
+      // Client-side gate so we don't burn a rate-limit slot on an obvious
+      // mistake. The action also defends with INVALID_INPUT codes.
+      if (activeTab === "photo" && !photoFile) {
+        setError("Please select an image first.");
+        return;
+      }
+      if (activeTab === "text" && !pastedText.trim()) {
+        setError("Please paste some text first.");
+        return;
       }
 
-      setOpen(false);
-      onSuggestion(suggestion);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      let result: Awaited<ReturnType<typeof suggestFromImageAction>>;
+      if (activeTab === "photo" && photoFile) {
+        const formData = new FormData();
+        formData.append("image", photoFile);
+        result = await suggestFromImageAction(formData);
+      } else {
+        result = await suggestFromTextAction(pastedText);
+      }
+
+      if (result.ok) {
+        setOpen(false);
+        onSuggestion(result.data);
+        return;
+      }
+      // Discriminated union — branch on .code rather than parsing message
+      // strings. Round 4.7 unified the action surface; the UI no longer
+      // peeks at error shapes from the server.
+      switch (result.code) {
+        case "RATE_LIMITED":
+          setError(result.message ?? "You've hit your daily AI limit.");
+          break;
+        case "INVALID_INPUT":
+          setError(result.message ?? "We couldn't read that input.");
+          break;
+        case "AI_PROVIDER_ERROR":
+          setError(result.message ?? "Something went wrong. Please try again.");
+          break;
+        case "UPGRADE_REQUIRED":
+          // Round 6: the gate denied access. Show a tasteful upgrade
+          // prompt instead of a generic error — keeps the dialog open
+          // so the user can click through to /pricing.
+          setError(
+            "AI assist is part of eeatly Plus. Visit /pricing to see what's included."
+          );
+          break;
+      }
     } finally {
       setIsPending(false);
     }

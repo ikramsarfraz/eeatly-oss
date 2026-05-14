@@ -34,7 +34,10 @@ export const meals = pgTable(
     // Attribution: who first added this recipe to the household. Set on
     // insert only; never overwritten when other members cook the meal.
     // ON DELETE SET NULL so removing a member doesn't cascade-delete
-    // recipes other members still want.
+    // recipes other members still want. POST-0018: nullable in DB too —
+    // 0016 had tightened it to NOT NULL which contradicted the SET NULL
+    // FK and silently broke account deletion. UI renders "Former member"
+    // via lib/meals/attribution.ts when this is null.
     createdByUserId: text("created_by_user_id").references(() => users.id, {
       onDelete: "set null"
     }),
@@ -81,9 +84,15 @@ export const mealLogs = pgTable(
     householdId: uuid("household_id")
       .notNull()
       .references(() => households.id, { onDelete: "cascade" }),
-    cookedByUserId: text("cooked_by_user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+    // POST-0017 state: nullable + ON DELETE SET NULL. The original CASCADE
+    // silently wiped a former member's logs across every household they ever
+    // joined when they deleted their account. SET NULL preserves the log
+    // (history stays in the household) but nulls the attribution — UI
+    // renders "Former member" in that case. APPLY 0017 BEFORE deploying
+    // this schema.
+    cookedByUserId: text("cooked_by_user_id").references(() => users.id, {
+      onDelete: "set null"
+    }),
     effortLevel: effortLevelEnum("effort_level").notNull(),
     notes: text("notes"),
     cookedAt: date("cooked_at").notNull(),

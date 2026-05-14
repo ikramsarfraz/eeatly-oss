@@ -36,7 +36,7 @@ export default async function DashboardLayout({
   // than one member — solo cooks don't need to know they're "in a kitchen."
   // The lookup is cheap and cached via `getCurrentHousehold` (React cache).
   const household = await getCurrentHousehold(user.id);
-  const memberCount = await countHouseholdMembers(household.id);
+  const memberCount = await countHouseholdMembers(user.id, household.id);
   const householdLabel = memberCount > 1 ? household.name : null;
 
   return (
