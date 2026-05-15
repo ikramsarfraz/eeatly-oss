@@ -4,10 +4,11 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { getSessionToken } from "../lib/auth/session";
 
 /**
- * Round 12 — landing route. Checks SecureStore for a persisted
+ * Round 12 / 13 — landing route. Checks SecureStore for a persisted
  * session token and routes accordingly:
- *   - token present → `/(authed)` home (Task 6 will validate the
- *     token against the server; for now we trust SecureStore)
+ *   - token present → `/(authed)/home` (Round 13 added the tab-bar
+ *     shell; explicitly target the home tab so the first frame is
+ *     deterministic regardless of expo-router's tab-resolution rules)
  *   - no token → `/(auth)/sign-in`
  *
  * Renders a centered spinner while the SecureStore read settles.
@@ -22,7 +23,7 @@ export default function Index() {
     async function decide() {
       const token = await getSessionToken();
       if (cancelled) return;
-      router.replace(token ? "/(authed)" : "/(auth)/sign-in");
+      router.replace(token ? "/(authed)/home" : "/(auth)/sign-in");
       setRouted(true);
     }
     void decide();
