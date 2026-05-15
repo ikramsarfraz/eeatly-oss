@@ -4,10 +4,12 @@ import {
   YoutubeTranscript,
   YoutubeTranscriptDisabledError,
   YoutubeTranscriptNotAvailableError,
+  YoutubeTranscriptNotAvailableLanguageError,
+  YoutubeTranscriptEmptyError,
   YoutubeTranscriptVideoUnavailableError,
   YoutubeTranscriptError,
   type TranscriptResponse
-} from "youtube-transcript";
+} from "@danielxceron/youtube-transcript";
 import {
   YoutubeFetchFailedError,
   YoutubeNoTranscriptError,
@@ -16,28 +18,22 @@ import {
 import { logger } from "@/lib/observability/logger";
 
 /**
- * Round 7 — swappable transcript fetcher. The `youtube-transcript`
- * library is the default; replacing it is a one-file change because
- * the rest of the system (service + action + UI) talks to this
- * `TranscriptFetcher` interface, not to library types.
+ * Round 7 — swappable transcript fetcher. The rest of the system
+ * (service + tRPC procedure + UI) talks to this `TranscriptFetcher`
+ * interface, not to library types, so replacing the underlying
+ * library is a one-file change.
  *
- * **Empirical verification deferred to the deploy reviewer.** The
- * library was selected based on:
- *   - Typed error class hierarchy (clean mapping to our typed errors)
- *   - Dual InnerTube + HTML-scrape fetch strategy (more resilient than
- *     single-strategy scrapers)
- *   - Narrow API surface (vs. youtubei.js's whole InnerTube wrapper —
- *     less surface area to break)
- *   - Maintained as of v1.3.1
+ * Currently backed by `@danielxceron/youtube-transcript`, a
+ * maintained fork of the original `youtube-transcript` package
+ * (which has been unmaintained for 12+ months and started returning
+ * false "Transcript is disabled" errors as YouTube's HTML changed).
+ * The fork adds an InnerTube API fallback that kicks in when the
+ * HTML scrape returns empty.
  *
- * BEFORE this round ships to production, run the verification:
- *   1. `pnpm tsx scripts/verify-yt-transcripts.ts` (script TBD; happy
- *      to scaffold one)
- *   2. Three videos: Food Fusion (English Pakistani), Kitchen with
- *      Amna (Urdu), one English non-Pakistani channel (control)
- *   3. Confirm `fetchTranscript()` returns text for all three.
- * If any fail, the swap is a single import change here + a similar
- * error-mapping table.
+ * If this fork also becomes unreliable, the long-term plan is
+ * Whisper-on-audio via ytdl-core — same `TranscriptFetcher` interface,
+ * different implementation, bypasses YouTube's caption infrastructure
+ * entirely.
  */
 
 export type TranscriptSegment = TranscriptResponse;
@@ -49,27 +45,23 @@ export interface TranscriptFetcher {
 const TRANSCRIPT_TIMEOUT_MS = 10_000;
 
 /**
- * Default implementation backed by `youtube-transcript`. Wraps `fetch`
- * with an AbortSignal to enforce a 10s timeout — transcript fetches
- * can be slow when YouTube is degraded; without this they'd hang
- * the entire action.
+ * Default implementation backed by `@danielxceron/youtube-transcript`.
+ *
+ * Unlike the original `youtube-transcript` package, the fork does not
+ * accept a custom `fetch` for the underlying HTTP calls — it uses the
+ * global `fetch` directly. So we enforce the 10s timeout via
+ * `Promise.race` rather than an AbortSignal. The underlying fetch
+ * continues in the background on timeout (it will be GC'd when its
+ * own socket times out), but the caller gets a timely error.
  */
 export const youtubeTranscriptFetcher: TranscriptFetcher = {
   async fetch(videoUrlOrId: string, signal?: AbortSignal): Promise<TranscriptSegment[]> {
-    // Merge the caller's signal with our timeout so either firing
-    // aborts the request. AbortSignal.any() composes them.
-    const timeoutSignal = AbortSignal.timeout(TRANSCRIPT_TIMEOUT_MS);
-    const combinedSignal = signal
-      ? AbortSignal.any([signal, timeoutSignal])
-      : timeoutSignal;
-
-    const fetchWithSignal: typeof fetch = (input, init) =>
-      fetch(input, { ...init, signal: combinedSignal });
-
     try {
-      return await YoutubeTranscript.fetchTranscript(videoUrlOrId, {
-        fetch: fetchWithSignal
-      });
+      return await raceWithTimeout(
+        YoutubeTranscript.fetchTranscript(videoUrlOrId),
+        TRANSCRIPT_TIMEOUT_MS,
+        signal
+      );
     } catch (error) {
       logger.warn("youtube_transcript_fetch_failed", {
         videoUrlOrId,
@@ -81,11 +73,51 @@ export const youtubeTranscriptFetcher: TranscriptFetcher = {
   }
 };
 
+function raceWithTimeout<T>(
+  work: Promise<T>,
+  timeoutMs: number,
+  signal?: AbortSignal
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      const err = new Error("Timed out reading the video.");
+      err.name = "AbortError";
+      reject(err);
+    }, timeoutMs);
+
+    const onAbort = () => {
+      clearTimeout(timer);
+      const err = new Error("Aborted");
+      err.name = "AbortError";
+      reject(err);
+    };
+    if (signal) {
+      if (signal.aborted) {
+        onAbort();
+        return;
+      }
+      signal.addEventListener("abort", onAbort, { once: true });
+    }
+
+    work.then(
+      (value) => {
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
+        reject(error);
+      }
+    );
+  });
+}
+
 /**
- * Map `youtube-transcript`'s typed errors into our typed module. The
- * cases below are the documented subclass set as of v1.3.1; any new
- * subclass falls through to `YoutubeFetchFailedError` and surfaces in
- * logs so we can extend the map.
+ * Map `@danielxceron/youtube-transcript`'s typed errors into our typed
+ * module. Any new subclass falls through to `YoutubeFetchFailedError`
+ * and surfaces in logs so we can extend the map.
  */
 function mapLibraryError(error: unknown): Error {
   if (error instanceof YoutubeTranscriptDisabledError) {
@@ -94,6 +126,17 @@ function mapLibraryError(error: unknown): Error {
   }
   if (error instanceof YoutubeTranscriptNotAvailableError) {
     // No track found for any language — same UX as disabled.
+    return new YoutubeNoTranscriptError();
+  }
+  if (error instanceof YoutubeTranscriptNotAvailableLanguageError) {
+    // Requested language unavailable. We don't pass a `lang`, so this
+    // shouldn't fire in practice — but treat as "no transcript" so
+    // the UX is consistent if YouTube ever returns an empty default.
+    return new YoutubeNoTranscriptError();
+  }
+  if (error instanceof YoutubeTranscriptEmptyError) {
+    // Both HTML scrape and InnerTube returned empty. Functionally the
+    // same as "no transcript available."
     return new YoutubeNoTranscriptError();
   }
   if (error instanceof YoutubeTranscriptVideoUnavailableError) {

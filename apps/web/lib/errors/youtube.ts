@@ -5,11 +5,11 @@
  * error shape leaks into the UI.
  *
  * Library coverage:
- *   - `youtube-transcript@1.3.1` throws typed `YoutubeTranscriptError`
- *     subclasses (Disabled / NotAvailable / VideoUnavailable /
- *     TooManyRequest). The fetcher in `lib/ai/youtube-transcript.ts`
- *     maps each one to a member of this module so the service stays
- *     library-agnostic.
+ *   - `@danielxceron/youtube-transcript` throws typed
+ *     `YoutubeTranscriptError` subclasses (Disabled / NotAvailable /
+ *     NotAvailableLanguage / Empty / VideoUnavailable / TooManyRequest).
+ *     The fetcher in `lib/ai/youtube-transcript.ts` maps each one to a
+ *     member of this module so the service stays library-agnostic.
  *   - Future library swap = one fetcher change + maybe a new entry
  *     in the mapping table; service / action / UI untouched.
  */
