@@ -4,7 +4,7 @@ import { S3Client } from "@aws-sdk/client-s3";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 import { randomUUID } from "node:crypto";
 import { getServerEnv, hasR2Env } from "@/lib/env/server";
-import type { PresignedUploadInput } from "@/lib/validators/meals";
+import type { PresignedUploadInput } from "@eeatly/api/validators/meals";
 
 export type PresignedUpload = {
   url: string;

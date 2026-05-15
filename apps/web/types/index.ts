@@ -1,10 +1,8 @@
-export type EffortLevel = "quick" | "easy" | "medium" | "high_effort";
-
-export type UserRole = "root_app_user" | "tenant_user" | "platform_admin";
-
-export type TenantRole = "owner" | "admin" | "member";
-
-export type BetaCohort = "alpha" | "beta_wave_1" | "beta_wave_2" | "internal" | "beta_2026";
+// Round 12 — literal enums moved to `@eeatly/api/enums` so both web and
+// mobile share the same source of truth. Re-exported here to keep the
+// existing `@/types` import surface intact for web call-sites.
+import type { EffortLevel, UserRole, TenantRole, BetaCohort } from "@eeatly/api";
+export type { EffortLevel, UserRole, TenantRole, BetaCohort };
 
 export type RecentMeal = {
   id: string;

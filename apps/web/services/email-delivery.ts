@@ -12,8 +12,8 @@ import { db } from "@/lib/db/client";
 import type { AnalyticsEventName } from "@/lib/observability/analytics";
 import { trackEvent } from "@/lib/observability/analytics";
 import { logger } from "@/lib/observability/logger";
-import type { HandledEmailWebhookType } from "@/lib/validators/resend-webhook-body";
-import type { ParsedResendWebhookBody } from "@/lib/validators/resend-webhook-body";
+import type { HandledEmailWebhookType } from "@eeatly/api/validators/resend-webhook-body";
+import type { ParsedResendWebhookBody } from "@eeatly/api/validators/resend-webhook-body";
 
 export type EmailDeliveryAdminFilter = "all" | "failed" | "bounced" | "opened" | "clicked";
 

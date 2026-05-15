@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FEATURE_REGISTRY, type FeatureKey } from "@/lib/gates/registry";
+import { FEATURE_REGISTRY, type FeatureKey } from "@eeatly/api/gates/registry";
 
 type UpgradePromptProps = {
   feature: FeatureKey;

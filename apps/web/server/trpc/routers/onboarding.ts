@@ -8,7 +8,7 @@ import { db } from "@/lib/db/client";
 import { logger } from "@/lib/observability/logger";
 import { trackActivationFunnelEvent } from "@/lib/observability/funnel";
 import { getRequestId } from "@/lib/observability/request-id";
-import { onboardingHabitsInputSchema } from "@/lib/validators/onboarding";
+import { onboardingHabitsInputSchema } from "@eeatly/api/validators/onboarding";
 import { protectedProcedure, router } from "../trpc";
 
 /**

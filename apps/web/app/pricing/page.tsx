@@ -3,7 +3,7 @@ import type { Metadata, Route } from "next";
 import { ChefHat } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getServerEnv, hasStripeEnv } from "@/lib/env/server";
-import { FEATURE_REGISTRY, type FeatureKey } from "@/lib/gates/registry";
+import { FEATURE_REGISTRY, type FeatureKey } from "@eeatly/api/gates/registry";
 import { getSubscriptionState } from "@/services/billing";
 import { PricingCard } from "@/components/pricing/pricing-card";
 

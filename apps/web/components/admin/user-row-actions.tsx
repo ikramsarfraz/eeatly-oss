@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/providers/toast-provider";
 import { trpc } from "@/lib/trpc/client";
-import { betaCohortValues } from "@/lib/validators/beta-cohort";
+import { betaCohortValues } from "@eeatly/api/validators/beta-cohort";
 
 /**
  * Round 11 — client-side wrapper for the admin /users row actions.

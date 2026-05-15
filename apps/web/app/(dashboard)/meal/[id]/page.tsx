@@ -6,7 +6,7 @@ import { MealBackLink } from "@/components/meals/meal-back-link";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { ShareButton } from "@/components/shares/share-button";
 import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
-import { classifyYoutubeUrl } from "@/lib/validators/ai";
+import { classifyYoutubeUrl } from "@eeatly/api/validators/ai";
 import { getMealDetail } from "@/services/meals";
 
 export const dynamic = "force-dynamic";

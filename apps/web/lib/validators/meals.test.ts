@@ -3,7 +3,7 @@ import {
   effortLevelSchema,
   mealLogInputSchema,
   presignedUploadInputSchema
-} from "./meals";
+} from "@eeatly/api/validators/meals";
 
 describe("effortLevelSchema", () => {
   it.each(["quick", "easy", "medium", "high_effort"] as const)("accepts %s", (value) => {

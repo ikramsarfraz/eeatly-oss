@@ -2,7 +2,7 @@
 
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { AppRouter } from "@/server/trpc/app-router";
-import type { FeatureKey } from "@/lib/gates/registry";
+import type { FeatureKey } from "@eeatly/api/gates/registry";
 
 /**
  * Round 11 — typed cause discriminator. Every TRPCError thrown by our

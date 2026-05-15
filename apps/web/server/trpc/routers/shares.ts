@@ -7,7 +7,7 @@ import { logger } from "@/lib/observability/logger";
 import {
   createRecipeShareSchema,
   revokeRecipeShareSchema
-} from "@/lib/validators/shares";
+} from "@eeatly/api/validators/shares";
 import {
   createRecipeShare,
   getRecipeShareByToken,

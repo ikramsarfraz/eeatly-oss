@@ -12,7 +12,7 @@ import {
   reorderDishesSchema,
   updateDishAnnotationSchema,
   updatePlanSchema
-} from "@/lib/validators/plans";
+} from "@eeatly/api/validators/plans";
 import {
   addDishToPlan,
   archivePlan,

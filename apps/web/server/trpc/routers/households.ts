@@ -21,7 +21,7 @@ import {
   createInvitationSchema,
   removeMemberSchema,
   revokeInvitationSchema
-} from "@/lib/validators/households";
+} from "@eeatly/api/validators/households";
 import { createNotification } from "@/services/notifications";
 import {
   acceptHouseholdInvitation,

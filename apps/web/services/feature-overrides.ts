@@ -4,8 +4,8 @@ import { and, count, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { featureOverrides, users } from "@/db/schema";
 import { logger } from "@/lib/observability/logger";
-import { FEATURE_REGISTRY, type FeatureKey } from "@/lib/gates/registry";
-import { GATE_RULES, type GateRule } from "@/lib/gates/rules";
+import { FEATURE_REGISTRY, type FeatureKey } from "@eeatly/api/gates/registry";
+import { GATE_RULES, type GateRule } from "@eeatly/api/gates/rules";
 
 /**
  * Round 6 — admin-only CRUD for `feature_overrides`. Callers gate access

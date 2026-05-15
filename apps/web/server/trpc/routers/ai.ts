@@ -23,7 +23,7 @@ import {
   audioInputSchema,
   MAX_AUDIO_UPLOAD_BYTES,
   youtubeUrlSchema
-} from "@/lib/validators/ai";
+} from "@eeatly/api/validators/ai";
 import {
   extractIngredientsForMeal,
   generateShareableRecipe,

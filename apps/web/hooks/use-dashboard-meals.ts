@@ -1,7 +1,7 @@
 "use client";
 
 import { trpc } from "@/lib/trpc/client";
-import type { MealLogInput } from "@/lib/validators/meals";
+import type { MealLogInput } from "@eeatly/api/validators/meals";
 import type { MealStat, RecentMeal } from "@/types";
 
 /**

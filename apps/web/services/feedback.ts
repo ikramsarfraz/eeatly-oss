@@ -3,7 +3,7 @@ import "server-only";
 import { desc, eq } from "drizzle-orm";
 import { betaFeedback, users } from "@/db/schema";
 import { db } from "@/lib/db/client";
-import { feedbackInputSchema, type FeedbackInput } from "@/lib/validators/feedback";
+import { feedbackInputSchema, type FeedbackInput } from "@eeatly/api/validators/feedback";
 
 export async function createBetaFeedback(userId: string, input: FeedbackInput) {
   const payload = feedbackInputSchema.parse(input);

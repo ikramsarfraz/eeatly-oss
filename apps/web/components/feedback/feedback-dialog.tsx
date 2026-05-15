@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/providers/toast-provider";
-import { feedbackInputSchema, type FeedbackInput } from "@/lib/validators/feedback";
+import { feedbackInputSchema, type FeedbackInput } from "@eeatly/api/validators/feedback";
 
 type FeedbackDialogProps = {
   trigger?: React.ReactNode;

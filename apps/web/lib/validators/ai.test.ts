@@ -6,7 +6,7 @@ import {
   MAX_AUDIO_UPLOAD_BYTES,
   mealSuggestionSchema,
   youtubeUrlSchema
-} from "./ai";
+} from "@eeatly/api/validators/ai";
 
 describe("classifyYoutubeUrl", () => {
   it("accepts /watch?v=<id> variants", () => {

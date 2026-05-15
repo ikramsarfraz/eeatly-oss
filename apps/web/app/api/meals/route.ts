@@ -4,7 +4,7 @@ import { trackMealLogLifecycleEvent } from "@/lib/observability/funnel";
 import { logger } from "@/lib/observability/logger";
 import { checkMealMutationLimit } from "@/lib/security/rate-limit";
 import { createMealLog, getDashboardMeals } from "@/services/meals";
-import { mealLogInputSchema } from "@/lib/validators/meals";
+import { mealLogInputSchema } from "@eeatly/api/validators/meals";
 
 export async function GET() {
   const user = await requireApiUser();

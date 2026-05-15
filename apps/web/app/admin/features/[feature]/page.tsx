@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import type { Route } from "next";
 import { format } from "date-fns";
 import { requirePlatformAdmin } from "@/lib/auth/session";
-import { FEATURE_REGISTRY, isFeatureKey } from "@/lib/gates/registry";
+import { FEATURE_REGISTRY, isFeatureKey } from "@eeatly/api/gates/registry";
 import { listOverridesForFeature } from "@/services/feature-overrides";
 import { FeatureOverridesPanel } from "@/components/admin/feature-overrides-panel";
 

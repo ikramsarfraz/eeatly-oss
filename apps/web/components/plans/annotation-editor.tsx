@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/providers/toast-provider";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc/client";
-import type { UpdateDishAnnotationInput } from "@/lib/validators/plans";
+import type { UpdateDishAnnotationInput } from "@eeatly/api/validators/plans";
 
 export type Annotation = {
   actualEffort: "quick" | "easy" | "medium" | "high_effort" | null;

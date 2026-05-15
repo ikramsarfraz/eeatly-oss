@@ -27,7 +27,7 @@ import {
   classifyYoutubeUrl,
   isSupportedAudioMediaType,
   MAX_AUDIO_UPLOAD_BYTES
-} from "@/lib/validators/ai";
+} from "@eeatly/api/validators/ai";
 import { logger } from "@/lib/observability/logger";
 import type { MealSuggestion, ShareActionResult } from "@/types";
 

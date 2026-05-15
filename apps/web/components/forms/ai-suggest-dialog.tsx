@@ -21,7 +21,7 @@ import {
   isSupportedAudioMediaType,
   MAX_AUDIO_UPLOAD_BYTES,
   SUPPORTED_AUDIO_MEDIA_TYPES
-} from "@/lib/validators/ai";
+} from "@eeatly/api/validators/ai";
 import type { MealSuggestion } from "@/types";
 
 type Tab = "photo" | "text" | "youtube" | "voice";

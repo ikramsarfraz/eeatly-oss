@@ -10,7 +10,7 @@ import { useToast } from "@/components/providers/toast-provider";
 import {
   COOK_FREQUENCY_BUCKETS,
   type CookFrequencyBucket
-} from "@/lib/validators/onboarding";
+} from "@eeatly/api/validators/onboarding";
 import { cn } from "@/lib/utils";
 import type { EffortLevel } from "@/types";
 import { trpc } from "@/lib/trpc/client";

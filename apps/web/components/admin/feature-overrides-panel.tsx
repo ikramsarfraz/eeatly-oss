@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/components/providers/toast-provider";
 import { trpc } from "@/lib/trpc/client";
-import { GATE_RULES, type GateRule } from "@/lib/gates/rules";
+import { GATE_RULES, type GateRule } from "@eeatly/api/gates/rules";
 
 export type OverridePanelRow = {
   id: string;

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/providers/toast-provider";
 import { trpc } from "@/lib/trpc/client";
-import { COOK_FREQUENCY_BUCKETS } from "@/lib/validators/onboarding";
+import { COOK_FREQUENCY_BUCKETS } from "@eeatly/api/validators/onboarding";
 import { cn } from "@/lib/utils";
 import type { EffortLevel } from "@/types";
 

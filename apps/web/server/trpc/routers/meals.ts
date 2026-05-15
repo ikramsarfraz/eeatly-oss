@@ -5,7 +5,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { trackMealLogLifecycleEvent } from "@/lib/observability/funnel";
 import { logger } from "@/lib/observability/logger";
-import { effortLevelSchema, mealLogInputSchema } from "@/lib/validators/meals";
+import { effortLevelSchema, mealLogInputSchema } from "@eeatly/api/validators/meals";
 import {
   createMealLog,
   deleteMealLog,

@@ -3,7 +3,7 @@ import "server-only";
 import { eq } from "drizzle-orm";
 
 import { resendWebhookReceipts } from "@/db/schema";
-import { HANDLED_WEBHOOK_TYPE_SET, verifiedResendWebhookBodySchema } from "@/lib/validators/resend-webhook-body";
+import { HANDLED_WEBHOOK_TYPE_SET, verifiedResendWebhookBodySchema } from "@eeatly/api/validators/resend-webhook-body";
 import { db } from "@/lib/db/client";
 import { logger } from "@/lib/observability/logger";
 import { applyResendWebhookToDeliveryLog } from "@/services/email-delivery";

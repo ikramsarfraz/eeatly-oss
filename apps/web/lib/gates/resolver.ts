@@ -9,8 +9,8 @@ import { logger } from "@/lib/observability/logger";
 import {
   FEATURE_REGISTRY,
   type FeatureKey
-} from "./registry";
-import { ruleEvaluators, type GateContext, type GateRule } from "./rules";
+} from "@eeatly/api/gates/registry";
+import { ruleEvaluators, type GateContext, type GateRule } from "@eeatly/api/gates/rules";
 
 /**
  * Round 6 — feature-gate resolver. Server-only, memoized per-request.

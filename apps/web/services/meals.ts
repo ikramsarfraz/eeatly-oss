@@ -5,7 +5,7 @@ import { db } from "@/lib/db/client";
 import { requireHouseholdMember } from "@/lib/auth/session";
 import { withSuggestions } from "@/lib/meals/rediscovery";
 import { normalizeMealName } from "@/lib/utils";
-import { mealLogInputSchema, type MealLogInput } from "@/lib/validators/meals";
+import { mealLogInputSchema, type MealLogInput } from "@eeatly/api/validators/meals";
 import { mealLogs, meals, users } from "@/db/schema";
 import type { DashboardMeals, MealStat, RecentMeal } from "@/types";
 

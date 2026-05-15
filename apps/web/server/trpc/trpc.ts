@@ -4,7 +4,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 import { FeatureGateDeniedError } from "@/lib/errors/gates";
-import type { FeatureKey } from "@/lib/gates/registry";
+import type { FeatureKey } from "@eeatly/api/gates/registry";
 import { requireFeatureAccess } from "@/lib/gates/resolver";
 import {
   checkAiCallLimit,

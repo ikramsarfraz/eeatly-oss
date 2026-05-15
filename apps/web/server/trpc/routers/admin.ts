@@ -11,11 +11,11 @@ import {
   dispatchTransactionalEmail,
   type TransactionalTemplate
 } from "@/lib/email/transactional";
-import { FEATURE_KEYS, FEATURE_REGISTRY, isFeatureKey } from "@/lib/gates/registry";
-import { GATE_RULES } from "@/lib/gates/rules";
+import { FEATURE_KEYS, FEATURE_REGISTRY, isFeatureKey } from "@eeatly/api/gates/registry";
+import { GATE_RULES } from "@eeatly/api/gates/rules";
 import { logger } from "@/lib/observability/logger";
 import { trackEvent } from "@/lib/observability/analytics";
-import { betaCohortValues } from "@/lib/validators/beta-cohort";
+import { betaCohortValues } from "@eeatly/api/validators/beta-cohort";
 import {
   createOverride,
   deleteOverride,

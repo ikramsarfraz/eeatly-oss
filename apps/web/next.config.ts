@@ -19,6 +19,9 @@ const contentSecurityPolicy = [
 
 const nextConfig: NextConfig = {
   typedRoutes: true,
+  // Round 12: workspace packages live as .ts source (not pre-built .d.ts +
+  // .js). Next needs to compile them through SWC alongside app code.
+  transpilePackages: ["@eeatly/api", "@eeatly/shared"],
   async headers() {
     return [
       {

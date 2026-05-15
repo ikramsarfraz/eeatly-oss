@@ -2,7 +2,7 @@ import "server-only";
 import * as React from "react";
 import { can } from "@/lib/gates/resolver";
 import { getCurrentUser } from "@/lib/auth/session";
-import type { FeatureKey } from "@/lib/gates/registry";
+import type { FeatureKey } from "@eeatly/api/gates/registry";
 
 type GatedProps = {
   feature: FeatureKey;

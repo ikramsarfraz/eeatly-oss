@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCreateMealLogImperative } from "@/hooks/use-dashboard-meals";
 import { endpoints, type PresignUploadResponse } from "@/lib/api/endpoints";
 import { trpc } from "@/lib/trpc/client";
-import { mealLogInputSchema, type MealLogInput } from "@/lib/validators/meals";
+import { mealLogInputSchema, type MealLogInput } from "@eeatly/api/validators/meals";
 import { cn } from "@/lib/utils";
 import type { MealSuggestion } from "@/types";
 

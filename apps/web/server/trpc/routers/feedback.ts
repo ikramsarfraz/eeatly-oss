@@ -3,7 +3,7 @@ import "server-only";
 import { TRPCError } from "@trpc/server";
 import { logger } from "@/lib/observability/logger";
 import { trackActivationFunnelEvent } from "@/lib/observability/funnel";
-import { feedbackInputSchema } from "@/lib/validators/feedback";
+import { feedbackInputSchema } from "@eeatly/api/validators/feedback";
 import { createBetaFeedback } from "@/services/feedback";
 import { protectedProcedure, rateLimit, router } from "../trpc";
 

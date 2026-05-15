@@ -6,7 +6,7 @@ import {
   reorderDishesSchema,
   updateDishAnnotationSchema,
   updatePlanSchema
-} from "./plans";
+} from "@eeatly/api/validators/plans";
 
 describe("createPlanSchema", () => {
   it("accepts a minimal valid payload (no notes)", () => {

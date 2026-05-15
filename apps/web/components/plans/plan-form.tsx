@@ -15,7 +15,7 @@ import { isUpgradeRequired } from "@/lib/trpc/errors";
 import {
   createPlanSchema,
   type CreatePlanInput
-} from "@/lib/validators/plans";
+} from "@eeatly/api/validators/plans";
 
 type PlanFormProps = {
   mode: "create" | "edit";

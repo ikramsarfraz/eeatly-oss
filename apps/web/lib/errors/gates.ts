@@ -1,4 +1,4 @@
-import type { FeatureKey } from "@/lib/gates/registry";
+import type { FeatureKey } from "@eeatly/api/gates/registry";
 
 /**
  * Round 6: thrown by `requireFeatureAccess(userId, feature)` when the

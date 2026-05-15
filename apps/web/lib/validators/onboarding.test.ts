@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   COOK_FREQUENCY_BUCKETS,
   onboardingHabitsInputSchema
-} from "./onboarding";
+} from "@eeatly/api/validators/onboarding";
 
 describe("onboardingHabitsInputSchema", () => {
   it("accepts a valid payload", () => {

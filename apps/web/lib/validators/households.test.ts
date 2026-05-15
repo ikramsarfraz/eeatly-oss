@@ -3,7 +3,7 @@ import {
   acceptInvitationSchema,
   createInvitationSchema,
   revokeInvitationSchema
-} from "./households";
+} from "@eeatly/api/validators/households";
 
 describe("createInvitationSchema", () => {
   it("trims and lowercases the email", () => {

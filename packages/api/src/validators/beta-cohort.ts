@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { BetaCohort } from "@/types";
+import type { BetaCohort } from "../enums";
 
 export const betaCohortValues = ["alpha", "beta_wave_1", "beta_wave_2", "internal"] as const satisfies Readonly<BetaCohort[]>;
 

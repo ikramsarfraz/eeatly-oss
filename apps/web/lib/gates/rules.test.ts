@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ruleEvaluators, type GateContext } from "./rules";
+import { ruleEvaluators, type GateContext } from "@eeatly/api/gates/rules";
 
 const baseCtx: GateContext = {
   userId: "u-1",

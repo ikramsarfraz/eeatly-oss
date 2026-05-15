@@ -4,7 +4,7 @@ import { logger } from "@/lib/observability/logger";
 import { getRequestId } from "@/lib/observability/request-id";
 import { checkUploadPresignLimit } from "@/lib/security/rate-limit";
 import { createPresignedPhotoUpload } from "@/lib/storage/r2";
-import { presignedUploadInputSchema } from "@/lib/validators/meals";
+import { presignedUploadInputSchema } from "@eeatly/api/validators/meals";
 
 export async function POST(request: Request) {
   const user = await requireApiUser();
