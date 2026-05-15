@@ -2,18 +2,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { ActivityIndicator, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { ReactNode } from "react";
+import { colors } from "../../lib/design/tokens";
 
 /**
- * Round 17 — screen scaffold.
+ * Round 18 — screen scaffold.
  *
- * Every screen wraps its content in `<Screen>` so the cream background
- * + safe-area treatment is consistent. Pass `edges` to opt out of
- * top safe-area when a custom header (e.g. expo-router stack title)
- * is already rendered.
- *
- * `<ScreenCentered>` is a sibling helper for loading / error /
- * empty states — vertically centered content on the same cream
- * surface.
+ * Wraps content in a warm-cream safe-area background. Pass `edges` to
+ * opt out of the top inset when a Stack header is rendered above
+ * (e.g. native back-arrow screens).
  */
 type ScreenProps = {
   children: ReactNode;
@@ -22,7 +18,7 @@ type ScreenProps = {
 
 export function Screen({ children, edges = ["top", "bottom"] }: ScreenProps) {
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={edges}>
+    <SafeAreaView className="flex-1 bg-cream" edges={edges}>
       {children}
     </SafeAreaView>
   );
@@ -30,7 +26,7 @@ export function Screen({ children, edges = ["top", "bottom"] }: ScreenProps) {
 
 export function ScreenCentered({ children }: { children: ReactNode }) {
   return (
-    <SafeAreaView className="flex-1 bg-background">
+    <SafeAreaView className="flex-1 bg-cream">
       <View className="flex-1 items-center justify-center gap-3 px-8">
         {children}
       </View>
@@ -41,9 +37,9 @@ export function ScreenCentered({ children }: { children: ReactNode }) {
 export function LoadingScreen({ label }: { label?: string }) {
   return (
     <ScreenCentered>
-      <ActivityIndicator color="#2C5F3F" size="large" />
+      <ActivityIndicator color={colors.forest} size="large" />
       {label ? (
-        <Text className="text-body text-foreground-muted">{label}</Text>
+        <Text className="font-body text-body-lg text-ink-2">{label}</Text>
       ) : null}
     </ScreenCentered>
   );
@@ -58,14 +54,17 @@ export function ErrorScreen({
 }) {
   return (
     <ScreenCentered>
-      <View className="h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
-        <Ionicons name="alert-circle-outline" size={32} color="#A03830" />
+      <View className="h-16 w-16 items-center justify-center rounded-full bg-danger-soft">
+        <Ionicons name="alert-circle-outline" size={32} color={colors.danger} />
       </View>
-      <Text className="text-heading-2 font-semibold text-foreground text-center">
+      <Text
+        className="font-display text-display-xs text-ink text-center"
+        style={{ letterSpacing: -0.4 }}
+      >
         {title}
       </Text>
       {body ? (
-        <Text className="text-body text-foreground-muted text-center max-w-[280px]">
+        <Text className="font-body text-body-lg text-ink-2 text-center max-w-[280px]">
           {body}
         </Text>
       ) : null}

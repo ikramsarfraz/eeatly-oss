@@ -1,37 +1,46 @@
 import { Ionicons } from "@expo/vector-icons";
-import { format } from "date-fns";
 import { Link, router } from "expo-router";
 import { useEffect, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import {
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  View
+} from "react-native";
 import { authClient } from "../../../lib/auth/client";
 import { clearSessionToken } from "../../../lib/auth/session";
-import { formatCookCount, formatCookedAt } from "../../../lib/dates";
+import { dateEyebrow, displayFirstName, greetingFor } from "../../../lib/design/greeting";
+import { formatCookedAt } from "../../../lib/dates";
+import { colors } from "../../../lib/design/tokens";
 import { trpc } from "../../../lib/trpc";
-import { MealCard } from "../../../components/meal-card";
+import { TopNav } from "../../../components/top-nav";
 import {
   Button,
   Card,
-  CardBody,
   EmptyState,
   ErrorScreen,
+  IconBubble,
   LoadingScreen,
+  MealTile,
+  PageTitle,
   Screen,
-  SectionHeader
+  SectionLabel
 } from "../../../components/ui";
 
 /**
- * Round 17 home tab — rebuilt with NativeWind primitives.
+ * Round 18 Home tab — editorial rebuild matching the design handoff.
  *
- * Layout from top:
- *   1. Greeting (heading-1) + today's date caption.
- *   2. Three horizontally-scrolling sections of MealCard tiles —
- *      Recent, Most cooked, Bring it back (with accent border).
- *   3. Plans summary card with a "View all plans" link.
+ * Stack, top to bottom:
+ *   1. TopNav (Home centered, gear right, no divider).
+ *   2. Editorial greeting: italic kicker + big serif name + mono date.
+ *   3. "Recently cooked" horizontal carousel of 148pt monogram tiles.
+ *   4. "Most cooked" 2-column grid (90pt tile band + name + ×N).
+ *   5. "Upcoming plans" section with one plan card + "View all" link.
  *
- * Empty-kitchen path renders a single EmptyState with a "Log a meal"
- * CTA. Empty section state collapses the section entirely rather
- * than rendering a row of italic text — the section header itself
- * disappears unless there's content.
+ * Empty kitchen path renders a single EmptyState with a log CTA.
+ * Empty sections collapse — we don't render section labels for empty
+ * collections, matching the handoff's editorial restraint.
  */
 export default function HomeTab() {
   const [firstName, setFirstName] = useState<string | null>(null);
@@ -51,8 +60,7 @@ export default function HomeTab() {
           return;
         }
         const raw = (data.user.name ?? data.user.email).trim();
-        const first = raw.split(/\s+/)[0] ?? raw;
-        setFirstName(first);
+        setFirstName(displayFirstName(raw));
       } catch {
         /* swallow — leave the greeting at "there" */
       }
@@ -64,57 +72,69 @@ export default function HomeTab() {
   }, []);
 
   if (dashboard.isPending) {
-    return <LoadingScreen />;
+    return (
+      <Screen>
+        <TopNav title="Home" divider={false} />
+        <LoadingScreen />
+      </Screen>
+    );
   }
 
   if (dashboard.error) {
     return (
-      <ErrorScreen
-        title="Couldn't load your kitchen"
-        body="Check your connection and pull down to retry."
-      />
+      <Screen>
+        <TopNav title="Home" divider={false} />
+        <ErrorScreen
+          title="Couldn't load your kitchen"
+          body="Check your connection and pull down to retry."
+        />
+      </Screen>
     );
   }
 
   const data = dashboard.data;
   const recent = data?.recentMeals ?? [];
   const mostCooked = data?.mostCookedMeals ?? [];
-  const neglected = data?.neglectedMeals ?? [];
   const kitchenEmpty = recent.length === 0 && mostCooked.length === 0;
 
-  const today = format(new Date(), "EEEE, MMM d");
+  const now = new Date();
 
   return (
-    <Screen edges={["top", "bottom"]}>
+    <Screen>
+      <TopNav title="Home" divider={false} />
       <ScrollView
-        contentContainerClassName="pb-12"
+        contentContainerStyle={{ paddingTop: 8, paddingBottom: 32 }}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={dashboard.isFetching && !dashboard.isPending}
             onRefresh={() => dashboard.refetch()}
-            tintColor="#2C5F3F"
+            tintColor={colors.forest}
           />
         }
       >
-        <View className="px-4 pt-4 pb-2 gap-1">
-          <Text className="text-heading-1 font-bold text-foreground">
-            Hello, {firstName ?? "there"}.
-          </Text>
-          <Text className="text-caption text-foreground-muted">{today}</Text>
+        <View className="px-[22px] mb-7">
+          <PageTitle
+            size="xl"
+            kicker={greetingFor(now)}
+            title={`${firstName ?? "there"}.`}
+            eyebrow={dateEyebrow(now)}
+          />
         </View>
 
         {kitchenEmpty ? (
-          <View className="px-4 pt-8">
-            <Card variant="default">
-              <CardBody>
+          <View className="px-5 pt-2">
+            <Card>
+              <View className="p-5">
                 <EmptyState
                   icon={
                     <Ionicons
                       name="restaurant-outline"
                       size={28}
-                      color="#2C5F3F"
+                      color={colors.forest}
                     />
                   }
+                  kicker="A blank slate."
                   title="Your kitchen is empty"
                   body="Log the first meal you've cooked to start your collection."
                   action={
@@ -125,52 +145,53 @@ export default function HomeTab() {
                     </Link>
                   }
                 />
-              </CardBody>
+              </View>
             </Card>
           </View>
         ) : (
           <>
             {recent.length > 0 ? (
-              <HorizontalSection title="Recent meals">
-                {recent.slice(0, 8).map((m) => (
-                  <MealCard
-                    key={m.id}
-                    mealId={m.mealId}
-                    mealName={m.mealName}
-                    photoUrl={m.photoUrl}
-                    subtitle={formatCookedAt(m.cookedAt)}
-                  />
-                ))}
-              </HorizontalSection>
+              <View className="mb-7">
+                <View className="px-[22px]">
+                  <SectionLabel>Recently cooked</SectionLabel>
+                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{
+                    paddingLeft: 22,
+                    paddingRight: 22,
+                    gap: 12
+                  }}
+                >
+                  {recent.slice(0, 8).map((m) => (
+                    <RecentTile
+                      key={m.id}
+                      mealId={m.mealId}
+                      mealName={m.mealName}
+                      photoUrl={m.photoUrl}
+                      cookedAt={m.cookedAt}
+                    />
+                  ))}
+                </ScrollView>
+              </View>
             ) : null}
 
             {mostCooked.length > 0 ? (
-              <HorizontalSection title="Most cooked">
-                {mostCooked.slice(0, 8).map((m) => (
-                  <MealCard
-                    key={m.mealId}
-                    mealId={m.mealId}
-                    mealName={m.mealName}
-                    photoUrl={m.photoUrl}
-                    subtitle={formatCookCount(m.cookCount)}
-                  />
-                ))}
-              </HorizontalSection>
-            ) : null}
-
-            {neglected.length > 0 ? (
-              <HorizontalSection title="Bring it back">
-                {neglected.slice(0, 8).map((m) => (
-                  <MealCard
-                    key={m.mealId}
-                    mealId={m.mealId}
-                    mealName={m.mealName}
-                    photoUrl={m.photoUrl}
-                    subtitle={`Last ${formatCookedAt(m.lastCookedAt)}`}
-                    accent
-                  />
-                ))}
-              </HorizontalSection>
+              <View className="px-[22px] mb-7">
+                <SectionLabel>Most cooked</SectionLabel>
+                <View className="flex-row flex-wrap" style={{ gap: 12 }}>
+                  {mostCooked.slice(0, 4).map((m) => (
+                    <MostCookedTile
+                      key={m.mealId}
+                      mealId={m.mealId}
+                      mealName={m.mealName}
+                      photoUrl={m.photoUrl}
+                      cookCount={m.cookCount}
+                    />
+                  ))}
+                </View>
+              </View>
             ) : null}
 
             <PlansSection />
@@ -181,106 +202,203 @@ export default function HomeTab() {
   );
 }
 
-function HorizontalSection({
-  title,
-  children
+/* ─── Recently cooked horizontal tile ────────────────────────── */
+function RecentTile({
+  mealId,
+  mealName,
+  photoUrl,
+  cookedAt
 }: {
-  title: string;
-  children: React.ReactNode;
+  mealId: string;
+  mealName: string;
+  photoUrl: string | null;
+  cookedAt: string | Date | null;
 }) {
   return (
-    <View>
-      <SectionHeader title={title} />
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerClassName="px-4 gap-3 pb-1"
+    <Link href={`/(authed)/meal/${mealId}` as never} asChild>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${mealName}, ${formatCookedAt(cookedAt)}`}
+        style={{ width: 148 }}
+        className="active:opacity-90"
       >
-        {children}
-      </ScrollView>
-    </View>
+        <View style={{ width: 148, height: 148, marginBottom: 10 }}>
+          <MealTile name={mealName} size="xl" photoUrl={photoUrl} radius={10} />
+        </View>
+        <Text
+          className="font-body-semibold text-body-md text-ink mb-0.5"
+          style={{ letterSpacing: -0.1, lineHeight: 18 }}
+          numberOfLines={2}
+        >
+          {mealName}
+        </Text>
+        <Text
+          className="font-mono text-eyebrow text-ink-3 uppercase"
+          style={{ letterSpacing: 0.6 }}
+          numberOfLines={1}
+        >
+          {formatCookedAt(cookedAt)}
+        </Text>
+      </Pressable>
+    </Link>
   );
 }
 
+/* ─── Most cooked grid tile ──────────────────────────────────── */
+function MostCookedTile({
+  mealId,
+  mealName,
+  photoUrl,
+  cookCount
+}: {
+  mealId: string;
+  mealName: string;
+  photoUrl: string | null;
+  cookCount: number;
+}) {
+  return (
+    <Link href={`/(authed)/meal/${mealId}` as never} asChild>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${mealName}, cooked ${cookCount} times`}
+        style={{ width: "48%" }}
+        className="bg-surface rounded-md border border-border-soft overflow-hidden active:opacity-90"
+      >
+        <View style={{ height: 90 }}>
+          <MealTile name={mealName} size="md" photoUrl={photoUrl} radius={0} />
+        </View>
+        <View style={{ paddingHorizontal: 12, paddingVertical: 10 }}>
+          <Text
+            className="font-body-semibold text-body-sm text-ink"
+            style={{ letterSpacing: -0.1 }}
+            numberOfLines={1}
+          >
+            {mealName}
+          </Text>
+          <View className="flex-row items-baseline mt-1" style={{ gap: 4 }}>
+            <Text
+              className="font-display-italic text-kicker text-forest"
+              style={{ lineHeight: 18 }}
+            >
+              ×{cookCount}
+            </Text>
+            <Text
+              className="font-mono text-eyebrow-xs text-ink-3 uppercase"
+              style={{ letterSpacing: 0.5 }}
+            >
+              cooked
+            </Text>
+          </View>
+        </View>
+      </Pressable>
+    </Link>
+  );
+}
+
+/* ─── Upcoming plans section ─────────────────────────────────── */
 function PlansSection() {
   const plans = trpc.plans.list.useQuery(undefined, { staleTime: 60_000 });
   const data = plans.data ?? [];
   const featured = data[0];
 
+  if (plans.isPending) {
+    return null;
+  }
+
   return (
-    <View className="mt-2">
-      <SectionHeader
-        title="Plans"
+    <View className="px-[22px]">
+      <SectionLabel
         action={
           <Link href="/(authed)/plans" asChild>
             <Pressable hitSlop={6} accessibilityRole="button">
-              <Text className="text-caption-strong font-semibold text-primary">
+              <Text className="font-body-semibold text-chip text-forest">
                 View all
               </Text>
             </Pressable>
           </Link>
         }
-      />
-      <View className="px-4">
-        {plans.isPending ? (
-          <Card>
-            <CardBody>
-              <Text className="text-caption text-foreground-muted">
-                Loading…
-              </Text>
-            </CardBody>
-          </Card>
-        ) : !featured ? (
-          <Link href="/(authed)/plans/new" asChild>
-            <Pressable>
-              <Card variant="interactive">
-                <CardBody>
-                  <Text className="text-heading-3 font-semibold text-foreground">
+      >
+        Upcoming plans
+      </SectionLabel>
+
+      {!featured ? (
+        <Link href="/(authed)/plans/new" asChild>
+          <Pressable>
+            <Card variant="interactive">
+              <View className="flex-row items-center p-4" style={{ gap: 12 }}>
+                <IconBubble size={44}>
+                  <Ionicons
+                    name="calendar-outline"
+                    size={20}
+                    color={colors.forest}
+                  />
+                </IconBubble>
+                <View className="flex-1 gap-1">
+                  <Text
+                    className="font-body-semibold text-body-lg text-ink"
+                    style={{ letterSpacing: -0.1 }}
+                  >
                     Plan an occasion menu
                   </Text>
-                  <Text className="text-caption text-foreground-muted mt-1">
-                    Build a menu for the next Eid, Diwali, or dinner party.
+                  <Text
+                    className="font-mono text-eyebrow text-ink-3 uppercase"
+                    style={{ letterSpacing: 0.6 }}
+                  >
+                    Eid · Diwali · dinner party
                   </Text>
-                  <Text className="text-caption-strong font-semibold text-primary mt-3">
-                    Create your first plan →
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.ink3} />
+              </View>
+            </Card>
+          </Pressable>
+        </Link>
+      ) : (
+        <Link href={`/(authed)/plans/${featured.id}` as never} asChild>
+          <Pressable>
+            <Card variant="interactive">
+              <View className="flex-row items-center p-4" style={{ gap: 12 }}>
+                <IconBubble size={44}>
+                  <Ionicons
+                    name="calendar-outline"
+                    size={20}
+                    color={colors.forest}
+                  />
+                </IconBubble>
+                <View className="flex-1 gap-1">
+                  <Text
+                    className="font-body-semibold text-body-lg text-ink"
+                    style={{ letterSpacing: -0.1 }}
+                    numberOfLines={1}
+                  >
+                    {featured.name}
                   </Text>
-                </CardBody>
-              </Card>
-            </Pressable>
-          </Link>
-        ) : (
-          <Link href={`/(authed)/plans/${featured.id}` as never} asChild>
-            <Pressable>
-              <Card variant="interactive">
-                <CardBody>
-                  <View className="flex-row items-center justify-between gap-3">
-                    <View className="flex-1 gap-1">
-                      <Text
-                        className="text-heading-3 font-semibold text-foreground"
-                        numberOfLines={1}
-                      >
-                        {featured.name}
-                      </Text>
-                      <Text className="text-caption text-foreground-muted">
-                        {featured.dishCount === 0
-                          ? "No dishes yet"
-                          : featured.dishCount === 1
-                            ? "1 dish"
-                            : `${featured.dishCount} dishes`}
-                      </Text>
-                    </View>
-                    <Ionicons
-                      name="chevron-forward"
-                      size={20}
-                      color="#9A968A"
-                    />
-                  </View>
-                </CardBody>
-              </Card>
-            </Pressable>
-          </Link>
-        )}
-      </View>
+                  <Text
+                    className="font-mono text-eyebrow text-ink-3 uppercase"
+                    style={{ letterSpacing: 0.6 }}
+                  >
+                    {planEyebrow(featured.scheduledDate, featured.dishCount)}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.ink3} />
+              </View>
+            </Card>
+          </Pressable>
+        </Link>
+      )}
     </View>
   );
+}
+
+function planEyebrow(scheduledDate: string | null, dishCount: number): string {
+  const dishes =
+    dishCount === 0
+      ? "no dishes"
+      : dishCount === 1
+        ? "1 dish"
+        : `${dishCount} dishes`;
+  if (!scheduledDate) return dishes;
+  const [y, m, d] = scheduledDate.split("-").map(Number);
+  if (!y || !m || !d) return dishes;
+  const when = formatCookedAt(new Date(y, m - 1, d));
+  return `${when} · ${dishes}`;
 }

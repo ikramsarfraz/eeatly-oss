@@ -171,16 +171,19 @@ export function PhotoPicker({ value, onChange, disabled }: PhotoPickerProps) {
           disabled={disabled}
           accessibilityRole="button"
           accessibilityLabel="Add a photo"
-          className={`min-h-[120px] rounded-md border border-dashed border-border-strong bg-background-muted/60 items-center justify-center px-4 py-4 gap-1.5 active:opacity-70 ${
+          className={`h-[180px] rounded-lg border border-dashed border-border bg-cream-soft items-center justify-center px-4 py-4 active:opacity-70 ${
             disabled ? "opacity-50" : ""
           }`}
         >
-          <Ionicons name="image-outline" size={28} color="#6B7068" />
-          <Text className="text-body font-semibold text-foreground">
+          <Ionicons name="image-outline" size={28} color="#2E5739" />
+          <Text className="font-body-semibold text-body-lg text-ink mt-2">
             Add a photo
           </Text>
-          <Text className="text-small text-foreground-muted">
-            Optional — camera or library
+          <Text
+            className="font-mono text-eyebrow text-ink-3 uppercase mt-1"
+            style={{ letterSpacing: 0.6 }}
+          >
+            Camera or library
           </Text>
         </Pressable>
       )}

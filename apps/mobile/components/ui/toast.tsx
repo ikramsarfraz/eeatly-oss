@@ -38,15 +38,15 @@ type ToastProps = {
 };
 
 const containerByVariant: Record<ToastVariant, string> = {
-  info: "bg-background-elevated border border-primary",
-  success: "bg-primary",
-  error: "bg-destructive"
+  info: "bg-surface border border-forest",
+  success: "bg-forest",
+  error: "bg-danger"
 };
 
 const labelByVariant: Record<ToastVariant, string> = {
-  info: "text-foreground",
-  success: "text-primary-foreground",
-  error: "text-destructive-foreground"
+  info: "text-ink",
+  success: "text-forest-text",
+  error: "text-forest-text"
 };
 
 const iconNameByVariant: Record<
@@ -59,9 +59,9 @@ const iconNameByVariant: Record<
 };
 
 const iconColorByVariant: Record<ToastVariant, string> = {
-  info: "#2C5F3F",
-  success: "#FBF8F1",
-  error: "#FBF8F1"
+  info: "#2E5739",
+  success: "#F5EFE2",
+  error: "#F5EFE2"
 };
 
 export function Toast({

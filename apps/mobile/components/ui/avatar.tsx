@@ -1,18 +1,17 @@
 import { Text, View } from "react-native";
+import { colors, fonts } from "../../lib/design/tokens";
 
 /**
- * Round 17 — initials avatar.
+ * Round 18 — initials avatar in the editorial style.
  *
- * Circle with up to 2 initials. Background color is derived
- * deterministically from the initials string so the same user
- * always renders in the same color across screens, and different
- * users in the same household visually differentiate without
- * needing photos.
+ * The kitchen members screen renders avatars with a wheat-tinted bg
+ * and a single Instrument Serif italic letter — `M.` for Mom, with the
+ * trailing period intentional. We approximate that here: take the
+ * first letter and append a period, render it in the serif italic.
  *
- * Sizes: `sm` (24px), `md` (32px, default), `lg` (48px).
- *
- * For real photo avatars we'd swap to an Image source — for now
- * initials cover every authed flow (no profile-photo upload yet).
+ * For consistency across household members we still hash a palette so
+ * different members get different warm-tinted backgrounds, but the
+ * default leans toward the wheat shown in the handoff.
  */
 type AvatarSize = "sm" | "md" | "lg";
 
@@ -21,22 +20,17 @@ type AvatarProps = {
   size?: AvatarSize;
 };
 
-const sizeClasses: Record<AvatarSize, { box: string; text: string }> = {
-  sm: { box: "h-6 w-6", text: "text-small" },
-  md: { box: "h-8 w-8", text: "text-caption" },
-  lg: { box: "h-12 w-12", text: "text-body" }
+const sizeClasses: Record<AvatarSize, { box: string; fontSize: number }> = {
+  sm: { box: "h-8 w-8", fontSize: 14 },
+  md: { box: "h-11 w-11", fontSize: 22 },
+  lg: { box: "h-14 w-14", fontSize: 28 }
 };
 
-// Palette pulled from the design tokens — every option has WCAG-AA
-// contrast against the cream text. Adding more options dilutes the
-// differentiation; 5 is enough for ~5-person households without
-// frequent collisions.
 const palette = [
-  { bg: "bg-primary", text: "text-primary-foreground" },
-  { bg: "bg-accent", text: "text-accent-foreground" },
-  { bg: "bg-destructive", text: "text-destructive-foreground" },
-  { bg: "bg-border-strong", text: "text-foreground" },
-  { bg: "bg-foreground", text: "text-background" }
+  { bg: colors.wheat, fg: "#5C4318" },
+  { bg: "#C9D3B5", fg: "#2E4A22" },
+  { bg: "#E2C6BC", fg: "#5C2C1A" },
+  { bg: "#C7D1D9", fg: "#2B3B49" }
 ];
 
 function pickColor(initials: string) {
@@ -49,17 +43,28 @@ function pickColor(initials: string) {
 }
 
 export function Avatar({ initials, size = "md" }: AvatarProps) {
-  const clean = initials.slice(0, 2).toUpperCase();
+  const clean = (initials || "?").trim();
+  const letter = clean.charAt(0).toUpperCase();
   const color = pickColor(clean || "??");
   const dims = sizeClasses[size];
   return (
     <View
-      className={`items-center justify-center rounded-full ${dims.box} ${color.bg}`}
+      className={`items-center justify-center rounded-full ${dims.box}`}
+      style={{ backgroundColor: color.bg }}
       accessibilityRole="image"
       accessibilityLabel={`Avatar ${clean}`}
     >
-      <Text className={`font-semibold ${dims.text} ${color.text}`}>
-        {clean}
+      <Text
+        style={{
+          fontFamily: fonts.displayItalic,
+          fontSize: dims.fontSize,
+          color: color.fg,
+          letterSpacing: -0.4,
+          lineHeight: dims.fontSize
+        }}
+        allowFontScaling={false}
+      >
+        {letter}.
       </Text>
     </View>
   );

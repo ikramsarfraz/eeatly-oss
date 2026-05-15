@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { router, Stack, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import {
   Alert,
-  Image,
   Linking,
   ScrollView,
   Text,
@@ -11,34 +10,37 @@ import {
 } from "react-native";
 import { detectPlatform } from "@eeatly/shared";
 import { formatCookedAt } from "../../../lib/dates";
+import { colors } from "../../../lib/design/tokens";
 import { trpc } from "../../../lib/trpc";
 import { IngredientChecklist } from "../../../components/ingredient-checklist";
 import { ShareSheet } from "../../../components/share-sheet";
 import { SourceUrlEmbed } from "../../../components/embeds/source-url-embed";
+import { TopNav } from "../../../components/top-nav";
 import {
   Button,
+  Chip,
   ErrorScreen,
   LoadingScreen,
+  MealTile,
   Screen,
-  SectionHeader,
-  Tag
+  SectionLabel
 } from "../../../components/ui";
 
 /**
- * Round 17 recipe view — NativeWind rebuild of the R13 screen.
+ * Round 18 recipe view — editorial rebuild.
  *
- * Layout, top to bottom:
- *   - Full-bleed hero (40% screen height aspect) — photo or
- *     placeholder card with food icon
- *   - Title + meta row (caption, foreground-muted) + optional
- *     source-platform tag
- *   - Embed (R16) if `recipeSourceUrl` is set
- *   - Ingredients checklist
- *   - Recipe body (prose, 24px line-height)
- *   - Sticky action row at bottom: Log again + Share
+ * Top to bottom:
+ *   - Editorial TopNav (back, no gear) — title shows meal name.
+ *   - Full-bleed hero: 4:3 photo OR monogram tile at the same aspect.
+ *   - Title block: serif name 36pt + meta row (caption) + optional
+ *     source-platform chip.
+ *   - Source URL embed (R16) if present.
+ *   - "INGREDIENTS" section label + checklist.
+ *   - "RECIPE" section label + prose.
+ *   - Sticky-ish action row: forest "Log again" CTA + secondary Share.
  *
- * The wife's primary screen — every visual choice in here should
- * make the biryani recipe feel inviting, not like a database row.
+ * The wife's primary screen — every visual choice should make the
+ * biryani recipe feel inviting, not like a database row.
  */
 
 function platformLabel(url: string): string | null {
@@ -93,43 +95,33 @@ export default function MealDetailScreen() {
   );
 
   const meal = query.data;
-  const title = meal?.name ?? "Meal";
 
   if (query.isPending) {
     return (
-      <>
-        <Stack.Screen
-          options={{
-            title,
-            headerBackTitle: "Back",
-            headerStyle: { backgroundColor: "#FBF8F1" },
-            headerTintColor: "#1A1F1B"
-          }}
-        />
+      <Screen edges={["top", "bottom"]}>
+        <TopNav title="Meal" back showSettings={false} />
         <LoadingScreen />
-      </>
+      </Screen>
     );
   }
 
   if (!meal) {
     return (
-      <>
-        <Stack.Screen options={{ title: "Meal", headerBackTitle: "Back" }} />
-        <View className="flex-1 bg-background">
-          <ErrorScreen
-            title="Meal not found"
-            body="It may have been archived, or you don't have access in this household."
-          />
-          <View className="px-8 pb-12 -mt-4 items-center">
-            <Button
-              variant="secondary"
-              onPress={() => router.replace("/(authed)/home")}
-            >
-              Back to home
-            </Button>
-          </View>
+      <Screen edges={["top", "bottom"]}>
+        <TopNav title="Meal" back showSettings={false} />
+        <ErrorScreen
+          title="Meal not found"
+          body="It may have been archived, or you don't have access in this kitchen."
+        />
+        <View style={{ paddingHorizontal: 30, marginTop: -8, alignItems: "center" }}>
+          <Button
+            variant="secondary"
+            onPress={() => router.replace("/(authed)/home")}
+          >
+            Back to home
+          </Button>
         </View>
-      </>
+      </Screen>
     );
   }
 
@@ -138,61 +130,68 @@ export default function MealDetailScreen() {
     : null;
 
   return (
-    <Screen edges={["bottom"]}>
-      <Stack.Screen
-        options={{
-          title,
-          headerBackTitle: "Back",
-          headerStyle: { backgroundColor: "#FBF8F1" },
-          headerTintColor: "#1A1F1B",
-          headerTitleStyle: { fontWeight: "600" }
-        }}
-      />
-      <ScrollView contentContainerClassName="pb-12">
-        <Hero photoUrl={meal.photoUrl} name={meal.name} />
-        <Header
-          name={meal.name}
-          cookCount={meal.cookCount}
-          lastCookedAt={meal.lastCookedAt}
-          createdByName={meal.createdByName}
-          sourcePlatform={sourcePlatform}
-        />
+    <Screen edges={["top", "bottom"]}>
+      <TopNav title={meal.name} back showSettings={false} />
+      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
+        <View style={{ width: "100%", aspectRatio: 4 / 3 }}>
+          <MealTile
+            name={meal.name}
+            size="xl"
+            photoUrl={meal.photoUrl}
+            radius={0}
+          />
+        </View>
+
+        <View style={{ paddingHorizontal: 22, paddingTop: 22, gap: 10 }}>
+          <Text
+            className="font-display text-display-sm text-ink"
+            style={{ letterSpacing: -0.4 }}
+          >
+            {meal.name}
+          </Text>
+          <MetaRow
+            cookCount={meal.cookCount}
+            lastCookedAt={meal.lastCookedAt}
+            createdByName={meal.createdByName}
+          />
+          {sourcePlatform ? (
+            <View style={{ flexDirection: "row", marginTop: 4 }}>
+              <Chip tone="wheat">{`From ${sourcePlatform}`}</Chip>
+            </View>
+          ) : null}
+        </View>
 
         {meal.recipeSourceUrl ? (
-          <View className="px-4 pt-4 gap-2">
+          <View style={{ paddingHorizontal: 22, paddingTop: 18, gap: 8 }}>
             <SourceUrlEmbed url={meal.recipeSourceUrl} />
-            <SourceLink
-              url={meal.recipeSourceUrl}
-              label={sourcePlatform}
-            />
+            <SourceLink url={meal.recipeSourceUrl} label={sourcePlatform} />
           </View>
         ) : null}
 
-        <View className="mt-2">
-          <SectionHeader title="Ingredients" />
-          <View className="px-4">
-            <IngredientChecklist
-              ingredients={meal.ingredients}
-              mealName={meal.name}
-              mealId={meal.id}
-              canExtract={Boolean(meal.recipeText?.trim())}
-            />
-          </View>
+        <View style={{ paddingHorizontal: 22, paddingTop: 24 }}>
+          <SectionLabel>Ingredients</SectionLabel>
+          <IngredientChecklist
+            ingredients={meal.ingredients}
+            mealName={meal.name}
+            mealId={meal.id}
+            canExtract={Boolean(meal.recipeText?.trim())}
+          />
         </View>
 
-        <View>
-          <SectionHeader title="Recipe" />
-          <View className="px-4">
-            {meal.recipeText ? (
-              <Text className="text-body text-foreground leading-6">
-                {meal.recipeText}
-              </Text>
-            ) : (
-              <Text className="text-body italic text-foreground-muted">
-                No recipe saved for this meal yet.
-              </Text>
-            )}
-          </View>
+        <View style={{ paddingHorizontal: 22, paddingTop: 24 }}>
+          <SectionLabel>Recipe</SectionLabel>
+          {meal.recipeText ? (
+            <Text
+              className="font-body text-body-lg text-ink"
+              style={{ lineHeight: 24 }}
+            >
+              {meal.recipeText}
+            </Text>
+          ) : (
+            <Text className="font-display-italic text-body-lg text-ink-3">
+              No recipe saved for this meal yet.
+            </Text>
+          )}
         </View>
 
         <ActionRow
@@ -206,45 +205,14 @@ export default function MealDetailScreen() {
   );
 }
 
-function Hero({
-  photoUrl,
-  name
-}: {
-  photoUrl: string | null;
-  name: string;
-}) {
-  if (photoUrl) {
-    return (
-      <Image
-        source={{ uri: photoUrl }}
-        className="w-full bg-background-muted aspect-[4/3]"
-        resizeMode="cover"
-        accessibilityLabel={`Photo of ${name}`}
-      />
-    );
-  }
-  return (
-    <View
-      className="w-full aspect-[4/3] items-center justify-center bg-primary-muted"
-      accessibilityElementsHidden
-    >
-      <Ionicons name="restaurant-outline" size={56} color="#2C5F3F" />
-    </View>
-  );
-}
-
-function Header({
-  name,
+function MetaRow({
   cookCount,
   lastCookedAt,
-  createdByName,
-  sourcePlatform
+  createdByName
 }: {
-  name: string;
   cookCount: number;
   lastCookedAt: string | Date | null;
   createdByName: string | null;
-  sourcePlatform: string | null;
 }) {
   const addedBy = createdByName ?? "Former member";
   const cookedText =
@@ -255,28 +223,20 @@ function Header({
         : `Cooked ${cookCount} times`;
   const cookedLabel = lastCookedLabel(lastCookedAt);
   return (
-    <View className="px-4 pt-4 gap-2">
-      <Text className="text-heading-1 font-bold text-foreground">{name}</Text>
-      <View className="flex-row items-center flex-wrap gap-x-1.5 gap-y-1">
-        <Text className="text-caption text-foreground-muted">
-          Added by{" "}
-          <Text className="text-foreground font-semibold">{addedBy}</Text>
-        </Text>
-        <Text className="text-caption text-foreground-subtle">·</Text>
-        <Text className="text-caption text-foreground-muted">{cookedText}</Text>
-        {cookedLabel ? (
-          <>
-            <Text className="text-caption text-foreground-subtle">·</Text>
-            <Text className="text-caption text-foreground-muted">
-              {cookedLabel}
-            </Text>
-          </>
-        ) : null}
-      </View>
-      {sourcePlatform ? (
-        <View className="flex-row mt-1">
-          <Tag variant="accent">{`From ${sourcePlatform}`}</Tag>
-        </View>
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+      <Text className="font-body text-body-md text-ink-2">
+        Added by{" "}
+        <Text className="font-body-semibold text-ink">{addedBy}</Text>
+      </Text>
+      <Text className="font-body text-body-md text-ink-3">·</Text>
+      <Text className="font-body text-body-md text-ink-2">{cookedText}</Text>
+      {cookedLabel ? (
+        <>
+          <Text className="font-body text-body-md text-ink-3">·</Text>
+          <Text className="font-body text-body-md text-ink-2">
+            {cookedLabel}
+          </Text>
+        </>
       ) : null}
     </View>
   );
@@ -291,7 +251,8 @@ function SourceLink({
 }) {
   return (
     <Text
-      className="text-caption-strong font-semibold text-primary"
+      className="font-body-semibold text-body-sm text-forest"
+      style={{ letterSpacing: -0.1 }}
       onPress={() => Linking.openURL(url)}
     >
       View original on {label ?? "the source site"} →
@@ -358,8 +319,15 @@ function ActionRow({
   const logged = logState === "logged";
 
   return (
-    <View className="px-4 pt-6 flex-row gap-2">
-      <View className="flex-1">
+    <View
+      style={{
+        paddingHorizontal: 22,
+        paddingTop: 28,
+        flexDirection: "row",
+        gap: 10
+      }}
+    >
+      <View style={{ flex: 1 }}>
         <Button
           variant="primary"
           size="lg"
@@ -370,7 +338,7 @@ function ActionRow({
             <Ionicons
               name={logged ? "checkmark-circle-outline" : "add-circle-outline"}
               size={18}
-              color="#FBF8F1"
+              color={colors.forestText}
             />
           }
           onPress={handleLogAgain}
@@ -382,7 +350,7 @@ function ActionRow({
         variant="secondary"
         size="lg"
         leadingIcon={
-          <Ionicons name="share-outline" size={18} color="#2C5F3F" />
+          <Ionicons name="share-outline" size={18} color={colors.forest} />
         }
         onPress={() => setShareOpen(true)}
       >
@@ -400,3 +368,4 @@ function ActionRow({
     </View>
   );
 }
+

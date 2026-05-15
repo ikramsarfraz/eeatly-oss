@@ -2,29 +2,39 @@ import "../global.css";
 
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AppProviders } from "../lib/providers";
+import { useAppFonts } from "../lib/design/use-app-fonts";
+import { colors } from "../lib/design/tokens";
 
 /**
- * Round 12 — root layout. Wraps the entire app in `AppProviders`
- * (TRPC + React Query) before the navigation stack so every screen
- * can use the typed hooks. SafeAreaProvider is outermost so the
- * provider tree can read insets if needed.
+ * Round 18 root layout. Loads the three editorial families
+ * (Instrument Serif, Geist, JetBrains Mono) before rendering the nav
+ * tree — without them every screen would flash in the platform default
+ * before the warm-cream UI snaps in.
  *
- * Round 17 added the `global.css` import — it has to be the very first
- * import in the entry tree so NativeWind's runtime registry is
- * populated before any screen reads it. The CSS file holds the
- * Tailwind directives that Metro's nativewind transform compiles.
- *
- * Status bar uses `dark` content on the cream background per R17
- * design tokens.
+ * `global.css` must be the very first import so NativeWind's runtime
+ * registry is populated before any screen reads it. `AppProviders`
+ * wraps TRPC + React Query so every screen can use the typed hooks.
  */
 export default function RootLayout() {
+  const [fontsLoaded] = useAppFonts();
+
   return (
     <SafeAreaProvider>
-      <StatusBar style="dark" backgroundColor="#FBF8F1" />
+      <StatusBar style="dark" backgroundColor={colors.cream} />
       <AppProviders>
-        <Stack screenOptions={{ headerShown: false }} />
+        {fontsLoaded ? (
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.cream }
+            }}
+          />
+        ) : (
+          <View style={{ flex: 1, backgroundColor: colors.cream }} />
+        )}
       </AppProviders>
     </SafeAreaProvider>
   );

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { Link, router, Stack, useLocalSearchParams } from "expo-router";
+import { Link, router, useLocalSearchParams } from "expo-router";
 import {
   ActivityIndicator,
   Alert,
@@ -13,31 +13,35 @@ import {
   View
 } from "react-native";
 import { PlanAnnotationSheet } from "../../../../components/plan-annotation-sheet";
+import { TopNav } from "../../../../components/top-nav";
+import { colors } from "../../../../lib/design/tokens";
 import { trpc } from "../../../../lib/trpc";
 import {
   Button,
   Card,
+  Chip,
   EmptyState,
   ErrorScreen,
   LoadingScreen,
+  MealTile,
+  PageTitle,
   Screen,
-  SectionHeader,
+  SectionLabel,
   Tag
 } from "../../../../components/ui";
 
 /**
- * Round 17 plan detail — NativeWind rebuild.
+ * Round 18 plan detail — editorial rebuild.
  *
- * Sections:
- *   - Header card: name, scheduled date, effort summary chip
- *   - "Dishes" section header
- *   - Dish list: each row shows name + annotation badges (verdict,
- *     effort, time) + previous-occasion hint badges. Tap to annotate;
- *     long-press to remove.
- *   - "Add dish to plan" Button → bottom sheet with meal library search.
+ * Stack:
+ *   - TopNav: title "Eid Al Adha", back chevron left, pencil-edit right.
+ *   - Hero: serif title 46pt + mono date eyebrow + sage chip with
+ *     gauge icon ("2 dishes · medium").
+ *   - "Dishes" section label → list of cards (44pt monogram + name +
+ *     pencil icon trailing).
+ *   - Full-width forest CTA with leading plus-circle: "Add dish to plan".
  *
- * Hint badges (Task 3, R14): if the plan was cloned, dish rows
- * render "Last time: …" badges driven by `previousAnnotationsByMeal`.
+ * Annotation + remove flows carry over unchanged from R17.
  */
 
 type EffortValue = "quick" | "easy" | "medium" | "high_effort";
@@ -59,17 +63,14 @@ const VERDICT_DISPLAY: Record<
   do_not_repeat: { label: "Don't repeat", tagVariant: "destructive" }
 };
 
-function formatPlanDate(ymd: string | null): string | null {
+function formatPlanEyebrow(ymd: string | null): string | null {
   if (!ymd) return null;
   const [y, m, d] = ymd.split("-").map(Number);
   if (!y || !m || !d) return ymd;
   const date = new Date(y, m - 1, d);
-  return date.toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric"
-  });
+  const weekday = date.toLocaleString("en-US", { weekday: "short" });
+  const month = date.toLocaleString("en-US", { month: "short" });
+  return `${weekday} · ${month} ${date.getDate()} · ${date.getFullYear()}`.toUpperCase();
 }
 
 export default function PlanDetailScreen() {
@@ -139,81 +140,60 @@ export default function PlanDetailScreen() {
     );
   }
 
-  const headerRight = plan
-    ? () => (
-        <Link href={`/(authed)/plans/${planId}/edit` as never} asChild>
-          <Pressable
-            hitSlop={12}
-            accessibilityRole="button"
-            accessibilityLabel="Edit plan"
-            style={{ paddingHorizontal: 16 }}
-          >
-            <Ionicons name="create-outline" size={22} color="#2C5F3F" />
-          </Pressable>
-        </Link>
-      )
-    : undefined;
-
   if (planQuery.isPending) {
     return (
-      <>
-        <Stack.Screen
-          options={{
-            title: "Plan",
-            headerBackTitle: "Back",
-            headerStyle: { backgroundColor: "#FBF8F1" },
-            headerTintColor: "#1A1F1B"
-          }}
-        />
+      <Screen edges={["top", "bottom"]}>
+        <TopNav title="Plan" back />
         <LoadingScreen />
-      </>
+      </Screen>
     );
   }
 
   if (!plan) {
     return (
-      <>
-        <Stack.Screen
-          options={{
-            title: "Plan",
-            headerBackTitle: "Back",
-            headerStyle: { backgroundColor: "#FBF8F1" },
-            headerTintColor: "#1A1F1B"
-          }}
+      <Screen edges={["top", "bottom"]}>
+        <TopNav title="Plan" back />
+        <ErrorScreen
+          title="Plan not found"
+          body="It may have been archived, or you don't have access in this kitchen."
         />
-        <Screen edges={["bottom"]}>
-          <ErrorScreen
-            title="Plan not found"
-            body="It may have been archived, or you don't have access in this kitchen."
-          />
-          <View className="px-8 -mt-2 items-center">
-            <Button
-              variant="secondary"
-              onPress={() => router.replace("/(authed)/plans")}
-            >
-              Back to plans
-            </Button>
-          </View>
-        </Screen>
-      </>
+        <View className="px-8 -mt-2 items-center">
+          <Button
+            variant="secondary"
+            onPress={() => router.replace("/(authed)/plans")}
+          >
+            Back to plans
+          </Button>
+        </View>
+      </Screen>
     );
   }
 
   return (
-    <Screen edges={["bottom"]}>
-      <Stack.Screen
-        options={{
-          title: plan.name,
-          headerBackTitle: "Back",
-          headerStyle: { backgroundColor: "#FBF8F1" },
-          headerTintColor: "#1A1F1B",
-          headerTitleStyle: { fontWeight: "600" },
-          headerRight
-        }}
+    <Screen edges={["top", "bottom"]}>
+      <TopNav
+        title={plan.name}
+        back
+        right={
+          <Link href={`/(authed)/plans/${planId}/edit` as never} asChild>
+            <Pressable
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Edit plan"
+            >
+              <Ionicons
+                name="create-outline"
+                size={22}
+                color={colors.forest}
+              />
+            </Pressable>
+          </Link>
+        }
+        showSettings={false}
       />
 
       <ScrollView
-        contentContainerClassName="pb-12 gap-2"
+        contentContainerStyle={{ paddingHorizontal: 22, paddingBottom: 32 }}
         refreshControl={
           <RefreshControl
             refreshing={planQuery.isFetching && !planQuery.isPending}
@@ -221,36 +201,35 @@ export default function PlanDetailScreen() {
               planQuery.refetch();
               effortQuery.refetch();
             }}
-            tintColor="#2C5F3F"
+            tintColor={colors.forest}
           />
         }
       >
-        <View className="px-4 pt-4 gap-2">
-          <Text className="text-heading-1 font-bold text-foreground">
-            {plan.name}
-          </Text>
-          {plan.scheduledDate ? (
-            <Text className="text-caption text-foreground-muted">
-              {formatPlanDate(plan.scheduledDate)}
-            </Text>
-          ) : null}
-          <EffortChip data={effortQuery.data} />
+        <View style={{ paddingTop: 12, marginBottom: 22 }}>
+          <PageTitle
+            title={plan.name}
+            size="lg"
+            eyebrow={formatPlanEyebrow(plan.scheduledDate) ?? undefined}
+          />
+          <View style={{ marginTop: 14 }}>
+            <EffortChip data={effortQuery.data} />
+          </View>
         </View>
 
-        <SectionHeader title="Dishes" />
+        <SectionLabel>Dishes</SectionLabel>
 
         {dishes.length === 0 ? (
-          <View className="flex-1">
+          <View style={{ paddingVertical: 8 }}>
             <EmptyState
               icon={
-                <Ionicons name="list-outline" size={28} color="#2C5F3F" />
+                <Ionicons name="list-outline" size={28} color={colors.forest} />
               }
               title="No dishes added yet"
               body="Tap the button below to pick from your kitchen."
             />
           </View>
         ) : (
-          <View className="px-4 gap-2">
+          <View style={{ gap: 10, marginBottom: 18 }}>
             {dishes.map((d) => (
               <DishRow
                 key={d.id}
@@ -278,13 +257,17 @@ export default function PlanDetailScreen() {
           </View>
         )}
 
-        <View className="px-4 mt-4">
+        <View style={{ marginTop: 8 }}>
           <Button
             variant="primary"
             size="lg"
             fullWidth
             leadingIcon={
-              <Ionicons name="add-circle-outline" size={18} color="#FBF8F1" />
+              <Ionicons
+                name="add-circle-outline"
+                size={20}
+                color={colors.forestText}
+              />
             }
             onPress={() => setAddDishOpen(true)}
           >
@@ -337,12 +320,14 @@ function EffortChip({
   if (data.high_effort) parts.push(`${data.high_effort} high`);
   if (data.unrated) parts.push(`${data.unrated} unrated`);
   return (
-    <View className="self-start flex-row items-center gap-1.5 rounded-pill bg-primary-muted px-2.5 py-1.5">
-      <Ionicons name="speedometer-outline" size={14} color="#2C5F3F" />
-      <Text className="text-caption-strong font-semibold text-primary">
-        {parts.join(" · ")}
-      </Text>
-    </View>
+    <Chip
+      tone="sage"
+      icon={
+        <Ionicons name="speedometer-outline" size={14} color={colors.forest} />
+      }
+    >
+      {parts.join(" · ")}
+    </Chip>
   );
 }
 
@@ -374,7 +359,9 @@ function DishRow({
   const effortLabel = effort ? EFFORT_LABEL[effort] : null;
   const hintLabels: string[] = [];
   if (hint?.verdict) {
-    hintLabels.push(`Last time: ${VERDICT_DISPLAY[hint.verdict].label.toLowerCase()}`);
+    hintLabels.push(
+      `Last time: ${VERDICT_DISPLAY[hint.verdict].label.toLowerCase()}`
+    );
   }
   if (hint?.timeTakenMinutes != null) {
     hintLabels.push(`Last time: ${hint.timeTakenMinutes} min`);
@@ -393,13 +380,20 @@ function DishRow({
       accessibilityLabel={`${mealName}. Tap to annotate, long-press to remove.`}
       className="active:opacity-90"
     >
-      <Card variant="default">
-        <View className="flex-row items-start gap-3 p-3.5">
+      <Card>
+        <View
+          className="flex-row items-start p-3"
+          style={{ gap: 12 }}
+        >
+          <View style={{ width: 44, height: 44 }}>
+            <MealTile name={mealName} size="sm" radius={8} />
+          </View>
           <View className="flex-1 gap-1.5">
             <Link href={`/(authed)/meal/${mealId}` as never} asChild>
               <Pressable hitSlop={4} className="active:opacity-70">
                 <Text
-                  className="text-body font-semibold text-foreground"
+                  className="font-body-semibold text-body-lg text-ink"
+                  style={{ letterSpacing: -0.1 }}
                   numberOfLines={1}
                 >
                   {mealName}
@@ -407,7 +401,7 @@ function DishRow({
               </Pressable>
             </Link>
             {verdictDisplay || effortLabel || timeTakenMinutes != null ? (
-              <View className="flex-row flex-wrap gap-1.5">
+              <View className="flex-row flex-wrap" style={{ gap: 6 }}>
                 {verdictDisplay ? (
                   <Tag variant={verdictDisplay.tagVariant}>
                     {verdictDisplay.label}
@@ -420,7 +414,10 @@ function DishRow({
               </View>
             ) : null}
             {hintLabels.length > 0 ? (
-              <View className="flex-row flex-wrap gap-1.5 mt-0.5">
+              <View
+                className="flex-row flex-wrap"
+                style={{ gap: 6, marginTop: 2 }}
+              >
                 {hintLabels.map((label) => (
                   <Tag key={label} variant="muted">
                     {label}
@@ -429,16 +426,14 @@ function DishRow({
               </View>
             ) : null}
           </View>
-          <Ionicons name="create-outline" size={18} color="#9A968A" />
+          <Ionicons name="create-outline" size={18} color={colors.ink3} />
         </View>
       </Card>
     </Pressable>
   );
 }
 
-/* ----------------------------------------------------------------- */
-/* Add dish bottom sheet — search the meal library and pick one.    */
-/* ----------------------------------------------------------------- */
+/* ─── Add dish bottom sheet ─────────────────────────────────────── */
 
 function AddDishSheet({
   visible,
@@ -485,61 +480,129 @@ function AddDishSheet({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <Pressable className="flex-1 bg-foreground/40 justify-end" onPress={onClose}>
+      <Pressable
+        style={{
+          flex: 1,
+          backgroundColor: "rgba(20,20,15,0.32)",
+          justifyContent: "flex-end"
+        }}
+        onPress={onClose}
+      >
         <Pressable
           onPress={() => null}
-          className="bg-background-elevated rounded-t-lg pb-7 max-h-[85%]"
+          style={{
+            backgroundColor: colors.paper,
+            borderTopLeftRadius: 22,
+            borderTopRightRadius: 22,
+            paddingBottom: 32,
+            maxHeight: "85%"
+          }}
         >
-          <View className="items-center py-2.5">
-            <View className="w-9 h-1 rounded-full bg-border-strong" />
+          <View style={{ alignItems: "center", paddingTop: 12 }}>
+            <View
+              style={{
+                width: 38,
+                height: 4,
+                borderRadius: 2,
+                backgroundColor: colors.ink4
+              }}
+            />
           </View>
-          <View className="px-5 pb-2 gap-3">
-            <Text className="text-heading-3 font-semibold text-foreground">
+          <View style={{ paddingHorizontal: 22, paddingTop: 14 }}>
+            <Text
+              className="font-display text-display-xs text-ink"
+              style={{ letterSpacing: -0.4, marginBottom: 14 }}
+            >
               Add a dish
             </Text>
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Search your meals…"
-              placeholderTextColor="#9A968A"
-              className="h-12 rounded-md border border-border bg-background px-3 text-body text-foreground"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+
+            <View
+              className="flex-row items-center"
+              style={{
+                backgroundColor: colors.cream,
+                borderWidth: 1,
+                borderColor: colors.sageDeep,
+                borderRadius: 12,
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                gap: 10,
+                marginBottom: 14
+              }}
+            >
+              <Ionicons name="search" size={18} color={colors.ink3} />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Search your meals…"
+                placeholderTextColor={colors.ink3}
+                style={{
+                  flex: 1,
+                  fontFamily: "Geist_400Regular",
+                  fontSize: 15,
+                  color: colors.ink,
+                  paddingVertical: 0
+                }}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+
             {library.isPending ? (
-              <ActivityIndicator color="#2C5F3F" style={{ marginTop: 12 }} />
+              <ActivityIndicator
+                color={colors.forest}
+                style={{ marginTop: 12 }}
+              />
             ) : rows.length === 0 ? (
-              <Text className="text-caption italic text-foreground-muted py-3">
+              <Text className="font-body italic text-body-md text-ink-2 py-3">
                 {query.trim()
                   ? "No matches. Try a different search."
                   : "Your meal library is empty. Add a meal log first."}
               </Text>
             ) : (
-              <ScrollView className="max-h-[360px]">
-                {rows.map((m) => (
+              <ScrollView style={{ maxHeight: 360 }}>
+                {rows.map((m, i) => (
                   <Pressable
                     key={m.id}
                     onPress={() => add(m.id)}
                     disabled={adding != null}
                     accessibilityRole="button"
-                    className={`flex-row items-center justify-between py-3 px-2.5 border-b border-border active:bg-background-muted ${
-                      adding != null ? "opacity-50" : ""
-                    }`}
+                    className="active:opacity-70"
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      paddingVertical: 12,
+                      gap: 12,
+                      borderTopWidth: i === 0 ? 0 : 1,
+                      borderTopColor: colors.borderSoft,
+                      opacity: adding != null ? 0.5 : 1
+                    }}
                   >
+                    <View style={{ width: 36, height: 36 }}>
+                      <MealTile name={m.name} size="sm" radius={8} />
+                    </View>
                     <Text
-                      className="flex-1 text-body text-foreground"
+                      className="flex-1 font-body-semibold text-body-md text-ink"
+                      style={{ letterSpacing: -0.1 }}
                       numberOfLines={1}
                     >
                       {m.name}
                     </Text>
                     {adding === m.id ? (
-                      <ActivityIndicator size="small" color="#2C5F3F" />
+                      <ActivityIndicator size="small" color={colors.forest} />
                     ) : (
-                      <Ionicons
-                        name="add-circle-outline"
-                        size={20}
-                        color="#2C5F3F"
-                      />
+                      <View
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 99,
+                          borderWidth: 1.5,
+                          borderColor: colors.forest,
+                          alignItems: "center",
+                          justifyContent: "center"
+                        }}
+                      >
+                        <Ionicons name="add" size={18} color={colors.forest} />
+                      </View>
                     )}
                   </Pressable>
                 ))}

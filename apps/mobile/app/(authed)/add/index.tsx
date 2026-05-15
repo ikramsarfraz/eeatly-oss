@@ -1,84 +1,75 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Link } from "expo-router";
 import { Pressable, ScrollView, Text, View } from "react-native";
-import { Card, Screen, SectionHeader } from "../../../components/ui";
+import { TopNav } from "../../../components/top-nav";
+import { colors } from "../../../lib/design/tokens";
+import {
+  IconBubble,
+  PageTitle,
+  Screen,
+  SectionLabel
+} from "../../../components/ui";
 
 /**
- * Round 17 — Add tab entry.
+ * Round 18 Add tab — editorial rebuild.
  *
- * Three large interactive cards, each with icon + title + subtitle:
- *   1. Log a meal I cooked — manual entry (the everyday path).
- *   2. Capture with AI — opens the unified AI screen
- *      (Photo / Text / Voice modes).
- *   3. Save a link — placeholder for the R16 URL-references flow.
- *      Today it routes to the manual log form with a URL field
- *      focused; a future round can give it its own screen.
+ * TopNav (Add, gear, no divider) → big serif "Add a meal" title +
+ * subtitle → CAPTURE section with primary forest card + two secondary
+ * surface cards → PLANS section with one row card.
  *
- * Cards are full-width pressables (≥96 px tall), 20 px internal
- * padding so each option feels generous on a phone. Tap targets
- * exceed the iOS HIG 44 pt minimum by a margin.
+ * Primary card uses forest bg + cream text + translucent icon bubble.
+ * Secondary cards use surface bg + sage IconBubble + ink text.
  */
 export default function AddTab() {
   return (
-    <Screen edges={["bottom"]}>
-      <ScrollView contentContainerClassName="px-4 pb-12">
-        <View className="pt-2 pb-2">
-          <Text className="text-heading-1 font-bold text-foreground">
-            Add a meal
-          </Text>
-          <Text className="text-body text-foreground-muted mt-1">
-            Quick log if you know what you cooked, or let AI extract a recipe
-            from a photo, voice note, or pasted text.
-          </Text>
+    <Screen>
+      <TopNav title="Add" divider={false} />
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: 22,
+          paddingTop: 8,
+          paddingBottom: 32
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={{ marginBottom: 22 }}>
+          <PageTitle
+            title="Add a meal"
+            size="md"
+            subtitle="Quick-log what you cooked, or let AI lift a recipe from a photo, voice note, or pasted text."
+          />
         </View>
 
-        <View className="gap-3 mt-4">
+        <SectionLabel>Capture</SectionLabel>
+        <View style={{ gap: 10, marginBottom: 28 }}>
           <AddOption
             href="/(authed)/add/log"
-            icon="restaurant-outline"
+            iconName="restaurant-outline"
             title="Log a meal I cooked"
             subtitle="Name, when, optional photo + notes."
             primary
           />
           <AddOption
             href="/(authed)/add/ai-suggest"
-            icon="sparkles-outline"
+            iconName="sparkles-outline"
             title="Capture with AI"
             subtitle="Photo, voice note, or pasted text."
           />
           <AddOption
             href="/(authed)/add/log"
-            icon="link-outline"
+            iconName="link-outline"
             title="Save a link"
             subtitle="YouTube, TikTok, Pinterest, or a recipe URL."
           />
         </View>
 
-        <SectionHeader title="Plans" />
-        <Link href="/(authed)/plans" asChild>
-          <Pressable>
-            <Card variant="interactive">
-              <View className="flex-row items-center gap-3 p-4">
-                <View className="h-11 w-11 items-center justify-center rounded-full bg-primary-muted">
-                  <Ionicons
-                    name="calendar-outline"
-                    size={22}
-                    color="#2C5F3F"
-                  />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-body font-semibold text-foreground">
-                    Plan an occasion menu
-                  </Text>
-                  <Text className="text-caption text-foreground-muted">
-                    Eid, Diwali, dinner party.
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="#9A968A" />
-              </View>
-            </Card>
-          </Pressable>
-        </Link>
+        <SectionLabel>Plans</SectionLabel>
+        <AddOption
+          href="/(authed)/plans"
+          iconName="calendar-outline"
+          title="Plan an occasion menu"
+          subtitle="Eid, Diwali, dinner party."
+        />
       </ScrollView>
     </Screen>
   );
@@ -86,62 +77,71 @@ export default function AddTab() {
 
 function AddOption({
   href,
-  icon,
+  iconName,
   title,
   subtitle,
   primary
 }: {
   href: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  iconName: keyof typeof Ionicons.glyphMap;
   title: string;
   subtitle: string;
   primary?: boolean;
 }) {
+  const iconColor = primary ? colors.forestText : colors.forest;
+  const titleColor = primary ? "#F5EFE2" : colors.ink;
+  const subtitleColor = primary ? "rgba(245,239,226,0.75)" : colors.ink2;
+  const chevronColor = primary ? "rgba(245,239,226,0.7)" : colors.ink3;
+
   return (
     <Link href={href as never} asChild>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${title}. ${subtitle}`}
-        className={`flex-row items-center gap-4 rounded-md p-5 min-h-[96px] shadow-sm active:opacity-90 ${
-          primary
-            ? "bg-primary"
-            : "bg-background-elevated border border-border"
-        }`}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 14,
+          padding: 16,
+          borderRadius: 14,
+          backgroundColor: primary ? colors.forest : colors.surface,
+          borderWidth: primary ? 0 : 1,
+          borderColor: colors.borderSoft,
+          shadowColor: primary ? colors.forest : "#000",
+          shadowOpacity: primary ? 0.35 : 0.04,
+          shadowOffset: { width: 0, height: primary ? 6 : 2 },
+          shadowRadius: primary ? 20 : 6,
+          elevation: primary ? 4 : 1
+        }}
+        className="active:opacity-90"
       >
-        <View
-          className={`h-12 w-12 items-center justify-center rounded-full ${
-            primary ? "bg-primary-foreground/20" : "bg-primary-muted"
-          }`}
-        >
-          <Ionicons
-            name={icon}
-            size={24}
-            color={primary ? "#FBF8F1" : "#2C5F3F"}
-          />
-        </View>
-        <View className="flex-1 gap-0.5">
+        <IconBubble size={42} onPrimary={primary}>
+          <Ionicons name={iconName} size={22} color={iconColor} />
+        </IconBubble>
+        <View style={{ flex: 1, gap: 2 }}>
           <Text
-            className={`text-heading-3 font-semibold ${
-              primary ? "text-primary-foreground" : "text-foreground"
-            }`}
+            style={{
+              fontFamily: "Geist_600SemiBold",
+              fontSize: 15.5,
+              color: titleColor,
+              letterSpacing: -0.15
+            }}
+            numberOfLines={1}
           >
             {title}
           </Text>
           <Text
-            className={`text-caption ${
-              primary
-                ? "text-primary-foreground/80"
-                : "text-foreground-muted"
-            }`}
+            style={{
+              fontFamily: "Geist_400Regular",
+              fontSize: 12.5,
+              color: subtitleColor,
+              lineHeight: 17
+            }}
           >
             {subtitle}
           </Text>
         </View>
-        <Ionicons
-          name="chevron-forward"
-          size={20}
-          color={primary ? "rgba(251,248,241,0.6)" : "#9A968A"}
-        />
+        <Ionicons name="chevron-forward" size={18} color={chevronColor} />
       </Pressable>
     </Link>
   );

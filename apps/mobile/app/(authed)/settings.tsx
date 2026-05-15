@@ -6,26 +6,26 @@ import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { API_BASE_URL } from "../../lib/api-base";
 import { authClient } from "../../lib/auth/client";
 import { clearSessionToken } from "../../lib/auth/session";
+import { colors } from "../../lib/design/tokens";
 import { trpc } from "../../lib/trpc";
+import { TopNav } from "../../components/top-nav";
 import {
   Button,
   Card,
+  Chip,
   ListItem,
+  PageTitle,
   Screen,
   ScreenCentered,
-  SectionHeader,
-  Tag
+  SectionLabel
 } from "../../components/ui";
 
 /**
- * Round 17 settings — NativeWind rebuild.
+ * Round 18 settings — editorial rebuild.
  *
- * Intentionally minimal: account snapshot (read-only — name and email
- * edits live on the web), plan badge, kitchen link, advanced web
- * deeplink, and a sign-out button at the bottom. Destructive ops
- * (delete account, manage household ownership, change subscription)
- * stay on web; mobile deep-links to them per Apple's reader-app
- * pattern.
+ * TopNav (Settings, back, no gear) → big serif "Settings" → grouped
+ * ACCOUNT / PLAN / KITCHEN / ADVANCED cards with mono-aligned values
+ * → footer "EEATLY · V2.1" → bottom Sign out CTA.
  */
 export default function Settings() {
   const [profile, setProfile] = useState<
@@ -76,99 +76,100 @@ export default function Settings() {
   if (!loaded) {
     return (
       <ScreenCentered>
-        <ActivityIndicator color="#2C5F3F" />
+        <ActivityIndicator color={colors.forest} />
       </ScreenCentered>
     );
   }
 
   return (
-    <Screen edges={["bottom"]}>
-      <ScrollView contentContainerClassName="pb-12">
-        <View className="px-4 pt-4 pb-2">
-          <Text className="text-heading-1 font-bold text-foreground">
-            Settings
-          </Text>
+    <Screen edges={["top", "bottom"]}>
+      <TopNav title="Settings" back showSettings={false} />
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 40 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={{ paddingHorizontal: 22, paddingTop: 12, marginBottom: 22 }}>
+          <PageTitle title="Settings" size="md" />
         </View>
 
-        <SectionHeader title="Account" />
-        <View className="px-4">
-          <Card>
+        <View style={{ paddingHorizontal: 22 }}>
+          <SectionLabel>Account</SectionLabel>
+          <Card variant="flush" style={{ marginBottom: 22 }}>
             <ListItem
               title="Name"
-              subtitle={profile?.name ?? "—"}
-              divider
+              value={profile?.name ?? "—"}
+              divider={false}
             />
             <ListItem
               title="Email"
-              subtitle={profile?.email ?? "—"}
-              divider={false}
+              value={profile?.email ?? "—"}
+              divider
             />
           </Card>
-        </View>
 
-        <SectionHeader title="Plan" />
-        <View className="px-4">
-          <Card>
+          <SectionLabel>Plan</SectionLabel>
+          <Card variant="flush" style={{ marginBottom: 22 }}>
             {subscription.isPending ? (
-              <View className="px-4 py-4">
-                <ActivityIndicator color="#2C5F3F" />
+              <View style={{ paddingHorizontal: 16, paddingVertical: 16 }}>
+                <ActivityIndicator color={colors.forest} />
               </View>
             ) : isPlus ? (
-              <View className="flex-row items-center justify-between px-4 py-4">
-                <Text className="text-body font-semibold text-foreground">
-                  eeatly Plus
-                </Text>
-                <Tag variant="primary">Active</Tag>
-              </View>
+              <ListItem
+                title="Current plan"
+                trailing={<Chip tone="sage">eeatly Plus</Chip>}
+                divider={false}
+              />
             ) : (
               <>
-                <View className="flex-row items-center justify-between px-4 py-4 border-b border-border">
-                  <Text className="text-body text-foreground">Plan</Text>
-                  <Tag variant="muted">Free</Tag>
-                </View>
+                <ListItem
+                  title="Current plan"
+                  trailing={<Chip tone="ghost">Free</Chip>}
+                  divider={false}
+                />
                 <ListItem
                   title="See Plus features"
                   trailing={
                     <Ionicons
                       name="open-outline"
-                      size={18}
-                      color="#2C5F3F"
+                      size={16}
+                      color={colors.forest}
                     />
                   }
                   onPress={() => openWeb("/pricing")}
-                  divider={false}
+                  divider
                 />
               </>
             )}
           </Card>
-        </View>
 
-        <SectionHeader title="Kitchen" />
-        <View className="px-4">
-          <Card>
+          <SectionLabel>Kitchen</SectionLabel>
+          <Card variant="flush" style={{ marginBottom: 22 }}>
             <ListItem
               title="Members + invitations"
+              subtitle="Just you · 1 pending invite"
               trailing={
                 <Ionicons
                   name="chevron-forward"
-                  size={20}
-                  color="#9A968A"
+                  size={18}
+                  color={colors.ink3}
                 />
               }
               onPress={() => router.push("/(authed)/household")}
               divider={false}
             />
           </Card>
-        </View>
 
-        <SectionHeader title="Advanced" />
-        <View className="px-4">
-          <Card>
+          <SectionLabel>Advanced</SectionLabel>
+          <Card variant="flush">
             <ListItem
               title="Manage account on web"
-              subtitle="Edit profile, delete account, subscription"
+              subtitle="Edit profile, delete account, subscription."
               trailing={
-                <Ionicons name="open-outline" size={18} color="#2C5F3F" />
+                <Ionicons
+                  name="open-outline"
+                  size={16}
+                  color={colors.forest}
+                />
               }
               onPress={() => openWeb("/settings")}
               divider={false}
@@ -176,7 +177,14 @@ export default function Settings() {
           </Card>
         </View>
 
-        <View className="px-4 mt-6">
+        <Text
+          className="font-mono text-eyebrow text-ink-3 uppercase text-center mt-7"
+          style={{ letterSpacing: 1.4 }}
+        >
+          eeatly · v2.1
+        </Text>
+
+        <View style={{ paddingHorizontal: 22, marginTop: 22, alignItems: "stretch" }}>
           <Button variant="secondary" size="md" fullWidth onPress={handleSignOut}>
             Sign out
           </Button>

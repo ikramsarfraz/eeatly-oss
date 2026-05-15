@@ -2,18 +2,16 @@ import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { KeyboardAvoidingView, Platform, Text, View } from "react-native";
 import { authClient } from "../../lib/auth/client";
-import { Button, Input, Screen } from "../../components/ui";
+import { colors } from "../../lib/design/tokens";
+import { Button, Input, PageTitle, Screen } from "../../components/ui";
 
 /**
- * Round 17 sign-in — NativeWind rebuild.
+ * Round 18 sign-in — editorial rebuild.
  *
- * Centered single-column layout. Magic-link auth: user types email,
- * we ask the server to dispatch a sign-in link with our `eeatly://`
- * deep-link callback. The actual verification happens in
- * `app/verify.tsx` after the user taps the link.
- *
- * "Check your email" success state replaces the form rather than
- * stacking under it — feels more decisive on a small screen.
+ * Centered single-column. Magic-link auth: user types email, we ask
+ * the server to dispatch a sign-in link with our `eeatly://` deep-link
+ * callback. Verification happens in `app/verify.tsx` after the user
+ * taps the link.
  */
 export default function SignIn() {
   const [email, setEmail] = useState("");
@@ -59,21 +57,33 @@ export default function SignIn() {
   if (state.kind === "sent") {
     return (
       <Screen edges={["top", "bottom"]}>
-        <View className="flex-1 items-center justify-center px-8 gap-3">
-          <View className="h-16 w-16 items-center justify-center rounded-full bg-primary-muted">
-            <Ionicons name="mail-outline" size={32} color="#2C5F3F" />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 30, gap: 14 }}>
+          <View
+            style={{
+              height: 64,
+              width: 64,
+              borderRadius: 99,
+              backgroundColor: colors.sageBg,
+              alignItems: "center",
+              justifyContent: "center"
+            }}
+          >
+            <Ionicons name="mail-outline" size={30} color={colors.forest} />
           </View>
-          <Text className="text-heading-1 font-bold text-foreground text-center">
-            Check your email
+          <Text
+            className="font-display text-display-xs text-ink text-center"
+            style={{ letterSpacing: -0.4 }}
+          >
+            Check your email.
           </Text>
-          <Text className="text-body text-foreground-muted text-center max-w-[320px]">
+          <Text className="font-body text-body-lg text-ink-2 text-center max-w-[320px]">
             We sent a sign-in link to{" "}
-            <Text className="font-semibold text-foreground">
+            <Text className="font-body-semibold text-ink">
               {email.trim().toLowerCase()}
             </Text>
             . Tap it on this phone to finish signing in.
           </Text>
-          <View className="mt-2">
+          <View style={{ marginTop: 6 }}>
             <Button
               variant="ghost"
               onPress={() => setState({ kind: "idle" })}
@@ -94,10 +104,19 @@ export default function SignIn() {
         className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <View className="flex-1 justify-center px-8 gap-4">
-          <View className="gap-1">
-            <Text className="text-display font-bold text-primary">eeatly</Text>
-            <Text className="text-body text-foreground-muted">
+        <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: 30, gap: 18 }}>
+          <View>
+            <Text
+              className="font-display-italic text-kicker text-ink-2"
+              style={{ marginBottom: 4 }}
+            >
+              Welcome to
+            </Text>
+            <PageTitle title="eeatly." size="lg" />
+            <Text
+              className="font-body text-body-lg text-ink-2 mt-3"
+              style={{ lineHeight: 22 }}
+            >
               Sign in with your email — no password needed.
             </Text>
           </View>
@@ -114,6 +133,7 @@ export default function SignIn() {
             placeholder="you@example.com"
             editable={!isSending}
             error={state.kind === "error" ? state.message : undefined}
+            mono
           />
 
           <Button
@@ -126,8 +146,11 @@ export default function SignIn() {
             Send sign-in link
           </Button>
 
-          <Text className="text-small text-foreground-muted text-center">
-            We&apos;ll email you a link that opens directly in this app.
+          <Text
+            className="font-mono text-eyebrow text-ink-3 uppercase text-center"
+            style={{ letterSpacing: 1.2 }}
+          >
+            Magic link · no password
           </Text>
         </View>
       </KeyboardAvoidingView>

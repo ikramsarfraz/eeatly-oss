@@ -1,30 +1,36 @@
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import type { PressableProps } from "react-native";
 import type { ReactNode } from "react";
+import { colors } from "../../lib/design/tokens";
 
 /**
- * Round 17 — primary Button primitive.
+ * Round 18 — primary Button.
  *
  * Variants:
- *   - `primary` — green bg, cream label. The default CTA.
- *   - `secondary` — cream bg + green border + green label. Sits next
+ *   - `primary` — forest bg, cream label. The default CTA.
+ *   - `secondary` — surface bg + sage border + forest label. Sits next
  *     to a primary or stands alone where primary would feel too loud.
- *   - `ghost` — transparent. Used inside surfaces (cards, sheets)
- *     where a bordered button competes with the container.
- *   - `destructive` — red bg, cream label. Delete / leave / sign out.
+ *   - `ghost` — transparent. Used inside cards/sheets where a
+ *     bordered button competes with the container.
+ *   - `destructive` — danger-soft bg, danger label.
+ *   - `outline-destructive` — transparent bg, danger border + label.
+ *     Used for the "Leave kitchen" affordance where a filled red would
+ *     read too alarming.
  *
  * Sizes:
  *   - `sm` (32px) — inline, compact rows.
- *   - `md` (44px, default) — the minimum thumb-friendly target.
+ *   - `md` (44px, default) — minimum thumb target.
  *   - `lg` (52px) — full-width primary CTAs.
  *
- * States: pressed → opacity step; disabled → 50% opacity + no press;
- * loading → spinner replaces label, button stays disabled.
- *
- * `leadingIcon` accepts any ReactNode so callers can use Ionicons,
- * Feather, lucide-react-native, or a custom svg.
+ * Buttons render pill-shaped (rounded-pill). `leadingIcon` accepts any
+ * ReactNode so callers can use Ionicons or any svg.
  */
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive";
+export type ButtonVariant =
+  | "primary"
+  | "secondary"
+  | "ghost"
+  | "destructive"
+  | "outline-destructive";
 export type ButtonSize = "sm" | "md" | "lg";
 
 type ButtonProps = Omit<PressableProps, "children" | "style"> & {
@@ -34,40 +40,44 @@ type ButtonProps = Omit<PressableProps, "children" | "style"> & {
   loading?: boolean;
   leadingIcon?: ReactNode;
   fullWidth?: boolean;
+  className?: string;
 };
 
 const containerByVariant: Record<ButtonVariant, string> = {
-  primary: "bg-primary active:bg-primary/90",
-  secondary:
-    "bg-background-elevated border border-primary active:bg-primary-muted",
-  ghost: "bg-transparent active:bg-primary-muted",
-  destructive: "bg-destructive active:bg-destructive/90"
+  primary: "bg-forest active:bg-forest-deep",
+  secondary: "bg-surface border border-sage-deep active:bg-sage-bg",
+  ghost: "bg-transparent active:bg-sage-bg",
+  destructive: "bg-danger-soft active:opacity-80",
+  "outline-destructive":
+    "bg-transparent border border-danger/40 active:bg-danger-soft"
 };
 
 const labelByVariant: Record<ButtonVariant, string> = {
-  primary: "text-primary-foreground",
-  secondary: "text-primary",
-  ghost: "text-primary",
-  destructive: "text-destructive-foreground"
+  primary: "text-forest-text",
+  secondary: "text-forest",
+  ghost: "text-forest",
+  destructive: "text-danger",
+  "outline-destructive": "text-danger"
 };
 
 const heightBySize: Record<ButtonSize, string> = {
-  sm: "h-8 px-3",
-  md: "h-11 px-4",
-  lg: "h-[52px] px-5"
+  sm: "h-9 px-4",
+  md: "h-11 px-5",
+  lg: "h-[52px] px-6"
 };
 
 const labelSizeBySize: Record<ButtonSize, string> = {
-  sm: "text-caption",
-  md: "text-body",
-  lg: "text-body"
+  sm: "text-body-sm",
+  md: "text-body-lg",
+  lg: "text-body-lg"
 };
 
 const spinnerColorByVariant: Record<ButtonVariant, string> = {
-  primary: "#FBF8F1",
-  secondary: "#2C5F3F",
-  ghost: "#2C5F3F",
-  destructive: "#FBF8F1"
+  primary: colors.forestText,
+  secondary: colors.forest,
+  ghost: colors.forest,
+  destructive: colors.danger,
+  "outline-destructive": colors.danger
 };
 
 export function Button({
@@ -80,7 +90,7 @@ export function Button({
   fullWidth,
   className,
   ...rest
-}: ButtonProps & { className?: string }) {
+}: ButtonProps) {
   const isDisabled = disabled || loading;
   return (
     <Pressable
@@ -103,7 +113,8 @@ export function Button({
         <View className="flex-row items-center gap-2">
           {leadingIcon ? <View>{leadingIcon}</View> : null}
           <Text
-            className={`font-semibold ${labelSizeBySize[size]} ${labelByVariant[variant]}`}
+            className={`font-body-semibold ${labelSizeBySize[size]} ${labelByVariant[variant]}`}
+            style={{ letterSpacing: -0.1 }}
             numberOfLines={1}
           >
             {children}
