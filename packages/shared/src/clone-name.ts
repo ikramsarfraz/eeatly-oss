@@ -9,6 +9,10 @@
  * a year (1900–2099). Bump by 1. Anchoring on the last match handles
  * names like "1971 Mom's Eid 2024" without producing "1972 Mom's Eid
  * 2024" (which is almost never what the user wanted).
+ *
+ * Round 15.5 Task 5 — promoted to `packages/shared` so the mobile
+ * clone-plan sheet can drop its inlined copy and both clients pull
+ * from one source of truth.
  */
 const YEAR_REGEX = /\b(19\d{2}|20\d{2})\b/g;
 

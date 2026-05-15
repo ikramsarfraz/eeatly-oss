@@ -1,0 +1,26 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "REPLACE_WITH_APPLE_TEAM_ID.app.eeatly.mobile"
+        ],
+        "components": [
+          {
+            "/": "/invite/*",
+            "comment": "Household invite deep link"
+          },
+          {
+            "/": "/share/*",
+            "comment": "Public recipe share link"
+          }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": [
+      "REPLACE_WITH_APPLE_TEAM_ID.app.eeatly.mobile"
+    ]
+  }
+}

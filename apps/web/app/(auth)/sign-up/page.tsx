@@ -17,6 +17,13 @@ export const metadata: Metadata = {
   description: "Create a private eeatly account with an email magic link."
 };
 
+// R15.5 Task 1 — auth pages call hasGoogleAuthEnv() / auth.api.getSession,
+// both of which trigger getServerEnv(). Marking as dynamic skips the
+// static-prerender step that would otherwise crash a build run without
+// production env vars present (the env access during prerender has no
+// `process.env` to read from). The pages are user-specific by nature.
+export const dynamic = "force-dynamic";
+
 export default async function SignUpPage({
   searchParams
 }: {

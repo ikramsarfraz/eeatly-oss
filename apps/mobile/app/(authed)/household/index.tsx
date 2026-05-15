@@ -110,6 +110,56 @@ export default function HouseholdScreen() {
       Alert.alert("Couldn't cancel", error.message || "Try again.")
   });
 
+  const leaveMutation = trpc.households.leaveHousehold.useMutation({
+    onSuccess: async (result) => {
+      // Invalidate every query that depends on the current household so
+      // the next sign-in lands in the fresh personal kitchen
+      // ensureHouseholdForUser will seed on next session.
+      await Promise.all([
+        utils.households.current.invalidate(),
+        utils.dashboard.meals.invalidate(),
+        utils.plans.list.invalidate(),
+        utils.search.meals.invalidate()
+      ]);
+      Alert.alert(
+        "Left the kitchen",
+        `You're no longer a member of ${result.householdName}. Your recipes stay credited to you as "Former member."`,
+        [
+          {
+            text: "OK",
+            onPress: () => router.replace("/(authed)/home")
+          }
+        ]
+      );
+    },
+    onError: (error) => {
+      const reason = getCauseReason(error);
+      if (reason === "SOLE_OWNER") {
+        Alert.alert(
+          "You're the only owner",
+          "Transfer ownership before leaving, or delete the kitchen. Reach out to support for help — ownership transfer is on the roadmap."
+        );
+        return;
+      }
+      Alert.alert("Couldn't leave", error.message || "Try again.");
+    }
+  });
+
+  function confirmLeave(householdName: string) {
+    Alert.alert(
+      `Leave ${householdName}?`,
+      'Your recipes stay credited to you as "Former member." You\'ll land in a fresh personal kitchen.',
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Leave kitchen",
+          style: "destructive",
+          onPress: () => leaveMutation.mutate()
+        }
+      ]
+    );
+  }
+
   function confirmRemove(targetUserId: string, name: string) {
     Alert.alert(
       `Remove ${name}?`,
@@ -287,9 +337,24 @@ export default function HouseholdScreen() {
           ) : null}
 
           <View style={styles.footerSpace}>
+            <Pressable
+              onPress={() => confirmLeave(household.name)}
+              disabled={leaveMutation.isPending}
+              style={({ pressed }) => [
+                styles.leaveButton,
+                leaveMutation.isPending && styles.disabled,
+                pressed && !leaveMutation.isPending && styles.pressed
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={`Leave ${household.name}`}
+            >
+              <Text style={styles.leaveText}>
+                {leaveMutation.isPending ? "Leaving…" : "Leave kitchen"}
+              </Text>
+            </Pressable>
             <Text style={styles.fineprint}>
-              To leave this kitchen, open eeatly.app in your browser and use
-              the Leave option on settings.
+              Your recipes stay credited to you. You'll land in a fresh
+              personal kitchen.
             </Text>
           </View>
         </ScrollView>
@@ -402,7 +467,23 @@ const styles = StyleSheet.create({
   linkText: { color: "#2f6f58", fontSize: 14, fontWeight: "500" },
   footerSpace: {
     marginTop: 20,
-    paddingHorizontal: 4
+    paddingHorizontal: 4,
+    alignItems: "center",
+    gap: 8
+  },
+  leaveButton: {
+    minHeight: 44,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#f0c5c2",
+    backgroundColor: "#fdecea"
+  },
+  leaveText: {
+    color: "#b91c1c",
+    fontSize: 14,
+    fontWeight: "500"
   },
   fineprint: {
     fontSize: 12,

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { CheckCircle2, GitMerge, Loader2 } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -25,6 +25,12 @@ type LocalError =
   | { kind: "ownership_transfer"; message: string }
   | { kind: "meal_collision"; message: string; names: readonly string[] };
 
+type Preview = {
+  mealsToMerge: number;
+  logsToMerge: number;
+  willDissolveCurrentHousehold: boolean;
+};
+
 export function AcceptInvitationCard({
   token,
   inviterName,
@@ -33,34 +39,61 @@ export function AcceptInvitationCard({
   const router = useRouter();
   const [success, setSuccess] = React.useState<{ moved: number } | null>(null);
   const [error, setError] = React.useState<LocalError | null>(null);
+  const [preview, setPreview] = React.useState<Preview | null>(null);
+  const [previewError, setPreviewError] = React.useState<LocalError | null>(null);
+  const previewMutation = trpc.households.acceptInvitation.useMutation();
   const acceptMutation = trpc.households.acceptInvitation.useMutation();
   const pending = acceptMutation.isPending;
+  const previewing = previewMutation.isPending;
+
+  function toLocalError(e: unknown): LocalError {
+    const cause = getCause(e);
+    const reason = cause?.reason;
+    const message =
+      e instanceof Error ? e.message : "Couldn't accept invitation.";
+    if (reason === "OWNERSHIP_TRANSFER_REQUIRED") {
+      return { kind: "ownership_transfer", message };
+    }
+    if (reason === "MEAL_NAME_COLLISION") {
+      const names = (cause as { collidingNames?: string[] } | null)
+        ?.collidingNames;
+      return { kind: "meal_collision", message, names: names ?? [] };
+    }
+    return { kind: "generic", message };
+  }
+
+  // R15.5 Task 6 — fetch the merge preview as soon as the card renders.
+  // The dry-run runs the same validation as the real accept, so any
+  // collision / ownership-transfer errors surface here before the user
+  // commits.
+  React.useEffect(() => {
+    if (preview || previewError || previewing) return;
+    previewMutation
+      .mutateAsync({ token, dryRun: true })
+      .then((result) => {
+        if (result.kind !== "preview") return;
+        setPreview({
+          mealsToMerge: result.mealsToMerge,
+          logsToMerge: result.logsToMerge,
+          willDissolveCurrentHousehold: result.willDissolveCurrentHousehold
+        });
+      })
+      .catch((e) => {
+        setPreviewError(toLocalError(e));
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   async function handleAccept() {
     if (pending) return;
     setError(null);
     try {
       const result = await acceptMutation.mutateAsync({ token });
+      if (result.kind !== "accepted") return;
       setSuccess({ moved: result.mealsMoved + result.logsMoved });
       setTimeout(() => router.push("/dashboard"), 900);
     } catch (e) {
-      const cause = getCause(e);
-      const reason = cause?.reason;
-      const message =
-        e instanceof Error ? e.message : "Couldn't accept invitation.";
-      if (reason === "OWNERSHIP_TRANSFER_REQUIRED") {
-        setError({ kind: "ownership_transfer", message });
-      } else if (reason === "MEAL_NAME_COLLISION") {
-        const names = (cause as { collidingNames?: string[] } | null)
-          ?.collidingNames;
-        setError({
-          kind: "meal_collision",
-          message,
-          names: names ?? []
-        });
-      } else {
-        setError({ kind: "generic", message });
-      }
+      setError(toLocalError(e));
     }
   }
 
@@ -81,6 +114,12 @@ export function AcceptInvitationCard({
     );
   }
 
+  const hasMergeContent =
+    preview &&
+    (preview.mealsToMerge > 0 ||
+      preview.logsToMerge > 0 ||
+      preview.willDissolveCurrentHousehold);
+
   return (
     <Card>
       <CardHeader>
@@ -93,10 +132,41 @@ export function AcceptInvitationCard({
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
+        {previewError ? <ErrorPanel error={previewError} /> : null}
+        {!previewError && previewing && !preview ? (
+          <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Checking what would merge…
+          </div>
+        ) : null}
+        {!previewError && preview && hasMergeContent ? (
+          <div className="grid gap-1.5 rounded-lg border bg-primary/5 p-3 text-sm">
+            <p className="flex items-center gap-1.5 font-medium text-primary">
+              <GitMerge className="h-4 w-4" />
+              What happens when you accept
+            </p>
+            <p className="text-foreground">
+              {preview.mealsToMerge > 0
+                ? `${preview.mealsToMerge} of your meals`
+                : "No meals"}
+              {preview.logsToMerge > 0
+                ? ` and ${preview.logsToMerge} cook ${preview.logsToMerge === 1 ? "log" : "logs"}`
+                : ""}{" "}
+              move into {householdName}.
+              {preview.willDissolveCurrentHousehold
+                ? " Your current personal kitchen will be dissolved."
+                : ""}
+            </p>
+          </div>
+        ) : null}
         {error ? <ErrorPanel error={error} /> : null}
-        <Button type="button" onClick={handleAccept} disabled={pending}>
+        <Button type="button" onClick={handleAccept} disabled={pending || previewing}>
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          {pending ? "Joining…" : "Join this kitchen"}
+          {pending
+            ? "Joining…"
+            : hasMergeContent
+              ? "Accept and merge"
+              : "Join this kitchen"}
         </Button>
       </CardContent>
     </Card>

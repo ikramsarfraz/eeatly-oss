@@ -76,9 +76,42 @@ export default function InviteAcceptScreen() {
     };
   }, []);
 
+  // Round 15.5 Task 6 — fetch the merge preview as soon as we know the
+  // user is signed in as the invited email, so the accept button can
+  // surface "this will merge N meals + M logs" before they commit.
+  const [preview, setPreview] = useState<{
+    mealsToMerge: number;
+    logsToMerge: number;
+    willDissolveCurrentHousehold: boolean;
+  } | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+
+  // Shared error mapper for both dry-run + real accept.
+  function mapAcceptError(error: unknown): string {
+    const reason = getCauseReason(error);
+    if (reason === "INVITATION_NOT_FOUND")
+      return "This invitation isn't valid anymore. Ask for a new one.";
+    if (reason === "INVITATION_EXPIRED")
+      return "This invitation has expired. Ask for a new one.";
+    if (reason === "INVITATION_ALREADY_USED")
+      return "This invitation has already been used.";
+    if (reason === "INVITATION_EMAIL_MISMATCH")
+      return "This invitation is for a different email address.";
+    if (reason === "OWNERSHIP_TRANSFER_REQUIRED")
+      return "You own a household with members. Transfer ownership or remove members before joining a new one.";
+    if (reason === "MEAL_NAME_COLLISION")
+      return "Some of your meal names collide with the new kitchen's. Rename them and try again.";
+    return (error as { message?: string }).message ?? "Couldn't accept the invitation.";
+  }
+
   const acceptMutation = trpc.households.acceptInvitation.useMutation({
     onSuccess: async (result) => {
       setBusy(null);
+      // R15.5 Task 6 — distinguish the preview shape (dry-run) from the
+      // committed shape. The preview-only-on-load flow uses a separate
+      // path below; this onSuccess is only hit for the real accept.
+      if (result.kind === "preview") return;
+
       // Refresh queries that depend on the new household.
       await Promise.all([
         utils.dashboard.meals.invalidate(),
@@ -103,24 +136,39 @@ export default function InviteAcceptScreen() {
     },
     onError: (error) => {
       setBusy(null);
-      const reason = getCauseReason(error);
-      const message =
-        reason === "INVITATION_NOT_FOUND"
-          ? "This invitation isn't valid anymore. Ask for a new one."
-          : reason === "INVITATION_EXPIRED"
-            ? "This invitation has expired. Ask for a new one."
-            : reason === "INVITATION_ALREADY_USED"
-              ? "This invitation has already been used."
-              : reason === "INVITATION_EMAIL_MISMATCH"
-                ? "This invitation is for a different email address."
-                : reason === "OWNERSHIP_TRANSFER_REQUIRED"
-                  ? "You own a household with members. Transfer ownership or remove members before joining a new one."
-                  : reason === "MEAL_NAME_COLLISION"
-                    ? "Some of your meal names collide with the new kitchen's. Rename them and try again."
-                    : error.message || "Couldn't accept the invitation.";
-      Alert.alert("Couldn't accept", message);
+      Alert.alert("Couldn't accept", mapAcceptError(error));
     }
   });
+
+  const previewMutation = trpc.households.acceptInvitation.useMutation({
+    onSuccess: (result) => {
+      if (result.kind !== "preview") return;
+      setPreview({
+        mealsToMerge: result.mealsToMerge,
+        logsToMerge: result.logsToMerge,
+        willDissolveCurrentHousehold: result.willDissolveCurrentHousehold
+      });
+      setPreviewError(null);
+    },
+    onError: (error) => {
+      setPreviewError(mapAcceptError(error));
+    }
+  });
+
+  // Kick the preview off when we know the user is signed in as the
+  // invited email. Skip otherwise — preview validates email match too,
+  // so a mismatched-email call would surface as an error we'd then
+  // have to suppress.
+  useEffect(() => {
+    if (!token) return;
+    if (!currentEmail) return;
+    const invite = inviteQuery.data;
+    if (!invite) return;
+    if (currentEmail.toLowerCase() !== invite.email.toLowerCase()) return;
+    if (preview || previewMutation.isPending || previewError) return;
+    previewMutation.mutate({ token, dryRun: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentEmail, inviteQuery.data, token]);
 
   async function startMagicLink(email: string) {
     if (!token) return;
@@ -261,12 +309,47 @@ export default function InviteAcceptScreen() {
     );
   }
 
-  // Signed in as the invited email — happy path.
+  // Signed in as the invited email — happy path. Show the merge
+  // preview card if we have it; otherwise show a brief loading shimmer
+  // while the dry-run completes.
+  const hasMergeContent =
+    preview &&
+    (preview.mealsToMerge > 0 ||
+      preview.logsToMerge > 0 ||
+      preview.willDissolveCurrentHousehold);
   return (
     <Layout>
       <Heading title="You're invited" body={inviterLine} />
+      {previewMutation.isPending && !preview ? (
+        <View style={styles.previewLoading}>
+          <ActivityIndicator color="#2f6f58" />
+          <Text style={styles.previewLoadingText}>
+            Checking what would merge…
+          </Text>
+        </View>
+      ) : preview && hasMergeContent ? (
+        <View style={styles.previewCard}>
+          <Ionicons name="git-merge-outline" size={20} color="#2f6f58" />
+          <Text style={styles.previewTitle}>What happens when you accept</Text>
+          <Text style={styles.previewBody}>
+            {preview.mealsToMerge > 0
+              ? `${preview.mealsToMerge} of your meals`
+              : "No meals"}
+            {preview.logsToMerge > 0
+              ? ` and ${preview.logsToMerge} cook ${preview.logsToMerge === 1 ? "log" : "logs"}`
+              : ""}{" "}
+            move into {invite.householdName}.
+            {preview.willDissolveCurrentHousehold
+              ? " Your current personal kitchen will be dissolved."
+              : ""}
+          </Text>
+        </View>
+      ) : null}
+      {previewError ? (
+        <Text style={styles.previewErrorText}>{previewError}</Text>
+      ) : null}
       <PrimaryCta
-        label="Accept invitation"
+        label={hasMergeContent ? "Accept and merge" : "Accept invitation"}
         icon="checkmark-circle-outline"
         loading={busy === "accept" || acceptMutation.isPending}
         onPress={() => {
@@ -420,6 +503,43 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 4,
     lineHeight: 17
+  },
+  previewLoading: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 16
+  },
+  previewLoadingText: {
+    fontSize: 12,
+    color: "#666"
+  },
+  previewCard: {
+    backgroundColor: "#eef5f1",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "#cfe1d7",
+    borderRadius: 12,
+    padding: 14,
+    gap: 8,
+    alignItems: "flex-start"
+  },
+  previewTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#1f4a3b",
+    letterSpacing: 0.3,
+    textTransform: "uppercase"
+  },
+  previewBody: {
+    fontSize: 14,
+    color: "#1f4a3b",
+    lineHeight: 20
+  },
+  previewErrorText: {
+    fontSize: 13,
+    color: "#b91c1c",
+    textAlign: "center"
   },
   pressed: { opacity: 0.85 },
   disabled: { opacity: 0.6 },

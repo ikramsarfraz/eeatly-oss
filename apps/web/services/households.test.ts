@@ -75,6 +75,7 @@ import {
   acceptHouseholdInvitation,
   countHouseholdMembers,
   ensureHouseholdForUser,
+  leaveCurrentHousehold,
   listHouseholdMembers,
   listPendingInvitations,
   removeMemberFromHousehold
@@ -84,7 +85,8 @@ import {
   MealNameCollisionError,
   NotHouseholdOwnerError,
   NotMemberError,
-  OwnershipTransferRequiredError
+  OwnershipTransferRequiredError,
+  SoleOwnerCannotLeaveError
 } from "@/lib/errors/households";
 
 function queue<T>(value: T) {
@@ -217,6 +219,8 @@ describe("acceptHouseholdInvitation sole-owner cleanup", () => {
       "tok-123456789012345678901234567890"
     );
 
+    expect(result.kind).toBe("accepted");
+    if (result.kind !== "accepted") return;
     expect(result.newHouseholdId).toBe("h-a");
     expect(result.newHouseholdName).toBe("A's Kitchen");
     expect(result.inviterUserId).toBe("u-a");
@@ -365,6 +369,63 @@ describe("removeMemberFromHousehold", () => {
   // then target === actor and the CANNOT_REMOVE_SELF branch fires first.
   // The typed error class is kept as forward-defense for a future admin
   // role that could remove members. Covered by code review.
+});
+
+describe("leaveCurrentHousehold (Round 15.5 Task 2)", () => {
+  it("happy path: non-owner member leaves, row deleted, pending invites cleared, preferred pointer cleared", async () => {
+    queue([{ id: "h-a", name: "Mom's Kitchen", ownerId: "u-owner" }]); // household lookup
+    queue([{ id: "m-1" }]); // membership lookup
+    queue([]); // delete household_members
+    queue([]); // delete householdInvitations for this user
+    queue([]); // update users.preferred_household_id = NULL
+
+    const result = await leaveCurrentHousehold("u-bob", "h-a");
+
+    expect(result).toEqual({
+      householdId: "h-a",
+      householdName: "Mom's Kitchen"
+    });
+  });
+
+  it("happy path: solo-owner of a single-member kitchen can leave (dissolves the kitchen)", async () => {
+    queue([{ id: "h-a", name: "Solo Kitchen", ownerId: "u-owner" }]); // household lookup
+    queue([{ id: "m-1" }]); // membership lookup
+    queue([{ value: 0 }]); // other-members count = 0
+    queue([]); // delete household_members
+    queue([]); // delete householdInvitations
+    queue([]); // update users.preferred_household_id
+
+    const result = await leaveCurrentHousehold("u-owner", "h-a");
+
+    expect(result.householdId).toBe("h-a");
+  });
+
+  it("throws SoleOwnerCannotLeaveError when the owner has other members", async () => {
+    queue([{ id: "h-a", name: "Family Kitchen", ownerId: "u-owner" }]);
+    queue([{ id: "m-1" }]); // owner's own membership
+    queue([{ value: 2 }]); // two other members present
+
+    await expect(
+      leaveCurrentHousehold("u-owner", "h-a")
+    ).rejects.toBeInstanceOf(SoleOwnerCannotLeaveError);
+  });
+
+  it("throws NotMemberError when the household doesn't exist", async () => {
+    queue([]); // household lookup returns no row
+
+    await expect(
+      leaveCurrentHousehold("u-bob", "h-missing")
+    ).rejects.toBeInstanceOf(NotMemberError);
+  });
+
+  it("throws NotMemberError when the user isn't actually a member", async () => {
+    queue([{ id: "h-a", name: "Kitchen", ownerId: "u-owner" }]);
+    queue([]); // membership lookup empty
+
+    await expect(
+      leaveCurrentHousehold("u-stranger", "h-a")
+    ).rejects.toBeInstanceOf(NotMemberError);
+  });
 });
 
 describe("Round 4.7 service-layer authz checks", () => {

@@ -10,6 +10,10 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.eeatly.mobile",
+      "associatedDomains": [
+        "applinks:eeatly.app",
+        "webcredentials:eeatly.app"
+      ],
       "infoPlist": {
         "NSCameraUsageDescription": "eeatly uses your camera so you can snap a photo of a meal you cooked or a recipe card you want to save.",
         "NSPhotoLibraryUsageDescription": "eeatly reads photos so you can attach a meal photo or have AI extract a recipe from a saved image.",
@@ -18,7 +22,26 @@
     },
     "android": {
       "package": "app.eeatly.mobile",
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "eeatly.app",
+              "pathPrefix": "/invite/"
+            },
+            {
+              "scheme": "https",
+              "host": "eeatly.app",
+              "pathPrefix": "/share/"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "bundler": "metro",

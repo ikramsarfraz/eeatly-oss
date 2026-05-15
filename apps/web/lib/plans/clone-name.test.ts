@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { bumpYearInName } from "./clone-name";
+import { bumpYearInName } from "@eeatly/shared";
 
+// Round 15.5 Task 5 — the helper itself moved to `packages/shared`,
+// but the test lives here because the web app's vitest is the only
+// configured test runner in the workspace. Adding vitest to
+// packages/shared is deferred until a second consumer wants coverage
+// there.
 describe("bumpYearInName", () => {
   it("bumps a single trailing year", () => {
     expect(bumpYearInName("Eid al-Adha 2024")).toBe("Eid al-Adha 2025");

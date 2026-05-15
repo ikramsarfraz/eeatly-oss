@@ -87,3 +87,21 @@ export class NotMemberError extends Error {
     this.name = "NotMemberError";
   }
 }
+
+/**
+ * Round 15.5 Task 2 — raised when the sole owner of a household tries
+ * to leave. They have to transfer ownership first (UI for that is
+ * still a parking-lot item; this error is the user's signal to
+ * contact support). Different from `OwnerAccountDeletionBlockedError`
+ * which is raised only on account-delete; `SoleOwnerCannotLeaveError`
+ * fires from the "Leave kitchen" flow.
+ */
+export class SoleOwnerCannotLeaveError extends Error {
+  readonly code = "SOLE_OWNER" as const;
+  constructor() {
+    super(
+      "You're the only owner of this kitchen. Transfer ownership before leaving, or delete the kitchen."
+    );
+    this.name = "SoleOwnerCannotLeaveError";
+  }
+}

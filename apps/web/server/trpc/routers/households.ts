@@ -3,6 +3,7 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { isMobileOrigin, pickInviteUrl } from "@/lib/auth/deep-links";
 import { dispatchTransactionalEmail } from "@/lib/email/transactional";
 import { getServerEnv } from "@/lib/env/server";
 import { FeatureGateDeniedError } from "@/lib/errors/gates";
@@ -13,7 +14,8 @@ import {
   MealNameCollisionError,
   NotHouseholdOwnerError,
   NotMemberError,
-  OwnershipTransferRequiredError
+  OwnershipTransferRequiredError,
+  SoleOwnerCannotLeaveError
 } from "@/lib/errors/households";
 import { logger } from "@/lib/observability/logger";
 import {
@@ -28,6 +30,7 @@ import {
   countHouseholdMembers,
   createHouseholdInvitation,
   findInvitationContextByToken,
+  leaveCurrentHousehold,
   listHouseholdMembers,
   listPendingInvitations,
   removeMemberFromHousehold,
@@ -42,9 +45,15 @@ import {
   router
 } from "../trpc";
 
-function buildInviteUrl(token: string): string {
+function buildInviteUrl(token: string, opts: { isMobile: boolean }): string {
   const base = getServerEnv().NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
-  return `${base}/invite/${encodeURIComponent(token)}`;
+  const webUrl = `${base}/invite/${encodeURIComponent(token)}`;
+  // Round 15.5 Task 4 — pick the right scheme based on the inviter's
+  // request origin. Mobile inviters get `eeatly://invite/...` so the
+  // recipient's tap deep-links directly into the app; web inviters
+  // keep the https URL, which Universal Links (R15.5 Task 3) route
+  // into the app when installed.
+  return pickInviteUrl({ webUrl, token, isMobile: opts.isMobile });
 }
 
 /**
@@ -101,6 +110,13 @@ export const householdsRouter = router({
           input.email
         );
 
+        // Pick the invite URL scheme based on the inviter's request
+        // origin: mobile inviter → `eeatly://invite/...`; web inviter
+        // → `https://eeatly.app/invite/...`. With Universal Links
+        // configured (R15.5 Task 3), the https URL still deep-links
+        // into the app on mobile devices, so the web URL stays the
+        // robust default.
+        const inviterIsMobile = isMobileOrigin(ctx.headers.get("origin"));
         void dispatchTransactionalEmail({
           template: "household_invitation",
           toEmail: input.email,
@@ -109,7 +125,9 @@ export const householdsRouter = router({
           invitation: {
             inviterName: result.inviterName,
             householdName: result.householdName,
-            inviteUrl: buildInviteUrl(result.token),
+            inviteUrl: buildInviteUrl(result.token, {
+              isMobile: inviterIsMobile
+            }),
             expiresInDays: Math.max(
               1,
               Math.round(
@@ -152,7 +170,24 @@ export const householdsRouter = router({
     .input(acceptInvitationSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        const result = await acceptHouseholdInvitation(ctx.user.id, input.token);
+        const result = await acceptHouseholdInvitation(ctx.user.id, input.token, {
+          dryRun: input.dryRun === true
+        });
+
+        // R15.5 Task 6 — dry-run path returns a preview shape and does
+        // NOT side-effect (no notifications, no revalidation). The
+        // discriminated return lets the UI render a confirmation card.
+        if ("kind" in result && result.kind === "preview") {
+          return {
+            kind: "preview" as const,
+            newHouseholdId: result.newHouseholdId,
+            newHouseholdName: result.newHouseholdName,
+            inviterName: result.inviterName,
+            mealsToMerge: result.mealsToMerge,
+            logsToMerge: result.logsToMerge,
+            willDissolveCurrentHousehold: result.willDissolveCurrentHousehold
+          };
+        }
 
         // Notify the inviter — fire-and-forget; membership is committed.
         void createNotification({
@@ -182,6 +217,7 @@ export const householdsRouter = router({
         revalidatePath("/settings");
 
         return {
+          kind: "accepted" as const,
           newHouseholdId: result.newHouseholdId,
           newHouseholdName: result.newHouseholdName,
           mealsMoved: result.mealsMoved,
@@ -235,6 +271,45 @@ export const householdsRouter = router({
             code: "NOT_FOUND",
             message,
             cause: { reason: "NOT_FOUND" }
+          });
+        }
+        throw error;
+      }
+    }),
+
+  /**
+   * Round 15.5 Task 2 — user-initiated leave. Member-scoped, not
+   * owner-only — anyone can leave. Sole owners of a multi-member
+   * household get `SOLE_OWNER` and must transfer first (UI for that
+   * is still parking-lot).
+   */
+  leaveHousehold: householdMemberProcedure
+    .use(rateLimit("mutation"))
+    .mutation(async ({ ctx }) => {
+      try {
+        const result = await leaveCurrentHousehold(
+          ctx.user.id,
+          ctx.household.id
+        );
+        revalidatePath("/settings");
+        revalidatePath("/dashboard");
+        return {
+          householdId: result.householdId,
+          householdName: result.householdName
+        };
+      } catch (error) {
+        if (error instanceof SoleOwnerCannotLeaveError) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: error.message,
+            cause: { reason: "SOLE_OWNER" }
+          });
+        }
+        if (error instanceof NotMemberError) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: error.message,
+            cause: { reason: "NOT_MEMBER" }
           });
         }
         throw error;

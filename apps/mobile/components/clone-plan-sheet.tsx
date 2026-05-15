@@ -17,12 +17,14 @@ import {
   View
 } from "react-native";
 import { clonePlanSchema } from "@eeatly/api/validators/plans";
+import { bumpYearInName } from "@eeatly/shared";
 import { trpc } from "../lib/trpc";
 
 /**
- * Round 14 Task 3 — clone-past-plan sheet. Triggered by long-press on a
- * plan tile in `/plans`. Name pre-fills via the local `bumpYearInName`
- * helper (lifted from the web — see comment above the function). Date
+ * Round 14 Task 3 — clone-past-plan sheet. Triggered by long-press on
+ * a plan tile in `/plans`. Name pre-fills via `bumpYearInName` from
+ * `@eeatly/shared` (R15.5 Task 5 moved the helper here from R14's
+ * inlined copy + web's `apps/web/lib/plans/clone-name.ts`). Date
  * defaults to today; the user almost always sets it to whenever this
  * year's Eid lands.
  *
@@ -30,28 +32,6 @@ import { trpc } from "../lib/trpc";
  * up at the top) and navigates to its detail page where hints will
  * render automatically via `plans.previousAnnotationsByMeal`.
  */
-
-/**
- * Pre-fill the new plan's name when cloning. "Eid al-Adha 2024" →
- * "Eid al-Adha 2025" so the user doesn't retype the title. Fall back
- * to "<name> (copy)" when no year is detected.
- *
- * Mirrors `apps/web/lib/plans/clone-name.ts`. Inlined here rather than
- * promoted to `packages/shared` to keep the R14 backend untouched —
- * a packages/shared addition would otherwise mean a web import-path
- * change. The function is 12 lines; the duplication cost is lower than
- * the cross-package coordination.
- */
-const YEAR_REGEX = /\b(19\d{2}|20\d{2})\b/g;
-function bumpYearInName(name: string): string {
-  const matches = Array.from(name.matchAll(YEAR_REGEX));
-  if (matches.length === 0) return `${name} (copy)`;
-  const last = matches[matches.length - 1]!;
-  const year = Number(last[0]);
-  const start = last.index ?? 0;
-  const end = start + last[0].length;
-  return `${name.slice(0, start)}${year + 1}${name.slice(end)}`;
-}
 
 function formatYMD(date: Date): string {
   const y = date.getFullYear();

@@ -17,6 +17,10 @@ export const metadata: Metadata = {
   description: "Sign in to your private eeatly meal memory."
 };
 
+// R15.5 Task 1 — see same comment on sign-up; the page reads env-driven
+// social-provider flags and so cannot be safely prerendered with no env.
+export const dynamic = "force-dynamic";
+
 export default async function SignInPage({
   searchParams
 }: {
