@@ -29,6 +29,13 @@ export const authClient = createAuthClient({
       type: "Bearer",
       token: async () => (await getSessionToken()) ?? undefined
     },
+    // iOS' shared NSURLSession cookie jar replays cookies set by an
+    // earlier `getSession()` GET on every subsequent request to the
+    // same host. Better Auth's CSRF guard treats a cookie-bearing
+    // request without an `Origin` header as suspicious and rejects it
+    // with MISSING_OR_NULL_ORIGIN. Send our scheme as the origin so
+    // the guard passes (trustedOrigins already includes `eeatly://`).
+    headers: { Origin: "eeatly://" },
     onResponse: async (ctx) => {
       const token = ctx.response.headers.get("set-auth-token");
       if (token) {
