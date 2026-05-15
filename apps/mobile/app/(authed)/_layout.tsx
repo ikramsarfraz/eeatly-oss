@@ -70,6 +70,14 @@ export default function AuthedLayout() {
         }}
       />
       <Tabs.Screen name="meal/[id]" options={{ href: null }} />
+      <Tabs.Screen
+        name="add/log"
+        options={{ href: null, title: "Log a meal" }}
+      />
+      <Tabs.Screen
+        name="add/ai-suggest"
+        options={{ href: null, title: "AI capture" }}
+      />
       <Tabs.Screen name="settings" options={{ href: null, title: "Settings" }} />
     </Tabs>
   );
