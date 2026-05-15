@@ -2,13 +2,28 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Repository layout
+
+Round 12 restructured this into a pnpm-workspaces monorepo:
+
+```
+apps/
+  web/        Next.js app (the existing eeatly app)
+  mobile/     Expo / React Native (Round 12+)
+packages/
+  api/        AppRouter type + validators + gate registry — shared by both clients
+  shared/     Pure utilities, framework-agnostic
+```
+
+Every command below runs from the **repo root**; pnpm filters into `@eeatly/web`.
+
 ## Commands
 
 ```bash
-pnpm dev              # Start dev server (localhost:3000)
-pnpm build            # Production build
+pnpm dev              # Start web dev server (localhost:3000)
+pnpm build            # Production build of the web app
 pnpm lint             # ESLint — zero warnings tolerated
-pnpm typecheck        # tsc --noEmit
+pnpm typecheck        # tsc --noEmit (every workspace package in parallel)
 
 pnpm db:generate      # Generate Drizzle migration from schema changes
 pnpm db:migrate       # Apply migrations to Neon Postgres
@@ -19,7 +34,9 @@ pnpm check:deploy     # Validate all required env vars are present
 pnpm smoke:prod       # HTTP smoke tests against production
 ```
 
-Node 24.14.x and pnpm 10.33.x are required (enforced via `engines` in package.json).
+To work directly inside a workspace, `cd apps/web && pnpm <script>` works too — but prefer the root commands so the right workspace is always selected.
+
+Node 24.14.x and pnpm 10.33.x are required (enforced via `engines` at the root `package.json`).
 
 ## Stack
 
@@ -39,14 +56,14 @@ Server component → Service (direct import) → Drizzle ORM → Neon Postgres
 
 Round 11 removed the `actions/` layer entirely. Every client-driven interaction now goes through a tRPC procedure; server components that need to read data still call services directly (no point routing SSR fetches through HTTP).
 
-- **Procedures** live in `server/trpc/routers/<domain>.ts` and are merged into `server/trpc/app-router.ts`. The `AppRouter` type is what the client imports for typed hooks.
-- **Middleware + procedure builders** in `server/trpc/trpc.ts`: `publicProcedure`, `protectedProcedure`, `adminProcedure`, `householdMemberProcedure`, `householdOwnerProcedure`, `gatedProcedure(featureKey)`, `rateLimit(kind)`. Compose with `.use(...)`.
-- **Context** (`server/trpc/context.ts`) lifts the Better Auth session once per request and memoizes the current-household lookup via React.cache.
-- **Errors** use `TRPCError` with structured `cause`: `{ reason, … }`. The wire-stable `reason` strings (`UPGRADE_REQUIRED`, `RATE_LIMITED`, `OWNER_BLOCK`, `MEAL_NAME_COLLISION`, etc.) are what the client UI matches on via `lib/trpc/errors.ts` (`getCause`, `isUpgradeRequired`, `isRateLimited`).
-- **Fetch adapter** at `app/api/trpc/[trpc]/route.ts` handles both GET (queries) and POST (mutations). Force-dynamic so cookies + rate limits aren't cached.
-- **Client integration** is co-located in `components/providers/query-provider.tsx`: a single `QueryClient` is shared between `<trpc.Provider>` and `<QueryClientProvider>`.
+- **Procedures** live in `apps/web/server/trpc/routers/<domain>.ts` and are merged into `apps/web/server/trpc/app-router.ts`. The `AppRouter` type is what the client imports for typed hooks.
+- **Middleware + procedure builders** in `apps/web/server/trpc/trpc.ts`: `publicProcedure`, `protectedProcedure`, `adminProcedure`, `householdMemberProcedure`, `householdOwnerProcedure`, `gatedProcedure(featureKey)`, `rateLimit(kind)`. Compose with `.use(...)`.
+- **Context** (`apps/web/server/trpc/context.ts`) lifts the Better Auth session once per request and memoizes the current-household lookup via React.cache.
+- **Errors** use `TRPCError` with structured `cause`: `{ reason, … }`. The wire-stable `reason` strings (`UPGRADE_REQUIRED`, `RATE_LIMITED`, `OWNER_BLOCK`, `MEAL_NAME_COLLISION`, etc.) are what the client UI matches on via `apps/web/lib/trpc/errors.ts` (`getCause`, `isUpgradeRequired`, `isRateLimited`).
+- **Fetch adapter** at `apps/web/app/api/trpc/[trpc]/route.ts` handles both GET (queries) and POST (mutations). Force-dynamic so cookies + rate limits aren't cached.
+- **Client integration** is co-located in `apps/web/components/providers/query-provider.tsx`: a single `QueryClient` is shared between `<trpc.Provider>` and `<QueryClientProvider>`.
 
-**File uploads stay on REST.** Persisted photos go through the existing R2 presigned-POST flow (`app/api/uploads/presign`). Multipart bodies don't ride through tRPC. The one exception: AI-suggest photo + voice inputs ride as base64 strings in the JSON body (see [server/trpc/routers/ai.ts](server/trpc/routers/ai.ts) for the trade-off rationale — preserves behavior and avoids orphan R2 uploads for one-shot AI calls).
+**File uploads stay on REST.** Persisted photos go through the existing R2 presigned-POST flow (`apps/web/app/api/uploads/presign`). Multipart bodies don't ride through tRPC. The one exception: AI-suggest photo + voice inputs ride as base64 strings in the JSON body (see [apps/web/server/trpc/routers/ai.ts](apps/web/server/trpc/routers/ai.ts) for the trade-off rationale — preserves behavior and avoids orphan R2 uploads for one-shot AI calls).
 
 **Procedures don't redirect.** Server actions used `redirect()`; procedures return `{ redirectTo }` and the client navigates with `router.replace` (or `window.location.assign` when the cookie-clear behavior matters — e.g. account delete, signOutAndRedirect).
 
@@ -67,14 +84,14 @@ Google sign-in is gated on `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` — the b
 
 ### Database schema
 
-Core tables live in `db/schema/`:
+Core tables live in `apps/web/db/schema/`:
 - `meals` — unique per `(userId, normalizedName)`; soft-deleted via `archivedAt` (always filter with `isNull(archivedAt)`)
 - `mealLogs` — one log per cooking event; has `effortLevel` enum: `quick | easy | medium | high_effort`
 - `analytics_events` — in-house event tracking
 - `email_delivery` — Resend webhook delivery receipts
 - `users.preferredTenantId` — scaffold column for future multi-tenancy; always null in current product logic. No `tenants` or `tenant_members` table exists yet.
 
-Always run `pnpm db:generate` then `pnpm db:migrate` after schema changes. Never hand-edit files in `drizzle/` (auto-generated migration history).
+Always run `pnpm db:generate` then `pnpm db:migrate` after schema changes. Never hand-edit files in `apps/web/drizzle/` (auto-generated migration history).
 
 ### Environment variables
 
@@ -92,23 +109,23 @@ Four vars are required at runtime; the rest enable optional features:
 | `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` | optional | Enables "Continue with Google" on sign-in/sign-up — **both or neither** |
 | `PLATFORM_ADMIN_HOST` | optional | Restricts `/admin/*` to a specific subdomain |
 
-All server-side env access goes through `lib/env/server.ts` → `getServerEnv()`, which validates and caches at startup. Never read `process.env` directly in server code.
+All server-side env access goes through `apps/web/lib/env/server.ts` → `getServerEnv()`, which validates and caches at startup. Never read `process.env` directly in server code.
 
 ### Key patterns
 
-- **`server-only`** — imported at the top of any module that must never reach the client bundle (`services/`, `lib/db/`, `lib/auth/`, `server/trpc/`). A build error surfaces immediately if the boundary is crossed.
+- **`server-only`** — imported at the top of any module that must never reach the client bundle (`apps/web/services/`, `apps/web/lib/db/`, `apps/web/lib/auth/`, `apps/web/server/trpc/`). A build error surfaces immediately if the boundary is crossed.
 - **Meal normalization** — `normalizedName` is `name.trim().toLowerCase()`. The unique index enforces one `meals` row per user per dish name; logging the same meal again creates a new `mealLogs` row against the existing `meals` row.
-- **Observability** — `lib/observability/` holds the analytics event logger and funnel-tracking helpers. Events are fire-and-forget inside procedures (not awaited) so a logging failure can't surface a procedure error.
-- **Email fallback** — when `RESEND_API_KEY` is absent, `lib/email/resend.ts` logs the email to the console instead of throwing. This keeps local dev functional without Resend credentials.
-- **Security headers** — defined in `next.config.ts` (CSP, X-Frame-Options DENY, Permissions-Policy). Do not add `<iframe>` embeds without updating the CSP.
+- **Observability** — `apps/web/lib/observability/` holds the analytics event logger and funnel-tracking helpers. Events are fire-and-forget inside procedures (not awaited) so a logging failure can't surface a procedure error.
+- **Email fallback** — when `RESEND_API_KEY` is absent, `apps/web/lib/email/resend.ts` logs the email to the console instead of throwing. This keeps local dev functional without Resend credentials.
+- **Security headers** — defined in `apps/web/next.config.ts` (CSP, X-Frame-Options DENY, Permissions-Policy). Do not add `<iframe>` embeds without updating the CSP.
 
 ### Adding a new tRPC procedure
 
-1. Pick the domain router under `server/trpc/routers/<domain>.ts`. If the domain doesn't exist, create the file + import it into `server/trpc/app-router.ts`.
+1. Pick the domain router under `apps/web/server/trpc/routers/<domain>.ts`. If the domain doesn't exist, create the file + import it into `apps/web/server/trpc/app-router.ts`.
 2. Compose the procedure builder. Examples:
    - Read: `householdMemberProcedure.input(schema).query(({ ctx, input }) => service(...))`
    - Write: `householdMemberProcedure.use(rateLimit("mutation")).input(schema).mutation(({ ctx, input }) => service(...))`
    - Paid-tier: `gatedProcedure("plans_create").input(...).mutation(...)`
 3. Catch service-level errors at the procedure boundary and rethrow as `TRPCError` with a structured `cause` — `{ reason: "STRING_CONSTANT", … }`. Client side reads via `getCause(error)?.reason`. Keep `reason` strings stable; the UI keys copy off them.
 4. From a client component, call `trpc.<domain>.<proc>.useQuery(input)` or `.useMutation()`. Use `trpc.useUtils().<domain>.<proc>.invalidate()` to refetch related queries after a related mutation.
-5. For tests, mock services + use `createCallerFactory(router)(ctx)` — pattern in [server/trpc/routers/routers.test.ts](server/trpc/routers/routers.test.ts).
+5. For tests, mock services + use `createCallerFactory(router)(ctx)` — pattern in [apps/web/server/trpc/routers/routers.test.ts](apps/web/server/trpc/routers/routers.test.ts).
