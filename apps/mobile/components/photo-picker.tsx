@@ -8,21 +8,20 @@ import {
   Image,
   Modal,
   Pressable,
-  StyleSheet,
   Text,
   View
 } from "react-native";
 import { PhotoUploadError, uploadPhoto } from "../lib/photo-upload";
 
 /**
- * Round 13 — photo picker primitive. Used by Task 3 (manual meal log)
- * and Task 4 (AI capture). Self-contained: handles permissions,
+ * Round 13 — photo picker primitive. Used by the meal log form and
+ * the AI capture review path. Self-contained: handles permissions,
  * camera-vs-library choice, upload to R2, error states.
  *
- * The component renders different surfaces depending on `value`:
- *   - no photo → "Add a photo" CTA tile (≥80px tap target)
- *   - uploading → preview + spinner overlay
- *   - photo present → preview + "Change" + "Remove" actions
+ * Round 17 — restyled with NativeWind tokens. Three surfaces:
+ *   - no photo → dashed border tile with icon + "Add a photo" CTA
+ *   - uploading → preview with overlay spinner
+ *   - photo present → preview + Change / Remove actions
  *
  * Calling `onChange(url)` with a publicUrl signals upload success.
  * Calling `onChange(null)` clears the value.
@@ -30,7 +29,6 @@ import { PhotoUploadError, uploadPhoto } from "../lib/photo-upload";
 export type PhotoPickerProps = {
   value: string | null;
   onChange: (url: string | null) => void;
-  /** Force-disable interactions, e.g. during form submission. */
   disabled?: boolean;
 };
 
@@ -62,8 +60,6 @@ export function PhotoPicker({ value, onChange, disabled }: PhotoPickerProps) {
     const perm = await request();
     if (!perm.granted) {
       if (perm.canAskAgain === false) {
-        // iOS / Android: user permanently denied. Offer to deep-link
-        // into the app's system settings so they can change it.
         Alert.alert(
           `${permissionName} access needed`,
           `eeatly needs ${permissionName.toLowerCase()} access to attach photos. Open Settings?`,
@@ -134,31 +130,37 @@ export function PhotoPicker({ value, onChange, disabled }: PhotoPickerProps) {
   return (
     <View>
       {value || uploading ? (
-        <View style={styles.previewWrap}>
+        <View className="relative">
           <Image
             source={{ uri: uploading ? sheet.previewUri : value! }}
-            style={styles.preview}
+            className="w-full aspect-[4/3] rounded-md bg-background-muted"
             resizeMode="cover"
           />
           {uploading ? (
-            <View style={styles.uploadingOverlay}>
-              <ActivityIndicator color="#fff" />
-              <Text style={styles.uploadingText}>Uploading…</Text>
+            <View className="absolute inset-0 items-center justify-center rounded-md bg-foreground/40 gap-2">
+              <ActivityIndicator color="#FBF8F1" />
+              <Text className="text-caption text-primary-foreground font-semibold">
+                Uploading…
+              </Text>
             </View>
           ) : null}
           {!uploading && !disabled ? (
-            <View style={styles.previewActions}>
+            <View className="flex-row gap-3 mt-2">
               <Pressable
                 onPress={openSheet}
-                style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
+                className="px-3 py-2 rounded-sm active:opacity-70 min-h-[44px] justify-center"
               >
-                <Text style={styles.actionText}>Change</Text>
+                <Text className="text-caption-strong font-semibold text-primary">
+                  Change
+                </Text>
               </Pressable>
               <Pressable
                 onPress={() => onChange(null)}
-                style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
+                className="px-3 py-2 rounded-sm active:opacity-70 min-h-[44px] justify-center"
               >
-                <Text style={[styles.actionText, styles.destructive]}>Remove</Text>
+                <Text className="text-caption-strong font-semibold text-destructive">
+                  Remove
+                </Text>
               </Pressable>
             </View>
           ) : null}
@@ -167,19 +169,25 @@ export function PhotoPicker({ value, onChange, disabled }: PhotoPickerProps) {
         <Pressable
           onPress={openSheet}
           disabled={disabled}
-          style={({ pressed }) => [
-            styles.addTile,
-            pressed && styles.pressed,
-            disabled && styles.disabled
-          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Add a photo"
+          className={`min-h-[120px] rounded-md border border-dashed border-border-strong bg-background-muted/60 items-center justify-center px-4 py-4 gap-1.5 active:opacity-70 ${
+            disabled ? "opacity-50" : ""
+          }`}
         >
-          <Ionicons name="image-outline" size={28} color="#666" />
-          <Text style={styles.addLabel}>Add a photo</Text>
-          <Text style={styles.addHint}>Optional — camera or library</Text>
+          <Ionicons name="image-outline" size={28} color="#6B7068" />
+          <Text className="text-body font-semibold text-foreground">
+            Add a photo
+          </Text>
+          <Text className="text-small text-foreground-muted">
+            Optional — camera or library
+          </Text>
         </Pressable>
       )}
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? (
+        <Text className="text-caption text-destructive mt-2">{error}</Text>
+      ) : null}
 
       <Modal
         visible={sheet.kind === "open"}
@@ -187,12 +195,33 @@ export function PhotoPicker({ value, onChange, disabled }: PhotoPickerProps) {
         animationType="fade"
         onRequestClose={closeSheet}
       >
-        <Pressable style={styles.backdrop} onPress={closeSheet}>
-          <Pressable style={styles.sheet} onPress={() => null}>
-            <Text style={styles.sheetTitle}>Add a photo</Text>
-            <SheetOption icon="camera-outline" label="Take photo" onPress={takePhoto} />
-            <SheetOption icon="images-outline" label="Choose from library" onPress={pickFromLibrary} />
-            <SheetOption icon="close-outline" label="Cancel" onPress={closeSheet} variant="cancel" />
+        <Pressable
+          className="flex-1 bg-foreground/40 justify-end"
+          onPress={closeSheet}
+        >
+          <Pressable
+            onPress={() => null}
+            className="bg-background-elevated rounded-t-lg pt-3 pb-9 px-4 gap-1"
+          >
+            <Text className="text-caption text-foreground-muted text-center py-2">
+              Add a photo
+            </Text>
+            <SheetOption
+              icon="camera-outline"
+              label="Take photo"
+              onPress={takePhoto}
+            />
+            <SheetOption
+              icon="images-outline"
+              label="Choose from library"
+              onPress={pickFromLibrary}
+            />
+            <SheetOption
+              icon="close-outline"
+              label="Cancel"
+              onPress={closeSheet}
+              variant="cancel"
+            />
           </Pressable>
         </Pressable>
       </Modal>
@@ -214,147 +243,24 @@ function SheetOption({
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.sheetOption,
-        pressed && styles.pressed,
-        variant === "cancel" && styles.sheetCancel
-      ]}
+      className={`flex-row items-center gap-3.5 px-2 py-3.5 rounded-sm min-h-[56px] active:opacity-70 ${
+        variant === "cancel" ? "mt-1 border-t border-border" : ""
+      }`}
     >
       <Ionicons
         name={icon}
         size={22}
-        color={variant === "cancel" ? "#888" : "#2f6f58"}
+        color={variant === "cancel" ? "#6B7068" : "#2C5F3F"}
       />
       <Text
-        style={[
-          styles.sheetOptionLabel,
-          variant === "cancel" && styles.sheetCancelLabel
-        ]}
+        className={`text-body ${
+          variant === "cancel"
+            ? "text-foreground-muted"
+            : "text-foreground font-semibold"
+        }`}
       >
         {label}
       </Text>
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  previewWrap: {
-    position: "relative"
-  },
-  preview: {
-    width: "100%",
-    aspectRatio: 4 / 3,
-    borderRadius: 12,
-    backgroundColor: "#eaeae3"
-  },
-  uploadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8
-  },
-  uploadingText: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "500"
-  },
-  previewActions: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 10
-  },
-  actionButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    minHeight: 44,
-    justifyContent: "center"
-  },
-  actionText: {
-    color: "#2f6f58",
-    fontSize: 14,
-    fontWeight: "500"
-  },
-  destructive: {
-    color: "#b91c1c"
-  },
-  pressed: {
-    opacity: 0.7
-  },
-  disabled: {
-    opacity: 0.5
-  },
-  addTile: {
-    minHeight: 120,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#d4d2cb",
-    borderStyle: "dashed",
-    backgroundColor: "#fbfaf6",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 16,
-    gap: 6
-  },
-  addLabel: {
-    fontSize: 15,
-    fontWeight: "500",
-    color: "#444"
-  },
-  addHint: {
-    fontSize: 12,
-    color: "#888"
-  },
-  error: {
-    marginTop: 8,
-    color: "#b91c1c",
-    fontSize: 13
-  },
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "flex-end"
-  },
-  sheet: {
-    backgroundColor: "#fff",
-    paddingTop: 12,
-    paddingBottom: 36,
-    paddingHorizontal: 16,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    gap: 4
-  },
-  sheetTitle: {
-    fontSize: 13,
-    color: "#888",
-    textAlign: "center",
-    paddingVertical: 8
-  },
-  sheetOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    minHeight: 56
-  },
-  sheetOptionLabel: {
-    fontSize: 16,
-    color: "#111",
-    fontWeight: "500"
-  },
-  sheetCancel: {
-    marginTop: 4,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: "#e5e3dc",
-    borderRadius: 0,
-    paddingTop: 14
-  },
-  sheetCancelLabel: {
-    color: "#666",
-    fontWeight: "400"
-  }
-});

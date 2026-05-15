@@ -5,8 +5,9 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "scheme": "eeatly",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "backgroundColor": "#FBF8F1",
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.eeatly.mobile",
@@ -62,6 +63,13 @@
         "expo-audio",
         {
           "microphonePermission": "eeatly uses the microphone so you can record a voice note describing a recipe."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FBF8F1",
+          "resizeMode": "contain"
         }
       ]
     ],

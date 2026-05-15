@@ -1,32 +1,31 @@
 import { useEffect, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import { router } from "expo-router";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { API_BASE_URL } from "../../lib/api-base";
 import { authClient } from "../../lib/auth/client";
 import { clearSessionToken } from "../../lib/auth/session";
 import { trpc } from "../../lib/trpc";
+import {
+  Button,
+  Card,
+  ListItem,
+  Screen,
+  ScreenCentered,
+  SectionHeader,
+  Tag
+} from "../../components/ui";
 
 /**
- * Round 13 — settings tab. Intentionally minimal per the handoff:
- *   - Account: name + email (read-only here; edits live on web)
- *   - Plan: shows "Plus" if subscribed, otherwise a CTA that
- *     deep-links to the web `/pricing` page (Apple reader-app pattern
- *     — IAP is explicitly out of scope)
- *   - "Manage account on web" link for advanced changes
- *   - Sign out
+ * Round 17 settings — NativeWind rebuild.
  *
- * No account management UI here. Web is the source of truth for
- * destructive operations (delete account, household management,
- * subscription changes); mobile just deep-links over to them.
+ * Intentionally minimal: account snapshot (read-only — name and email
+ * edits live on the web), plan badge, kitchen link, advanced web
+ * deeplink, and a sign-out button at the bottom. Destructive ops
+ * (delete account, manage household ownership, change subscription)
+ * stay on web; mobile deep-links to them per Apple's reader-app
+ * pattern.
  */
 export default function Settings() {
   const [profile, setProfile] = useState<
@@ -76,167 +75,113 @@ export default function Settings() {
 
   if (!loaded) {
     return (
-      <SafeAreaView style={styles.loading}>
-        <ActivityIndicator />
-      </SafeAreaView>
+      <ScreenCentered>
+        <ActivityIndicator color="#2C5F3F" />
+      </ScreenCentered>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Section title="Account">
-          <Row label="Name" value={profile?.name ?? "—"} />
-          <Row label="Email" value={profile?.email ?? "—"} />
-        </Section>
+    <Screen edges={["bottom"]}>
+      <ScrollView contentContainerClassName="pb-12">
+        <View className="px-4 pt-4 pb-2">
+          <Text className="text-heading-1 font-bold text-foreground">
+            Settings
+          </Text>
+        </View>
 
-        <Section title="Plan">
-          {subscription.isPending ? (
-            <View style={styles.row}>
-              <ActivityIndicator />
-            </View>
-          ) : isPlus ? (
-            <Row label="eeatly Plus" value="Active" />
-          ) : (
-            <>
-              <Row label="Plan" value="Free" />
-              <LinkRow
-                label="See Plus features"
-                onPress={() => openWeb("/pricing")}
-              />
-            </>
-          )}
-        </Section>
+        <SectionHeader title="Account" />
+        <View className="px-4">
+          <Card>
+            <ListItem
+              title="Name"
+              subtitle={profile?.name ?? "—"}
+              divider
+            />
+            <ListItem
+              title="Email"
+              subtitle={profile?.email ?? "—"}
+              divider={false}
+            />
+          </Card>
+        </View>
 
-        <Section title="Kitchen">
-          <LinkRow
-            label="Members + invitations"
-            onPress={() => router.push("/(authed)/household")}
-          />
-        </Section>
+        <SectionHeader title="Plan" />
+        <View className="px-4">
+          <Card>
+            {subscription.isPending ? (
+              <View className="px-4 py-4">
+                <ActivityIndicator color="#2C5F3F" />
+              </View>
+            ) : isPlus ? (
+              <View className="flex-row items-center justify-between px-4 py-4">
+                <Text className="text-body font-semibold text-foreground">
+                  eeatly Plus
+                </Text>
+                <Tag variant="primary">Active</Tag>
+              </View>
+            ) : (
+              <>
+                <View className="flex-row items-center justify-between px-4 py-4 border-b border-border">
+                  <Text className="text-body text-foreground">Plan</Text>
+                  <Tag variant="muted">Free</Tag>
+                </View>
+                <ListItem
+                  title="See Plus features"
+                  trailing={
+                    <Ionicons
+                      name="open-outline"
+                      size={18}
+                      color="#2C5F3F"
+                    />
+                  }
+                  onPress={() => openWeb("/pricing")}
+                  divider={false}
+                />
+              </>
+            )}
+          </Card>
+        </View>
 
-        <Section title="Advanced">
-          <LinkRow
-            label="Manage account on web"
-            onPress={() => openWeb("/settings")}
-          />
-        </Section>
+        <SectionHeader title="Kitchen" />
+        <View className="px-4">
+          <Card>
+            <ListItem
+              title="Members + invitations"
+              trailing={
+                <Ionicons
+                  name="chevron-forward"
+                  size={20}
+                  color="#9A968A"
+                />
+              }
+              onPress={() => router.push("/(authed)/household")}
+              divider={false}
+            />
+          </Card>
+        </View>
 
-        <Pressable
-          onPress={handleSignOut}
-          style={({ pressed }) => [styles.signOut, pressed && styles.signOutPressed]}
-        >
-          <Text style={styles.signOutText}>Sign out</Text>
-        </Pressable>
+        <SectionHeader title="Advanced" />
+        <View className="px-4">
+          <Card>
+            <ListItem
+              title="Manage account on web"
+              subtitle="Edit profile, delete account, subscription"
+              trailing={
+                <Ionicons name="open-outline" size={18} color="#2C5F3F" />
+              }
+              onPress={() => openWeb("/settings")}
+              divider={false}
+            />
+          </Card>
+        </View>
+
+        <View className="px-4 mt-6">
+          <Button variant="secondary" size="md" fullWidth onPress={handleSignOut}>
+            Sign out
+          </Button>
+        </View>
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={styles.sectionBody}>{children}</View>
-    </View>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue} numberOfLines={1}>
-        {value}
-      </Text>
-    </View>
-  );
-}
-
-function LinkRow({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="link"
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-    >
-      <Text style={styles.linkText}>{label}</Text>
-      <Text style={styles.linkArrow}>›</Text>
-    </Pressable>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fdfdfa" },
-  loading: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#fdfdfa"
-  },
-  content: { paddingVertical: 16, gap: 24 },
-  section: {},
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    color: "#666",
-    paddingHorizontal: 16,
-    paddingBottom: 8
-  },
-  sectionBody: {
-    backgroundColor: "#fff",
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: "#e5e3dc"
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    minHeight: 44,
-    gap: 12
-  },
-  rowPressed: {
-    backgroundColor: "#f5f4ef"
-  },
-  rowLabel: {
-    fontSize: 14,
-    color: "#444"
-  },
-  rowValue: {
-    fontSize: 14,
-    color: "#111",
-    flexShrink: 1,
-    textAlign: "right"
-  },
-  linkText: {
-    fontSize: 14,
-    color: "#2f6f58",
-    fontWeight: "500"
-  },
-  linkArrow: {
-    fontSize: 18,
-    color: "#999"
-  },
-  signOut: {
-    marginHorizontal: 16,
-    marginTop: 8,
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: "center",
-    borderColor: "#ccc",
-    borderWidth: 1
-  },
-  signOutPressed: {
-    backgroundColor: "#f5f5f5"
-  },
-  signOutText: {
-    color: "#444",
-    fontSize: 14,
-    fontWeight: "500"
-  }
-});

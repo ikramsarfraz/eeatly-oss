@@ -16,6 +16,7 @@
 //      (otherwise pnpm's symlinking can produce duplicate copies and
 //      a "two Reacts" runtime error).
 const { getDefaultConfig } = require("expo/metro-config");
+const { withNativeWind } = require("nativewind/metro");
 const path = require("node:path");
 
 const projectRoot = __dirname;
@@ -43,4 +44,8 @@ config.resolver.disableHierarchicalLookup = false;
 // timeouts on the initial crawl. Use Metro's node crawler instead.
 config.resolver.useWatchman = false;
 
-module.exports = config;
+// Round 17 — `withNativeWind` injects a CSS transform step that turns
+// `global.css` (with Tailwind directives) into a styles registry that
+// `react-native-css-interop` consumes at runtime. The `input` path is
+// resolved relative to the project root.
+module.exports = withNativeWind(config, { input: "./global.css" });
