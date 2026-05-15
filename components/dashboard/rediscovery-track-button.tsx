@@ -1,7 +1,7 @@
 "use client";
 
 import { Sparkles } from "lucide-react";
-import { trackUserEventAction } from "@/actions/analytics";
+import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import type { RediscoverySuggestion } from "@/types";
 
@@ -10,16 +10,20 @@ export function RediscoveryTrackButton({
 }: {
   suggestion: RediscoverySuggestion;
 }) {
+  const trackEvent = trpc.analytics.trackUserEvent.useMutation();
   return (
     <Button
       type="button"
       variant="ghost"
       size="sm"
       onClick={() => {
-        void trackUserEventAction("rediscovery_clicked", {
-          mealId: suggestion.mealId,
-          reason: suggestion.reason,
-          suggestionKind: suggestion.reason
+        trackEvent.mutate({
+          name: "rediscovery_clicked",
+          metadata: {
+            mealId: suggestion.mealId,
+            reason: suggestion.reason,
+            suggestionKind: suggestion.reason
+          }
         });
       }}
     >

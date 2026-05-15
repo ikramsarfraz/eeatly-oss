@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { CheckCircle2, Loader2, Mail } from "lucide-react";
-import { trackAuthFunnelAction } from "@/actions/analytics";
+import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +25,8 @@ export function AuthEmailForm({ mode, initialEmail, callbackURL }: AuthEmailForm
   const [error, setError] = React.useState<string | null>(null);
   const [submittedEmail, setSubmittedEmail] = React.useState<string | null>(null);
   const isSignUp = mode === "sign-up";
+  // Fire-and-forget analytics; we don't care about the result.
+  const trackAuthFunnel = trpc.analytics.trackAuthFunnel.useMutation();
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -54,7 +56,7 @@ export function AuthEmailForm({ mode, initialEmail, callbackURL }: AuthEmailForm
       }
 
       setSubmittedEmail(email);
-      void trackAuthFunnelAction(isSignUp ? "signed_up" : "signed_in");
+      trackAuthFunnel.mutate({ name: isSignUp ? "signed_up" : "signed_in" });
     } catch {
       setError("Sign-in is temporarily unavailable. Please try again later.");
     } finally {

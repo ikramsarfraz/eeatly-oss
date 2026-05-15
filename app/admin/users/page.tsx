@@ -1,12 +1,10 @@
 import { format } from "date-fns";
-import {
-  adminDispatchLifecycleEmailAction,
-  adminTrackReminderClickPlaceholderAction,
-  adminTrackReminderOpenPlaceholderAction,
-  adminUpdateBetaCohortAction
-} from "@/actions/beta-operations";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  UserCohortPicker,
+  UserLifecycleEmailButtons
+} from "@/components/admin/user-row-actions";
 import {
   Table,
   TableBody,
@@ -22,15 +20,7 @@ import {
   type RetentionStatus
 } from "@/lib/retention/status";
 import { cn } from "@/lib/utils";
-import { betaCohortValues } from "@/lib/validators/beta-cohort";
 import { listOperationalUserRows } from "@/services/user-lifecycle";
-
-const cohortLabels: Record<(typeof betaCohortValues)[number], string> = {
-  alpha: "Alpha",
-  beta_wave_1: "Beta wave 1",
-  beta_wave_2: "Beta wave 2",
-  internal: "Internal"
-};
 
 function segmentHref(segment: RetentionStatus | "all") {
   if (segment === "all") {
@@ -162,24 +152,7 @@ export default async function AdminUsersPage(props: PageProps) {
               return (
                 <TableRow key={row.userId}>
                 <TableCell className="align-top">
-                  <form action={adminUpdateBetaCohortAction} className="flex flex-col gap-2">
-                    <input name="userId" type="hidden" value={row.userId} />
-                    <select
-                      className="h-9 rounded-md border bg-background px-2 text-xs"
-                      defaultValue={row.betaCohort ?? ""}
-                      name="cohort"
-                    >
-                      <option value="">Unassigned</option>
-                      {betaCohortValues.map((value) => (
-                        <option key={value} value={value}>
-                          {cohortLabels[value]}
-                        </option>
-                      ))}
-                    </select>
-                    <Button size="sm" type="submit" variant="outline">
-                      Save cohort
-                    </Button>
-                  </form>
+                  <UserCohortPicker userId={row.userId} currentCohort={row.betaCohort} />
                 </TableCell>
                 <TableCell className="align-top font-medium">
                   <div>{row.email}</div>
@@ -204,53 +177,7 @@ export default async function AdminUsersPage(props: PageProps) {
                   </Badge>
                 </TableCell>
                 <TableCell className="align-top text-xs">
-                  <div className="flex flex-col gap-1">
-                    <form action={adminDispatchLifecycleEmailAction}>
-                      <input name="userId" type="hidden" value={row.userId} />
-                      <input name="template" type="hidden" value="welcome" />
-                      <Button size="sm" type="submit" variant="outline">
-                        Welcome
-                      </Button>
-                    </form>
-                    <form action={adminDispatchLifecycleEmailAction}>
-                      <input name="userId" type="hidden" value={row.userId} />
-                      <input name="template" type="hidden" value="first_meal_encouragement" />
-                      <Button size="sm" type="submit" variant="outline">
-                        First-meal poke
-                      </Button>
-                    </form>
-                    <form action={adminDispatchLifecycleEmailAction}>
-                      <input name="userId" type="hidden" value={row.userId} />
-                      <input name="template" type="hidden" value="inactive_reminder" />
-                      <Button size="sm" type="submit" variant="outline">
-                        Quiet streak
-                      </Button>
-                    </form>
-                    <form action={adminDispatchLifecycleEmailAction}>
-                      <input name="userId" type="hidden" value={row.userId} />
-                      <input name="template" type="hidden" value="weekly_recap_placeholder" />
-                      <Button size="sm" type="submit" variant="outline">
-                        Weekly recap test
-                      </Button>
-                    </form>
-                  </div>
-                  <details className="mt-3 text-muted-foreground">
-                    <summary className="cursor-pointer">Analytics placeholders</summary>
-                    <div className="mt-2 flex flex-col gap-1">
-                      <form action={adminTrackReminderOpenPlaceholderAction}>
-                        <input name="userId" type="hidden" value={row.userId} />
-                        <Button size="sm" type="submit" variant="ghost">
-                          Log open stub
-                        </Button>
-                      </form>
-                      <form action={adminTrackReminderClickPlaceholderAction}>
-                        <input name="userId" type="hidden" value={row.userId} />
-                        <Button size="sm" type="submit" variant="ghost">
-                          Log click stub
-                        </Button>
-                      </form>
-                    </div>
-                  </details>
+                  <UserLifecycleEmailButtons userId={row.userId} />
                 </TableCell>
                 </TableRow>
               );

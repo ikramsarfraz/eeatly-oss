@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/providers/toast-provider";
-import { createPlanAction, updatePlanAction } from "@/actions/plans";
+import { trpc } from "@/lib/trpc/client";
+import { isUpgradeRequired } from "@/lib/trpc/errors";
 import {
   createPlanSchema,
   type CreatePlanInput
@@ -33,6 +34,8 @@ export function PlanForm({
 }: PlanFormProps) {
   const router = useRouter();
   const { showToast } = useToast();
+  const create = trpc.plans.create.useMutation();
+  const update = trpc.plans.update.useMutation();
   const {
     register,
     handleSubmit,
@@ -49,17 +52,22 @@ export function PlanForm({
 
   async function onSubmit(values: CreatePlanInput) {
     if (mode === "create") {
-      const result = await createPlanAction(values);
-      if (result.ok) {
+      try {
+        const result = await create.mutateAsync(values);
         showToast({ variant: "success", title: "Plan created" });
         router.push(`/plans/${result.planId}` as never);
-        return;
+      } catch (error) {
+        // Upgrade prompt was previously surfaced via the plans-page
+        // dialog; the form-level toast keeps copy here consistent
+        // with the Round 6 messaging.
+        showToast({
+          variant: "error",
+          title: isUpgradeRequired(error)
+            ? "Upgrade required"
+            : "Couldn't create plan",
+          description: error instanceof Error ? error.message : undefined
+        });
       }
-      showToast({
-        variant: "error",
-        title: "Couldn't create plan",
-        description: result.message
-      });
       return;
     }
 
@@ -71,18 +79,18 @@ export function PlanForm({
       });
       return;
     }
-    const result = await updatePlanAction(planId, values);
-    if (result.ok) {
+    try {
+      await update.mutateAsync({ planId, patch: values });
       showToast({ variant: "success", title: "Saved" });
       onSaved?.();
       router.refresh();
-      return;
+    } catch (error) {
+      showToast({
+        variant: "error",
+        title: "Couldn't save",
+        description: error instanceof Error ? error.message : undefined
+      });
     }
-    showToast({
-      variant: "error",
-      title: "Couldn't save",
-      description: result.message
-    });
   }
 
   return (
@@ -128,13 +136,18 @@ export function PlanForm({
             type="button"
             variant="ghost"
             onClick={onCancel}
-            disabled={isSubmitting}
+            disabled={isSubmitting || create.isPending || update.isPending}
           >
             Cancel
           </Button>
         ) : null}
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+        <Button
+          type="submit"
+          disabled={isSubmitting || create.isPending || update.isPending}
+        >
+          {isSubmitting || create.isPending || update.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : null}
           {mode === "create" ? "Create plan" : "Save"}
         </Button>
       </div>

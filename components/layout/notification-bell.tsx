@@ -10,71 +10,67 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-import {
-  listNotificationsAction,
-  markAllNotificationsReadAction,
-  markNotificationReadAction
-} from "@/actions/notifications";
 import { useToast } from "@/components/providers/toast-provider";
+import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 import type { NotificationDTO } from "@/services/notifications";
 
-type BellState = {
-  rows: NotificationDTO[];
-  unreadCount: number;
-  loaded: boolean;
-};
-
+/**
+ * Round 11 — bell reads via `trpc.notifications.list.useQuery`. The
+ * two mark-as-read actions are still server actions until Task 3
+ * migrates them; on success we invalidate the tRPC query to refetch
+ * unread counts.
+ *
+ * `refetchOnWindowFocus` is true on this one query so the badge stays
+ * honest if the user lets the tab sit open. (Round 6 cache defaults
+ * disable focus refetch globally; we opt back in here because it's
+ * cheap and the badge is high-visibility.)
+ */
 export function NotificationBell() {
   const { showToast } = useToast();
-  const [state, setState] = React.useState<BellState>({
-    rows: [],
-    unreadCount: 0,
-    loaded: false
-  });
   const [open, setOpen] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
+  const utils = trpc.useUtils();
+  const markRead = trpc.notifications.markRead.useMutation();
+  const markAllRead = trpc.notifications.markAllRead.useMutation();
 
-  const load = React.useCallback(async () => {
-    try {
-      const result = await listNotificationsAction();
-      setState({
-        rows: result.rows,
-        unreadCount: result.unreadCount,
-        loaded: true
-      });
-    } catch {
-      // Soft-fail — bell stays at zero unread, the next open re-tries.
+  const { data, isFetching, refetch } = trpc.notifications.list.useQuery(
+    undefined,
+    {
+      staleTime: 30_000,
+      refetchOnWindowFocus: true
     }
-  }, []);
+  );
 
-  /* eslint-disable react-hooks/set-state-in-effect */
-  // Initial load + on-open refresh. Counts could go stale between opens,
-  // so re-loading on open keeps the badge honest without polling.
-  // load() is async and only sets state on the result — the lint rule's
-  // "cascading renders" warning is reasonable in general but this is the
-  // narrow case it's meant to allow.
+  // Re-fetch when the dropdown opens — the badge could be stale and
+  // we'd rather pay one tRPC call than show outdated counts.
   React.useEffect(() => {
-    if (!state.loaded) void load();
-  }, [load, state.loaded]);
+    if (open) void refetch();
+  }, [open, refetch]);
 
-  React.useEffect(() => {
-    if (open) void load();
-  }, [open, load]);
-  /* eslint-enable react-hooks/set-state-in-effect */
+  const rows = data?.rows ?? [];
+  const unread = data?.unreadCount ?? 0;
+  const loaded = data !== undefined;
 
   function handleItemClick(notification: NotificationDTO) {
     if (notification.readAt) return;
     startTransition(async () => {
       try {
-        await markNotificationReadAction(notification.id);
-        setState((prev) => ({
-          ...prev,
-          rows: prev.rows.map((n) =>
-            n.id === notification.id ? { ...n, readAt: new Date() } : n
-          ),
-          unreadCount: Math.max(0, prev.unreadCount - 1)
-        }));
+        await markRead.mutateAsync({ notificationId: notification.id });
+        // Optimistic local mutation via tRPC's cache helper, then
+        // invalidate so the server's source of truth wins on the
+        // next render pass.
+        utils.notifications.list.setData(undefined, (prev) =>
+          prev
+            ? {
+                rows: prev.rows.map((n) =>
+                  n.id === notification.id ? { ...n, readAt: new Date() } : n
+                ),
+                unreadCount: Math.max(0, prev.unreadCount - 1)
+              }
+            : prev
+        );
+        await utils.notifications.list.invalidate();
       } catch (error) {
         showToast({
           variant: "error",
@@ -86,16 +82,20 @@ export function NotificationBell() {
   }
 
   function handleMarkAll() {
-    if (state.unreadCount === 0) return;
+    if (unread === 0) return;
     startTransition(async () => {
       try {
-        await markAllNotificationsReadAction();
+        await markAllRead.mutateAsync();
         const readAt = new Date();
-        setState((prev) => ({
-          ...prev,
-          rows: prev.rows.map((n) => ({ ...n, readAt: n.readAt ?? readAt })),
-          unreadCount: 0
-        }));
+        utils.notifications.list.setData(undefined, (prev) =>
+          prev
+            ? {
+                rows: prev.rows.map((n) => ({ ...n, readAt: n.readAt ?? readAt })),
+                unreadCount: 0
+              }
+            : prev
+        );
+        await utils.notifications.list.invalidate();
       } catch (error) {
         showToast({
           variant: "error",
@@ -105,8 +105,6 @@ export function NotificationBell() {
       }
     });
   }
-
-  const unread = state.unreadCount;
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -147,14 +145,14 @@ export function NotificationBell() {
           </button>
         </div>
         <div className="max-h-[420px] overflow-y-auto">
-          {state.rows.length === 0 ? (
+          {rows.length === 0 ? (
             <p className="px-3 py-8 text-center text-[13px] text-muted-foreground">
-              {state.loaded
+              {loaded && !isFetching
                 ? "You're all caught up. Notifications will appear here."
                 : "Loading…"}
             </p>
           ) : (
-            state.rows.map((n) => (
+            rows.map((n) => (
               <NotificationItem
                 key={n.id}
                 notification={n}

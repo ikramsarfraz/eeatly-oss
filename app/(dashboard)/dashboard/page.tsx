@@ -1,14 +1,15 @@
 import { Suspense } from "react";
 import { DashboardClient } from "@/components/dashboard/dashboard-client";
 import { WelcomeToast } from "@/components/dashboard/welcome-toast";
-import { getDashboardMealsAction } from "@/actions/meals";
-import { requireCurrentUser } from "@/lib/auth/session";
+import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
+import { getDashboardMeals } from "@/services/meals";
 
 export default async function DashboardPage() {
-  const [user, meals] = await Promise.all([
-    requireCurrentUser(),
-    getDashboardMealsAction()
-  ]);
+  // Round 11: server components read services directly. tRPC is the
+  // client-driven interaction layer; routing every SSR fetch through
+  // it would add network latency for no benefit.
+  const { user, household } = await requireCurrentUserWithHousehold();
+  const meals = await getDashboardMeals(user.id, household.id);
 
   return (
     <>

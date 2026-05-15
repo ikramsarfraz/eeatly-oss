@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { CheckCircle2, Copy, Loader2, RefreshCw, Share2 } from "lucide-react";
-import { generateShareAction } from "@/actions/ai";
+import { trpc } from "@/lib/trpc/client";
+import { getCause } from "@/lib/trpc/errors";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,7 +14,6 @@ import {
   DialogTrigger
 } from "@/components/ui/dialog";
 import { useToast } from "@/components/providers/toast-provider";
-import type { ShareActionResult } from "@/types";
 
 type ShareRecipeDialogProps = {
   mealId: string;
@@ -33,23 +33,22 @@ export function ShareRecipeDialog({ mealId, mealName, onOpenLogForm }: ShareReci
   const [state, setState] = React.useState<State>({ phase: "idle" });
   const [copied, setCopied] = React.useState(false);
   const { showToast } = useToast();
+  const generateMutation = trpc.ai.generateShareableRecipe.useMutation();
 
   async function generate() {
     setState({ phase: "loading" });
-    let result: ShareActionResult;
     try {
-      result = await generateShareAction(mealId);
-    } catch {
-      setState({ phase: "error", message: "Something went wrong. Please try again." });
-      return;
-    }
-
-    if (result.ok) {
+      const result = await generateMutation.mutateAsync({ mealId });
       setState({ phase: "recipe", text: result.text });
-    } else if (result.code === "RECIPE_MISSING") {
-      setState({ phase: "missing" });
-    } else {
-      setState({ phase: "error", message: result.message });
+    } catch (error) {
+      const cause = getCause(error);
+      if (cause?.reason === "RECIPE_MISSING") {
+        setState({ phase: "missing" });
+        return;
+      }
+      const message =
+        error instanceof Error ? error.message : "Something went wrong. Please try again.";
+      setState({ phase: "error", message });
     }
   }
 

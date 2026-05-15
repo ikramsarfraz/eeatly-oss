@@ -1,17 +1,27 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createMealLogAction, deleteMealLogAction, getDashboardMealsAction } from "@/actions/meals";
-import { queryKeys } from "@/lib/query/keys";
+import { trpc } from "@/lib/trpc/client";
 import type { MealLogInput } from "@/lib/validators/meals";
-import type { DashboardMeals, MealStat, RecentMeal } from "@/types";
+import type { MealStat, RecentMeal } from "@/types";
 
-export function useDashboardMeals(initialData?: DashboardMeals) {
-  return useQuery({
-    queryKey: queryKeys.meals.dashboard(),
-    // Wrap the action so TanStack's queryFn context (a single object arg) doesn't
-    // collide with the action's optional options-object parameter.
-    queryFn: () => getDashboardMealsAction(),
+/**
+ * Round 11 — every read and mutation flows through tRPC. Optimistic
+ * cache writes target the `trpc.dashboard.meals` query key via the
+ * `utils` helper; the wrapper preserves the Round 10 UX (immediate
+ * recent-meal + most-cooked update on mutate, snap-back on error).
+ *
+ * The `mutateAsync` shape exposed by the underlying hook is the
+ * imperative call site for forms / log-again buttons — the existing
+ * call sites used a TanStack `useMutation` whose `mutateAsync`
+ * returned the action's result; tRPC's hook gives the same surface
+ * back, so call sites don't need to change shape.
+ */
+export function useDashboardMeals(initialData?: Parameters<typeof trpc.dashboard.meals.useQuery>[1] extends infer Q
+  ? Q extends { initialData?: infer T }
+    ? T
+    : never
+  : never) {
+  return trpc.dashboard.meals.useQuery(undefined, {
     staleTime: 30_000,
     initialData
   });
@@ -28,14 +38,13 @@ export function useCreateMealLog(options?: {
    */
   cookedBy?: { userId: string; name: string };
 }) {
-  const queryClient = useQueryClient();
+  const utils = trpc.useUtils();
 
-  return useMutation({
-    mutationFn: (input: MealLogInput) =>
-      createMealLogAction(input, { source: options?.source }),
-    onMutate: async (input) => {
-      await queryClient.cancelQueries({ queryKey: queryKeys.meals.dashboard() });
-      const previous = queryClient.getQueryData<DashboardMeals>(queryKeys.meals.dashboard());
+  return trpc.meals.createLog.useMutation({
+    onMutate: async (variables) => {
+      const input = variables.log;
+      await utils.dashboard.meals.cancel();
+      const previous = utils.dashboard.meals.getData();
 
       if (previous) {
         const optimisticRecentMeal: RecentMeal = {
@@ -70,7 +79,7 @@ export function useCreateMealLog(options?: {
               recipeSourceUrl: null
             };
 
-        queryClient.setQueryData<DashboardMeals>(queryKeys.meals.dashboard(), {
+        utils.dashboard.meals.setData(undefined, {
           ...previous,
           recentMeals: [optimisticRecentMeal, ...previous.recentMeals].slice(0, 10),
           mostCookedMeals: [
@@ -84,25 +93,44 @@ export function useCreateMealLog(options?: {
 
       return { previous };
     },
-    onError: (_error, _input, context) => {
+    onError: (_error, _variables, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(queryKeys.meals.dashboard(), context.previous);
+        utils.dashboard.meals.setData(undefined, context.previous);
       }
     },
     onSettled: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.meals.all });
+      await utils.dashboard.meals.invalidate();
     }
   });
 }
 
-export function useDeleteMealLog() {
-  const queryClient = useQueryClient();
+/**
+ * Imperative helper for call sites that still want `mutateAsync(input)`
+ * with just the `MealLogInput` payload — wraps the source flag this
+ * hook was instantiated with so call sites don't have to thread it
+ * through every call. Returns the underlying mutation object so
+ * callers can read `.isPending`, etc.
+ */
+export function useCreateMealLogImperative(options?: {
+  source?: "quick_log" | "log_again";
+  cookedBy?: { userId: string; name: string };
+}) {
+  const mutation = useCreateMealLog(options);
+  return {
+    ...mutation,
+    mutateAsync: (input: MealLogInput) =>
+      mutation.mutateAsync({ log: input, source: options?.source })
+  };
+}
 
-  return useMutation({
-    mutationFn: (logId: string) => deleteMealLogAction(logId),
-    onMutate: async (logId) => {
-      await queryClient.cancelQueries({ queryKey: queryKeys.meals.dashboard() });
-      const previous = queryClient.getQueryData<DashboardMeals>(queryKeys.meals.dashboard());
+export function useDeleteMealLog() {
+  const utils = trpc.useUtils();
+
+  return trpc.meals.deleteLog.useMutation({
+    onMutate: async (variables) => {
+      const { logId } = variables;
+      await utils.dashboard.meals.cancel();
+      const previous = utils.dashboard.meals.getData();
 
       if (previous) {
         const deletedLog = previous.recentMeals.find((m) => m.id === logId);
@@ -116,7 +144,7 @@ export function useDeleteMealLog() {
             .filter((m) => m.cookCount > 0);
         };
 
-        queryClient.setQueryData<DashboardMeals>(queryKeys.meals.dashboard(), {
+        utils.dashboard.meals.setData(undefined, {
           ...previous,
           recentMeals: previous.recentMeals.filter((m) => m.id !== logId),
           mostCookedMeals: updateStats(previous.mostCookedMeals),
@@ -126,13 +154,13 @@ export function useDeleteMealLog() {
 
       return { previous };
     },
-    onError: (_error, _logId, context) => {
+    onError: (_error, _variables, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(queryKeys.meals.dashboard(), context.previous);
+        utils.dashboard.meals.setData(undefined, context.previous);
       }
     },
     onSettled: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.meals.all });
+      await utils.dashboard.meals.invalidate();
     }
   });
 }

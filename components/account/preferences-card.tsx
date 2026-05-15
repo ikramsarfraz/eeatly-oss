@@ -5,7 +5,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/providers/toast-provider";
-import { updatePreferencesAction } from "@/actions/onboarding";
+import { trpc } from "@/lib/trpc/client";
 import { COOK_FREQUENCY_BUCKETS } from "@/lib/validators/onboarding";
 import { cn } from "@/lib/utils";
 import type { EffortLevel } from "@/types";
@@ -26,31 +26,26 @@ export function PreferencesCard({ cooksPerWeek, weeknightEffort }: Props) {
   const { showToast } = useToast();
   const [draftCooks, setDraftCooks] = React.useState<number | null>(cooksPerWeek);
   const [draftEffort, setDraftEffort] = React.useState<EffortLevel | null>(weeknightEffort);
-  const [pending, setPending] = React.useState(false);
+  const updateMutation = trpc.onboarding.updatePreferences.useMutation();
+  const pending = updateMutation.isPending;
 
   const dirty = draftCooks !== cooksPerWeek || draftEffort !== weeknightEffort;
   const valid = draftCooks !== null && draftEffort !== null;
 
   async function handleSave() {
     if (!valid || !dirty) return;
-    setPending(true);
     try {
-      await updatePreferencesAction({
+      await updateMutation.mutateAsync({
         cooksPerWeek: draftCooks!,
         weeknightEffort: draftEffort!
       });
-      showToast({
-        variant: "success",
-        title: "Preferences saved"
-      });
+      showToast({ variant: "success", title: "Preferences saved" });
     } catch (error) {
       showToast({
         variant: "error",
         title: "Couldn't save preferences",
         description: error instanceof Error ? error.message : String(error)
       });
-    } finally {
-      setPending(false);
     }
   }
 

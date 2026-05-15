@@ -25,10 +25,7 @@ import {
   AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/components/providers/toast-provider";
-import {
-  createOverrideAction,
-  deleteOverrideAction
-} from "@/actions/feature-overrides";
+import { trpc } from "@/lib/trpc/client";
 import { GATE_RULES, type GateRule } from "@/lib/gates/rules";
 
 export type OverridePanelRow = {
@@ -55,34 +52,31 @@ export function FeatureOverridesPanel({ feature, overrides }: Props) {
   const [userId, setUserId] = React.useState("");
   const [cohort, setCohort] = React.useState("");
   const [rule, setRule] = React.useState<GateRule>("open");
-  const [pending, setPending] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
+  const createMutation = trpc.admin.createGateOverride.useMutation();
+  const deleteMutation = trpc.admin.deleteGateOverride.useMutation();
+  const pending = createMutation.isPending;
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (pending) return;
-    setPending(true);
     try {
-      const result = await createOverrideAction({
+      await createMutation.mutateAsync({
         feature,
         ruleOverride: rule,
         userId: target === "user" ? userId.trim() : undefined,
         cohort: target === "cohort" ? cohort.trim() : undefined
       });
-      if (result.ok) {
-        showToast({ variant: "success", title: "Override saved" });
-        setUserId("");
-        setCohort("");
-        router.refresh();
-      } else {
-        showToast({
-          variant: "error",
-          title: "Couldn't save override",
-          description: result.message
-        });
-      }
-    } finally {
-      setPending(false);
+      showToast({ variant: "success", title: "Override saved" });
+      setUserId("");
+      setCohort("");
+      router.refresh();
+    } catch (error) {
+      showToast({
+        variant: "error",
+        title: "Couldn't save override",
+        description: error instanceof Error ? error.message : undefined
+      });
     }
   }
 
@@ -90,17 +84,15 @@ export function FeatureOverridesPanel({ feature, overrides }: Props) {
     if (deletingId) return;
     setDeletingId(id);
     try {
-      const result = await deleteOverrideAction(id);
-      if (result.ok) {
-        showToast({ variant: "success", title: "Override removed" });
-        router.refresh();
-      } else {
-        showToast({
-          variant: "error",
-          title: "Couldn't remove",
-          description: result.message
-        });
-      }
+      await deleteMutation.mutateAsync({ overrideId: id });
+      showToast({ variant: "success", title: "Override removed" });
+      router.refresh();
+    } catch (error) {
+      showToast({
+        variant: "error",
+        title: "Couldn't remove",
+        description: error instanceof Error ? error.message : undefined
+      });
     } finally {
       setDeletingId(null);
     }

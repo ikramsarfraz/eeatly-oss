@@ -3,7 +3,8 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Check, Clipboard, Loader2, MessageCircle, Sparkles } from "lucide-react";
-import { extractIngredientsFromExistingRecipeAction } from "@/actions/ai";
+import { trpc } from "@/lib/trpc/client";
+import { getCause } from "@/lib/trpc/errors";
 import { useToast } from "@/components/providers/toast-provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -67,84 +68,67 @@ function IngredientChecklistEmpty({
 }) {
   const { showToast } = useToast();
   const router = useRouter();
-  const [isPending, setIsPending] = React.useState(false);
+  const extractMutation = trpc.ai.extractIngredientsForMeal.useMutation();
 
   async function handleExtract() {
-    setIsPending(true);
     try {
-      const result = await extractIngredientsFromExistingRecipeAction({ mealId });
-      if (result.ok) {
-        if (result.ingredients.length === 0) {
-          // The AI saw the recipe but couldn't find an ingredient list
-          // in it — surface honestly instead of leaving the user
-          // staring at an unchanged empty state with no feedback.
-          showToast({
-            variant: "info",
-            title: "No ingredients found",
-            description:
-              "The AI couldn't pick out an ingredient list from this recipe. You can edit the recipe and try again."
-          });
-        } else {
-          showToast({
-            variant: "success",
-            title: `Extracted ${result.ingredients.length} ingredient${
-              result.ingredients.length === 1 ? "" : "s"
-            }`
-          });
-          // Refresh the route so the server-rendered prop refills with
-          // the persisted list. The button keeps its loading state
-          // through the refresh — handled in `finally` below.
-          router.refresh();
-        }
+      const result = await extractMutation.mutateAsync({ mealId });
+      if (result.ingredients.length === 0) {
+        showToast({
+          variant: "info",
+          title: "No ingredients found",
+          description:
+            "The AI couldn't pick out an ingredient list from this recipe. You can edit the recipe and try again."
+        });
         return;
       }
-      // Failure cases — each maps to a tailored toast. The shapes
-      // match what the UI shows elsewhere (RATE_LIMITED, UPGRADE,
-      // etc.) so the user gets familiar copy.
-      if (result.code === "UPGRADE_REQUIRED") {
+      showToast({
+        variant: "success",
+        title: `Extracted ${result.ingredients.length} ingredient${
+          result.ingredients.length === 1 ? "" : "s"
+        }`
+      });
+      router.refresh();
+    } catch (error) {
+      const cause = getCause(error);
+      const reason = cause?.reason;
+      const message =
+        error instanceof Error ? error.message : "Please try again.";
+      if (reason === "UPGRADE_REQUIRED") {
         showToast({
           variant: "error",
           title: "Upgrade required",
-          description:
-            result.message ?? "Extracting ingredients is a paid-tier feature."
+          description: message ?? "Extracting ingredients is a paid-tier feature."
         });
-      } else if (result.code === "RATE_LIMITED") {
+      } else if (reason === "RATE_LIMITED") {
         showToast({
           variant: "error",
           title: "Daily AI limit reached",
-          description: result.message ?? "Try again tomorrow."
+          description: message ?? "Try again tomorrow."
         });
-      } else if (result.code === "NO_RECIPE_TEXT") {
+      } else if (reason === "NO_RECIPE_TEXT") {
         showToast({
           variant: "info",
           title: "Nothing to extract",
           description:
             "Add a recipe to this meal first, then try extracting ingredients."
         });
-      } else if (result.code === "NOT_FOUND") {
+      } else if (reason === "NOT_FOUND") {
         showToast({
           variant: "error",
           title: "Meal not found",
-          description: result.message
+          description: message
         });
       } else {
         showToast({
           variant: "error",
           title: "Extraction failed",
-          description: result.message ?? "Please try again."
+          description: message
         });
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Please try again.";
-      showToast({
-        variant: "error",
-        title: "Extraction failed",
-        description: message
-      });
-    } finally {
-      setIsPending(false);
     }
   }
+  const isPending = extractMutation.isPending;
 
   return (
     <div className="grid gap-2.5 rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-2)] p-4">

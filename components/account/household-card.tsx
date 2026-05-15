@@ -26,11 +26,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/providers/toast-provider";
-import {
-  createInvitationAction,
-  removeMemberAction,
-  revokeInvitationAction
-} from "@/actions/households";
+import { trpc } from "@/lib/trpc/client";
+import { isUpgradeRequired } from "@/lib/trpc/errors";
 
 export type HouseholdCardMember = {
   userId: string;
@@ -64,27 +61,28 @@ export function HouseholdCard({
 }: HouseholdCardProps) {
   const { showToast } = useToast();
   const [email, setEmail] = React.useState("");
-  const [pendingInvite, setPendingInvite] = React.useState(false);
   const [revokingId, setRevokingId] = React.useState<string | null>(null);
   const [removingUserId, setRemovingUserId] = React.useState<string | null>(null);
+  const inviteMutation = trpc.households.invite.useMutation();
+  const revokeMutation = trpc.households.revokeInvitation.useMutation();
+  const removeMutation = trpc.households.removeMember.useMutation();
+  const pendingInvite = inviteMutation.isPending;
 
   async function handleRemove(targetUserId: string, targetName: string) {
     if (removingUserId) return;
     setRemovingUserId(targetUserId);
     try {
-      const result = await removeMemberAction({ targetUserId });
-      if (result.ok) {
-        showToast({
-          variant: "success",
-          title: `Removed ${result.removedUserName}`
-        });
-      } else {
-        showToast({
-          variant: "error",
-          title: `Couldn't remove ${targetName}`,
-          description: result.message
-        });
-      }
+      const result = await removeMutation.mutateAsync({ targetUserId });
+      showToast({
+        variant: "success",
+        title: `Removed ${result.removedUserName}`
+      });
+    } catch (error) {
+      showToast({
+        variant: "error",
+        title: `Couldn't remove ${targetName}`,
+        description: error instanceof Error ? error.message : undefined
+      });
     } finally {
       setRemovingUserId(null);
     }
@@ -93,25 +91,22 @@ export function HouseholdCard({
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
     if (!email.trim() || pendingInvite) return;
-    setPendingInvite(true);
     try {
-      const result = await createInvitationAction({ email });
-      if (result.ok) {
-        showToast({
-          variant: "success",
-          title: "Invitation sent",
-          description: `We emailed an invite to ${email.trim()}.`
-        });
-        setEmail("");
-      } else {
-        showToast({
-          variant: "error",
-          title: "Couldn't send invitation",
-          description: result.message
-        });
-      }
-    } finally {
-      setPendingInvite(false);
+      await inviteMutation.mutateAsync({ email });
+      showToast({
+        variant: "success",
+        title: "Invitation sent",
+        description: `We emailed an invite to ${email.trim()}.`
+      });
+      setEmail("");
+    } catch (error) {
+      showToast({
+        variant: "error",
+        title: isUpgradeRequired(error)
+          ? "Upgrade required"
+          : "Couldn't send invitation",
+        description: error instanceof Error ? error.message : undefined
+      });
     }
   }
 
@@ -119,16 +114,14 @@ export function HouseholdCard({
     if (revokingId) return;
     setRevokingId(invitationId);
     try {
-      const result = await revokeInvitationAction({ invitationId });
-      if (result.ok) {
-        showToast({ variant: "success", title: "Invitation revoked" });
-      } else {
-        showToast({
-          variant: "error",
-          title: "Couldn't revoke",
-          description: result.message
-        });
-      }
+      await revokeMutation.mutateAsync({ invitationId });
+      showToast({ variant: "success", title: "Invitation revoked" });
+    } catch (error) {
+      showToast({
+        variant: "error",
+        title: "Couldn't revoke",
+        description: error instanceof Error ? error.message : undefined
+      });
     } finally {
       setRevokingId(null);
     }

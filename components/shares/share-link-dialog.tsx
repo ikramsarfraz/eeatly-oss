@@ -13,11 +13,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/providers/toast-provider";
 import { UpgradePrompt } from "@/components/pricing/upgrade-prompt";
-import {
-  createRecipeShareAction,
-  getShareForMealAction,
-  revokeRecipeShareAction
-} from "@/actions/shares";
+import { trpc } from "@/lib/trpc/client";
+import { getCause, isUpgradeRequired } from "@/lib/trpc/errors";
 
 export type ShareLinkDialogProps = {
   open: boolean;
@@ -39,53 +36,62 @@ function ShareLinkDialogBody({
   mealName
 }: Omit<ShareLinkDialogProps, "open">) {
   const { showToast } = useToast();
-  const [state, setState] = React.useState<DialogState>({ kind: "loading" });
-  const [busy, setBusy] = React.useState(false);
+  const utils = trpc.useUtils();
   const [copied, setCopied] = React.useState(false);
-  const [revoking, setRevoking] = React.useState(false);
+  // Local override for terminal states the query can't surface:
+  // `upgrade_required` (mutation rejection) and ad-hoc `error`
+  // (network failure on the mutation itself). The query is the
+  // source of truth for empty/active/loading.
+  const [override, setOverride] = React.useState<
+    | { kind: "upgrade_required" }
+    | { kind: "error"; message: string }
+    | null
+  >(null);
 
-  // Pre-fetch existing share state on mount. If a share exists we
-  // skip straight to the "active" view; if not, the user sees the
-  // "Create share link" CTA and the service round-trip only fires
-  // on intent. No `useEffect` for prop-derived state (lint rule),
-  // but a one-shot mount-effect for a network fetch is fine.
-  React.useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      const result = await getShareForMealAction({ mealId });
-      if (cancelled) return;
-      if (!result.ok) {
-        setState({ kind: "error", message: result.message });
-        return;
-      }
-      if (result.share) {
-        setState({ kind: "active", shareId: result.share.shareId, url: result.share.url });
-      } else {
-        setState({ kind: "empty" });
-      }
+  // Pre-fetch existing share state via tRPC. The dialog body is
+  // keyed on (mealId, open) by its parent so the query re-runs
+  // each time the dialog re-opens.
+  const activeShare = trpc.shares.activeForMeal.useQuery(
+    { mealId },
+    { staleTime: 0 }
+  );
+
+  const createMutation = trpc.shares.create.useMutation();
+  const revokeMutation = trpc.shares.revoke.useMutation();
+
+  // Derive the dialog state directly from query + override —
+  // no useEffect required, no setState-in-effect lint warning.
+  const state: DialogState = (() => {
+    if (override) return override;
+    if (activeShare.isPending) return { kind: "loading" };
+    if (activeShare.error) return { kind: "error", message: activeShare.error.message };
+    if (activeShare.data) {
+      return {
+        kind: "active",
+        shareId: activeShare.data.shareId,
+        url: activeShare.data.url
+      };
     }
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [mealId]);
+    return { kind: "empty" };
+  })();
 
   async function handleCreate() {
-    if (busy) return;
-    setBusy(true);
+    if (createMutation.isPending) return;
+    setOverride(null);
     try {
-      const result = await createRecipeShareAction({ mealId });
-      if (result.ok) {
-        setState({ kind: "active", shareId: result.shareId, url: result.url });
+      await createMutation.mutateAsync({ mealId });
+      // Don't manually project the result — invalidate so the query
+      // refetches with the canonical row and our derived `state`
+      // flips to "active" on its own.
+      await utils.shares.activeForMeal.invalidate({ mealId });
+    } catch (error) {
+      if (isUpgradeRequired(error)) {
+        setOverride({ kind: "upgrade_required" });
         return;
       }
-      if (result.code === "UPGRADE_REQUIRED") {
-        setState({ kind: "upgrade_required" });
-        return;
-      }
-      setState({ kind: "error", message: result.message });
-    } finally {
-      setBusy(false);
+      const message =
+        error instanceof Error ? error.message : "Couldn't create share link.";
+      setOverride({ kind: "error", message });
     }
   }
 
@@ -104,22 +110,18 @@ function ShareLinkDialogBody({
   }
 
   async function handleRevoke(shareId: string) {
-    if (revoking) return;
-    setRevoking(true);
+    if (revokeMutation.isPending) return;
     try {
-      const result = await revokeRecipeShareAction({ shareId });
-      if (result.ok) {
-        showToast({ variant: "success", title: "Share revoked" });
-        setState({ kind: "empty" });
-        return;
-      }
+      await revokeMutation.mutateAsync({ shareId });
+      showToast({ variant: "success", title: "Share revoked" });
+      await utils.shares.activeForMeal.invalidate({ mealId });
+    } catch (error) {
+      const cause = getCause(error);
       showToast({
         variant: "error",
         title: "Couldn't revoke",
-        description: result.message
+        description: error instanceof Error ? error.message : cause?.reason
       });
-    } finally {
-      setRevoking(false);
     }
   }
 
@@ -152,8 +154,8 @@ function ShareLinkDialogBody({
             Generate a public link to share this recipe via WhatsApp, iMessage,
             or anywhere else.
           </p>
-          <Button type="button" onClick={handleCreate} disabled={busy}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          <Button type="button" onClick={handleCreate} disabled={createMutation.isPending}>
+            {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Create share link
           </Button>
         </div>
@@ -235,10 +237,10 @@ function ShareLinkDialogBody({
             variant="ghost"
             size="sm"
             onClick={() => handleRevoke(state.shareId)}
-            disabled={revoking}
+            disabled={revokeMutation.isPending}
             className="text-destructive hover:bg-destructive/10 hover:text-destructive"
           >
-            {revoking ? (
+            {revokeMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Trash2 className="h-4 w-4" />

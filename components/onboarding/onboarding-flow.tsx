@@ -13,11 +13,7 @@ import {
 } from "@/lib/validators/onboarding";
 import { cn } from "@/lib/utils";
 import type { EffortLevel } from "@/types";
-import {
-  completeOnboardingAction,
-  saveOnboardingHabitsAction
-} from "@/actions/onboarding";
-import { createMealLogAction } from "@/actions/meals";
+import { trpc } from "@/lib/trpc/client";
 
 type FreshStep = 1 | 2 | 3 | 4;
 type InvitedStep = 1 | 2 | 3;
@@ -62,12 +58,15 @@ export function OnboardingFlow({
   const [habits, setHabits] = React.useState<Habits>(initialHabits);
   const [firstMealName, setFirstMealName] = React.useState("");
   const [pending, setPending] = React.useState(false);
+  const createLogMutation = trpc.meals.createLog.useMutation();
+  const saveHabitsMutation = trpc.onboarding.saveHabits.useMutation();
+  const completeMutation = trpc.onboarding.complete.useMutation();
 
   async function handleHabitsContinue() {
     if (habits.cooksPerWeek === null || habits.weeknightEffort === null) return;
     setPending(true);
     try {
-      await saveOnboardingHabitsAction({
+      await saveHabitsMutation.mutateAsync({
         cooksPerWeek: habits.cooksPerWeek,
         weeknightEffort: habits.weeknightEffort
       });
@@ -90,8 +89,8 @@ export function OnboardingFlow({
     if (trimmed.length < 2) return;
     setPending(true);
     try {
-      await createMealLogAction(
-        {
+      await createLogMutation.mutateAsync({
+        log: {
           mealName: trimmed,
           effortLevel: habits.weeknightEffort ?? "easy",
           notes: "",
@@ -100,8 +99,8 @@ export function OnboardingFlow({
           recipeText: "",
           recipeSourceUrl: ""
         },
-        { source: "quick_log" }
-      );
+        source: "quick_log"
+      });
       setStep(4);
     } catch (error) {
       showToast({
@@ -117,15 +116,16 @@ export function OnboardingFlow({
   async function handleFinish() {
     setPending(true);
     try {
-      await completeOnboardingAction();
-      router.replace(buildPostOnboardingHref({ path, householdName }));
+      await completeMutation.mutateAsync();
     } catch {
-      // completeOnboardingAction's redirect() throws NEXT_REDIRECT —
-      // any other failure still lands us at the dashboard with the toast.
-      router.replace(buildPostOnboardingHref({ path, householdName }));
+      // Non-fatal — the procedure marks completion best-effort and
+      // returns the dashboard target regardless.
     } finally {
       setPending(false);
     }
+    // The procedure returns `{ redirectTo }`; we override here so the
+    // welcome-toast params land correctly.
+    router.replace(buildPostOnboardingHref({ path, householdName }));
   }
 
   return (

@@ -16,7 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/providers/toast-provider";
-import { clonePlanFromPastAction } from "@/actions/plans";
+import { trpc } from "@/lib/trpc/client";
+import { isUpgradeRequired } from "@/lib/trpc/errors";
 import { bumpYearInName } from "@/lib/plans/clone-name";
 
 export type ClonePlanDialogProps = {
@@ -33,15 +34,12 @@ function ClonePlanDialogBody({ onOpenChange, source }: Omit<ClonePlanDialogProps
   const { showToast } = useToast();
   const [name, setName] = React.useState(() => bumpYearInName(source.name));
   const [date, setDate] = React.useState("");
-  const [pending, setPending] = React.useState(false);
+  const cloneMutation = trpc.plans.cloneFromPast.useMutation();
 
   async function handleClone() {
-    if (pending) return;
+    if (cloneMutation.isPending) return;
     if (!name.trim()) {
-      showToast({
-        variant: "error",
-        title: "Give the plan a name"
-      });
+      showToast({ variant: "error", title: "Give the plan a name" });
       return;
     }
     if (!date) {
@@ -51,31 +49,24 @@ function ClonePlanDialogBody({ onOpenChange, source }: Omit<ClonePlanDialogProps
       });
       return;
     }
-    setPending(true);
     try {
-      const result = await clonePlanFromPastAction({
+      const result = await cloneMutation.mutateAsync({
         sourcePlanId: source.id,
         newName: name.trim(),
         newScheduledDate: date
       });
-      if (result.ok) {
-        onOpenChange(false);
-        // Pass `hintsFrom=<sourceId>` so the new plan's detail page can
-        // server-render hint badges even after refresh. The action also
-        // returns previousAnnotations directly, but the URL-bound source
-        // makes hints survive refreshes / shared links until dismissed.
-        router.push(
-          `/plans/${result.newPlanId}?hintsFrom=${source.id}` as Route
-        );
-        return;
-      }
+      onOpenChange(false);
+      // Pass `hintsFrom=<sourceId>` so the new plan's detail page can
+      // server-render hint badges even after refresh. The procedure
+      // returns previousAnnotations directly, but the URL-bound source
+      // makes hints survive refreshes / shared links until dismissed.
+      router.push(`/plans/${result.newPlanId}?hintsFrom=${source.id}` as Route);
+    } catch (error) {
       showToast({
         variant: "error",
-        title: "Couldn't clone plan",
-        description: result.message
+        title: isUpgradeRequired(error) ? "Upgrade required" : "Couldn't clone plan",
+        description: error instanceof Error ? error.message : undefined
       });
-    } finally {
-      setPending(false);
     }
   }
 
@@ -118,12 +109,12 @@ function ClonePlanDialogBody({ onOpenChange, source }: Omit<ClonePlanDialogProps
           type="button"
           variant="ghost"
           onClick={() => onOpenChange(false)}
-          disabled={pending}
+          disabled={cloneMutation.isPending}
         >
           Cancel
         </Button>
-        <Button type="button" onClick={handleClone} disabled={pending}>
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+        <Button type="button" onClick={handleClone} disabled={cloneMutation.isPending}>
+          {cloneMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Clone
         </Button>
       </DialogFooter>
