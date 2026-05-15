@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { Link, router, Stack } from "expo-router";
+import { Link, router } from "expo-router";
 import {
   Alert,
   FlatList,
@@ -10,24 +10,27 @@ import {
   View
 } from "react-native";
 import { ClonePlanSheet } from "../../../components/clone-plan-sheet";
+import { TopNav } from "../../../components/top-nav";
 import { formatCookedAt } from "../../../lib/dates";
+import { colors } from "../../../lib/design/tokens";
 import { trpc } from "../../../lib/trpc";
 import {
-  Button,
   Card,
-  EmptyState,
   ErrorScreen,
+  IconBubble,
   LoadingScreen,
+  PageTitle,
   Screen
 } from "../../../components/ui";
 
 /**
- * Round 17 plans list — NativeWind rebuild.
+ * Round 18 plans list — editorial rebuild.
  *
- * Tile-based scroll, FAB at bottom-right for "+ New plan", clone
- * sheet on long-press (carried over from R14). Each tile shows
- * name + scheduled date + dish count; effort summary lives on the
- * detail page.
+ * Layout: TopNav with back chevron (gear right) → big serif "Plans"
+ * title + subtitle → vertical list of plan cards (44pt sage IconBubble
+ * + name + mono date eyebrow + chevron) → italic serif empty hint
+ * when the list is short → floating forest FAB at bottom-right for
+ * "+ new plan".
  */
 export default function PlansListScreen() {
   const list = trpc.plans.list.useQuery(undefined, { staleTime: 30_000 });
@@ -54,107 +57,121 @@ export default function PlansListScreen() {
 
   if (list.isPending) {
     return (
-      <>
-        <Stack.Screen
-          options={{
-            title: "Plans",
-            headerBackTitle: "Back",
-            headerStyle: { backgroundColor: "#FBF8F1" },
-            headerTintColor: "#1A1F1B"
-          }}
-        />
+      <Screen edges={["top", "bottom"]}>
+        <TopNav title="Plans" back />
         <LoadingScreen />
-      </>
+      </Screen>
     );
   }
 
   if (list.error) {
     return (
-      <>
-        <Stack.Screen
-          options={{
-            title: "Plans",
-            headerBackTitle: "Back",
-            headerStyle: { backgroundColor: "#FBF8F1" },
-            headerTintColor: "#1A1F1B"
-          }}
-        />
+      <Screen edges={["top", "bottom"]}>
+        <TopNav title="Plans" back />
         <ErrorScreen
           title="Couldn't load your plans"
           body="Pull down to retry."
         />
-      </>
+      </Screen>
     );
   }
 
   return (
-    <Screen edges={["bottom"]}>
-      <Stack.Screen
-        options={{
-          title: "Plans",
-          headerBackTitle: "Back",
-          headerStyle: { backgroundColor: "#FBF8F1" },
-          headerTintColor: "#1A1F1B",
-          headerTitleStyle: { fontWeight: "600" }
-        }}
-      />
+    <Screen edges={["top", "bottom"]}>
+      <TopNav title="Plans" back />
 
-      {plans.length === 0 ? (
-        <View className="flex-1">
-          <EmptyState
-            icon={
-              <Ionicons name="calendar-outline" size={28} color="#2C5F3F" />
-            }
-            title="No plans yet"
-            body="Plans help you remember what worked for last year's Eid, Diwali, or any occasion. Build a menu, log what each dish took, then clone for next year."
-            action={
-              <Link href="/(authed)/plans/new" asChild>
-                <Pressable>
-                  <Button
-                    variant="primary"
-                    size="lg"
-                    leadingIcon={
-                      <Ionicons name="add" size={18} color="#FBF8F1" />
-                    }
-                  >
-                    Create your first plan
-                  </Button>
-                </Pressable>
-              </Link>
-            }
+      <FlatList
+        data={plans}
+        keyExtractor={(p) => p.id}
+        ListHeaderComponent={
+          <View style={{ paddingHorizontal: 22, paddingTop: 12, paddingBottom: 22 }}>
+            <PageTitle
+              title="Plans"
+              size="md"
+              subtitle="Occasion menus, dinners, weeknight cooks."
+            />
+          </View>
+        }
+        contentContainerStyle={{
+          paddingHorizontal: 22,
+          paddingBottom: 140
+        }}
+        ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+        ListEmptyComponent={
+          <View style={{ alignItems: "center", marginTop: 16 }}>
+            <Text
+              className="font-display-italic text-display-xs text-ink-2"
+              style={{ letterSpacing: -0.3, marginBottom: 8 }}
+            >
+              No plans yet.
+            </Text>
+            <Text
+              className="font-body text-body-md text-ink-3 text-center"
+              style={{ maxWidth: 260, lineHeight: 21 }}
+            >
+              Use plans for menus tied to a date — Eid, Diwali, a dinner party.
+            </Text>
+          </View>
+        }
+        ListFooterComponent={
+          plans.length > 0 ? (
+            <View style={{ alignItems: "center", marginTop: 36 }}>
+              <Text
+                className="font-display-italic text-display-xs text-ink-2"
+                style={{ letterSpacing: -0.3, marginBottom: 8 }}
+              >
+                {plans.length === 1 ? "One plan so far." : "That's all for now."}
+              </Text>
+              <Text
+                className="font-body text-body-md text-ink-3 text-center"
+                style={{ maxWidth: 260, lineHeight: 21 }}
+              >
+                Use plans for menus tied to a date — Eid, Diwali, a dinner party.
+              </Text>
+            </View>
+          ) : null
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={list.isFetching && !list.isPending}
+            onRefresh={() => list.refetch()}
+            tintColor={colors.forest}
           />
-        </View>
-      ) : (
-        <FlatList
-          data={plans}
-          keyExtractor={(p) => p.id}
-          contentContainerClassName="p-4 pb-24 gap-2.5"
-          refreshControl={
-            <RefreshControl
-              refreshing={list.isFetching && !list.isPending}
-              onRefresh={() => list.refetch()}
-              tintColor="#2C5F3F"
-            />
-          }
-          renderItem={({ item }) => (
-            <PlanTile
-              id={item.id}
-              name={item.name}
-              scheduledDate={item.scheduledDate}
-              dishCount={item.dishCount}
-              onLongPress={() => offerClone(item.id, item.name)}
-            />
-          )}
-        />
-      )}
+        }
+        renderItem={({ item }) => (
+          <PlanTile
+            id={item.id}
+            name={item.name}
+            scheduledDate={item.scheduledDate}
+            dishCount={item.dishCount}
+            onLongPress={() => offerClone(item.id, item.name)}
+          />
+        )}
+      />
 
       <Pressable
         onPress={() => router.push("/(authed)/plans/new")}
         accessibilityRole="button"
         accessibilityLabel="Create a new plan"
-        className="absolute bottom-6 right-5 w-14 h-14 rounded-full bg-primary items-center justify-center shadow-lg active:opacity-90"
+        style={{
+          position: "absolute",
+          bottom: 28,
+          right: 22,
+          width: 56,
+          height: 56,
+          borderRadius: 99,
+          backgroundColor: colors.forest,
+          alignItems: "center",
+          justifyContent: "center",
+          shadowColor: colors.forest,
+          shadowOpacity: 0.35,
+          shadowOffset: { width: 0, height: 6 },
+          shadowRadius: 20,
+          elevation: 6
+        }}
+        className="active:opacity-90"
       >
-        <Ionicons name="add" size={28} color="#FBF8F1" />
+        <Ionicons name="add" size={26} color={colors.forestText} />
       </Pressable>
 
       {cloneSource ? (
@@ -191,43 +208,35 @@ function PlanTile({
         delayLongPress={420}
         className="active:opacity-90"
       >
-        <Card variant="default">
-          <View className="flex-row items-center gap-3 p-4">
-            <View className="h-11 w-11 items-center justify-center rounded-full bg-primary-muted">
+        <Card>
+          <View
+            className="flex-row items-center p-3.5"
+            style={{ gap: 12 }}
+          >
+            <IconBubble size={48}>
               <Ionicons
                 name="calendar-outline"
-                size={20}
-                color="#2C5F3F"
+                size={22}
+                color={colors.forest}
               />
-            </View>
+            </IconBubble>
             <View className="flex-1 gap-1">
               <Text
-                className="text-body font-semibold text-foreground"
+                className="font-body-semibold text-title-md text-ink"
+                style={{ letterSpacing: -0.1 }}
                 numberOfLines={1}
               >
                 {name}
               </Text>
-              <View className="flex-row items-center gap-1.5 flex-wrap">
-                {scheduledDate ? (
-                  <>
-                    <Text className="text-caption text-foreground-muted">
-                      {formatPlanDate(scheduledDate)}
-                    </Text>
-                    <Text className="text-caption text-foreground-subtle">
-                      ·
-                    </Text>
-                  </>
-                ) : null}
-                <Text className="text-caption text-foreground-muted">
-                  {dishCount === 0
-                    ? "No dishes yet"
-                    : dishCount === 1
-                      ? "1 dish"
-                      : `${dishCount} dishes`}
-                </Text>
-              </View>
+              <Text
+                className="font-mono text-eyebrow text-ink-3 uppercase"
+                style={{ letterSpacing: 0.6 }}
+                numberOfLines={1}
+              >
+                {planEyebrow(scheduledDate, dishCount)}
+              </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#9A968A" />
+            <Ionicons name="chevron-forward" size={18} color={colors.ink3} />
           </View>
         </Card>
       </Pressable>
@@ -235,10 +244,15 @@ function PlanTile({
   );
 }
 
-function formatPlanDate(ymd: string): string {
-  const [y, m, d] = ymd.split("-").map(Number);
-  if (!y || !m || !d) return ymd;
-  const date = new Date(y, m - 1, d);
-  const label = formatCookedAt(date);
-  return label.charAt(0).toUpperCase() + label.slice(1);
+function planEyebrow(scheduledDate: string | null, dishCount: number): string {
+  const dishes =
+    dishCount === 0
+      ? "no dishes"
+      : dishCount === 1
+        ? "1 dish"
+        : `${dishCount} dishes`;
+  if (!scheduledDate) return dishes;
+  const [y, m, d] = scheduledDate.split("-").map(Number);
+  if (!y || !m || !d) return dishes;
+  return `${formatCookedAt(new Date(y, m - 1, d))} · ${dishes}`;
 }

@@ -2,34 +2,45 @@ import { Text, View } from "react-native";
 import type { ReactNode } from "react";
 
 /**
- * Round 17 — empty state.
+ * Round 18 — empty state. Centered icon-in-bubble + serif italic
+ * kicker (optional) + serif title + body + optional action.
  *
- * Centered icon-in-circle + title + body + optional action. Use on
- * every list-bearing screen when the underlying collection is
- * genuinely empty (not just loading or filtered — those have their
- * own affordances).
- *
- * The icon container is `primary-muted` so the icon glyph itself
- * can stay in `primary` for color contrast.
+ * The italic kicker matches the editorial "One plan so far." pattern
+ * on the plans list — pass it via `kicker` for the same treatment.
  */
 type EmptyStateProps = {
   icon: ReactNode;
   title: string;
   body?: string;
+  kicker?: string;
   action?: ReactNode;
 };
 
-export function EmptyState({ icon, title, body, action }: EmptyStateProps) {
+export function EmptyState({
+  icon,
+  title,
+  body,
+  kicker,
+  action
+}: EmptyStateProps) {
   return (
     <View className="flex-1 items-center justify-center gap-3 px-8 py-12">
-      <View className="h-16 w-16 items-center justify-center rounded-full bg-primary-muted">
+      <View className="h-16 w-16 items-center justify-center rounded-full bg-sage-bg">
         {icon}
       </View>
-      <Text className="text-heading-2 font-semibold text-foreground text-center">
+      {kicker ? (
+        <Text className="font-display-italic text-kicker text-ink-2">
+          {kicker}
+        </Text>
+      ) : null}
+      <Text
+        className="font-display text-display-xs text-ink text-center"
+        style={{ letterSpacing: -0.4 }}
+      >
         {title}
       </Text>
       {body ? (
-        <Text className="text-body text-foreground-muted text-center max-w-[280px]">
+        <Text className="font-body text-body-lg text-ink-2 text-center max-w-[280px]">
           {body}
         </Text>
       ) : null}

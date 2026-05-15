@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { Link, router, Stack } from "expo-router";
+import { Link, router } from "expo-router";
 import {
   ActivityIndicator,
   Alert,
@@ -11,26 +11,30 @@ import {
   View
 } from "react-native";
 import { authClient } from "../../../lib/auth/client";
+import { colors } from "../../../lib/design/tokens";
 import { trpc } from "../../../lib/trpc";
+import { TopNav } from "../../../components/top-nav";
 import {
   Avatar,
   Button,
   Card,
+  Chip,
   ErrorScreen,
   LoadingScreen,
+  PageTitle,
   Screen,
-  SectionHeader,
-  Tag
+  SectionLabel
 } from "../../../components/ui";
 
 /**
- * Round 17 household — NativeWind rebuild.
+ * Round 18 kitchen — editorial rebuild.
  *
- * Kitchen header card → invite button (owner only) → members list →
- * pending invitations list (owner only) → leave kitchen button.
- *
- * Member rows use the Avatar primitive with deterministic colors so
- * each household member is visually distinguishable.
+ * TopNav (Kitchen, back chevron, gear) → italic kicker "The" + serif
+ * "<name> kitchen." 44pt → mono uppercase eyebrow → inline forest
+ * "Invite someone" pill (owner only) → MEMBERS section with avatar
+ * + name + (you) + email + Owner chip + joined eyebrow → PENDING
+ * INVITATIONS section → centered "Leave kitchen" outline-destructive
+ * button with explanatory caption.
  */
 
 function getCauseReason(error: unknown): string | null {
@@ -40,22 +44,35 @@ function getCauseReason(error: unknown): string | null {
   return typeof reason === "string" ? reason : null;
 }
 
-function formatJoined(d: string | Date): string {
+function formatJoinedEyebrow(d: string | Date): string {
   const date = d instanceof Date ? d : new Date(d);
-  return date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric"
-  });
+  const month = date.toLocaleString("en-US", { month: "short" });
+  return `Joined ${month} ${date.getDate()} · ${date.getFullYear()}`.toUpperCase();
+}
+
+function formatInviteEyebrow(sent: string | Date, expires: string | Date): string {
+  const sentDate = sent instanceof Date ? sent : new Date(sent);
+  const expiresDate = expires instanceof Date ? expires : new Date(expires);
+  const fmt = (d: Date) =>
+    `${d.toLocaleString("en-US", { month: "short" })} ${d.getDate()}`;
+  return `Sent ${fmt(sentDate)} · expires ${fmt(expiresDate)}`.toUpperCase();
 }
 
 function initialsFor(name: string, email: string): string {
   const source = name.trim() || email.trim();
-  const parts = source.split(/\s+/);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase();
-  }
   return source.slice(0, 2).toUpperCase();
+}
+
+function kitchenKicker(name: string): { kicker: string; title: string } {
+  const trimmed = name.trim();
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith("the ")) {
+    return { kicker: "The", title: trimmed.slice(4) + "." };
+  }
+  if (lower.endsWith(" kitchen")) {
+    return { kicker: "The", title: trimmed + "." };
+  }
+  return { kicker: "Your", title: trimmed + "." };
 }
 
 export default function HouseholdScreen() {
@@ -92,23 +109,6 @@ export default function HouseholdScreen() {
   });
 
   const utils = trpc.useUtils();
-  const removeMutation = trpc.households.removeMember.useMutation({
-    onSuccess: () => {
-      utils.households.current.invalidate();
-    },
-    onError: (error) => {
-      const reason = getCauseReason(error);
-      Alert.alert(
-        "Couldn't remove",
-        reason === "CANNOT_REMOVE_SELF"
-          ? "Use Leave kitchen on the web to remove yourself."
-          : reason === "CANNOT_REMOVE_OWNER"
-            ? "You can't remove the owner. Transfer ownership first."
-            : error.message || "Try again."
-      );
-    }
-  });
-
   const cancelMutation = trpc.households.revokeInvitation.useMutation({
     onSuccess: () => utils.households.pendingInvitations.invalidate(),
     onError: (error) =>
@@ -157,21 +157,6 @@ export default function HouseholdScreen() {
     );
   }
 
-  function confirmRemove(targetUserId: string, name: string) {
-    Alert.alert(
-      `Remove ${name}?`,
-      "Their recipes stay in the kitchen; future contributions stop.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: () => removeMutation.mutate({ targetUserId })
-        }
-      ]
-    );
-  }
-
   function confirmCancel(invitationId: string, email: string) {
     Alert.alert(
       `Cancel invitation to ${email}?`,
@@ -189,52 +174,36 @@ export default function HouseholdScreen() {
 
   if (current.isPending) {
     return (
-      <>
-        <Stack.Screen
-          options={{
-            title: "Kitchen",
-            headerBackTitle: "Back",
-            headerStyle: { backgroundColor: "#FBF8F1" },
-            headerTintColor: "#1A1F1B"
-          }}
-        />
+      <Screen edges={["top", "bottom"]}>
+        <TopNav title="Kitchen" back />
         <LoadingScreen />
-      </>
+      </Screen>
     );
   }
 
   if (!household) {
     return (
-      <>
-        <Stack.Screen
-          options={{
-            title: "Kitchen",
-            headerBackTitle: "Back",
-            headerStyle: { backgroundColor: "#FBF8F1" },
-            headerTintColor: "#1A1F1B"
-          }}
-        />
+      <Screen edges={["top", "bottom"]}>
+        <TopNav title="Kitchen" back />
         <ErrorScreen
           title="Kitchen not loaded"
           body="Try again or head back to home."
         />
-      </>
+      </Screen>
     );
   }
 
+  const { kicker, title } = kitchenKicker(household.name);
+  const memberEyebrow =
+    household.memberCount === 1
+      ? "Just you for now"
+      : `${household.memberCount} members`;
+
   return (
-    <Screen edges={["bottom"]}>
-      <Stack.Screen
-        options={{
-          title: "Kitchen",
-          headerBackTitle: "Back",
-          headerStyle: { backgroundColor: "#FBF8F1" },
-          headerTintColor: "#1A1F1B",
-          headerTitleStyle: { fontWeight: "600" }
-        }}
-      />
+    <Screen edges={["top", "bottom"]}>
+      <TopNav title="Kitchen" back />
       <ScrollView
-        contentContainerClassName="pb-12"
+        contentContainerStyle={{ paddingHorizontal: 22, paddingBottom: 36 }}
         refreshControl={
           <RefreshControl
             refreshing={current.isFetching && !current.isPending}
@@ -242,177 +211,183 @@ export default function HouseholdScreen() {
               current.refetch();
               if (isOwner) pending.refetch();
             }}
-            tintColor="#2C5F3F"
+            tintColor={colors.forest}
           />
         }
       >
-        <View className="px-4 pt-4 gap-2">
-          <Text className="text-heading-1 font-bold text-foreground">
-            {household.name}
-          </Text>
-          <Text className="text-caption text-foreground-muted">
-            {household.memberCount === 1
-              ? "Just you for now"
-              : `${household.memberCount} members`}
-          </Text>
-          {isOwner ? (
-            <View className="mt-2">
-              <Link href="/(authed)/household/invite" asChild>
-                <Pressable>
-                  <Button
-                    variant="primary"
-                    size="md"
-                    leadingIcon={
-                      <Ionicons
-                        name="person-add-outline"
-                        size={18}
-                        color="#FBF8F1"
-                      />
-                    }
-                  >
-                    Invite someone
-                  </Button>
-                </Pressable>
-              </Link>
-            </View>
-          ) : null}
+        <View style={{ paddingTop: 8, marginBottom: 22 }}>
+          <PageTitle
+            title={title}
+            size="md"
+            kicker={kicker}
+            eyebrow={memberEyebrow.toUpperCase()}
+          />
         </View>
 
-        <SectionHeader title="Members" />
-        <View className="px-4">
-          <Card>
-            {members.map((m, i) => {
+        {isOwner ? (
+          <View style={{ marginBottom: 28 }}>
+            <Link href="/(authed)/household/invite" asChild>
+              <Pressable>
+                <Button
+                  variant="primary"
+                  size="md"
+                  leadingIcon={
+                    <Ionicons
+                      name="person-add-outline"
+                      size={16}
+                      color={colors.forestText}
+                    />
+                  }
+                >
+                  Invite someone
+                </Button>
+              </Pressable>
+            </Link>
+          </View>
+        ) : null}
+
+        <SectionLabel>Members</SectionLabel>
+        <Card style={{ marginBottom: 22, padding: 16 }}>
+          <View style={{ gap: 18 }}>
+            {members.map((m) => {
               const isMe = currentUserId === m.userId;
-              const canRemove = isOwner && !isMe && m.role !== "owner";
               return (
                 <View
                   key={m.userId}
-                  className={`flex-row items-start gap-3 p-3.5 ${
-                    i < members.length - 1 ? "border-b border-border" : ""
-                  }`}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "flex-start",
+                    gap: 12
+                  }}
                 >
-                  <Avatar
-                    size="md"
-                    initials={initialsFor(m.name, m.email)}
-                  />
-                  <View className="flex-1 gap-0.5">
-                    <Text
-                      className="text-body font-semibold text-foreground"
-                      numberOfLines={1}
-                    >
-                      {m.name}
+                  <Avatar size="md" initials={initialsFor(m.name, m.email)} />
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
+                      <Text
+                        className="font-body-semibold text-body-lg text-ink"
+                        style={{ letterSpacing: -0.1 }}
+                        numberOfLines={1}
+                      >
+                        {m.name}
+                      </Text>
                       {isMe ? (
-                        <Text className="text-caption text-foreground-muted font-normal">
-                          {"  "}(you)
+                        <Text className="font-body text-chip text-ink-3">
+                          (you)
                         </Text>
                       ) : null}
-                    </Text>
+                    </View>
                     <Text
-                      className="text-caption text-foreground-muted"
+                      className="font-mono text-eyebrow text-ink-3"
+                      style={{ letterSpacing: 0.4 }}
                       numberOfLines={1}
                     >
                       {m.email}
                     </Text>
-                    <View className="flex-row items-center flex-wrap gap-1.5 mt-1">
-                      {m.role === "owner" ? (
-                        <Tag variant="primary">Owner</Tag>
-                      ) : null}
-                      <Text className="text-small text-foreground-subtle">
-                        Joined {formatJoined(m.joinedAt)}
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 10,
+                        marginTop: 6,
+                        flexWrap: "wrap"
+                      }}
+                    >
+                      {m.role === "owner" ? <Chip tone="sage">Owner</Chip> : null}
+                      <Text
+                        className="font-mono text-eyebrow-xs text-ink-3 uppercase"
+                        style={{ letterSpacing: 0.6 }}
+                      >
+                        {formatJoinedEyebrow(m.joinedAt)}
                       </Text>
                     </View>
                   </View>
-                  {canRemove ? (
-                    <Pressable
-                      onPress={() => confirmRemove(m.userId, m.name)}
-                      hitSlop={6}
-                      disabled={removeMutation.isPending}
-                      className={`px-3 py-2 rounded-sm border border-destructive/30 bg-destructive/10 active:opacity-70 ${
-                        removeMutation.isPending ? "opacity-50" : ""
-                      }`}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Remove ${m.name}`}
-                    >
-                      <Text className="text-caption-strong font-semibold text-destructive">
-                        Remove
-                      </Text>
-                    </Pressable>
-                  ) : null}
                 </View>
               );
             })}
-          </Card>
-        </View>
+          </View>
+        </Card>
 
         {isOwner ? (
           <>
-            <SectionHeader title="Pending invitations" />
-            <View className="px-4">
-              {pending.isPending ? (
-                <ActivityIndicator color="#2C5F3F" />
-              ) : pending.data && pending.data.length > 0 ? (
-                <Card>
-                  {pending.data.map((p, i) => (
+            <SectionLabel>Pending invitations</SectionLabel>
+            {pending.isPending ? (
+              <ActivityIndicator color={colors.forest} />
+            ) : pending.data && pending.data.length > 0 ? (
+              <View style={{ gap: 10, marginBottom: 28 }}>
+                {pending.data.map((p) => (
+                  <Card key={p.id} style={{ padding: 14 }}>
                     <View
-                      key={p.id}
-                      className={`flex-row items-center gap-3 p-3.5 ${
-                        i < (pending.data?.length ?? 0) - 1
-                          ? "border-b border-border"
-                          : ""
-                      }`}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 12
+                      }}
                     >
-                      <View className="flex-1 gap-0.5">
+                      <View style={{ flex: 1 }}>
                         <Text
-                          className="text-body text-foreground"
+                          className="font-body-semibold text-body-md text-ink"
+                          style={{ letterSpacing: -0.1 }}
                           numberOfLines={1}
                         >
                           {p.email}
                         </Text>
-                        <Text className="text-small text-foreground-muted">
-                          Sent {formatJoined(p.createdAt)} · expires{" "}
-                          {formatJoined(p.expiresAt)}
+                        <Text
+                          className="font-mono text-eyebrow-xs text-ink-3 uppercase mt-1"
+                          style={{ letterSpacing: 0.5 }}
+                        >
+                          {formatInviteEyebrow(p.createdAt, p.expiresAt)}
                         </Text>
                       </View>
                       <Pressable
                         onPress={() => confirmCancel(p.id, p.email)}
-                        hitSlop={6}
                         disabled={cancelMutation.isPending}
-                        className={`px-3 py-2 rounded-sm border border-destructive/30 bg-destructive/10 active:opacity-70 ${
-                          cancelMutation.isPending ? "opacity-50" : ""
-                        }`}
                         accessibilityRole="button"
+                        accessibilityLabel={`Cancel invitation to ${p.email}`}
+                        style={{
+                          paddingHorizontal: 12,
+                          paddingVertical: 7,
+                          borderRadius: 99,
+                          backgroundColor: colors.dangerSoft,
+                          opacity: cancelMutation.isPending ? 0.5 : 1
+                        }}
                       >
-                        <Text className="text-caption-strong font-semibold text-destructive">
+                        <Text
+                          style={{
+                            fontFamily: "Geist_600SemiBold",
+                            fontSize: 12.5,
+                            color: colors.danger,
+                            letterSpacing: -0.05
+                          }}
+                        >
                           Cancel
                         </Text>
                       </Pressable>
                     </View>
-                  ))}
-                </Card>
-              ) : (
-                <Text className="text-caption italic text-foreground-muted px-1">
-                  No pending invitations.
-                </Text>
-              )}
-            </View>
+                  </Card>
+                ))}
+              </View>
+            ) : (
+              <Text className="font-display-italic text-body-md text-ink-3 mb-7">
+                No pending invitations.
+              </Text>
+            )}
           </>
         ) : null}
 
-        <View className="mt-8 px-8 items-center gap-2">
-          <Pressable
+        <View style={{ alignItems: "center", marginTop: 16 }}>
+          <Button
+            variant="outline-destructive"
+            size="sm"
             onPress={() => confirmLeave(household.name)}
             disabled={leaveMutation.isPending}
-            accessibilityRole="button"
-            accessibilityLabel={`Leave ${household.name}`}
-            className={`min-h-[44px] px-4 py-2.5 rounded-sm border border-destructive/30 bg-destructive/10 active:opacity-70 ${
-              leaveMutation.isPending ? "opacity-50" : ""
-            }`}
+            loading={leaveMutation.isPending}
           >
-            <Text className="text-caption-strong font-semibold text-destructive">
-              {leaveMutation.isPending ? "Leaving…" : "Leave kitchen"}
-            </Text>
-          </Pressable>
-          <Text className="text-small text-foreground-muted text-center max-w-[280px]">
+            Leave kitchen
+          </Button>
+          <Text
+            className="font-body text-body-sm text-ink-3 text-center mt-3"
+            style={{ maxWidth: 280, lineHeight: 19 }}
+          >
             Your recipes stay credited to you. You&apos;ll land in a fresh
             personal kitchen.
           </Text>

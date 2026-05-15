@@ -2,15 +2,18 @@ import { Pressable, View } from "react-native";
 import type { PressableProps, ViewProps } from "react-native";
 
 /**
- * Round 17 — Card primitive.
+ * Round 18 — Card primitive.
  *
- * `default` — cream surface on background, subtle shadow.
- * `interactive` — pressable, slight press feedback (use for tiles
- * the user can tap into).
+ * `default` — surface bg on cream, hairline border, very subtle
+ * downward shadow. The everyday card.
+ * `interactive` — same surface but pressable; press feedback is a
+ * gentle sage-bg tint.
  * `outlined` — border only, no shadow. Cheaper visual weight for
- * sections inside dense layouts.
+ * dense sections.
+ * `flush` — same surface but no internal padding; the consumer lays
+ * out grouped rows inside. Used by Settings / Kitchen.
  */
-export type CardVariant = "default" | "interactive" | "outlined";
+export type CardVariant = "default" | "interactive" | "outlined" | "flush";
 
 type CardProps = ViewProps & {
   variant?: CardVariant;
@@ -22,10 +25,13 @@ type InteractiveCardProps = Omit<PressableProps, "style"> & {
 };
 
 const baseByVariant: Record<CardVariant, string> = {
-  default: "bg-background-elevated rounded-md shadow-sm",
+  default:
+    "bg-surface rounded-lg border border-border-soft shadow-sm",
   interactive:
-    "bg-background-elevated rounded-md shadow-sm active:bg-background-muted",
-  outlined: "bg-background-elevated rounded-md border border-border"
+    "bg-surface rounded-lg border border-border-soft shadow-sm active:bg-sage-bg/40",
+  outlined:
+    "bg-surface rounded-lg border border-border-soft",
+  flush: "bg-surface rounded-lg border border-border-soft overflow-hidden"
 };
 
 export function Card(props: CardProps | InteractiveCardProps) {
@@ -51,19 +57,27 @@ export function Card(props: CardProps | InteractiveCardProps) {
 }
 
 /**
- * Optional header / body subcomponents that pad consistently. Callers
- * are free to skip these and lay out content directly — they're just
- * common scaffolding.
+ * Optional padding helpers — used when consumers want consistent inner
+ * spacing without manually adding `p-4`.
  */
-export function CardHeader({ className, ...rest }: ViewProps & { className?: string }) {
+export function CardHeader({
+  className,
+  ...rest
+}: ViewProps & { className?: string }) {
   return <View className={`px-4 pt-4 pb-2 ${className ?? ""}`} {...rest} />;
 }
 
-export function CardBody({ className, ...rest }: ViewProps & { className?: string }) {
+export function CardBody({
+  className,
+  ...rest
+}: ViewProps & { className?: string }) {
   return <View className={`px-4 py-4 ${className ?? ""}`} {...rest} />;
 }
 
-export function CardFooter({ className, ...rest }: ViewProps & { className?: string }) {
+export function CardFooter({
+  className,
+  ...rest
+}: ViewProps & { className?: string }) {
   return (
     <View
       className={`px-4 pt-2 pb-4 flex-row items-center justify-end gap-2 ${className ?? ""}`}

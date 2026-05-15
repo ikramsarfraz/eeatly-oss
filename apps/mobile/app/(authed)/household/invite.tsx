@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
-import { router, Stack } from "expo-router";
+import { router } from "expo-router";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -13,15 +13,21 @@ import {
   View
 } from "react-native";
 import { createInvitationSchema } from "@eeatly/api/validators/households";
+import { colors } from "../../../lib/design/tokens";
 import { trpc } from "../../../lib/trpc";
-import { Button, Card, Input, Screen } from "../../../components/ui";
+import { TopNav } from "../../../components/top-nav";
+import {
+  Button,
+  Card,
+  Input,
+  PageTitle,
+  Screen
+} from "../../../components/ui";
 
 /**
- * Round 17 invite — NativeWind rebuild.
- *
- * Owner-only (server-enforced). Email-only form; success pops back
- * to the household screen and triggers a refresh of the pending list.
- * `UPGRADE_REQUIRED` triggers a modal pointing at web pricing.
+ * Round 18 invite — editorial rebuild. Email-only form, owner-only
+ * (server-enforced). Success pops back to the household screen and
+ * triggers a refresh of the pending list.
  */
 function getCauseReason(error: unknown): string | null {
   if (!error || typeof error !== "object") return null;
@@ -78,15 +84,12 @@ export default function InviteScreen() {
   const canSubmit = email.trim().length > 0 && !submitting;
 
   return (
-    <Screen edges={["bottom"]}>
-      <Stack.Screen
-        options={{
-          title: "Invite",
-          headerBackTitle: "Back",
-          headerStyle: { backgroundColor: "#FBF8F1" },
-          headerTintColor: "#1A1F1B",
-          headerTitleStyle: { fontWeight: "600" }
-        }}
+    <Screen edges={["top", "bottom"]}>
+      <TopNav
+        title="Invite"
+        leftLabel="Cancel"
+        onLeftPress={() => router.back()}
+        showSettings={false}
       />
       <KeyboardAvoidingView
         className="flex-1"
@@ -94,18 +97,19 @@ export default function InviteScreen() {
         keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
       >
         <ScrollView
-          contentContainerClassName="p-4 pb-12 gap-4"
+          contentContainerStyle={{
+            paddingHorizontal: 22,
+            paddingTop: 14,
+            paddingBottom: 32,
+            gap: 22
+          }}
           keyboardShouldPersistTaps="handled"
         >
-          <View className="gap-2">
-            <Text className="text-heading-1 font-bold text-foreground">
-              Invite to your kitchen
-            </Text>
-            <Text className="text-body text-foreground-muted">
-              Their recipes and cook logs will merge into your shared kitchen
-              when they accept. The invitation email lasts a few days.
-            </Text>
-          </View>
+          <PageTitle
+            title="Invite to your kitchen."
+            size="sm"
+            subtitle="Their recipes and cook logs merge into your shared kitchen when they accept. The invitation email lasts a few days."
+          />
 
           <Input
             label="Email"
@@ -122,6 +126,7 @@ export default function InviteScreen() {
             textContentType="emailAddress"
             editable={!submitting}
             error={emailError ?? undefined}
+            mono
           />
 
           <Button
@@ -131,7 +136,11 @@ export default function InviteScreen() {
             loading={submitting}
             disabled={!canSubmit}
             leadingIcon={
-              <Ionicons name="mail-outline" size={18} color="#FBF8F1" />
+              <Ionicons
+                name="mail-outline"
+                size={18}
+                color={colors.forestText}
+              />
             }
             onPress={handleSubmit}
           >
@@ -147,23 +156,43 @@ export default function InviteScreen() {
         onRequestClose={() => setUpgradeOpen(false)}
       >
         <Pressable
-          className="flex-1 bg-foreground/40 items-center justify-center p-6"
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(20,20,15,0.5)",
+            justifyContent: "center",
+            padding: 22
+          }}
           onPress={() => setUpgradeOpen(false)}
         >
-          <Pressable onPress={() => null} className="self-stretch max-w-[360px] mx-auto">
+          <Pressable
+            onPress={() => null}
+            style={{ alignSelf: "stretch", maxWidth: 360, marginHorizontal: "auto" }}
+          >
             <Card>
-              <View className="px-5 py-6 gap-3 items-center">
-                <View className="h-14 w-14 items-center justify-center rounded-full bg-accent">
-                  <Ionicons name="sparkles-outline" size={26} color="#1A1F1B" />
+              <View style={{ padding: 24, alignItems: "center", gap: 12 }}>
+                <View
+                  style={{
+                    height: 56,
+                    width: 56,
+                    borderRadius: 99,
+                    backgroundColor: colors.wheat,
+                    alignItems: "center",
+                    justifyContent: "center"
+                  }}
+                >
+                  <Ionicons name="sparkles-outline" size={26} color={colors.ink} />
                 </View>
-                <Text className="text-heading-2 font-semibold text-foreground text-center">
+                <Text
+                  className="font-display text-display-xs text-ink text-center"
+                  style={{ letterSpacing: -0.4 }}
+                >
                   Inviting is part of eeatly Plus
                 </Text>
-                <Text className="text-body text-foreground-muted text-center">
+                <Text className="font-body text-body-md text-ink-2 text-center">
                   Upgrade on the web to add family members to your shared
                   kitchen. Solo cooking stays free.
                 </Text>
-                <View className="self-stretch gap-2 mt-2">
+                <View style={{ alignSelf: "stretch", gap: 10, marginTop: 8 }}>
                   <Button
                     variant="primary"
                     size="lg"

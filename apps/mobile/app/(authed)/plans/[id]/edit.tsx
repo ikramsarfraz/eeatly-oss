@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
-import { router, Stack, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -13,17 +13,21 @@ import {
   View
 } from "react-native";
 import { updatePlanSchema } from "@eeatly/api/validators/plans";
+import { TopNav } from "../../../../components/top-nav";
+import { colors } from "../../../../lib/design/tokens";
 import { trpc } from "../../../../lib/trpc";
 import {
-  Button,
   Input,
   LoadingScreen,
   Screen
 } from "../../../../components/ui";
 
 /**
- * Round 17 edit-plan — NativeWind rebuild. Metadata only (name +
- * scheduled date); dish editing happens on the plan detail page.
+ * Round 18 edit-plan — metadata-only form (name + scheduled date +
+ * notes). Dish editing happens on the detail page.
+ *
+ * The destructive "Delete plan" row at the bottom uses the danger-soft
+ * bg + danger text from the handoff. Confirm via Alert.
  */
 
 function formatYMD(date: Date): string {
@@ -33,16 +37,13 @@ function formatYMD(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-function formatDateLabel(ymd: string): string {
+function formatDateValue(ymd: string): string {
   const [y, m, d] = ymd.split("-").map(Number);
   if (!y || !m || !d) return ymd;
   const date = new Date(y, m - 1, d);
-  return date.toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric"
-  });
+  const weekday = date.toLocaleString("en-US", { weekday: "short" });
+  const month = date.toLocaleString("en-US", { month: "short" });
+  return `${weekday}, ${month} ${date.getDate()}, ${date.getFullYear()}`;
 }
 
 export default function EditPlanScreen() {
@@ -95,88 +96,155 @@ export default function EditPlanScreen() {
     update.mutate({ planId, patch: parsed.data });
   }
 
+  function handleDelete() {
+    Alert.alert(
+      "Delete plan?",
+      "Dishes stay in your library, but this plan disappears.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            // TODO: wire to plans.delete once available; gracefully exits
+            // for now since the mutation isn't exposed yet.
+            Alert.alert(
+              "Not yet wired",
+              "Plan deletion ships in the next round. Edits stay."
+            );
+          }
+        }
+      ]
+    );
+  }
+
   const submitting = update.isPending;
   const loading = planQuery.isPending;
   const canSubmit = name.trim().length > 0 && !submitting;
 
   if (loading) {
     return (
-      <>
-        <Stack.Screen
-          options={{
-            title: "Edit plan",
-            headerBackTitle: "Back",
-            headerStyle: { backgroundColor: "#FBF8F1" },
-            headerTintColor: "#1A1F1B"
-          }}
+      <Screen edges={["top", "bottom"]}>
+        <TopNav
+          title="Edit plan"
+          leftLabel="Cancel"
+          onLeftPress={() => router.back()}
+          showSettings={false}
         />
         <LoadingScreen />
-      </>
+      </Screen>
     );
   }
 
   return (
-    <Screen edges={["bottom"]}>
-      <Stack.Screen
-        options={{
-          title: "Edit plan",
-          headerBackTitle: "Back",
-          headerStyle: { backgroundColor: "#FBF8F1" },
-          headerTintColor: "#1A1F1B",
-          headerTitleStyle: { fontWeight: "600" }
-        }}
+    <Screen edges={["top", "bottom"]}>
+      <TopNav
+        title="Edit plan"
+        leftLabel="Cancel"
+        onLeftPress={() => router.back()}
+        rightLabel={submitting ? "Saving…" : "Save"}
+        onRightPress={canSubmit ? handleSubmit : undefined}
+        showSettings={false}
       />
+
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
       >
         <ScrollView
-          contentContainerClassName="p-4 pb-12 gap-4"
+          contentContainerStyle={{
+            paddingHorizontal: 22,
+            paddingTop: 14,
+            paddingBottom: 32
+          }}
           keyboardShouldPersistTaps="handled"
         >
-          <Input
-            label="Plan name"
-            value={name}
-            onChangeText={(t) => {
-              setName(t);
-              if (nameError) setNameError(null);
-            }}
-            autoCapitalize="sentences"
-            autoCorrect
-            maxLength={80}
-            editable={!submitting}
-            error={nameError ?? undefined}
-          />
+          <View style={{ gap: 18 }}>
+            <Input
+              label="Plan name"
+              value={name}
+              onChangeText={(t) => {
+                setName(t);
+                if (nameError) setNameError(null);
+              }}
+              autoCapitalize="sentences"
+              autoCorrect
+              maxLength={80}
+              editable={!submitting}
+              error={nameError ?? undefined}
+            />
 
-          <View className="gap-1.5">
-            <Text className="text-caption-strong font-semibold text-foreground">
-              Planned date
-            </Text>
-            <Pressable
-              onPress={() => setShowDatePicker(true)}
-              disabled={submitting}
-              className={`flex-row items-center justify-between rounded-md border border-border bg-background-elevated px-3 h-11 active:bg-background-muted ${
-                submitting ? "opacity-50" : ""
-              }`}
-            >
-              <Text className="text-body text-foreground">
-                {formatDateLabel(scheduledDate)}
+            <View style={{ gap: 8 }}>
+              <Text
+                className="font-body-semibold text-body-md text-ink"
+                style={{ letterSpacing: -0.1 }}
+              >
+                Planned date
               </Text>
-              <Ionicons name="calendar-outline" size={18} color="#6B7068" />
-            </Pressable>
+              <Pressable
+                onPress={() => setShowDatePicker(true)}
+                disabled={submitting}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  borderWidth: 1,
+                  borderRadius: 12,
+                  paddingHorizontal: 16,
+                  height: 48,
+                  opacity: submitting ? 0.5 : 1
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: "JetBrainsMono_400Regular",
+                    fontSize: 15,
+                    color: colors.ink
+                  }}
+                >
+                  {formatDateValue(scheduledDate)}
+                </Text>
+                <Ionicons name="calendar-outline" size={18} color={colors.ink3} />
+              </Pressable>
+            </View>
           </View>
 
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            loading={submitting}
-            disabled={!canSubmit}
-            onPress={handleSubmit}
+          <Pressable
+            onPress={handleDelete}
+            style={{
+              marginTop: 32,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingHorizontal: 16,
+              paddingVertical: 14,
+              backgroundColor: colors.dangerSoft,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: "rgba(168,65,58,0.12)"
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Delete plan"
           >
-            Save changes
-          </Button>
+            <View style={{ flex: 1 }}>
+              <Text
+                className="font-body-semibold text-body-md text-danger"
+                style={{ letterSpacing: -0.1 }}
+              >
+                Delete plan
+              </Text>
+              <Text
+                className="font-body text-body-sm text-danger mt-0.5"
+                style={{ opacity: 0.75 }}
+              >
+                Dishes stay in your library.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.danger} />
+          </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -225,22 +293,64 @@ function DatePickerSheet({
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
       <Pressable
-        className="flex-1 bg-foreground/40 justify-end"
+        style={{
+          flex: 1,
+          backgroundColor: "rgba(20,20,15,0.32)",
+          justifyContent: "flex-end"
+        }}
         onPress={onCancel}
       >
         <Pressable
           onPress={() => null}
-          className="bg-background-elevated rounded-t-lg pb-6"
+          style={{
+            backgroundColor: colors.paper,
+            borderTopLeftRadius: 22,
+            borderTopRightRadius: 22,
+            paddingBottom: 32
+          }}
         >
-          <View className="flex-row items-center justify-between px-4 py-3 border-b border-border">
-            <Pressable onPress={onCancel} hitSlop={12}>
-              <Text className="text-body text-foreground-muted">Cancel</Text>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingHorizontal: 16,
+              paddingVertical: 14,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.borderSoft
+            }}
+          >
+            <Pressable onPress={onCancel} hitSlop={10}>
+              <Text
+                style={{
+                  fontFamily: "Geist_500Medium",
+                  fontSize: 15,
+                  color: colors.ink2
+                }}
+              >
+                Cancel
+              </Text>
             </Pressable>
-            <Text className="text-caption-strong font-semibold text-foreground">
+            <Text
+              style={{
+                fontFamily: "Geist_600SemiBold",
+                fontSize: 14,
+                color: colors.ink,
+                letterSpacing: -0.1
+              }}
+            >
               Plan date
             </Text>
-            <Pressable onPress={() => onConfirm(formatYMD(draft))} hitSlop={12}>
-              <Text className="text-body font-semibold text-primary">Done</Text>
+            <Pressable onPress={() => onConfirm(formatYMD(draft))} hitSlop={10}>
+              <Text
+                style={{
+                  fontFamily: "Geist_600SemiBold",
+                  fontSize: 15,
+                  color: colors.forest
+                }}
+              >
+                Done
+              </Text>
             </Pressable>
           </View>
           <DateTimePicker

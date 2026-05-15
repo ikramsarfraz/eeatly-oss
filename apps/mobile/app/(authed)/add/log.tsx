@@ -1,22 +1,23 @@
-import { Stack } from "expo-router";
-import { StyleSheet } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
 import { MealLogForm } from "../../../components/meal-log-form";
+import { TopNav } from "../../../components/top-nav";
+import { Screen } from "../../../components/ui";
 
 /**
- * Round 13 Task 3 — manual meal log entry. Thin wrapper around the
- * shared `<MealLogForm>` (Task 4's AI review screen uses the same
- * form with `showRecipePreview`).
+ * Round 18 — manual meal log entry. Editorial TopNav with Cancel/Save
+ * affordances; the form itself is in `<MealLogForm>` (also used by
+ * the AI review screen with `showRecipePreview`).
  */
 export default function ManualLogScreen() {
   return (
-    <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <Stack.Screen options={{ title: "Log a meal", headerBackTitle: "Back" }} />
+    <Screen edges={["top", "bottom"]}>
+      <TopNav
+        title="Log a meal"
+        leftLabel="Cancel"
+        onLeftPress={() => router.back()}
+        showSettings={false}
+      />
       <MealLogForm submitSource="quick_log" />
-    </SafeAreaView>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fdfdfa" }
-});

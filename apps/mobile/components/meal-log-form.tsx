@@ -10,29 +10,34 @@ import {
   Pressable,
   ScrollView,
   Text,
+  TextInput,
   View
 } from "react-native";
 import { mealLogInputSchema } from "@eeatly/api/validators/meals";
 import type { MealLogInput } from "@eeatly/api/validators/meals";
 import { trpc } from "../lib/trpc";
+import { colors } from "../lib/design/tokens";
 import { PhotoPicker } from "./photo-picker";
 import { SourceUrlInputPreview } from "./embeds/source-url-input-preview";
 import { Button, Card, CardBody, Input, ListItem } from "./ui";
 
 /**
- * Round 17 meal log form — NativeWind rebuild of the R13 form.
+ * Round 18 meal log form — editorial rebuild.
+ *
+ * Stack: meal-name + autocomplete → date → photo zone (dashed cream
+ * tile) → effort 4-segment pill → italic-serif notes → mono URL input
+ * with embed preview → save CTA.
  *
  * Two callers:
- *   - `/add/log` — plain manual log, autocompletes against the
- *     household library, no recipe preview.
- *   - `/add/ai-suggest` — review-and-edit after the AI returns a
- *     suggestion. Recipe text + extracted ingredients show as a
- *     read-only preview card above the fields.
+ *   - `/add/log` — quick manual log, autocompletes against the
+ *     household library.
+ *   - `/add/ai-suggest` — review/edit after the AI returns a draft;
+ *     `showRecipePreview` renders the read-only extraction card above
+ *     the fields.
  *
- * Submit funnels through `meals.createLog` either way; the server's
- * `(householdId, normalizedName)` idempotency means typing an
- * existing name (or AI guessing one) produces a re-cook log, not a
- * duplicate meal.
+ * Submit funnels through `meals.createLog`; the server's
+ * `(householdId, normalizedName)` idempotency means typing an existing
+ * name produces a re-cook log, not a duplicate meal.
  */
 
 type EffortValue = MealLogInput["effortLevel"];
@@ -90,6 +95,26 @@ export type MealLogFormProps = {
   hideAutocomplete?: boolean;
   submitLabel?: string;
 };
+
+function FieldLabel({
+  children,
+  optional
+}: {
+  children: string;
+  optional?: boolean;
+}) {
+  return (
+    <Text
+      className="font-body-semibold text-body-md text-ink mb-2"
+      style={{ letterSpacing: -0.1 }}
+    >
+      {children}
+      {optional ? (
+        <Text className="font-body text-body-md text-ink-3"> · optional</Text>
+      ) : null}
+    </Text>
+  );
+}
 
 export function MealLogForm({
   initialValues,
@@ -215,28 +240,46 @@ export function MealLogForm({
       keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
     >
       <ScrollView
-        contentContainerClassName="p-4 pb-12 gap-4"
+        contentContainerStyle={{
+          paddingHorizontal: 22,
+          paddingTop: 14,
+          paddingBottom: 32,
+          gap: 18
+        }}
         keyboardShouldPersistTaps="handled"
       >
         {showRecipePreview &&
         (recipeText || (ingredients?.length ?? 0) > 0) ? (
           <Card>
             <CardBody>
-              <View className="flex-row items-center gap-2 mb-2">
-                <Ionicons name="sparkles-outline" size={16} color="#2C5F3F" />
-                <Text className="text-caption-strong font-semibold uppercase tracking-wider text-primary">
+              <View
+                className="flex-row items-center mb-2"
+                style={{ gap: 8 }}
+              >
+                <Ionicons
+                  name="sparkles-outline"
+                  size={16}
+                  color={colors.forest}
+                />
+                <Text
+                  className="font-body-semibold text-label text-forest uppercase"
+                  style={{ letterSpacing: 1.4 }}
+                >
                   What the AI read
                 </Text>
               </View>
               {ingredients && ingredients.length > 0 ? (
-                <View className="gap-1 mb-3">
-                  <Text className="text-caption-strong font-semibold text-foreground">
+                <View style={{ gap: 4, marginBottom: 12 }}>
+                  <Text
+                    className="font-body-semibold text-body-md text-ink"
+                    style={{ letterSpacing: -0.1 }}
+                  >
                     Ingredients
                   </Text>
-                  {ingredients.map((line, i) => (
+                  {ingredients.map((line: string, i: number) => (
                     <Text
                       key={`${line}-${i}`}
-                      className="text-caption text-foreground"
+                      className="font-body text-body-md text-ink"
                     >
                       •  {line}
                     </Text>
@@ -244,16 +287,22 @@ export function MealLogForm({
                 </View>
               ) : null}
               {recipeText ? (
-                <View className="gap-1">
-                  <Text className="text-caption-strong font-semibold text-foreground">
+                <View style={{ gap: 4 }}>
+                  <Text
+                    className="font-body-semibold text-body-md text-ink"
+                    style={{ letterSpacing: -0.1 }}
+                  >
                     Recipe
                   </Text>
-                  <Text className="text-caption text-foreground leading-5">
+                  <Text
+                    className="font-body text-body-md text-ink"
+                    style={{ lineHeight: 21 }}
+                  >
                     {recipeText}
                   </Text>
                 </View>
               ) : null}
-              <Text className="text-small italic text-foreground-muted mt-3">
+              <Text className="font-display-italic text-body-md text-ink-3 mt-3">
                 Saved as-is when you tap save. Edit the name, photo, or
                 effort below if the AI got something off.
               </Text>
@@ -261,21 +310,23 @@ export function MealLogForm({
           </Card>
         ) : null}
 
-        <Input
-          label="Meal name"
-          value={mealName}
-          onChangeText={(t) => {
-            setMealName(t);
-            setSuggestionsHidden(false);
-            if (nameError) setNameError(null);
-          }}
-          placeholder="What did you cook?"
-          autoCapitalize="sentences"
-          autoCorrect
-          returnKeyType="next"
-          editable={!submitting}
-          error={nameError ?? undefined}
-        />
+        <View>
+          <FieldLabel>Meal name</FieldLabel>
+          <Input
+            value={mealName}
+            onChangeText={(t) => {
+              setMealName(t);
+              setSuggestionsHidden(false);
+              if (nameError) setNameError(null);
+            }}
+            placeholder="What did you cook?"
+            autoCapitalize="sentences"
+            autoCorrect
+            returnKeyType="next"
+            editable={!submitting}
+            error={nameError ?? undefined}
+          />
+        </View>
 
         {suggestions.length > 0 ? (
           <Card variant="outlined">
@@ -287,43 +338,54 @@ export function MealLogForm({
                   <Ionicons
                     name="restaurant-outline"
                     size={20}
-                    color="#2C5F3F"
+                    color={colors.forest}
                   />
                 }
                 trailing={
-                  <Text className="text-caption-strong font-semibold text-primary">
+                  <Text className="font-body-semibold text-body-sm text-forest">
                     Log again
                   </Text>
                 }
                 onPress={() => handleSelectSuggestion(s.name)}
-                divider={i < suggestions.length - 1}
+                divider={i > 0}
               />
             ))}
           </Card>
         ) : null}
 
-        <View className="gap-1.5">
-          <Text className="text-caption-strong font-semibold text-foreground">
-            When did you cook this?
-          </Text>
+        <View>
+          <FieldLabel>When</FieldLabel>
           <Pressable
             onPress={() => setShowDatePicker(true)}
             disabled={submitting}
-            className={`flex-row items-center justify-between rounded-md border border-border bg-background-elevated px-3 h-11 active:bg-background-muted ${
-              submitting ? "opacity-50" : ""
-            }`}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              borderWidth: 1,
+              borderRadius: 12,
+              paddingHorizontal: 16,
+              height: 48,
+              opacity: submitting ? 0.5 : 1
+            }}
           >
-            <Text className="text-body text-foreground">
+            <Text
+              style={{
+                fontFamily: "JetBrainsMono_400Regular",
+                fontSize: 15,
+                color: colors.ink
+              }}
+            >
               {formatDateLabel(cookedDate)}
             </Text>
-            <Ionicons name="calendar-outline" size={18} color="#6B7068" />
+            <Ionicons name="calendar-outline" size={18} color={colors.ink3} />
           </Pressable>
         </View>
 
-        <View className="gap-1.5">
-          <Text className="text-caption-strong font-semibold text-foreground">
-            Photo
-          </Text>
+        <View>
+          <FieldLabel optional>Photo</FieldLabel>
           <PhotoPicker
             value={photoUrl}
             onChange={setPhotoUrl}
@@ -331,12 +393,20 @@ export function MealLogForm({
           />
         </View>
 
-        <View className="gap-1.5">
-          <Text className="text-caption-strong font-semibold text-foreground">
-            Effort
-          </Text>
-          <View className="flex-row rounded-md border border-border bg-background-elevated overflow-hidden">
-            {EFFORT_OPTIONS.map((opt, idx) => {
+        <View>
+          <FieldLabel>Effort</FieldLabel>
+          <View
+            style={{
+              flexDirection: "row",
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              borderWidth: 1,
+              borderRadius: 99,
+              padding: 4,
+              gap: 2
+            }}
+          >
+            {EFFORT_OPTIONS.map((opt) => {
               const active = effort === opt.value;
               return (
                 <Pressable
@@ -345,14 +415,23 @@ export function MealLogForm({
                   disabled={submitting}
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
-                  className={`flex-1 h-11 items-center justify-center ${
-                    idx > 0 ? "border-l border-border" : ""
-                  } ${active ? "bg-primary" : "active:bg-background-muted"}`}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 9,
+                    borderRadius: 99,
+                    backgroundColor: active ? colors.forest : "transparent",
+                    alignItems: "center"
+                  }}
                 >
                   <Text
-                    className={`text-caption-strong font-semibold ${
-                      active ? "text-primary-foreground" : "text-foreground"
-                    }`}
+                    style={{
+                      fontFamily: active
+                        ? "Geist_600SemiBold"
+                        : "Geist_500Medium",
+                      fontSize: 13.5,
+                      color: active ? colors.forestText : colors.ink2,
+                      letterSpacing: -0.1
+                    }}
                   >
                     {opt.label}
                   </Text>
@@ -362,21 +441,23 @@ export function MealLogForm({
           </View>
         </View>
 
-        <Input
-          label="Notes"
-          helper="What worked, what to change next time. Optional."
-          value={notes}
-          onChangeText={setNotes}
-          placeholder="Doubled the garlic, used chicken stock instead of water…"
-          multiline
-          maxLength={1000}
-          editable={!submitting}
-        />
-
-        <View className="gap-1.5">
+        <View>
+          <FieldLabel optional>Notes</FieldLabel>
           <Input
-            label="Source URL"
-            helper="YouTube, TikTok, Pinterest, or any recipe link. Optional."
+            value={notes}
+            onChangeText={setNotes}
+            placeholder="Doubled the garlic. Used chicken stock instead of water…"
+            multiline
+            maxLength={1000}
+            editable={!submitting}
+            italicSerif
+            helper="What worked, what to change next time."
+          />
+        </View>
+
+        <View>
+          <FieldLabel optional>Source URL</FieldLabel>
+          <Input
             value={recipeSourceUrl}
             onChangeText={setRecipeSourceUrl}
             placeholder="https://youtube.com/…"
@@ -386,8 +467,11 @@ export function MealLogForm({
             keyboardType="url"
             textContentType="URL"
             editable={!submitting}
+            mono
           />
-          <SourceUrlInputPreview url={recipeSourceUrl} />
+          <View style={{ marginTop: 12 }}>
+            <SourceUrlInputPreview url={recipeSourceUrl} />
+          </View>
         </View>
 
         <Button
@@ -451,22 +535,64 @@ function DatePickerSheet({
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
       <Pressable
-        className="flex-1 bg-foreground/40 justify-end"
+        style={{
+          flex: 1,
+          backgroundColor: "rgba(20,20,15,0.32)",
+          justifyContent: "flex-end"
+        }}
         onPress={onCancel}
       >
         <Pressable
           onPress={() => null}
-          className="bg-background-elevated rounded-t-lg pb-6"
+          style={{
+            backgroundColor: colors.paper,
+            borderTopLeftRadius: 22,
+            borderTopRightRadius: 22,
+            paddingBottom: 32
+          }}
         >
-          <View className="flex-row items-center justify-between px-4 py-3 border-b border-border">
-            <Pressable onPress={onCancel} hitSlop={12}>
-              <Text className="text-body text-foreground-muted">Cancel</Text>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingHorizontal: 16,
+              paddingVertical: 14,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.borderSoft
+            }}
+          >
+            <Pressable onPress={onCancel} hitSlop={10}>
+              <Text
+                style={{
+                  fontFamily: "Geist_500Medium",
+                  fontSize: 15,
+                  color: colors.ink2
+                }}
+              >
+                Cancel
+              </Text>
             </Pressable>
-            <Text className="text-caption-strong font-semibold text-foreground">
+            <Text
+              style={{
+                fontFamily: "Geist_600SemiBold",
+                fontSize: 14,
+                color: colors.ink,
+                letterSpacing: -0.1
+              }}
+            >
               When did you cook this?
             </Text>
-            <Pressable onPress={() => onConfirm(formatYMD(draft))} hitSlop={12}>
-              <Text className="text-body font-semibold text-primary">Done</Text>
+            <Pressable onPress={() => onConfirm(formatYMD(draft))} hitSlop={10}>
+              <Text
+                style={{
+                  fontFamily: "Geist_600SemiBold",
+                  fontSize: 15,
+                  color: colors.forest
+                }}
+              >
+                Done
+              </Text>
             </Pressable>
           </View>
           <DateTimePicker
@@ -484,3 +610,7 @@ function DatePickerSheet({
     </Modal>
   );
 }
+
+// Re-export so screens importing TextInput from this file still get
+// the styled fallback. Kept to limit breakage on R17 callsites.
+export const _StyledTextInput = TextInput;
