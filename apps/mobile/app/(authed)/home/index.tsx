@@ -149,10 +149,82 @@ export default function HomeTab() {
                 ))}
               </Section>
             ) : null}
+
+            <PlansSection />
           </>
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function PlansSection() {
+  // Round 14 Task 2 — entry point for the plans surface. Renders the most
+  // recent plan (or empty CTA) plus a "View all" link. Kept lightweight —
+  // the plans list lives at /plans, not on the dashboard.
+  const plans = trpc.plans.list.useQuery(undefined, { staleTime: 60_000 });
+  const data = plans.data ?? [];
+  const featured = data[0];
+
+  return (
+    <View style={styles.section}>
+      <View style={styles.plansHeader}>
+        <Text style={styles.sectionTitle}>Plans</Text>
+        <Link href="/(authed)/plans" asChild>
+          <Pressable hitSlop={6} accessibilityRole="button">
+            <Text style={styles.plansLink}>View all</Text>
+          </Pressable>
+        </Link>
+      </View>
+      <View style={styles.sectionBody}>
+        {plans.isPending ? (
+          <View style={styles.emptyRow}>
+            <Text style={styles.emptyText}>Loading…</Text>
+          </View>
+        ) : !featured ? (
+          <Link href="/(authed)/plans/new" asChild>
+            <Pressable
+              style={({ pressed }) => [
+                styles.plansEmptyCta,
+                pressed && { opacity: 0.85 }
+              ]}
+            >
+              <Text style={styles.plansEmptyTitle}>
+                Plan an occasion menu
+              </Text>
+              <Text style={styles.plansEmptyBody}>
+                Build a menu for the next Eid, Diwali, or dinner party.
+              </Text>
+              <Text style={styles.plansEmptyCtaText}>Create your first plan →</Text>
+            </Pressable>
+          </Link>
+        ) : (
+          <Link href={`/(authed)/plans/${featured.id}` as never} asChild>
+            <Pressable
+              style={({ pressed }) => [
+                styles.planTile,
+                pressed && { backgroundColor: "#f5f4ef" }
+              ]}
+              accessibilityRole="button"
+            >
+              <View style={{ flex: 1, gap: 4 }}>
+                <Text style={styles.planTileName} numberOfLines={1}>
+                  {featured.name}
+                </Text>
+                <Text style={styles.planTileMeta}>
+                  {featured.dishCount === 0
+                    ? "No dishes yet"
+                    : featured.dishCount === 1
+                      ? "1 dish"
+                      : `${featured.dishCount} dishes`}
+                </Text>
+              </View>
+              <Text style={styles.plansLink}>Open →</Text>
+            </Pressable>
+          </Link>
+        )}
+      </View>
+    </View>
   );
 }
 
@@ -284,5 +356,57 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 15,
     fontWeight: "600"
+  },
+  plansHeader: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    paddingTop: 0
+  },
+  plansLink: {
+    color: "#2f6f58",
+    fontSize: 13,
+    fontWeight: "500"
+  },
+  planTile: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    minHeight: 72,
+    backgroundColor: "#fff",
+    gap: 10
+  },
+  planTileName: {
+    fontSize: 15,
+    fontWeight: "500",
+    color: "#111"
+  },
+  planTileMeta: {
+    fontSize: 13,
+    color: "#666"
+  },
+  plansEmptyCta: {
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    backgroundColor: "#fff",
+    gap: 4
+  },
+  plansEmptyTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#111"
+  },
+  plansEmptyBody: {
+    fontSize: 13,
+    color: "#555"
+  },
+  plansEmptyCtaText: {
+    fontSize: 13,
+    color: "#2f6f58",
+    fontWeight: "500",
+    marginTop: 4
   }
 });

@@ -8,7 +8,6 @@ import {
   Linking,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   View
@@ -17,6 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { formatCookedAt } from "../../../lib/dates";
 import { trpc } from "../../../lib/trpc";
 import { IngredientChecklist } from "../../../components/ingredient-checklist";
+import { ShareSheet } from "../../../components/share-sheet";
 
 /**
  * Round 13 Task 5 — recipe view. Mobile-first single column the wife
@@ -104,6 +104,7 @@ export default function MealDetailScreen() {
             recipeSourceUrl={meal.recipeSourceUrl}
           />
           <ActionRow
+            mealId={meal.id}
             mealName={meal.name}
             recipeText={meal.recipeText}
             recipeSourceUrl={meal.recipeSourceUrl}
@@ -220,16 +221,19 @@ function RecipeSection({
 }
 
 function ActionRow({
+  mealId,
   mealName,
   recipeText,
   recipeSourceUrl
 }: {
+  mealId: string;
   mealName: string;
   recipeText: string | null;
   recipeSourceUrl: string | null;
 }) {
   const utils = trpc.useUtils();
   const [logState, setLogState] = useState<"idle" | "logged">("idle");
+  const [shareOpen, setShareOpen] = useState(false);
   const resetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -271,19 +275,6 @@ function ActionRow({
     });
   }
 
-  async function handleShare() {
-    const parts = [mealName];
-    if (recipeText) parts.push("", recipeText);
-    if (recipeSourceUrl) parts.push("", `Source: ${recipeSourceUrl}`);
-    const message = parts.join("\n");
-    try {
-      await Share.share({ message, title: mealName });
-    } catch {
-      // RN's Share.share rejects on user-cancel in some cases; nothing
-      // to surface — they cancelled.
-    }
-  }
-
   const submitting = logAgain.isPending;
   const logged = logState === "logged";
 
@@ -319,7 +310,7 @@ function ActionRow({
       </Pressable>
 
       <Pressable
-        onPress={handleShare}
+        onPress={() => setShareOpen(true)}
         style={({ pressed }) => [
           styles.actionButton,
           styles.actionSecondary,
@@ -331,6 +322,15 @@ function ActionRow({
         <Ionicons name="share-outline" size={18} color="#2f6f58" />
         <Text style={styles.actionSecondaryText}>Share</Text>
       </Pressable>
+
+      <ShareSheet
+        visible={shareOpen}
+        onClose={() => setShareOpen(false)}
+        mealId={mealId}
+        mealName={mealName}
+        recipeText={recipeText}
+        recipeSourceUrl={recipeSourceUrl}
+      />
     </View>
   );
 }
