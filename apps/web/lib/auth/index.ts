@@ -2,7 +2,7 @@ import "server-only";
 
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
-import { magicLink } from "better-auth/plugins";
+import { bearer, magicLink } from "better-auth/plugins";
 import { db } from "@/lib/db/client";
 import * as schema from "@/db/schema";
 import { getServerEnv, hasGoogleAuthEnv } from "@/lib/env/server";
@@ -45,9 +45,37 @@ function developmentLocalhostOrigins(): string[] {
   return out;
 }
 
+/**
+ * Round 12 — mobile clients sign in from custom URL schemes (eeatly://)
+ * and Expo dev URLs (exp://...). Better Auth checks the request Origin
+ * against this list before honouring credentialed requests, so we have
+ * to enumerate every variant we expect.
+ *
+ *   - `eeatly://` — production app scheme (configured in apps/mobile's
+ *     app.json). Magic-link callbacks land on `eeatly://verify`.
+ *   - `exp://*` — Expo Go runtime origins; the wildcard form is what
+ *     Better Auth recognizes for a scheme without a stable host.
+ *   - `http://localhost:8081` — Expo Metro bundler dev server.
+ *   - `http://localhost:19006` — Expo Web's dev port.
+ */
+function mobileTrustedOrigins(): string[] {
+  return [
+    "eeatly://",
+    "exp://",
+    "http://localhost:8081",
+    "http://localhost:19006"
+  ];
+}
+
 function trustedOriginsList(): string[] {
   const fromEnv = [env.NEXT_PUBLIC_APP_URL, env.BETTER_AUTH_URL, appUrl].filter(Boolean);
-  return [...new Set([...fromEnv, ...developmentLocalhostOrigins()])];
+  return [
+    ...new Set([
+      ...fromEnv,
+      ...developmentLocalhostOrigins(),
+      ...mobileTrustedOrigins()
+    ])
+  ];
 }
 
 export const auth = betterAuth({
@@ -70,7 +98,16 @@ export const auth = betterAuth({
       sendMagicLink: async ({ email, url }) => {
         await sendMagicLinkEmail(email, url);
       }
-    })
+    }),
+    // Round 12 — bearer-token support for the mobile app. The plugin
+    // converts incoming `Authorization: Bearer <token>` headers into the
+    // equivalent session-cookie lookup, so every existing
+    // `auth.api.getSession({ headers })` call site (server components,
+    // tRPC context) keeps working without changes. Mobile gets the token
+    // back from sign-in via the `set-auth-token` response header (Better
+    // Auth's documented mobile flow); it stores the token in expo-
+    // secure-store and includes it on every subsequent request.
+    bearer()
   ],
   ...(socialProviders ? { socialProviders } : {}),
   user: {

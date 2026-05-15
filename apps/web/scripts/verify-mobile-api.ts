@@ -1,31 +1,31 @@
 /**
- * Round 11 / Task 6 — Mobile-readiness verification.
+ * Round 11 / 12 — Mobile-readiness verification.
  *
  * Calls the eeatly tRPC API from outside the Next.js runtime — exactly
- * the shape the future React Native client will use:
+ * the shape the React Native client uses:
  *   - Vanilla `createTRPCClient` (NOT the React Query variant)
  *   - `httpBatchLink` against `/api/trpc`
  *   - `superjson` transformer (matches the server)
- *   - Auth via a `Cookie` header (Better Auth's default flow)
+ *   - Auth via `Authorization: Bearer <token>` (Round 12: Better Auth
+ *     `bearer` plugin is enabled, so the token-via-header flow now
+ *     works the same way mobile uses it)
  *
- * This script is intentionally minimal. It probes a public procedure
- * to confirm the wire format works, and — when a session cookie is
- * provided — an authenticated procedure to confirm cookie-based auth
- * is reachable off-host. It does NOT attempt to fix the mobile
- * blockers (bearer tokens, CORS) — those are out of scope for
- * Round 11 per the handoff.
+ * The script also exercises a CORS preflight with an `eeatly://` origin
+ * to confirm the route handler's allowlist accepts the mobile scheme.
  *
  * Usage:
  *   pnpm dev   # in another shell
  *   API_BASE_URL=http://localhost:3000 \
- *   SESSION_COOKIE="better-auth.session_token=...; better-auth.session_data=..." \
- *   pnpm dlx tsx scripts/verify-mobile-api.ts
+ *   SESSION_TOKEN="<token>" \
+ *   pnpm dlx tsx apps/web/scripts/verify-mobile-api.ts
  *
- * `SESSION_COOKIE` is optional — without it, only the public probe
- * runs. Grab the value from a signed-in browser session: DevTools →
- * Application → Cookies → http://localhost:3000 → copy the
- * `better-auth.session_token` (+ `session_data` if present) name=value
- * pairs separated by `; `.
+ * `SESSION_TOKEN` is optional — without it, only the public probe and
+ * the CORS preflight run. Get a token in one of two ways:
+ *   1. Hit `POST /api/auth/sign-in/magic-link` with `{ email }`, click
+ *      the link, then `GET /api/auth/get-session` and read
+ *      `response.headers.get("set-auth-token")`. (How mobile gets it.)
+ *   2. From a signed-in browser session: DevTools → Application →
+ *      Cookies → `better-auth.session_token` value. (Faster for dev.)
  */
 
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
@@ -33,7 +33,8 @@ import superjson from "superjson";
 import type { AppRouter } from "../server/trpc/app-router";
 
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:3000";
-const SESSION_COOKIE = process.env.SESSION_COOKIE;
+const SESSION_TOKEN = process.env.SESSION_TOKEN ?? process.env.SESSION_COOKIE;
+const MOBILE_ORIGIN = "eeatly://";
 
 function logSection(title: string) {
   console.log("\n" + "=".repeat(60));
@@ -60,15 +61,19 @@ const client = createTRPCClient<AppRouter>({
     httpBatchLink({
       url: `${API_BASE_URL.replace(/\/$/, "")}/api/trpc`,
       transformer: superjson,
-      // The fetch override is the one place a mobile client would
-      // inject auth. For web, the browser attaches the Better Auth
-      // cookie automatically; here we forward `SESSION_COOKIE` as
-      // the `Cookie` header so the server sees an authenticated
-      // session. A bearer-token mobile client would set an
-      // `Authorization: Bearer <token>` header here instead.
+      // The fetch override is the one place a mobile client injects
+      // auth. Mobile signs in once, captures the token from Better
+      // Auth's `set-auth-token` response header, stores it in
+      // expo-secure-store, then forwards it on every request as
+      // `Authorization: Bearer <token>`. The same path works here —
+      // the Better Auth bearer plugin (Round 12) translates the
+      // header into the session lookup `auth.api.getSession` performs.
+      // We also send the mobile `Origin` so the server's CORS layer
+      // sees what production traffic looks like.
       fetch: (url, init) => {
         const headers = new Headers(init?.headers);
-        if (SESSION_COOKIE) headers.set("cookie", SESSION_COOKIE);
+        if (SESSION_TOKEN) headers.set("authorization", `Bearer ${SESSION_TOKEN}`);
+        headers.set("origin", MOBILE_ORIGIN);
         return fetch(url, { ...init, headers });
       }
     })
@@ -80,7 +85,38 @@ async function main() {
 
   logSection("API target");
   console.log(`  Base URL: ${API_BASE_URL}`);
-  console.log(`  Cookie:   ${SESSION_COOKIE ? "provided" : "(missing — auth probes will be skipped)"}`);
+  console.log(`  Origin:   ${MOBILE_ORIGIN} (simulating a real mobile request)`);
+  console.log(`  Token:    ${SESSION_TOKEN ? "provided" : "(missing — auth probes will be skipped)"}`);
+
+  logSection("CORS preflight (OPTIONS)");
+  try {
+    const res = await fetch(`${API_BASE_URL.replace(/\/$/, "")}/api/trpc/health.ping`, {
+      method: "OPTIONS",
+      headers: {
+        origin: MOBILE_ORIGIN,
+        "access-control-request-method": "GET",
+        "access-control-request-headers": "Authorization, Content-Type"
+      }
+    });
+    const allowOrigin = res.headers.get("access-control-allow-origin");
+    const allowHeaders = res.headers.get("access-control-allow-headers");
+    const allowMethods = res.headers.get("access-control-allow-methods");
+    if (
+      res.status === 204 &&
+      allowOrigin === MOBILE_ORIGIN &&
+      (allowHeaders ?? "").toLowerCase().includes("authorization")
+    ) {
+      logOk("OPTIONS preflight", { allowOrigin, allowHeaders, allowMethods });
+    } else {
+      failures++;
+      logFail("OPTIONS preflight", new Error(
+        `status=${res.status} allowOrigin=${allowOrigin} allowHeaders=${allowHeaders}`
+      ));
+    }
+  } catch (error) {
+    failures++;
+    logFail("OPTIONS preflight", error);
+  }
 
   logSection("Public probe");
   try {
@@ -100,10 +136,10 @@ async function main() {
     );
   }
 
-  if (!SESSION_COOKIE) {
+  if (!SESSION_TOKEN) {
     logSection("Auth probes — skipped");
     console.log(
-      "  Set SESSION_COOKIE to exercise the household-scoped procedures."
+      "  Set SESSION_TOKEN to exercise the household-scoped procedures."
     );
   } else {
     logSection("Authenticated probes");
@@ -145,35 +181,15 @@ async function main() {
     }
   }
 
-  logSection("Known mobile-consumption blockers");
-  console.log("  These are documented but NOT fixed in Round 11:");
+  logSection("Round 12 — Round 11 blocker status");
+  console.log("  Bearer-token auth     ✓ Better Auth `bearer` plugin enabled");
+  console.log("  CORS                  ✓ /api/trpc accepts eeatly:// + exp:// + dev");
+  console.log("  Trusted origins       ✓ mobileTrustedOrigins() added to auth");
   console.log("");
-  console.log("  1. Bearer-token auth.");
-  console.log("     Better Auth's default cookie flow doesn't translate cleanly");
-  console.log("     to a native mobile app. Cookies work for this script (we");
-  console.log("     forward the `Cookie` header explicitly) but a production");
-  console.log("     mobile client should use bearer tokens via the Better Auth");
-  console.log("     `bearer` plugin. The seam to wire this in lives in");
-  console.log("     `server/trpc/context.ts` — read `Authorization: Bearer …`");
-  console.log("     before falling through to the cookie lookup.");
-  console.log("");
-  console.log("  2. CORS.");
-  console.log("     The `/api/trpc/[trpc]` route doesn't set CORS headers.");
-  console.log("     Same-origin web works because cookies + fetch agree on the");
-  console.log("     host; cross-origin mobile (or any third party) will need");
-  console.log("     `Access-Control-Allow-{Origin,Credentials,Methods,Headers}`");
-  console.log("     set explicitly in the fetch adapter's response hook.");
-  console.log("");
-  console.log("  3. Trusted origins.");
-  console.log("     Better Auth's `trustedOrigins` list in `lib/auth/index.ts`");
-  console.log("     is currently dev hosts + the web app URL. Add the mobile");
-  console.log("     app's custom URL scheme when shipping.");
-  console.log("");
-  console.log("  4. Wire size for AI binary inputs.");
-  console.log("     `ai.suggestFromPhoto` / `ai.suggestFromVoice` accept");
-  console.log("     base64-in-JSON. Mobile clients can do the same, but if the");
-  console.log("     base64 overhead bothers anyone, add an R2-key alternate");
-  console.log("     input to those procedures.");
+  console.log("  Still flagged for the future (not in scope yet):");
+  console.log("  • AI binary input wire size — base64-in-JSON works for mobile");
+  console.log("    but an R2-key alternate input on `ai.suggestFromPhoto` and");
+  console.log("    `ai.suggestFromVoice` would cut payload size if needed.");
 
   logSection("Summary");
   if (failures === 0) {

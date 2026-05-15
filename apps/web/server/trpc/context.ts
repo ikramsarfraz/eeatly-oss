@@ -15,11 +15,13 @@ import type { UserRole } from "@/types";
  * call rather than React's render tree (so it survives fetch-adapter
  * lifecycles outside the App-Router render).
  *
- * Mobile note: today the session travels via cookie (Better Auth's
- * default). When the mobile app lands, this is the seam to add a
- * bearer-token fallback (read `Authorization: Bearer <token>`,
- * resolve through Better Auth's API). Out of scope for Round 11 — see
- * the Round 6 Mobile readiness brief.
+ * Round 12 — bearer-token support is live. The Better Auth `bearer`
+ * plugin (registered in `lib/auth/index.ts`) intercepts the request
+ * BEFORE `auth.api.getSession` runs and converts an
+ * `Authorization: Bearer <token>` header into the equivalent session
+ * cookie lookup, transparently. No code change here was required;
+ * web cookies and mobile bearer tokens both resolve through the same
+ * `getSession({ headers })` call below.
  */
 export type TRPCContext = {
   user: AppUser | null;
