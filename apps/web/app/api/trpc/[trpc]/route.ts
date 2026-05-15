@@ -81,10 +81,25 @@ async function handler(req: Request) {
       // need surfacing at error level. The 5xx bucket is the signal we
       // care about for alerting.
       if (error.code === "INTERNAL_SERVER_ERROR") {
+        // Walk the cause chain. Drizzle's DrizzleQueryError wraps the
+        // underlying pg/Neon error on `.cause`, whose message + code
+        // (e.g. "42703 column does not exist", "57P01 terminating
+        // connection") are what we actually need to diagnose 500s.
+        const chain: Array<{ message: string; code?: string }> = [];
+        let current: unknown = error;
+        while (current instanceof Error && chain.length < 5) {
+          const pgCode = (current as { code?: unknown }).code;
+          chain.push({
+            message: current.message,
+            code: typeof pgCode === "string" ? pgCode : undefined
+          });
+          current = (current as { cause?: unknown }).cause;
+        }
         logger.error("trpc_internal_error", {
           path,
           type,
           message: error.message,
+          causeChain: JSON.stringify(chain),
           stack: error.stack
         });
       }
