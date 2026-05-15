@@ -58,6 +58,35 @@ function developmentLocalhostOrigins(): string[] {
  *   - `http://localhost:8081` — Expo Metro bundler dev server.
  *   - `http://localhost:19006` — Expo Web's dev port.
  */
+/**
+ * Round 12 — given Better Auth's standard magic-link URL (`https://
+ * eeatly.app/api/auth/magic-link/verify?token=...&callbackURL=...`),
+ * decide whether to send that URL to the user's email or to substitute
+ * a mobile deep link.
+ *
+ *   - Web flows: callbackURL is a web URL (`/dashboard`, `/invite/...`,
+ *     etc.), keep the default server URL. The user clicks → browser
+ *     verifies → cookie set → redirect to web callbackURL.
+ *   - Mobile flows: callbackURL is `eeatly://...`. The default server
+ *     URL would open the browser; the redirect's cookie wouldn't
+ *     transfer. Send `eeatly://verify?token=<ml_token>` instead — the
+ *     mobile app opens directly via the deep link and exchanges the
+ *     token for a session via fetch.
+ */
+function pickMagicLinkUrl({ url, token }: { url: string; token: string }): string {
+  try {
+    const parsed = new URL(url);
+    const callbackURL = parsed.searchParams.get("callbackURL") ?? "";
+    if (callbackURL.startsWith("eeatly://")) {
+      return `eeatly://verify?token=${encodeURIComponent(token)}`;
+    }
+  } catch {
+    // Fall through to the default URL on any parse failure — web is
+    // the safer default.
+  }
+  return url;
+}
+
 function mobileTrustedOrigins(): string[] {
   return [
     "eeatly://",
@@ -95,8 +124,22 @@ export const auth = betterAuth({
   plugins: [
     magicLink({
       storeToken: "hashed",
-      sendMagicLink: async ({ email, url }) => {
-        await sendMagicLinkEmail(email, url);
+      sendMagicLink: async ({ email, url, token }) => {
+        // Round 12 — when the caller's `callbackURL` is a mobile deep
+        // link (`eeatly://...`), Better Auth's default `url` is a server
+        // URL that would open the user's browser. The browser-issued
+        // session cookie wouldn't transfer to the native app on the
+        // post-verify redirect, so mobile would never get a session.
+        //
+        // We detect the mobile case by inspecting `callbackURL` inside
+        // the `url`'s query string. For mobile we send the email link
+        // pointing at our own deep-link route — the app catches it,
+        // calls Better Auth's verify endpoint via fetch, and reads the
+        // session token from the `set-auth-token` response header
+        // (added by the `bearer` plugin). Web flows are untouched and
+        // continue using the default server URL.
+        const link = pickMagicLinkUrl({ url, token });
+        await sendMagicLinkEmail(email, link);
       }
     }),
     // Round 12 — bearer-token support for the mobile app. The plugin

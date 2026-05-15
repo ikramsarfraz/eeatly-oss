@@ -1,21 +1,23 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { AppProviders } from "../lib/providers";
 
 /**
- * Round 12 — root layout for the eeatly mobile app. Mounts the providers
- * Task 5 wires up (TRPC + React Query) and the navigation stack
- * Expo Router resolves from the `app/` directory.
+ * Round 12 — root layout. Wraps the entire app in `AppProviders`
+ * (TRPC + React Query) before the navigation stack so every screen
+ * can use the typed hooks. SafeAreaProvider is outermost so the
+ * provider tree can read insets if needed.
  *
- * For now the stack is unstyled — Phase 1 ships with RN primitives.
- * Style decisions (NativeWind vs Tamagui vs StyleSheet) live in a
- * future round once there's real UI to design against.
+ * Style decisions stay raw RN primitives for Phase 1 (handoff rule).
  */
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <StatusBar style="auto" />
-      <Stack screenOptions={{ headerShown: false }} />
+      <AppProviders>
+        <Stack screenOptions={{ headerShown: false }} />
+      </AppProviders>
     </SafeAreaProvider>
   );
 }
