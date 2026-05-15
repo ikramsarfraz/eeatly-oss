@@ -76,8 +76,23 @@ pnpm prebuild --platform ios
 # Build a dev client. EAS does it in the cloud (free tier OK).
 eas build --profile development --platform ios
 
-# Or build locally if you have Xcode set up:
-#   pnpm dlx expo run:ios --device
+# Or build locally if you have Xcode set up. Use the workspace's own
+# Expo CLI (NOT `pnpm dlx expo …`) — dlx fetches the latest CLI, which
+# is for the next SDK and can't peer-resolve this project's expo-router.
+# Symptoms when you get this wrong: `Cannot find module
+# 'expo-router/_ctx-shared'` from `@expo/router-server`, often right
+# after `Installing on …` — the build succeeds but the install never
+# finishes, leaving a stale .app on the device.
+#
+#   pnpm exec expo run:ios            # simulator
+#   pnpm exec expo run:ios --device   # physical device (tethered)
+#
+# If a prior crash left an outdated build on the simulator, manually
+# install the freshly built .app:
+#   xcrun simctl install booted \
+#     "$(xcrun xcodebuild -workspace ios/eeatly.xcworkspace \
+#        -scheme eeatly -configuration Debug -showBuildSettings \
+#        | awk -F' = ' '/TARGET_BUILD_DIR/{print $2}')/eeatly.app"
 ```
 
 The build emits an .ipa. Install on your phone via QR code (EAS prints
