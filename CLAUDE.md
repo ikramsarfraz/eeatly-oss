@@ -8,14 +8,18 @@ Round 12 restructured this into a pnpm-workspaces monorepo:
 
 ```
 apps/
-  web/        Next.js app (the existing eeatly app)
-  mobile/     Expo / React Native (Round 12+)
+  web/        Next.js app — the eeatly web product
+  mobile/     Expo + React Native — Phase-1 magic-link auth (R12);
+              features land in R13+
 packages/
-  api/        AppRouter type + validators + gate registry — shared by both clients
-  shared/     Pure utilities, framework-agnostic
+  api/        AppRouter type + validators + gate registry — both clients
+              import via subpath exports (`@eeatly/api/validators/meals`,
+              `@eeatly/api/gates/registry`, etc.)
+  shared/     Pure utilities, framework-agnostic. Currently
+              `normalizeMealName`; grows as cross-app reuse surfaces.
 ```
 
-Every command below runs from the **repo root**; pnpm filters into `@eeatly/web`.
+Every command below runs from the **repo root**; pnpm filters into `@eeatly/web` by default. Mobile-specific flows live under `apps/mobile/`; see [docs/mobile-dev-runbook.md](docs/mobile-dev-runbook.md) for the dev-client install + verify steps.
 
 ## Commands
 
