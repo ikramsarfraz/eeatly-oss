@@ -8,6 +8,10 @@ import {
   View
 } from "react-native";
 import { AUTH_URL } from "../lib/api-base";
+import {
+  clearPendingInvite,
+  getPendingInvite
+} from "../lib/auth/pending-invite";
 import { setSessionToken } from "../lib/auth/session";
 
 /**
@@ -77,7 +81,16 @@ export default function Verify() {
           return;
         }
         await setSessionToken(sessionToken);
-        router.replace("/(authed)/home");
+        // Round 14 Task 4 — if the user kicked off sign-in from an
+        // invite-accept page, route back there. Clear the slot so a
+        // future unrelated sign-in doesn't accidentally trigger.
+        const pendingInvite = await getPendingInvite();
+        if (pendingInvite) {
+          await clearPendingInvite();
+          router.replace(`/invite/${pendingInvite}` as never);
+        } else {
+          router.replace("/(authed)/home");
+        }
       } catch (e) {
         if (cancelled) return;
         setState({

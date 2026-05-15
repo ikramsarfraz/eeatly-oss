@@ -108,6 +108,13 @@ export default function Settings() {
           )}
         </Section>
 
+        <Section title="Kitchen">
+          <LinkRow
+            label="Members + invitations"
+            onPress={() => router.push("/(authed)/household")}
+          />
+        </Section>
+
         <Section title="Advanced">
           <LinkRow
             label="Manage account on web"

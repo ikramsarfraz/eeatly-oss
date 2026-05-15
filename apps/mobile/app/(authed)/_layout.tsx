@@ -78,6 +78,30 @@ export default function AuthedLayout() {
         name="add/ai-suggest"
         options={{ href: null, title: "AI capture" }}
       />
+      <Tabs.Screen
+        name="plans/index"
+        options={{ href: null, title: "Plans" }}
+      />
+      <Tabs.Screen
+        name="plans/new"
+        options={{ href: null, title: "New plan" }}
+      />
+      <Tabs.Screen
+        name="plans/[id]/index"
+        options={{ href: null, title: "Plan" }}
+      />
+      <Tabs.Screen
+        name="plans/[id]/edit"
+        options={{ href: null, title: "Edit plan" }}
+      />
+      <Tabs.Screen
+        name="household/index"
+        options={{ href: null, title: "Kitchen" }}
+      />
+      <Tabs.Screen
+        name="household/invite"
+        options={{ href: null, title: "Invite" }}
+      />
       <Tabs.Screen name="settings" options={{ href: null, title: "Settings" }} />
     </Tabs>
   );
