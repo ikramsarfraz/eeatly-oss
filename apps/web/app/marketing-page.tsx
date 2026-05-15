@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 
 const HEADLINE = "One kitchen. Your whole family. Any distance.";
 const SUBHEAD =
-  "Save the recipes your family actually cooks — from voice notes, WhatsApp photos, YouTube videos, however they reach you. Everyone in your kitchen can see them, even when you're not in the same one.";
+  "Save the recipes your family actually cooks — from voice notes, WhatsApp photos, recipe links, however they reach you. Everyone in your kitchen can see them, even when you're not in the same one.";
 
 /* ────────────────────────────────────────────────────────────────────────── */
 /* Animation Variants                                                        */
@@ -365,7 +365,7 @@ const FEATURES = [
     icon: Camera,
     title: "Save recipes however they reach you",
     description:
-      "A photo of mom's handwritten notes. A voice note explaining the method. A YouTube video your aunt sent. eeatly reads all of them and saves the recipe clean.",
+      "A photo of mom's handwritten notes. A voice note explaining the method. A recipe link your aunt sent. eeatly reads what we can, and saves the link to the rest so you can find it again.",
     highlight: true
   },
   {
@@ -478,7 +478,7 @@ const HOW_IT_WORKS = [
   },
   {
     step: "Save it before you forget",
-    description: "Photo, voice note, pasted text, YouTube link. Done in under a minute."
+    description: "Photo, voice note, pasted text, or save a link. Done in under a minute."
   },
   {
     step: "Find it when you need it",
@@ -763,7 +763,7 @@ const FAQS: readonly FaqItem[] = [
     question: "What is the AI actually doing with my photos and voice notes?",
     answer: (
       <>
-        When you save a recipe from a photo, voice note, or YouTube link, we send
+        When you save a recipe from a photo, voice note, or pasted text, we send
         the input to a third-party AI service for processing. We don&apos;t keep
         your audio or transcripts. Full details on our{" "}
         <Link

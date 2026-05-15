@@ -69,6 +69,11 @@ Round 11 removed the `actions/` layer entirely. Every client-driven interaction 
 
 **File uploads stay on REST.** Persisted photos go through the existing R2 presigned-POST flow (`apps/web/app/api/uploads/presign`). Multipart bodies don't ride through tRPC. The one exception: AI-suggest photo + voice inputs ride as base64 strings in the JSON body (see [apps/web/server/trpc/routers/ai.ts](apps/web/server/trpc/routers/ai.ts) for the trade-off rationale — preserves behavior and avoids orphan R2 uploads for one-shot AI calls).
 
+**Video sources ride through URL references, not AI extraction.** Round 16 removed the YouTube transcript path (scraping violated YouTube ToS, the upstream library was abandoned, and audio-on-Whisper fallbacks carry their own legal risk at scale). Users now paste a URL into the meal log form's "Source URL" field and the recipe view embeds the result:
+- **YouTube** / **TikTok** / **Pinterest** → native iframe / WebView embed.
+- **Instagram** / arbitrary web URLs → server-side OG preview card (real Instagram embeds need a Meta Developer + App Review approval — deferred).
+- Server-side OG fetching is gated by [apps/web/lib/url-preview/ssrf.ts](apps/web/lib/url-preview/ssrf.ts): scheme allowlist + private-IP DNS rejection. Results land in the `url_previews` table (7d for successes, 1h for failures).
+
 **Procedures don't redirect.** Server actions used `redirect()`; procedures return `{ redirectTo }` and the client navigates with `router.replace` (or `window.location.assign` when the cookie-clear behavior matters — e.g. account delete, signOutAndRedirect).
 
 ### App Router layout groups
@@ -89,9 +94,10 @@ Google sign-in is gated on `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` — the b
 ### Database schema
 
 Core tables live in `apps/web/db/schema/`:
-- `meals` — unique per `(userId, normalizedName)`; soft-deleted via `archivedAt` (always filter with `isNull(archivedAt)`)
+- `meals` — unique per `(userId, normalizedName)`; soft-deleted via `archivedAt` (always filter with `isNull(archivedAt)`). `recipe_source_url` is the canonical "where I got this recipe" field, rendered as a platform embed on the recipe view (R16).
 - `mealLogs` — one log per cooking event; has `effortLevel` enum: `quick | easy | medium | high_effort`
 - `analytics_events` — in-house event tracking
+- `url_previews` — R16 cache of OG/Twitter-card metadata fetched server-side. Primary key is the URL itself; successful rows live 7d, failures 1h.
 - `email_delivery` — Resend webhook delivery receipts
 - `users.preferredTenantId` — scaffold column for future multi-tenancy; always null in current product logic. No `tenants` or `tenant_members` table exists yet.
 

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Camera, FileText, Loader2, Mic, Sparkles, Square, Upload, Youtube } from "lucide-react";
+import { Camera, FileText, Loader2, Mic, Sparkles, Square, Upload } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { getCause } from "@/lib/trpc/errors";
 import { Button } from "@/components/ui/button";
@@ -13,18 +13,16 @@ import {
   DialogTitle,
   DialogTrigger
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
-  classifyYoutubeUrl,
   isSupportedAudioMediaType,
   MAX_AUDIO_UPLOAD_BYTES,
   SUPPORTED_AUDIO_MEDIA_TYPES
 } from "@eeatly/api/validators/ai";
 import type { MealSuggestion } from "@/types";
 
-type Tab = "photo" | "text" | "youtube" | "voice";
+type Tab = "photo" | "text" | "voice";
 type VoiceMode = "record" | "upload";
 
 type AiSuggestDialogProps = {
@@ -54,7 +52,6 @@ async function blobToBase64(blob: Blob): Promise<string> {
 export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
   const photoMutation = trpc.ai.suggestFromPhoto.useMutation();
   const textMutation = trpc.ai.suggestFromText.useMutation();
-  const youtubeMutation = trpc.ai.suggestFromYouTube.useMutation();
   const voiceMutation = trpc.ai.suggestFromVoice.useMutation();
   const [open, setOpen] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<Tab>("photo");
@@ -69,13 +66,10 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
   // Text tab state
   const [pastedText, setPastedText] = React.useState("");
 
-  // YouTube tab state. `slowLoading` flips true after 5s of pending —
-  // transcript fetches are slow when YouTube is degraded; honest copy
+  // Slow-loading hint. Long voice notes can take a moment; honest copy
   // beats a stuck "Thinking…" spinner. The effect only schedules the
   // flip; the false-reset happens explicitly at the start of
-  // `handleSuggest` (a setState inside the effect would trigger the
-  // `set-state-in-effect` lint rule).
-  const [youtubeUrl, setYoutubeUrl] = React.useState("");
+  // `handleSuggest`.
   const [slowLoading, setSlowLoading] = React.useState(false);
   React.useEffect(() => {
     if (!isPending) return;
@@ -104,15 +98,6 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
 
   const [audioFile, setAudioFile] = React.useState<File | null>(null);
   const audioInputRef = React.useRef<HTMLInputElement>(null);
-
-  // Client-side URL classification — only enables the Suggest button
-  // when the input looks reachable. Server still validates.
-  const youtubeClassification = React.useMemo(
-    () => (youtubeUrl ? classifyYoutubeUrl(youtubeUrl) : null),
-    [youtubeUrl]
-  );
-  const youtubeUrlReady =
-    youtubeClassification !== null && youtubeClassification.kind === "watch";
 
   function resetVoiceState() {
     // Stop any in-flight recording + release the mic. MediaRecorder.stop
@@ -250,7 +235,6 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
       if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
       setPhotoPreviewUrl(null);
       setPastedText("");
-      setYoutubeUrl("");
       setError(null);
       setIsPending(false);
       if (photoInputRef.current) photoInputRef.current.value = "";
@@ -272,10 +256,6 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
       }
       if (activeTab === "text" && !pastedText.trim()) {
         setError("Please paste some text first.");
-        return;
-      }
-      if (activeTab === "youtube" && !youtubeUrlReady) {
-        setError("Paste a YouTube video link.");
         return;
       }
       if (activeTab === "voice" && !voicePayloadReady) {
@@ -315,16 +295,6 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
           onSuggestion(result);
         } catch (e) {
           handleAiError(e, "text");
-        }
-      } else if (activeTab === "youtube") {
-        try {
-          const result = await youtubeMutation.mutateAsync({
-            url: youtubeUrl.trim()
-          });
-          setOpen(false);
-          onSuggestion(result);
-        } catch (e) {
-          handleAiError(e, "youtube");
         }
       } else if (activeTab === "voice") {
         let payload:
@@ -378,11 +348,7 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
       return;
     }
     if (reason === "UPGRADE_REQUIRED") {
-      if (tab === "youtube") {
-        setError(
-          "YouTube recipe extraction is part of eeatly Plus. Visit /pricing to see what's included."
-        );
-      } else if (tab === "voice") {
+      if (tab === "voice") {
         setError(
           "Voice notes are part of eeatly Plus. Visit /pricing to see what's included."
         );
@@ -396,30 +362,6 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
     if (reason === "INVALID_INPUT") {
       setError(message ?? "We couldn't read that input.");
       return;
-    }
-    if (tab === "youtube") {
-      switch (reason) {
-        case "YOUTUBE_NO_TRANSCRIPT":
-          setError(
-            "This video doesn't have captions we can read. Try a different video, or paste the recipe text manually."
-          );
-          return;
-        case "YOUTUBE_SHORTS_UNSUPPORTED":
-          setError("YouTube Shorts don't work yet — try a regular video.");
-          return;
-        case "YOUTUBE_PLAYLIST_UNSUPPORTED":
-          setError("This is a playlist link. Open one video and try its URL.");
-          return;
-        case "YOUTUBE_UNAVAILABLE":
-          setError("Video isn't available — it may be private or removed.");
-          return;
-        case "YOUTUBE_AGE_RESTRICTED":
-          setError("Age-restricted videos can't be read.");
-          return;
-        case "YOUTUBE_FETCH_FAILED":
-          setError("Couldn't load the video right now. Try again in a minute.");
-          return;
-      }
     }
     if (tab === "voice") {
       switch (reason) {
@@ -456,10 +398,10 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
 
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Fill from photo, text, video, or voice</DialogTitle>
+          <DialogTitle>Fill from photo, text, or voice</DialogTitle>
           <DialogDescription>
-            Upload a photo, paste recipe text, drop a YouTube cooking video link,
-            or share a voice note. AI suggests the fields.
+            Upload a photo, paste recipe text, or share a voice note. AI
+            suggests the fields.
           </DialogDescription>
         </DialogHeader>
 
@@ -490,19 +432,6 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
           >
             <FileText className="h-3.5 w-3.5" />
             Text
-          </button>
-          <button
-            type="button"
-            onClick={() => handleTabChange("youtube")}
-            className={cn(
-              "flex min-w-[64px] flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12.5px] font-medium transition-all",
-              activeTab === "youtube"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <Youtube className="h-3.5 w-3.5" />
-            YouTube
           </button>
           <button
             type="button"
@@ -575,37 +504,6 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
               }}
               disabled={isPending}
             />
-          </div>
-        )}
-
-        {/* YouTube tab */}
-        {activeTab === "youtube" && (
-          <div className="grid gap-2">
-            <Input
-              type="url"
-              inputMode="url"
-              placeholder="https://www.youtube.com/watch?v=…"
-              value={youtubeUrl}
-              onChange={(e) => {
-                setYoutubeUrl(e.target.value);
-                setError(null);
-              }}
-              disabled={isPending}
-              autoComplete="off"
-            />
-            {youtubeClassification?.kind === "shorts" ? (
-              <p className="text-[11.5px] text-amber-700">
-                Shorts don&apos;t have captions we can read — try a regular video.
-              </p>
-            ) : youtubeClassification?.kind === "playlist" ? (
-              <p className="text-[11.5px] text-amber-700">
-                That&apos;s a playlist — open one video and use its URL.
-              </p>
-            ) : (
-              <p className="text-[11.5px] text-muted-foreground">
-                Works best on full cooking videos. Shorts and playlists don&apos;t work.
-              </p>
-            )}
           </div>
         )}
 
@@ -781,20 +679,14 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
               ? !photoFile
               : activeTab === "text"
                 ? !pastedText.trim()
-                : activeTab === "youtube"
-                  ? !youtubeUrlReady
-                  : !voicePayloadReady)
+                : !voicePayloadReady)
           }
           className="w-full"
         >
           {isPending ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              {activeTab === "youtube"
-                ? "Reading the video…"
-                : activeTab === "voice"
-                  ? "Listening…"
-                  : "Thinking…"}
+              {activeTab === "voice" ? "Listening…" : "Thinking…"}
             </>
           ) : (
             <>
@@ -803,12 +695,6 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
             </>
           )}
         </Button>
-
-        {isPending && activeTab === "youtube" && slowLoading ? (
-          <p className="text-center text-[11px] text-muted-foreground">
-            This sometimes takes a moment for longer videos.
-          </p>
-        ) : null}
 
         {isPending && activeTab === "voice" && slowLoading ? (
           <p className="text-center text-[11px] text-muted-foreground">

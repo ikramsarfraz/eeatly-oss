@@ -6,8 +6,7 @@ import {
   EXTRACT_INGREDIENTS_FROM_TEXT_PROMPT,
   SUGGEST_FROM_IMAGE_PROMPT,
   SUGGEST_FROM_TEXT_PROMPT,
-  SUGGEST_FROM_VOICE_NOTE_PROMPT,
-  SUGGEST_FROM_YOUTUBE_PROMPT
+  SUGGEST_FROM_VOICE_NOTE_PROMPT
 } from "@/lib/ai/prompts";
 import { logger } from "@/lib/observability/logger";
 import type { MealSuggestion } from "@/types";
@@ -137,35 +136,6 @@ export async function suggestMealFromText(text: string): Promise<MealSuggestion>
 
   const toolBlock = response.content.find((b) => b.type === "tool_use");
   if (!toolBlock || toolBlock.type !== "tool_use") throw new Error("Anthropic did not return a suggestion.");
-  return parseSuggestion(toolBlock.input);
-}
-
-export async function suggestMealFromTranscript(transcript: string): Promise<MealSuggestion> {
-  const client = getAnthropicClient();
-  const response = await client.messages.create(
-    {
-      model: "claude-sonnet-4-6",
-      max_tokens: 1500,
-      tools: [suggestMealTool],
-      tool_choice: { type: "tool", name: "suggest_meal" },
-      messages: [
-        { role: "user", content: `${SUGGEST_FROM_YOUTUBE_PROMPT}\n\n${transcript}` }
-      ]
-    },
-    { signal: AbortSignal.timeout(FALLBACK_TIMEOUT_MS) }
-  );
-
-  logger.info("ai_provider_tokens", {
-    provider: "anthropic",
-    operation: "suggest_meal_from_youtube",
-    input_tokens: response.usage.input_tokens,
-    output_tokens: response.usage.output_tokens
-  });
-
-  const toolBlock = response.content.find((b) => b.type === "tool_use");
-  if (!toolBlock || toolBlock.type !== "tool_use") {
-    throw new Error("Anthropic did not return a suggestion.");
-  }
   return parseSuggestion(toolBlock.input);
 }
 

@@ -55,16 +55,17 @@ export const RECIPE_MISSING = "RECIPE_MISSING" as const;
 // AI
 export const AI_PROVIDER_ERROR = "AI_PROVIDER_ERROR" as const;
 export const AI_ERROR = "AI_ERROR" as const;
-export const YOUTUBE_NO_TRANSCRIPT = "YOUTUBE_NO_TRANSCRIPT" as const;
-export const YOUTUBE_SHORTS_UNSUPPORTED = "YOUTUBE_SHORTS_UNSUPPORTED" as const;
-export const YOUTUBE_PLAYLIST_UNSUPPORTED = "YOUTUBE_PLAYLIST_UNSUPPORTED" as const;
-export const YOUTUBE_UNAVAILABLE = "YOUTUBE_UNAVAILABLE" as const;
-export const YOUTUBE_AGE_RESTRICTED = "YOUTUBE_AGE_RESTRICTED" as const;
-export const YOUTUBE_FETCH_FAILED = "YOUTUBE_FETCH_FAILED" as const;
 export const AUDIO_TOO_LARGE = "AUDIO_TOO_LARGE" as const;
 export const AUDIO_INVALID_FORMAT = "AUDIO_INVALID_FORMAT" as const;
 export const AUDIO_TRANSCRIPTION_FAILED = "AUDIO_TRANSCRIPTION_FAILED" as const;
 export const AUDIO_TOO_SHORT_OR_EMPTY = "AUDIO_TOO_SHORT_OR_EMPTY" as const;
+
+// URL preview (Round 16)
+export const URL_INVALID = "URL_INVALID" as const;
+export const URL_PRIVATE_NETWORK = "URL_PRIVATE_NETWORK" as const;
+export const URL_FETCH_FAILED = "URL_FETCH_FAILED" as const;
+export const URL_TOO_LARGE = "URL_TOO_LARGE" as const;
+export const URL_NO_METADATA = "URL_NO_METADATA" as const;
 
 // Billing
 export const BILLING_NOT_CONFIGURED = "BILLING_NOT_CONFIGURED" as const;
@@ -105,15 +106,14 @@ export type ErrorReason =
   | typeof RECIPE_MISSING
   | typeof AI_PROVIDER_ERROR
   | typeof AI_ERROR
-  | typeof YOUTUBE_NO_TRANSCRIPT
-  | typeof YOUTUBE_SHORTS_UNSUPPORTED
-  | typeof YOUTUBE_PLAYLIST_UNSUPPORTED
-  | typeof YOUTUBE_UNAVAILABLE
-  | typeof YOUTUBE_AGE_RESTRICTED
-  | typeof YOUTUBE_FETCH_FAILED
   | typeof AUDIO_TOO_LARGE
   | typeof AUDIO_INVALID_FORMAT
   | typeof AUDIO_TRANSCRIPTION_FAILED
   | typeof AUDIO_TOO_SHORT_OR_EMPTY
+  | typeof URL_INVALID
+  | typeof URL_PRIVATE_NETWORK
+  | typeof URL_FETCH_FAILED
+  | typeof URL_TOO_LARGE
+  | typeof URL_NO_METADATA
   | typeof BILLING_NOT_CONFIGURED
   | typeof NO_STRIPE_CUSTOMER;

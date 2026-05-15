@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Camera, CheckCircle2, ChevronDown, Loader2, Plus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { AiSuggestDialog } from "@/components/forms/ai-suggest-dialog";
+import { SourceUrlInputPreview } from "@/components/embeds/source-url-input-preview";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -480,7 +481,7 @@ export function MealLogForm({ onSuccess, initialMealName, autoFocusRecipe }: Mea
               <Input
                 id="recipeSourceUrl"
                 type="url"
-                placeholder="https://example.com/recipe"
+                placeholder="https://youtube.com/… or any recipe link"
                 disabled={isSubmitting}
                 {...form.register("recipeSourceUrl")}
               />
@@ -489,6 +490,7 @@ export function MealLogForm({ onSuccess, initialMealName, autoFocusRecipe }: Mea
                   {form.formState.errors.recipeSourceUrl.message}
                 </p>
               ) : null}
+              <SourceUrlInputPreview url={form.watch("recipeSourceUrl") ?? ""} />
             </div>
           </div>
         )}

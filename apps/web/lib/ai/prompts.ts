@@ -51,18 +51,6 @@ Recipe:
 ${recipeText}${notesSection}`;
 }
 
-export const SUGGEST_FROM_YOUTUBE_PROMPT = `The text below is a transcript of a cooking video. It may include intro chatter, repetitions, ad reads, and informal language. Extract a clean, useful recipe from it.
-
-Return:
-- name: the dish name, concise (2–5 words). If the dish has a traditional Urdu/Hindi/regional name, lead with English but mention the traditional name in notes.
-- effortGuess: cooking effort — quick (under 15 min), easy (15–30 min), medium (30–60 min), high_effort (over 60 min or technically complex)
-- notes: 1–2 sentences of cook's-eye observations worth remembering — non-obvious technique, why a step matters, common mistakes the cook flagged. Don't summarize the recipe — that goes in recipeText. Empty string if nothing stands out.
-- recipeText: a CLEAN recipe. List ingredients with rough quantities (best-guess if the speaker was vague). Number the steps. Strip filler ("welcome back", "don't forget to subscribe", brand mentions). Plain text only.
-- ingredients: an ordered array of strings — one ingredient line each, in the order they appear in the transcript. Include any quantity the speaker mentioned ("1 tbsp ginger paste"), but a bare "ginger paste" is fine when no quantity was given. Be lenient: cooking videos often scatter ingredients through the talk track. Empty array if the transcript never names ingredients.
-- confidence: "high" if the transcript clearly described a complete recipe, "medium" if some details required inference, "low" if the transcript was fragmented or barely recipe-shaped.
-
-Transcript:`;
-
 export const SUGGEST_FROM_VOICE_NOTE_PROMPT = `This is a transcript of a voice note describing a recipe. The speaker may have rambled, corrected themselves, repeated ingredients, or shared asides ("you know, like my mother used to make"). Extract:
 
 - name: the dish's name as commonly known. If the dish has a traditional Urdu/Hindi/regional name, prefer that (e.g., "Chicken Karahi" not "Chicken Curry"); concise (2–5 words).

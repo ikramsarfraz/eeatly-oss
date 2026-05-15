@@ -5,7 +5,7 @@ import { getServerEnv } from "@/lib/env/server";
 import MarketingPage from "./marketing-page";
 
 const META_DESCRIPTION =
-  "Save the family recipes that matter — from voice notes, WhatsApp photos, YouTube videos, however they reach you. Shared kitchens across continents.";
+  "Save the family recipes that matter — from voice notes, WhatsApp photos, recipe links, however they reach you. Shared kitchens across continents.";
 
 export const metadata: Metadata = {
   title: "eeatly — One kitchen for your whole family",

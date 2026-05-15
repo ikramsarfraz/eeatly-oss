@@ -19,6 +19,7 @@ import { mealLogInputSchema } from "@eeatly/api/validators/meals";
 import type { MealLogInput } from "@eeatly/api/validators/meals";
 import { trpc } from "../lib/trpc";
 import { PhotoPicker } from "./photo-picker";
+import { SourceUrlInputPreview } from "./embeds/source-url-input-preview";
 
 /**
  * Round 13 — shared meal log form. Two callers:
@@ -122,10 +123,16 @@ export function MealLogForm({
   // Recipe / ingredients ride through invisibly when the AI prefilled
   // them. No UI field to edit them on mobile (matches Task 3's "keep the
   // form small" cap) — but the values still post on submit so the recipe
-  // view (Task 5) renders them properly.
+  // view renders them properly.
   const recipeText = initialValues?.recipeText ?? "";
-  const recipeSourceUrl = initialValues?.recipeSourceUrl ?? "";
   const ingredients = initialValues?.ingredients;
+
+  // Round 16 — Source URL is now an editable field. Users paste recipe
+  // links (YouTube, TikTok, blog posts) here; the saved meal renders the
+  // embedded media or an OG preview card on the detail screen.
+  const [recipeSourceUrl, setRecipeSourceUrl] = useState(
+    initialValues?.recipeSourceUrl ?? ""
+  );
 
   const [debouncedName, setDebouncedName] = useState("");
   const [suggestionsHidden, setSuggestionsHidden] = useState(false);
@@ -193,7 +200,7 @@ export function MealLogForm({
       notes: notes.trim() || undefined,
       photoUrl: photoUrl ?? undefined,
       recipeText: recipeText || undefined,
-      recipeSourceUrl: recipeSourceUrl || undefined,
+      recipeSourceUrl: recipeSourceUrl.trim() || undefined,
       ingredients: ingredients && ingredients.length > 0 ? ingredients : undefined
     };
     const parsed = mealLogInputSchema.safeParse(payload);
@@ -358,6 +365,26 @@ export function MealLogForm({
             style={[styles.input, styles.notesInput]}
             editable={!submitting}
           />
+        </Field>
+
+        <Field
+          label="Source URL"
+          hint="YouTube, TikTok, Pinterest, or any recipe link. Optional."
+        >
+          <TextInput
+            value={recipeSourceUrl}
+            onChangeText={setRecipeSourceUrl}
+            placeholder="https://youtube.com/…"
+            placeholderTextColor="#999"
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="url"
+            keyboardType="url"
+            textContentType="URL"
+            style={styles.input}
+            editable={!submitting}
+          />
+          <SourceUrlInputPreview url={recipeSourceUrl} />
         </Field>
 
         <Pressable

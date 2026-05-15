@@ -52,10 +52,6 @@ export const FEATURE_REGISTRY = {
     description: "Share recipes with anyone via a public link",
     defaultRule: "beta_or_paid" as GateRule
   },
-  ai_suggest_youtube: {
-    description: "Turn YouTube cooking videos into saved recipes",
-    defaultRule: "beta_or_paid" as GateRule
-  },
   ai_suggest_voice: {
     description: "Extract recipes from voice notes",
     defaultRule: "beta_or_paid" as GateRule
