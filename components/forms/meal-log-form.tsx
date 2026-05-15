@@ -4,7 +4,6 @@
 
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useQueryClient } from "@tanstack/react-query";
 import { Camera, CheckCircle2, ChevronDown, Loader2, Plus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { AiSuggestDialog } from "@/components/forms/ai-suggest-dialog";
@@ -12,12 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useCreateMealLog } from "@/hooks/use-dashboard-meals";
+import { useCreateMealLogImperative } from "@/hooks/use-dashboard-meals";
 import { endpoints, type PresignUploadResponse } from "@/lib/api/endpoints";
-import { queryKeys } from "@/lib/query/keys";
+import { trpc } from "@/lib/trpc/client";
 import { mealLogInputSchema, type MealLogInput } from "@/lib/validators/meals";
 import { cn } from "@/lib/utils";
-import type { DashboardMeals, MealSuggestion } from "@/types";
+import type { MealSuggestion } from "@/types";
 
 type MealLogFormProps = {
   onSuccess?: () => void;
@@ -74,7 +73,7 @@ async function uploadPhoto(file: File) {
 
 export function MealLogForm({ onSuccess, initialMealName, autoFocusRecipe }: MealLogFormProps) {
   const datalistId = React.useId();
-  const queryClient = useQueryClient();
+  const utils = trpc.useUtils();
   const [photoFile, setPhotoFile] = React.useState<File | null>(null);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
@@ -83,8 +82,12 @@ export function MealLogForm({ onSuccess, initialMealName, autoFocusRecipe }: Mea
   const aiNoticeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const recipeTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
 
+  // Peek at the dashboard's tRPC cache for autocomplete + recipe
+  // prefill. `getData()` is non-subscribing — re-renders only happen
+  // when react-hook-form updates the watched mealName below.
+  const cachedDashboard = utils.dashboard.meals.getData();
   const { mealNameSuggestions, mealDetailsByName } = React.useMemo(() => {
-    const cached = queryClient.getQueryData<DashboardMeals>(queryKeys.meals.dashboard());
+    const cached = cachedDashboard;
     if (!cached) return { mealNameSuggestions: [], mealDetailsByName: new Map<string, { recipeText: string | null; recipeSourceUrl: string | null }>() };
 
     const seen = new Set<string>();
@@ -117,7 +120,7 @@ export function MealLogForm({ onSuccess, initialMealName, autoFocusRecipe }: Mea
     }
 
     return { mealNameSuggestions: names, mealDetailsByName: detailsMap };
-  }, [queryClient]);
+  }, [cachedDashboard]);
 
   const form = useForm<MealLogInput>({
     resolver: zodResolver(mealLogInputSchema),
@@ -191,7 +194,7 @@ export function MealLogForm({ onSuccess, initialMealName, autoFocusRecipe }: Mea
     }
   }, [mealName, mealDetailsByName, form]);
 
-  const mutation = useCreateMealLog();
+  const mutation = useCreateMealLogImperative();
   const isSubmitting = form.formState.isSubmitting || mutation.isPending;
   const selectedEffort = form.watch("effortLevel");
 

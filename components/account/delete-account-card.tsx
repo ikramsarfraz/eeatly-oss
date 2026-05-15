@@ -16,7 +16,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/providers/toast-provider";
-import { deleteAccountAction } from "@/actions/account";
+import { trpc } from "@/lib/trpc/client";
+import { getCause } from "@/lib/trpc/errors";
 
 const CONFIRMATION_PHRASE = "delete my account";
 
@@ -24,25 +25,25 @@ export function DeleteAccountCard() {
   const { showToast } = useToast();
   const [open, setOpen] = React.useState(false);
   const [phrase, setPhrase] = React.useState("");
-  const [pending, setPending] = React.useState(false);
+  const deleteMutation = trpc.auth.deleteAccount.useMutation();
+  const pending = deleteMutation.isPending;
 
   const phraseMatches = phrase.trim().toLowerCase() === CONFIRMATION_PHRASE;
 
   async function handleConfirm() {
     if (!phraseMatches) return;
-    setPending(true);
     try {
-      // The action redirects on success — control normally won't return
-      // with `ok: true`. Failure cases come back as a discriminated-union
-      // result; the UI branches on `code` rather than parsing strings.
-      const result = await deleteAccountAction(phrase);
-      if (result.ok) {
-        // Unreachable in practice (redirect short-circuits). Defensive
-        // no-op so the type-narrowing stays exhaustive.
-        return;
-      }
-      setPending(false);
-      if (result.code === "OWNER_BLOCK") {
+      // Round 11: tRPC procedures don't redirect — they return the
+      // post-sign-out target and the client navigates. `assign` (not
+      // `router.push`) is intentional so the freshly-cleared Better
+      // Auth cookie state takes effect on the next page load.
+      const result = await deleteMutation.mutateAsync({
+        confirmationPhrase: phrase
+      });
+      window.location.assign(result.redirectTo);
+    } catch (error) {
+      const cause = getCause(error);
+      if (cause?.reason === "OWNER_BLOCK") {
         showToast({
           variant: "error",
           title: "Can't delete your account yet",
@@ -54,19 +55,7 @@ export function DeleteAccountCard() {
       showToast({
         variant: "error",
         title: "Couldn't delete your account",
-        description: result.message
-      });
-    } catch (error) {
-      // The NEXT_REDIRECT thrown by `redirect()` is intentionally not a
-      // user-facing error. Let it bubble silently. Any other throw is
-      // an infra failure (rate limit, signOut crash) — surface generic.
-      const message = error instanceof Error ? error.message : String(error);
-      if (message.includes("NEXT_REDIRECT")) return;
-      setPending(false);
-      showToast({
-        variant: "error",
-        title: "Couldn't delete your account",
-        description: message
+        description: error instanceof Error ? error.message : undefined
       });
     }
   }

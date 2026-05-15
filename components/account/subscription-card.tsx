@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/providers/toast-provider";
-import { createPortalSessionAction } from "@/actions/billing";
+import { trpc } from "@/lib/trpc/client";
 
 export type SubscriptionCardProps = {
   /**
@@ -52,7 +52,8 @@ export function SubscriptionCard({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { showToast } = useToast();
-  const [portalPending, setPortalPending] = React.useState(false);
+  const portalMutation = trpc.billing.createPortalSession.useMutation();
+  const portalPending = portalMutation.isPending;
 
   // Surface a success toast when the user returns from a completed
   // checkout. We don't wait for the webhook here — the server-resolved
@@ -81,20 +82,15 @@ export function SubscriptionCard({
 
   async function openPortal() {
     if (portalPending) return;
-    setPortalPending(true);
     try {
-      const result = await createPortalSessionAction();
-      if (result.ok) {
-        window.location.href = result.url;
-        return;
-      }
+      const result = await portalMutation.mutateAsync();
+      window.location.href = result.url;
+    } catch (error) {
       showToast({
         variant: "error",
         title: "Couldn't open billing portal",
-        description: result.message
+        description: error instanceof Error ? error.message : undefined
       });
-    } finally {
-      setPortalPending(false);
     }
   }
 

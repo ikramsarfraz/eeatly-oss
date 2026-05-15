@@ -7,7 +7,7 @@ import { Check, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/providers/toast-provider";
-import { createCheckoutSessionAction } from "@/actions/billing";
+import { trpc } from "@/lib/trpc/client";
 
 type AuthState =
   | { kind: "anonymous" }
@@ -39,28 +39,24 @@ export function PricingCard({
   // Default to annual — better unit economics, higher LTV. The toggle
   // is a state, not a free-floating decision, so I keep it in component.
   const [priceType, setPriceType] = React.useState<"monthly" | "annual">("annual");
-  const [pending, setPending] = React.useState(false);
+  const checkoutMutation = trpc.billing.createCheckoutSession.useMutation();
+  const pending = checkoutMutation.isPending;
 
   const activePriceDisplay =
     priceType === "monthly" ? monthlyPriceDisplay : annualPriceDisplay;
 
   async function handleUpgrade() {
     if (pending) return;
-    setPending(true);
     try {
-      const result = await createCheckoutSessionAction({ priceType });
-      if (result.ok) {
-        // Stripe hosts the checkout — full navigation, not a fetch.
-        window.location.href = result.url;
-        return;
-      }
+      const result = await checkoutMutation.mutateAsync({ priceType });
+      // Stripe hosts the checkout — full navigation, not a fetch.
+      window.location.href = result.url;
+    } catch (error) {
       showToast({
         variant: "error",
         title: "Couldn't start checkout",
-        description: result.message
+        description: error instanceof Error ? error.message : undefined
       });
-    } finally {
-      setPending(false);
     }
   }
 

@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/providers/toast-provider";
-import { addDishToPlanAction } from "@/actions/plans";
+import { trpc } from "@/lib/trpc/client";
 
 type MealLibraryItem = {
   id: string;
@@ -38,6 +38,7 @@ export function AddDishPicker({
   const [open, setOpen] = React.useState(false);
   const [q, setQ] = React.useState("");
   const [addingMealId, setAddingMealId] = React.useState<string | null>(null);
+  const addDishMutation = trpc.plans.addDish.useMutation();
 
   // The picker only shows meals already in the household (the server fetch
   // is gated by `requireHouseholdMember` in services/plans.ts:listMealLibrary),
@@ -54,20 +55,15 @@ export function AddDishPicker({
     if (addingMealId) return;
     setAddingMealId(mealId);
     try {
-      const result = await addDishToPlanAction(planId, { mealId });
-      if (result.ok) {
-        showToast({
-          variant: "success",
-          title: `Added "${mealName}"`
-        });
-        router.refresh();
-      } else {
-        showToast({
-          variant: "error",
-          title: "Couldn't add dish",
-          description: result.message
-        });
-      }
+      await addDishMutation.mutateAsync({ planId, dish: { mealId } });
+      showToast({ variant: "success", title: `Added "${mealName}"` });
+      router.refresh();
+    } catch (error) {
+      showToast({
+        variant: "error",
+        title: "Couldn't add dish",
+        description: error instanceof Error ? error.message : undefined
+      });
     } finally {
       setAddingMealId(null);
     }

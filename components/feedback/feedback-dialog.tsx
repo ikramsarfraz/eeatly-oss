@@ -7,7 +7,8 @@ import { usePathname } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, MessageSquare } from "lucide-react";
 import { useForm } from "react-hook-form";
-import { submitFeedbackAction } from "@/actions/feedback";
+import { trpc } from "@/lib/trpc/client";
+import { isRateLimited } from "@/lib/trpc/errors";
 import { Button } from "@/components/ui/button";
 import { useHydrated } from "@/hooks/use-hydrated";
 import {
@@ -54,11 +55,12 @@ export function FeedbackDialog({ trigger }: FeedbackDialogProps) {
       context: pathname
     }
   });
-  const isSubmitting = form.formState.isSubmitting;
+  const submitMutation = trpc.feedback.submit.useMutation();
+  const isSubmitting = form.formState.isSubmitting || submitMutation.isPending;
 
   const handleSend = form.handleSubmit(async (values) => {
-    const result = await submitFeedbackAction(values);
-    if (result.ok) {
+    try {
+      await submitMutation.mutateAsync(values);
       form.reset({ type: "general", message: "", context: pathname });
       setOpen(false);
       showToast({
@@ -66,21 +68,16 @@ export function FeedbackDialog({ trigger }: FeedbackDialogProps) {
         title: "Feedback sent",
         description: "Thanks for sharing — this genuinely helps."
       });
-      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : undefined;
+      showToast({
+        variant: "error",
+        title: "Unable to send feedback",
+        description: isRateLimited(error)
+          ? message ?? "Too many submissions. Please try again later."
+          : message ?? "Please try again."
+      });
     }
-    // Discriminated union — branch on .code. Round 4.7 unified the action
-    // surface; no more string-parsing on caught errors.
-    const description =
-      result.code === "RATE_LIMITED"
-        ? result.message ?? "Too many submissions. Please try again later."
-        : result.code === "INVALID_INPUT"
-          ? result.message ?? "We couldn't read that feedback. Please try again."
-          : result.message ?? "Please try again.";
-    showToast({
-      variant: "error",
-      title: "Unable to send feedback",
-      description
-    });
   });
 
   React.useEffect(() => {

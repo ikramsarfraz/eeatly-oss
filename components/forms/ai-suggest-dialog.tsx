@@ -2,12 +2,8 @@
 
 import * as React from "react";
 import { Camera, FileText, Loader2, Mic, Sparkles, Square, Upload, Youtube } from "lucide-react";
-import {
-  suggestFromAudioAction,
-  suggestFromImageAction,
-  suggestFromTextAction,
-  suggestFromYouTubeAction
-} from "@/actions/ai";
+import { trpc } from "@/lib/trpc/client";
+import { getCause } from "@/lib/trpc/errors";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -35,7 +31,31 @@ type AiSuggestDialogProps = {
   onSuggestion: (suggestion: MealSuggestion) => void;
 };
 
+/**
+ * Convert binary `Blob` / `File` → base64 string suitable for the
+ * tRPC procedure's JSON body. Read via `arrayBuffer()` (vs. `FileReader`)
+ * for cleaner async flow; the result is a Node-style base64 string the
+ * server-side `Buffer.from(_, 'base64')` decodes losslessly.
+ */
+async function blobToBase64(blob: Blob): Promise<string> {
+  const buf = await blob.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  // btoa needs a binary string. For typical photo (a few MB) and voice
+  // (up to 25 MB) sizes this stays well below the call-stack limit for
+  // String.fromCharCode.apply(...); chunked when above 16k bytes.
+  const CHUNK = 0x8000;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
 export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
+  const photoMutation = trpc.ai.suggestFromPhoto.useMutation();
+  const textMutation = trpc.ai.suggestFromText.useMutation();
+  const youtubeMutation = trpc.ai.suggestFromYouTube.useMutation();
+  const voiceMutation = trpc.ai.suggestFromVoice.useMutation();
   const [open, setOpen] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<Tab>("photo");
   const [isPending, setIsPending] = React.useState(false);
@@ -245,7 +265,7 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
 
     try {
       // Client-side gate so we don't burn a rate-limit slot on an obvious
-      // mistake. The action also defends with INVALID_INPUT codes.
+      // mistake. The procedure also rejects with INVALID_INPUT shapes.
       if (activeTab === "photo" && !photoFile) {
         setError("Please select an image first.");
         return;
@@ -267,157 +287,163 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
         return;
       }
 
-      // Each tab has a distinct result-shape (YouTube has 6 extra
-      // codes, Voice has 4). Branch first, then handle each result's union.
+      // Round 11: each tab calls its tRPC mutation. Binary inputs ride
+      // as base64 strings in the JSON body — see the procedure-level
+      // notes in `server/trpc/routers/ai.ts` for the trade-off.
       if (activeTab === "photo" && photoFile) {
-        const formData = new FormData();
-        formData.append("image", photoFile);
-        handleSuggestResult(await suggestFromImageAction(formData));
-      } else if (activeTab === "text") {
-        handleSuggestResult(await suggestFromTextAction(pastedText));
-      } else if (activeTab === "youtube") {
-        handleYouTubeResult(
-          await suggestFromYouTubeAction({ url: youtubeUrl.trim() })
-        );
-      } else if (activeTab === "voice") {
-        const formData = new FormData();
-        if (voiceMode === "record" && recordedBlob) {
-          // Recorded blob's MIME comes from MediaRecorder's chosen container.
-          // Pass it through as a File so the server reads `.type` + `.name`.
-          const extension = mimeToExtension(recordedBlob.type);
-          formData.append(
-            "audio",
-            new File([recordedBlob], `voice-note.${extension}`, {
-              type: recordedBlob.type
-            })
-          );
-        } else if (voiceMode === "upload" && audioFile) {
-          formData.append("audio", audioFile);
+        const imageBase64 = await blobToBase64(photoFile);
+        try {
+          const result = await photoMutation.mutateAsync({
+            imageBase64,
+            mediaType: photoFile.type as
+              | "image/jpeg"
+              | "image/png"
+              | "image/gif"
+              | "image/webp"
+          });
+          setOpen(false);
+          onSuggestion(result);
+        } catch (e) {
+          handleAiError(e, "photo");
         }
-        handleVoiceResult(await suggestFromAudioAction(formData));
+      } else if (activeTab === "text") {
+        try {
+          const result = await textMutation.mutateAsync({
+            text: pastedText
+          });
+          setOpen(false);
+          onSuggestion(result);
+        } catch (e) {
+          handleAiError(e, "text");
+        }
+      } else if (activeTab === "youtube") {
+        try {
+          const result = await youtubeMutation.mutateAsync({
+            url: youtubeUrl.trim()
+          });
+          setOpen(false);
+          onSuggestion(result);
+        } catch (e) {
+          handleAiError(e, "youtube");
+        }
+      } else if (activeTab === "voice") {
+        let payload:
+          | { blob: Blob; mediaType: string; fileName: string }
+          | null = null;
+        if (voiceMode === "record" && recordedBlob) {
+          const extension = mimeToExtension(recordedBlob.type);
+          payload = {
+            blob: recordedBlob,
+            mediaType: recordedBlob.type,
+            fileName: `voice-note.${extension}`
+          };
+        } else if (voiceMode === "upload" && audioFile) {
+          payload = {
+            blob: audioFile,
+            mediaType: audioFile.type,
+            fileName: audioFile.name
+          };
+        }
+        if (!payload) return;
+        const audioBase64 = await blobToBase64(payload.blob);
+        try {
+          const result = await voiceMutation.mutateAsync({
+            audioBase64,
+            mediaType: payload.mediaType as (typeof SUPPORTED_AUDIO_MEDIA_TYPES)[number],
+            fileName: payload.fileName
+          });
+          setOpen(false);
+          onSuggestion(result);
+        } catch (e) {
+          handleAiError(e, "voice");
+        }
       }
     } finally {
       setIsPending(false);
     }
   }
 
-  const voicePayloadReady =
-    voiceMode === "record" ? recordedBlob !== null : audioFile !== null;
+  /**
+   * Single discriminator that handles all four tab paths. The cause's
+   * `reason` is the wire-stable name we set in the AI router; the UI
+   * copy is preserved verbatim from the Round 8 action.
+   */
+  function handleAiError(error: unknown, tab: Tab) {
+    const cause = getCause(error);
+    const reason = cause?.reason;
+    const message = error instanceof Error ? error.message : undefined;
 
-  function handleSuggestResult(
-    result: Awaited<ReturnType<typeof suggestFromImageAction>>
-  ) {
-    if (result.ok) {
-      setOpen(false);
-      onSuggestion(result.data);
+    if (reason === "RATE_LIMITED") {
+      setError(message ?? "You've hit your daily AI limit.");
       return;
     }
-    switch (result.code) {
-      case "RATE_LIMITED":
-        setError(result.message ?? "You've hit your daily AI limit.");
-        break;
-      case "INVALID_INPUT":
-        setError(result.message ?? "We couldn't read that input.");
-        break;
-      case "AI_PROVIDER_ERROR":
-        setError(result.message ?? "Something went wrong. Please try again.");
-        break;
-      case "UPGRADE_REQUIRED":
-        setError(
-          "AI assist is part of eeatly Plus. Visit /pricing to see what's included."
-        );
-        break;
-    }
-  }
-
-  function handleYouTubeResult(
-    result: Awaited<ReturnType<typeof suggestFromYouTubeAction>>
-  ) {
-    if (result.ok) {
-      setOpen(false);
-      onSuggestion(result.data);
-      return;
-    }
-    // Each YouTube error code gets tailored copy. Generic "try again"
-    // would be wrong here — Shorts won't work no matter how many times
-    // the user retries.
-    switch (result.code) {
-      case "YOUTUBE_NO_TRANSCRIPT":
-        setError(
-          "This video doesn't have captions we can read. Try a different video, or paste the recipe text manually."
-        );
-        break;
-      case "YOUTUBE_SHORTS_UNSUPPORTED":
-        setError("YouTube Shorts don't work yet — try a regular video.");
-        break;
-      case "YOUTUBE_PLAYLIST_UNSUPPORTED":
-        setError("This is a playlist link. Open one video and try its URL.");
-        break;
-      case "YOUTUBE_UNAVAILABLE":
-        setError("Video isn't available — it may be private or removed.");
-        break;
-      case "YOUTUBE_AGE_RESTRICTED":
-        setError("Age-restricted videos can't be read.");
-        break;
-      case "YOUTUBE_FETCH_FAILED":
-        setError("Couldn't load the video right now. Try again in a minute.");
-        break;
-      case "INVALID_INPUT":
-        setError(result.message ?? "That doesn't look like a YouTube link.");
-        break;
-      case "RATE_LIMITED":
-        setError(result.message ?? "You've hit your daily AI limit.");
-        break;
-      case "UPGRADE_REQUIRED":
+    if (reason === "UPGRADE_REQUIRED") {
+      if (tab === "youtube") {
         setError(
           "YouTube recipe extraction is part of eeatly Plus. Visit /pricing to see what's included."
         );
-        break;
-      case "AI_PROVIDER_ERROR":
-        setError(result.message ?? "Something went wrong. Please try again.");
-        break;
-    }
-  }
-
-  function handleVoiceResult(
-    result: Awaited<ReturnType<typeof suggestFromAudioAction>>
-  ) {
-    if (result.ok) {
-      setOpen(false);
-      onSuggestion(result.data);
-      return;
-    }
-    switch (result.code) {
-      case "AUDIO_TOO_LARGE":
-        setError("That file is too large. Try a shorter voice note (max 25 MB).");
-        break;
-      case "AUDIO_INVALID_FORMAT":
-        setError("Unsupported audio format. Try a different file.");
-        break;
-      case "AUDIO_TRANSCRIPTION_FAILED":
-        setError("Couldn't process the audio right now. Try again in a minute.");
-        break;
-      case "AUDIO_TOO_SHORT_OR_EMPTY":
-        setError(
-          "We couldn't hear a recipe in that audio. Try a longer recording or upload a different file."
-        );
-        break;
-      case "INVALID_INPUT":
-        setError(result.message ?? "Record or upload a voice note first.");
-        break;
-      case "RATE_LIMITED":
-        setError(result.message ?? "You've hit your daily AI limit.");
-        break;
-      case "UPGRADE_REQUIRED":
+      } else if (tab === "voice") {
         setError(
           "Voice notes are part of eeatly Plus. Visit /pricing to see what's included."
         );
-        break;
-      case "AI_PROVIDER_ERROR":
-        setError(result.message ?? "Something went wrong. Please try again.");
-        break;
+      } else {
+        setError(
+          "AI assist is part of eeatly Plus. Visit /pricing to see what's included."
+        );
+      }
+      return;
     }
+    if (reason === "INVALID_INPUT") {
+      setError(message ?? "We couldn't read that input.");
+      return;
+    }
+    if (tab === "youtube") {
+      switch (reason) {
+        case "YOUTUBE_NO_TRANSCRIPT":
+          setError(
+            "This video doesn't have captions we can read. Try a different video, or paste the recipe text manually."
+          );
+          return;
+        case "YOUTUBE_SHORTS_UNSUPPORTED":
+          setError("YouTube Shorts don't work yet — try a regular video.");
+          return;
+        case "YOUTUBE_PLAYLIST_UNSUPPORTED":
+          setError("This is a playlist link. Open one video and try its URL.");
+          return;
+        case "YOUTUBE_UNAVAILABLE":
+          setError("Video isn't available — it may be private or removed.");
+          return;
+        case "YOUTUBE_AGE_RESTRICTED":
+          setError("Age-restricted videos can't be read.");
+          return;
+        case "YOUTUBE_FETCH_FAILED":
+          setError("Couldn't load the video right now. Try again in a minute.");
+          return;
+      }
+    }
+    if (tab === "voice") {
+      switch (reason) {
+        case "AUDIO_TOO_LARGE":
+          setError("That file is too large. Try a shorter voice note (max 25 MB).");
+          return;
+        case "AUDIO_INVALID_FORMAT":
+          setError("Unsupported audio format. Try a different file.");
+          return;
+        case "AUDIO_TRANSCRIPTION_FAILED":
+          setError("Couldn't process the audio right now. Try again in a minute.");
+          return;
+        case "AUDIO_TOO_SHORT_OR_EMPTY":
+          setError(
+            "We couldn't hear a recipe in that audio. Try a longer recording or upload a different file."
+          );
+          return;
+      }
+    }
+    setError(message ?? "Something went wrong. Please try again.");
   }
+
+  const voicePayloadReady =
+    voiceMode === "record" ? recordedBlob !== null : audioFile !== null;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>

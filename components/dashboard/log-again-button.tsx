@@ -4,7 +4,7 @@ import * as React from "react";
 import { Check, Loader2, RotateCcw } from "lucide-react";
 import { useToast } from "@/components/providers/toast-provider";
 import { Button } from "@/components/ui/button";
-import { useCreateMealLog } from "@/hooks/use-dashboard-meals";
+import { useCreateMealLogImperative } from "@/hooks/use-dashboard-meals";
 import type { EffortLevel } from "@/types";
 
 type LogAgainButtonProps = {
@@ -31,7 +31,7 @@ export function LogAgainButton({
   iconOnly = false
 }: LogAgainButtonProps) {
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
-  const mutation = useCreateMealLog({ source: "log_again" });
+  const mutation = useCreateMealLogImperative({ source: "log_again" });
   const { showToast } = useToast();
 
   async function logAgain() {

@@ -39,12 +39,7 @@ import { ClonePlanDialog } from "@/components/plans/clone-plan-dialog";
 import { EffortAggregateChip } from "@/components/plans/effort-aggregate-chip";
 import { HintBadge, type HintData } from "@/components/plans/hint-badge";
 import { ShareButton } from "@/components/shares/share-button";
-import {
-  archivePlanAction,
-  removeDishFromPlanAction,
-  reorderDishesAction,
-  unarchivePlanAction
-} from "@/actions/plans";
+import { trpc } from "@/lib/trpc/client";
 
 export type PlanDetailDish = {
   id: string;
@@ -108,6 +103,11 @@ export function PlanDetail({
   const [archivePending, setArchivePending] = React.useState(false);
   const [cloneOpen, setCloneOpen] = React.useState(false);
 
+  const reorderMutation = trpc.plans.reorderDishes.useMutation();
+  const removeDishMutation = trpc.plans.removeDish.useMutation();
+  const archiveMutation = trpc.plans.archive.useMutation();
+  const unarchiveMutation = trpc.plans.unarchive.useMutation();
+
   const hasHints = hints && Object.keys(hints).length > 0;
 
   function dismissHints() {
@@ -133,18 +133,17 @@ export function PlanDetail({
 
     setReorderingId(next[swapIndex]!.id);
     try {
-      const result = await reorderDishesAction(plan.id, {
-        dishIdsInOrder: next.map((d) => d.id)
+      await reorderMutation.mutateAsync({
+        planId: plan.id,
+        order: { dishIdsInOrder: next.map((d) => d.id) }
       });
-      if (!result.ok) {
-        showToast({
-          variant: "error",
-          title: "Couldn't reorder",
-          description: result.message
-        });
-      } else {
-        router.refresh();
-      }
+      router.refresh();
+    } catch (error) {
+      showToast({
+        variant: "error",
+        title: "Couldn't reorder",
+        description: error instanceof Error ? error.message : undefined
+      });
     } finally {
       setReorderingId(null);
     }
@@ -154,20 +153,18 @@ export function PlanDetail({
     if (removingId) return;
     setRemovingId(planDishId);
     try {
-      const result = await removeDishFromPlanAction(plan.id, { planDishId });
-      if (result.ok) {
-        showToast({
-          variant: "success",
-          title: `Removed "${mealName}"`
-        });
-        router.refresh();
-      } else {
-        showToast({
-          variant: "error",
-          title: "Couldn't remove dish",
-          description: result.message
-        });
-      }
+      await removeDishMutation.mutateAsync({
+        planId: plan.id,
+        dish: { planDishId }
+      });
+      showToast({ variant: "success", title: `Removed "${mealName}"` });
+      router.refresh();
+    } catch (error) {
+      showToast({
+        variant: "error",
+        title: "Couldn't remove dish",
+        description: error instanceof Error ? error.message : undefined
+      });
     } finally {
       setRemovingId(null);
     }
@@ -177,22 +174,22 @@ export function PlanDetail({
     if (archivePending) return;
     setArchivePending(true);
     try {
-      const result = plan.archivedAt
-        ? await unarchivePlanAction(plan.id)
-        : await archivePlanAction(plan.id);
-      if (result.ok) {
-        showToast({
-          variant: "success",
-          title: plan.archivedAt ? "Plan restored" : "Plan archived"
-        });
-        router.refresh();
+      if (plan.archivedAt) {
+        await unarchiveMutation.mutateAsync({ planId: plan.id });
       } else {
-        showToast({
-          variant: "error",
-          title: "Couldn't update",
-          description: result.message
-        });
+        await archiveMutation.mutateAsync({ planId: plan.id });
       }
+      showToast({
+        variant: "success",
+        title: plan.archivedAt ? "Plan restored" : "Plan archived"
+      });
+      router.refresh();
+    } catch (error) {
+      showToast({
+        variant: "error",
+        title: "Couldn't update",
+        description: error instanceof Error ? error.message : undefined
+      });
     } finally {
       setArchivePending(false);
     }

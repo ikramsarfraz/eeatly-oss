@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/providers/toast-provider";
 import { cn } from "@/lib/utils";
-import { updateDishAnnotationAction } from "@/actions/plans";
+import { trpc } from "@/lib/trpc/client";
+import type { UpdateDishAnnotationInput } from "@/lib/validators/plans";
 
 export type Annotation = {
   actualEffort: "quick" | "easy" | "medium" | "high_effort" | null;
@@ -54,6 +55,7 @@ export function AnnotationEditor({ planDishId, initial }: AnnotationEditorProps)
   const { showToast } = useToast();
   const [expanded, setExpanded] = React.useState(false);
   const [pendingField, setPendingField] = React.useState<string | null>(null);
+  const updateAnnotation = trpc.plans.updateDishAnnotation.useMutation();
 
   // Local mirror of the annotation so toggles read snappily before the
   // server confirms. We do NOT set this from a useEffect (lint rule); the
@@ -64,22 +66,17 @@ export function AnnotationEditor({ planDishId, initial }: AnnotationEditorProps)
   const [verdict, setVerdict] = React.useState(initial.verdict);
   const [annotationNotes, setAnnotationNotes] = React.useState(initial.annotationNotes ?? "");
 
-  async function save(
-    field: string,
-    patch: Parameters<typeof updateDishAnnotationAction>[1]
-  ) {
+  async function save(field: string, patch: UpdateDishAnnotationInput) {
     setPendingField(field);
     try {
-      const result = await updateDishAnnotationAction(planDishId, patch);
-      if (!result.ok) {
-        showToast({
-          variant: "error",
-          title: "Couldn't save",
-          description: result.message
-        });
-        return;
-      }
+      await updateAnnotation.mutateAsync({ planDishId, patch });
       router.refresh();
+    } catch (error) {
+      showToast({
+        variant: "error",
+        title: "Couldn't save",
+        description: error instanceof Error ? error.message : undefined
+      });
     } finally {
       setPendingField(null);
     }

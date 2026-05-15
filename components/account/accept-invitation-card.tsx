@@ -11,7 +11,8 @@ import {
   CardTitle
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { acceptInvitationAction } from "@/actions/households";
+import { trpc } from "@/lib/trpc/client";
+import { getCause } from "@/lib/trpc/errors";
 
 export type AcceptInvitationCardProps = {
   token: string;
@@ -30,40 +31,36 @@ export function AcceptInvitationCard({
   householdName
 }: AcceptInvitationCardProps) {
   const router = useRouter();
-  const [pending, setPending] = React.useState(false);
   const [success, setSuccess] = React.useState<{ moved: number } | null>(null);
   const [error, setError] = React.useState<LocalError | null>(null);
+  const acceptMutation = trpc.households.acceptInvitation.useMutation();
+  const pending = acceptMutation.isPending;
 
   async function handleAccept() {
     if (pending) return;
-    setPending(true);
     setError(null);
     try {
-      const result = await acceptInvitationAction({ token });
-      if (result.ok) {
-        setSuccess({ moved: result.mealsMoved + result.logsMoved });
-        // Soft navigate after a beat so the success state is visible.
-        setTimeout(() => router.push("/dashboard"), 900);
-        return;
-      }
-      if (result.code === "OWNERSHIP_TRANSFER_REQUIRED") {
-        setError({ kind: "ownership_transfer", message: result.message });
-      } else if (result.code === "MEAL_NAME_COLLISION") {
+      const result = await acceptMutation.mutateAsync({ token });
+      setSuccess({ moved: result.mealsMoved + result.logsMoved });
+      setTimeout(() => router.push("/dashboard"), 900);
+    } catch (e) {
+      const cause = getCause(e);
+      const reason = cause?.reason;
+      const message =
+        e instanceof Error ? e.message : "Couldn't accept invitation.";
+      if (reason === "OWNERSHIP_TRANSFER_REQUIRED") {
+        setError({ kind: "ownership_transfer", message });
+      } else if (reason === "MEAL_NAME_COLLISION") {
+        const names = (cause as { collidingNames?: string[] } | null)
+          ?.collidingNames;
         setError({
           kind: "meal_collision",
-          message: result.message,
-          names: result.collidingNames ?? []
+          message,
+          names: names ?? []
         });
       } else {
-        setError({ kind: "generic", message: result.message });
+        setError({ kind: "generic", message });
       }
-    } catch (e) {
-      setError({
-        kind: "generic",
-        message: e instanceof Error ? e.message : "Couldn't accept invitation."
-      });
-    } finally {
-      setPending(false);
     }
   }
 

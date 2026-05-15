@@ -12,7 +12,7 @@ import {
   CardHeader,
   CardTitle
 } from "@/components/ui/card";
-import { signOutAndRedirectAction } from "@/actions/auth";
+import { trpc } from "@/lib/trpc/client";
 
 export type InviteEmailMismatchProps = {
   invitedEmail: string;
@@ -29,22 +29,21 @@ export function InviteEmailMismatch({
   currentEmail,
   redirectTo
 }: InviteEmailMismatchProps) {
-  const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const signOutMutation = trpc.auth.signOutAndRedirect.useMutation();
+  const pending = signOutMutation.isPending;
 
   async function handleSignOut() {
-    setPending(true);
     setError(null);
-    const result = await signOutAndRedirectAction({ redirectTo });
-    if (result.ok) {
-      // Full-page navigation so the cleared cookie takes effect — router
-      // pushes preserve the in-memory session and would show the
-      // mismatch view again on the next render.
+    try {
+      const result = await signOutMutation.mutateAsync({ redirectTo });
+      // Full-page navigation so the cleared cookie takes effect.
       window.location.assign(result.redirectTo);
-      return;
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Couldn't sign you out. Please try again."
+      );
     }
-    setError(result.message);
-    setPending(false);
   }
 
   return (
