@@ -1,0 +1,42 @@
+{
+  "name": "@eeatly/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start --dev-client",
+    "android": "expo start --android --dev-client",
+    "ios": "expo start --ios --dev-client",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "prebuild": "expo prebuild"
+  },
+  "dependencies": {
+    "@eeatly/api": "workspace:*",
+    "@eeatly/shared": "workspace:*",
+    "@tanstack/react-query": "^5.90.12",
+    "@trpc/client": "^11.17.0",
+    "@trpc/react-query": "^11.17.0",
+    "better-auth": "^1.4.0",
+    "expo": "^54.0.0",
+    "expo-constants": "~18.0.0",
+    "expo-linking": "~8.0.0",
+    "expo-router": "~6.0.0",
+    "expo-secure-store": "~15.0.0",
+    "expo-status-bar": "~3.0.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.4",
+    "react-native-gesture-handler": "~2.20.0",
+    "react-native-reanimated": "~4.0.0",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.4.0",
+    "superjson": "^2.2.6",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.0",
+    "@types/react": "~19.2.0",
+    "typescript": "^5.9.0"
+  }
+}
