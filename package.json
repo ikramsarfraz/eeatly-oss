@@ -24,5 +24,19 @@
     "db:backfill:beta-cohort": "pnpm --filter @eeatly/web db:backfill:beta-cohort",
     "db:studio": "pnpm --filter @eeatly/web db:studio",
     "auth:generate": "pnpm --filter @eeatly/web auth:generate"
+  },
+  "pnpm": {
+    "packageExtensions": {
+      "@hookform/resolvers": {
+        "peerDependencies": {
+          "zod": "*"
+        },
+        "peerDependenciesMeta": {
+          "zod": {
+            "optional": true
+          }
+        }
+      }
+    }
   }
 }

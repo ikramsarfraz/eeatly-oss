@@ -30,6 +30,17 @@ config.resolver.nodeModulesPaths = [
   path.resolve(workspaceRoot, "node_modules")
 ];
 
-config.resolver.disableHierarchicalLookup = true;
+// Keep hierarchical lookup enabled. pnpm symlinks workspace deps into
+// `.pnpm/<pkg>@.../node_modules/<pkg>`, and each `<pkg>` has its own
+// sibling `node_modules` with its transitive deps. The upward walk is
+// what lets Metro find e.g. whatwg-fetch (a transitive of
+// @expo/metro-runtime) from inside the source file that imports it.
+config.resolver.disableHierarchicalLookup = false;
+
+// pnpm symlinks workspace deps into ~/Library/pnpm/store/...; `watchman
+// watch-project` follows those symlinks and registers each store path as
+// its own root, producing thousands of independent watches and 60s+ query
+// timeouts on the initial crawl. Use Metro's node crawler instead.
+config.resolver.useWatchman = false;
 
 module.exports = config;

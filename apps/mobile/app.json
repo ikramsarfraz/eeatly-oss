@@ -4,7 +4,6 @@
     "slug": "eeatly",
     "version": "0.1.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "scheme": "eeatly",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -18,10 +17,6 @@
     },
     "android": {
       "package": "app.eeatly.mobile",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#f7f5ef"
-      },
       "edgeToEdgeEnabled": true
     },
     "web": {
@@ -37,7 +32,8 @@
           "photosPermission": "eeatly reads photos so you can attach a meal photo or have AI extract a recipe from a saved image.",
           "cameraPermission": "eeatly uses your camera so you can snap a photo of a meal you cooked or a recipe card you want to save."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true
