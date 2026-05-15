@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/providers/toast-provider";
 import { trpc } from "@/lib/trpc/client";
 import { isUpgradeRequired } from "@/lib/trpc/errors";
-import { bumpYearInName } from "@/lib/plans/clone-name";
+import { bumpYearInName } from "@eeatly/shared";
 
 export type ClonePlanDialogProps = {
   open: boolean;

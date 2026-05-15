@@ -48,6 +48,34 @@ const nextConfig: NextConfig = {
             value: contentSecurityPolicy
           }
         ]
+      },
+      // Round 15.5 Task 3 — Universal Links + App Links manifests. The
+      // iOS AASA file has no extension, so without an explicit
+      // Content-Type Next.js would serve it as application/octet-stream
+      // and Apple's CDN would refuse to ingest it. The Android
+      // assetlinks.json is JSON-by-extension but we set the type
+      // explicitly anyway for parity.
+      //
+      // `X-Content-Type-Options: nosniff` blocks heuristic content
+      // sniffing, so the explicit Content-Type here is the only signal
+      // Apple's swcd / Google's PackageManager will see.
+      {
+        source: "/.well-known/apple-app-site-association",
+        headers: [
+          {
+            key: "Content-Type",
+            value: "application/json"
+          }
+        ]
+      },
+      {
+        source: "/.well-known/assetlinks.json",
+        headers: [
+          {
+            key: "Content-Type",
+            value: "application/json"
+          }
+        ]
       }
     ];
   }

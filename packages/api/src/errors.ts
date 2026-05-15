@@ -45,6 +45,7 @@ export const MEAL_NAME_COLLISION = "MEAL_NAME_COLLISION" as const;
 export const CANNOT_REMOVE_SELF = "CANNOT_REMOVE_SELF" as const;
 export const CANNOT_REMOVE_OWNER = "CANNOT_REMOVE_OWNER" as const;
 export const NOT_MEMBER = "NOT_MEMBER" as const;
+export const SOLE_OWNER = "SOLE_OWNER" as const;
 
 // Meals
 export const MEAL_ARCHIVED = "MEAL_ARCHIVED" as const;
@@ -98,6 +99,7 @@ export type ErrorReason =
   | typeof CANNOT_REMOVE_SELF
   | typeof CANNOT_REMOVE_OWNER
   | typeof NOT_MEMBER
+  | typeof SOLE_OWNER
   | typeof MEAL_ARCHIVED
   | typeof NO_RECIPE_TEXT
   | typeof RECIPE_MISSING

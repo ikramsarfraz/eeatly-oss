@@ -19,7 +19,8 @@ import {
   MealNameCollisionError,
   NotHouseholdOwnerError,
   NotMemberError,
-  OwnershipTransferRequiredError
+  OwnershipTransferRequiredError,
+  SoleOwnerCannotLeaveError
 } from "@/lib/errors/households";
 import { requireFeatureAccess } from "@/lib/gates/resolver";
 import { logger } from "@/lib/observability/logger";
@@ -232,6 +233,7 @@ export async function revokeHouseholdInvitation(
 }
 
 export type AcceptHouseholdInvitationResult = {
+  kind: "accepted";
   newHouseholdId: string;
   newHouseholdName: string;
   inviterUserId: string;
@@ -255,10 +257,24 @@ export type AcceptHouseholdInvitationResult = {
  *
  * Returns context the action needs for the inviter confirmation email.
  */
+export type AcceptHouseholdInvitationPreview = {
+  kind: "preview";
+  newHouseholdId: string;
+  newHouseholdName: string;
+  inviterUserId: string;
+  inviterName: string;
+  mealsToMerge: number;
+  logsToMerge: number;
+  /** Whether the old (current) household will be dissolved on accept. */
+  willDissolveCurrentHousehold: boolean;
+};
+
 export async function acceptHouseholdInvitation(
   userId: string,
-  token: string
-): Promise<AcceptHouseholdInvitationResult> {
+  token: string,
+  opts: { dryRun?: boolean } = {}
+): Promise<AcceptHouseholdInvitationResult | AcceptHouseholdInvitationPreview> {
+  const dryRun = opts.dryRun === true;
   return db.transaction(async (tx) => {
     // 1. Validate invitation
     const [invitation] = await tx
@@ -337,6 +353,7 @@ export async function acceptHouseholdInvitation(
         .where(eq(users.id, invitation.invitedByUserId))
         .limit(1);
       return {
+        kind: "accepted" as const,
         newHouseholdId: invitation.householdId,
         newHouseholdName: hh?.name ?? "your household",
         inviterUserId: invitation.invitedByUserId,
@@ -408,6 +425,62 @@ export async function acceptHouseholdInvitation(
           throw new MealNameCollisionError(collidingNames);
         }
       }
+    }
+
+    // R15.5 Task 6 — dry-run preview short-circuit. Same validation
+    // path as the real accept (invitation valid, email matches,
+    // ownership-transfer clear, no name collisions); we just compute
+    // the would-merge counts and return without writing. Caller's UI
+    // renders these as a confirmation card before the real accept.
+    if (dryRun) {
+      const [mealsCountRow] = currentMembership
+        ? await tx
+            .select({ value: count(meals.id) })
+            .from(meals)
+            .where(
+              and(
+                eq(meals.householdId, currentMembership.householdId),
+                eq(meals.createdByUserId, userId),
+                isNull(meals.archivedAt)
+              )
+            )
+        : [{ value: 0 }];
+
+      const [logsCountRow] = currentMembership
+        ? await tx
+            .select({ value: count(mealLogs.id) })
+            .from(mealLogs)
+            .where(
+              and(
+                eq(mealLogs.householdId, currentMembership.householdId),
+                eq(mealLogs.cookedByUserId, userId),
+                isNull(mealLogs.deletedAt)
+              )
+            )
+        : [{ value: 0 }];
+
+      const [hhRow] = await tx
+        .select({ name: households.name })
+        .from(households)
+        .where(eq(households.id, invitation.householdId))
+        .limit(1);
+      const [inviterRow] = await tx
+        .select({ name: users.name })
+        .from(users)
+        .where(eq(users.id, invitation.invitedByUserId))
+        .limit(1);
+
+      const preview: AcceptHouseholdInvitationPreview = {
+        kind: "preview",
+        newHouseholdId: invitation.householdId,
+        newHouseholdName: hhRow?.name ?? "the kitchen",
+        inviterUserId: invitation.invitedByUserId,
+        inviterName: inviterRow?.name ?? "",
+        mealsToMerge: Number(mealsCountRow?.value ?? 0),
+        logsToMerge: Number(logsCountRow?.value ?? 0),
+        willDissolveCurrentHousehold: willDeleteOldHousehold
+      };
+      return preview;
     }
 
     // 5. Move meals + logs to the new household. The two updates aren't
@@ -499,6 +572,7 @@ export async function acceptHouseholdInvitation(
     });
 
     return {
+      kind: "accepted" as const,
       newHouseholdId: invitation.householdId,
       newHouseholdName: hh?.name ?? "your household",
       inviterUserId: invitation.invitedByUserId,
@@ -615,6 +689,136 @@ export async function removeMemberFromHousehold(
       removedUserId: targetUserId,
       removedUserName: target.name,
       removedUserEmail: target.email,
+      householdName: household.name
+    };
+  });
+}
+
+/**
+ * Round 15.5 Task 2 — user-initiated leave. Removes the caller from
+ * the household they're currently a member of. Throws
+ * `SoleOwnerCannotLeaveError` if they're the only owner AND the
+ * household has other members (transfer ownership first; the UI for
+ * that is parking-lot). Owners of a solo household (just them) CAN
+ * leave — it's effectively them deleting their kitchen, and the
+ * `getCurrentHousehold` self-heal on next session creates a fresh
+ * personal kitchen.
+ *
+ * Cooked-by attribution is preserved automatically — the
+ * `created_by_user_id` column on meals/logs is set ON DELETE SET
+ * NULL, so removing the membership row doesn't touch the attribution
+ * column directly. The reading side (`apps/web/lib/meals/attribution.ts`)
+ * renders the null as "Former member."
+ *
+ * Returns the household's id + name so the caller can include them in
+ * the success toast.
+ */
+export type LeaveHouseholdResult = {
+  householdId: string;
+  householdName: string;
+};
+
+export async function leaveCurrentHousehold(
+  userId: string,
+  householdId: string
+): Promise<LeaveHouseholdResult> {
+  return db.transaction(async (tx) => {
+    const [household] = await tx
+      .select({
+        id: households.id,
+        name: households.name,
+        ownerId: households.ownerId
+      })
+      .from(households)
+      .where(eq(households.id, householdId))
+      .limit(1);
+    if (!household) {
+      throw new NotMemberError();
+    }
+
+    // Confirm the user is actually a member; the procedure already
+    // gates on householdMemberProcedure but defense-in-depth catches a
+    // stale ctx + a deleted-out-from-under membership.
+    const [membership] = await tx
+      .select({ id: householdMembers.id })
+      .from(householdMembers)
+      .where(
+        and(
+          eq(householdMembers.householdId, householdId),
+          eq(householdMembers.userId, userId)
+        )
+      )
+      .limit(1);
+    if (!membership) {
+      throw new NotMemberError();
+    }
+
+    // Sole-owner block: count OTHER members. If any exist, the owner
+    // has to transfer ownership before leaving. Solo households (just
+    // the owner) pass — leaving in that case is effectively dissolving
+    // the kitchen, and ensureHouseholdForUser will re-seed on next
+    // sign-in.
+    if (household.ownerId === userId) {
+      const [otherMembers] = await tx
+        .select({ value: count(householdMembers.id) })
+        .from(householdMembers)
+        .where(
+          and(
+            eq(householdMembers.householdId, householdId),
+            ne(householdMembers.userId, userId)
+          )
+        );
+      if (Number(otherMembers?.value ?? 0) > 0) {
+        throw new SoleOwnerCannotLeaveError();
+      }
+    }
+
+    await tx
+      .delete(householdMembers)
+      .where(
+        and(
+          eq(householdMembers.householdId, householdId),
+          eq(householdMembers.userId, userId)
+        )
+      );
+
+    // Drop any pending invites the leaving user sent — they can't
+    // accept on a kitchen they no longer belong to anyway. Other
+    // members can re-invite if needed. (Decision: leave-vs-revoke
+    // — chose revoke so the recipient gets a clean "this was
+    // cancelled" rather than "click and get a weird membership error.")
+    await tx
+      .delete(householdInvitations)
+      .where(
+        and(
+          eq(householdInvitations.householdId, householdId),
+          eq(householdInvitations.invitedByUserId, userId),
+          isNull(householdInvitations.acceptedAt)
+        )
+      );
+
+    // Clear preferred pointer so the next session re-seeds via
+    // ensureHouseholdForUser (the standard re-house path).
+    await tx
+      .update(users)
+      .set({ preferredHouseholdId: null, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+
+    // If the leaver was a solo-owner dissolving their kitchen, the
+    // household row + meals + logs cascade-delete via the schema's
+    // ON DELETE CASCADE on households. We DON'T explicitly delete
+    // the household here — the FK chain handles it, and if other
+    // members exist (sole-owner-with-others would have thrown above),
+    // the household stays for them.
+
+    logger.info("household_left", {
+      userId,
+      householdId,
+      wasOwner: household.ownerId === userId
+    });
+
+    return {
+      householdId,
       householdName: household.name
     };
   });

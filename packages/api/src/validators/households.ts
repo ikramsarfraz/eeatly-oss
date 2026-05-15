@@ -15,11 +15,17 @@ export type CreateInvitationInput = z.infer<typeof createInvitationSchema>;
 
 // Tokens are base64url(32 bytes) = 43 chars after stripping padding. Min 32
 // is conservative — anything shorter is malformed, not just an old format.
+//
+// `dryRun` (R15.5 Task 6): when true the procedure computes the merge
+// preview (meals/logs that would move, target kitchen name) without
+// committing. The UI calls dryRun first to render a confirmation card,
+// then calls without dryRun to actually accept.
 export const acceptInvitationSchema = z.object({
   token: z
     .string()
     .min(32, "Invitation token is malformed.")
-    .max(128, "Invitation token is malformed.")
+    .max(128, "Invitation token is malformed."),
+  dryRun: z.boolean().optional()
 });
 
 export type AcceptInvitationInput = z.infer<typeof acceptInvitationSchema>;

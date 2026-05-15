@@ -5,23 +5,23 @@ import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { bearer, magicLink } from "better-auth/plugins";
 import { db } from "@/lib/db/client";
 import * as schema from "@/db/schema";
+import { pickMagicLinkUrl } from "@/lib/auth/deep-links";
 import { getServerEnv, hasGoogleAuthEnv } from "@/lib/env/server";
 import { sendMagicLinkEmail } from "@/lib/email/resend";
 import { logger } from "@/lib/observability/logger";
 import { ensureHouseholdForUser } from "@/services/households";
 
-const env = getServerEnv();
-const appUrl = env.BETTER_AUTH_URL;
-
-const socialProviders =
-  hasGoogleAuthEnv(env) && env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
-    ? {
-        google: {
-          clientId: env.GOOGLE_CLIENT_ID,
-          clientSecret: env.GOOGLE_CLIENT_SECRET
-        }
-      }
-    : undefined;
+/**
+ * Round 15.5 Task 1 — env access deferred. Previously this module
+ * ran `getServerEnv()` at import, which broke `next build` when
+ * routes that transitively imported `auth` triggered env validation
+ * during page-data collection. The `auth` instance is now built
+ * lazily on first access via a Proxy (see bottom of file).
+ *
+ * The fail-fast contract still holds: as soon as anything actually
+ * touches `auth.api.*` or `auth.handler`, env validation runs and
+ * throws if a required var is missing.
+ */
 
 /**
  * Better Auth rejects server actions from origins not listed here.
@@ -58,35 +58,6 @@ function developmentLocalhostOrigins(): string[] {
  *   - `http://localhost:8081` — Expo Metro bundler dev server.
  *   - `http://localhost:19006` — Expo Web's dev port.
  */
-/**
- * Round 12 — given Better Auth's standard magic-link URL (`https://
- * eeatly.app/api/auth/magic-link/verify?token=...&callbackURL=...`),
- * decide whether to send that URL to the user's email or to substitute
- * a mobile deep link.
- *
- *   - Web flows: callbackURL is a web URL (`/dashboard`, `/invite/...`,
- *     etc.), keep the default server URL. The user clicks → browser
- *     verifies → cookie set → redirect to web callbackURL.
- *   - Mobile flows: callbackURL is `eeatly://...`. The default server
- *     URL would open the browser; the redirect's cookie wouldn't
- *     transfer. Send `eeatly://verify?token=<ml_token>` instead — the
- *     mobile app opens directly via the deep link and exchanges the
- *     token for a session via fetch.
- */
-function pickMagicLinkUrl({ url, token }: { url: string; token: string }): string {
-  try {
-    const parsed = new URL(url);
-    const callbackURL = parsed.searchParams.get("callbackURL") ?? "";
-    if (callbackURL.startsWith("eeatly://")) {
-      return `eeatly://verify?token=${encodeURIComponent(token)}`;
-    }
-  } catch {
-    // Fall through to the default URL on any parse failure — web is
-    // the safer default.
-  }
-  return url;
-}
-
 function mobileTrustedOrigins(): string[] {
   return [
     "eeatly://",
@@ -96,8 +67,8 @@ function mobileTrustedOrigins(): string[] {
   ];
 }
 
-function trustedOriginsList(): string[] {
-  const fromEnv = [env.NEXT_PUBLIC_APP_URL, env.BETTER_AUTH_URL, appUrl].filter(Boolean);
+function trustedOriginsList(env: ReturnType<typeof getServerEnv>): string[] {
+  const fromEnv = [env.NEXT_PUBLIC_APP_URL, env.BETTER_AUTH_URL].filter(Boolean);
   return [
     ...new Set([
       ...fromEnv,
@@ -107,10 +78,22 @@ function trustedOriginsList(): string[] {
   ];
 }
 
-export const auth = betterAuth({
-  appName: "eeatly",
-  baseURL: appUrl,
-  secret: env.BETTER_AUTH_SECRET,
+function buildAuth() {
+  const env = getServerEnv();
+  const appUrl = env.BETTER_AUTH_URL;
+  const socialProviders =
+    hasGoogleAuthEnv(env) && env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+      ? {
+          google: {
+            clientId: env.GOOGLE_CLIENT_ID,
+            clientSecret: env.GOOGLE_CLIENT_SECRET
+          }
+        }
+      : undefined;
+  return betterAuth({
+    appName: "eeatly",
+    baseURL: appUrl,
+    secret: env.BETTER_AUTH_SECRET,
   database: drizzleAdapter(db, {
     provider: "pg",
     schema: {
@@ -190,7 +173,30 @@ export const auth = betterAuth({
       maxAge: 5 * 60
     }
   },
-  trustedOrigins: trustedOriginsList()
+    trustedOrigins: trustedOriginsList(env)
+  });
+}
+
+type RealAuth = ReturnType<typeof buildAuth>;
+let _auth: RealAuth | null = null;
+
+function getAuth(): RealAuth {
+  if (_auth) return _auth;
+  _auth = buildAuth();
+  return _auth;
+}
+
+// Lazy `auth` proxy — same call-site shape (`auth.api.getSession`,
+// `auth.handler`) as before, but the underlying betterAuth instance
+// isn't built until first property access. Matches the lazy DB
+// pattern in `lib/db/client.ts`.
+export const auth = new Proxy({} as RealAuth, {
+  get(_target, prop, receiver) {
+    return Reflect.get(getAuth(), prop, receiver);
+  },
+  has(_target, prop) {
+    return Reflect.has(getAuth(), prop);
+  }
 });
 
-export type AuthSession = Awaited<ReturnType<typeof auth.api.getSession>>;
+export type AuthSession = Awaited<ReturnType<RealAuth["api"]["getSession"]>>;
