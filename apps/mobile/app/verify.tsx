@@ -77,7 +77,7 @@ export default function Verify() {
           return;
         }
         await setSessionToken(sessionToken);
-        router.replace("/(authed)");
+        router.replace("/(authed)/home");
       } catch (e) {
         if (cancelled) return;
         setState({
