@@ -27,27 +27,25 @@ import { uploadPhoto } from "../../../lib/photo-upload";
 import { trpc } from "../../../lib/trpc";
 
 /**
- * Round 15 Task 4 — unified AI capture screen with four input modes:
- * Photo / Text / Voice / YouTube. Replaces the R13 two-mode screen.
+ * Round 15 Task 4 — unified AI capture screen with three input modes:
+ * Photo / Text / Voice. Replaces the R13 two-mode screen.
  *
  * Mode selector is a horizontal pill strip at the top; tap to switch
- * without losing other modes' input state. (R13 used buttons-as-cards
- * on the Add tab to choose mode; R15 consolidates to a single screen
- * with an in-screen mode switcher.)
+ * without losing other modes' input state.
  *
- * The handoff suggested implementing this as a "single bottom sheet"
- * from the Add tab. I kept it as a screen — voice recording needs
- * space (132x132 record button + timer + preview), and the existing
- * `calling`/`review` phases already fit the screen-based shape. The
- * Add tab now opens this screen with a default mode; users switch
- * modes inline. Documented as a divergence in the R15 report.
+ * Round 16 dropped the original YouTube mode — scraping YouTube
+ * transcripts violates their ToS and the upstream library hit
+ * permanent bot-detection failures. Video sources (YouTube, TikTok,
+ * Pinterest) now ride through the URL-references path on the meal log
+ * form — saved as `recipeSourceUrl`, rendered as an embed on the
+ * recipe view.
  *
- * All four modes converge on the same review phase, which renders the
+ * All three modes converge on the same review phase, which renders the
  * shared `<MealLogForm>` with `showRecipePreview` and AI-prefilled
  * fields.
  */
 
-type Mode = "photo" | "text" | "voice" | "youtube";
+type Mode = "photo" | "text" | "voice";
 
 type Phase =
   | { kind: "input" }
@@ -60,22 +58,14 @@ const AI_PHOTO_LONG_EDGE = 1600;
 const MODE_LABELS: Record<Mode, string> = {
   photo: "Photo",
   text: "Text",
-  voice: "Voice",
-  youtube: "YouTube"
+  voice: "Voice"
 };
 
 const MODE_ICONS: Record<Mode, keyof typeof Ionicons.glyphMap> = {
   photo: "camera-outline",
   text: "document-text-outline",
-  voice: "mic-outline",
-  youtube: "logo-youtube"
+  voice: "mic-outline"
 };
-
-// Round 7 (web) accepts both `youtube.com/...` and `youtu.be/...` as
-// well as `m.youtube.com`. Light client-side check before the round-
-// trip; the server re-validates via classifyYoutubeUrl.
-const YOUTUBE_HOST_REGEX =
-  /^(https?:\/\/)?((www\.|m\.|music\.)?youtube\.com|youtu\.be)\//i;
 
 function getCauseReason(error: unknown): string | null {
   if (!error || typeof error !== "object") return null;
@@ -92,8 +82,6 @@ function modeToFeatureLabel(mode: Mode): string {
       return "text capture";
     case "voice":
       return "voice capture";
-    case "youtube":
-      return "YouTube capture";
   }
 }
 
@@ -101,7 +89,7 @@ export default function AiSuggestScreen() {
   const params = useLocalSearchParams<{ mode?: string }>();
   const initialMode: Mode = (() => {
     const value = Array.isArray(params.mode) ? params.mode[0] : params.mode;
-    if (value === "photo" || value === "text" || value === "voice" || value === "youtube") {
+    if (value === "photo" || value === "text" || value === "voice") {
       return value;
     }
     return "photo";
@@ -113,7 +101,6 @@ export default function AiSuggestScreen() {
   const photoMutation = trpc.ai.suggestFromPhoto.useMutation();
   const textMutation = trpc.ai.suggestFromText.useMutation();
   const voiceMutation = trpc.ai.suggestFromVoice.useMutation();
-  const ytMutation = trpc.ai.suggestFromYouTube.useMutation();
 
   function handleAiError(error: unknown, currentMode: Mode) {
     const reason = getCauseReason(error);
@@ -148,28 +135,6 @@ export default function AiSuggestScreen() {
         break;
       case "AUDIO_TOO_SHORT_OR_EMPTY":
         message = "That recording is too short to read. Try a longer note.";
-        break;
-      // ---- YouTube-specific
-      case "YOUTUBE_NO_TRANSCRIPT":
-        message =
-          "No transcript available for that video. Try a different video or paste the recipe text.";
-        break;
-      case "YOUTUBE_UNAVAILABLE":
-        message = "Video not available. It may have been removed or made private.";
-        break;
-      case "YOUTUBE_AGE_RESTRICTED":
-        message = "Age-restricted videos can't be read by the AI.";
-        break;
-      case "YOUTUBE_SHORTS_UNSUPPORTED":
-        message =
-          "YouTube Shorts aren't supported. Use a long-form recipe video instead.";
-        break;
-      case "YOUTUBE_PLAYLIST_UNSUPPORTED":
-        message =
-          "Playlists aren't supported. Pick a single video and paste its URL.";
-        break;
-      case "YOUTUBE_FETCH_FAILED":
-        message = "We couldn't reach YouTube. Try again in a moment.";
         break;
       default:
         message = fallbackMsg ?? "Something went wrong. Try again.";
@@ -314,28 +279,6 @@ export default function AiSuggestScreen() {
     }
   }
 
-  async function runYouTube(url: string) {
-    const cancelTimer = withSlowHintTimer("youtube");
-    try {
-      const suggestion = await ytMutation.mutateAsync({ url });
-      cancelTimer();
-      setPhase({
-        kind: "review",
-        initial: {
-          mealName: suggestion.name,
-          effortLevel: suggestion.effortGuess,
-          notes: suggestion.notes,
-          recipeText: suggestion.recipeText,
-          ingredients: suggestion.ingredients,
-          recipeSourceUrl: url
-        }
-      });
-    } catch (error) {
-      cancelTimer();
-      handleAiError(error, "youtube");
-    }
-  }
-
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
       <Stack.Screen options={{ title: "Capture with AI", headerBackTitle: "Back" }} />
@@ -348,7 +291,6 @@ export default function AiSuggestScreen() {
           {mode === "voice" ? (
             <VoiceInputView onPicked={runVoice} />
           ) : null}
-          {mode === "youtube" ? <YouTubeInputView onSubmit={runYouTube} /> : null}
         </>
       ) : null}
 
@@ -379,7 +321,7 @@ function ModeTabs({
   active: Mode;
   onChange: (m: Mode) => void;
 }) {
-  const modes: Mode[] = ["photo", "text", "voice", "youtube"];
+  const modes: Mode[] = ["photo", "text", "voice"];
   return (
     <View style={styles.tabStrip}>
       {modes.map((m) => {
@@ -422,11 +364,9 @@ function CallingView({
   const heading =
     mode === "voice"
       ? "Listening…"
-      : mode === "youtube"
-        ? "Reading the video…"
-        : mode === "text"
-          ? "Reading your text…"
-          : "Reading your photo…";
+      : mode === "text"
+        ? "Reading your text…"
+        : "Reading your photo…";
   return (
     <View style={styles.callingWrap}>
       <ActivityIndicator size="large" color="#2f6f58" />
@@ -447,8 +387,7 @@ function UpgradeView({ feature }: { feature: string }) {
       <Text style={styles.upgradeTitle}>{feature} is a Plus feature</Text>
       <Text style={styles.upgradeBody}>
         Upgrade on the web to let eeatly extract recipes from photos,
-        pasted text, voice notes, or YouTube videos. Manual logging
-        stays free.
+        pasted text, or voice notes. Manual logging stays free.
       </Text>
       <Pressable
         onPress={() => Linking.openURL("https://eeatly.app/pricing")}
@@ -756,73 +695,6 @@ function VoiceInputView({
   );
 }
 
-/* ---------------------------------------------------------------------- */
-/* YouTube input — paste a URL.                                            */
-/* ---------------------------------------------------------------------- */
-
-function YouTubeInputView({ onSubmit }: { onSubmit: (url: string) => void }) {
-  const [url, setUrl] = useState("");
-  const [touched, setTouched] = useState(false);
-  const trimmed = url.trim();
-  const isValid = YOUTUBE_HOST_REGEX.test(trimmed);
-  const showWarning = touched && trimmed.length > 0 && !isValid;
-  const canSubmit = isValid;
-
-  return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
-    >
-      <ScrollView
-        contentContainerStyle={styles.inputScroll}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text style={styles.heading}>Paste a YouTube link</Text>
-        <Text style={styles.body}>
-          Long-form recipe videos work best. We'll read the transcript and
-          extract the recipe. Shorts and playlists aren't supported.
-        </Text>
-
-        <TextInput
-          value={url}
-          onChangeText={setUrl}
-          onBlur={() => setTouched(true)}
-          placeholder="https://youtube.com/watch?v=…"
-          placeholderTextColor="#999"
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="url"
-          keyboardType="url"
-          textContentType="URL"
-          style={styles.urlInput}
-        />
-        {showWarning ? (
-          <Text style={styles.inlineError}>
-            That doesn't look like a YouTube link. Use a full URL from the
-            video's share menu.
-          </Text>
-        ) : null}
-
-        <Pressable
-          onPress={() => onSubmit(trimmed)}
-          disabled={!canSubmit}
-          style={({ pressed }) => [
-            styles.bigCta,
-            styles.submitCta,
-            !canSubmit && styles.submitDisabled,
-            pressed && canSubmit && styles.pressed
-          ]}
-          accessibilityRole="button"
-        >
-          <Ionicons name="sparkles-outline" size={22} color="#fff" />
-          <Text style={styles.bigCtaText}>Read the video</Text>
-        </Pressable>
-      </ScrollView>
-    </KeyboardAvoidingView>
-  );
-}
-
 function Tip({ text }: { text: string }) {
   return (
     <View style={styles.tipRow}>
@@ -987,16 +859,6 @@ const styles = StyleSheet.create({
     color: "#888",
     textAlign: "right",
     marginTop: -8
-  },
-  urlInput: {
-    minHeight: 48,
-    borderColor: "#d4d2cb",
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    fontSize: 15,
-    backgroundColor: "#fff",
-    color: "#111"
   },
   subModeRow: {
     flexDirection: "row",

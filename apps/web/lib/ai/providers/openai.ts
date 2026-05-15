@@ -6,8 +6,7 @@ import {
   EXTRACT_INGREDIENTS_FROM_TEXT_PROMPT,
   SUGGEST_FROM_IMAGE_PROMPT,
   SUGGEST_FROM_TEXT_PROMPT,
-  SUGGEST_FROM_VOICE_NOTE_PROMPT,
-  SUGGEST_FROM_YOUTUBE_PROMPT
+  SUGGEST_FROM_VOICE_NOTE_PROMPT
 } from "@/lib/ai/prompts";
 import { logger } from "@/lib/observability/logger";
 import { getServerEnv } from "@/lib/env/server";
@@ -150,48 +149,13 @@ export async function suggestMealFromText(text: string): Promise<MealSuggestion>
   return parseSuggestion(JSON.parse(content) as Record<string, unknown>);
 }
 
-export async function suggestMealFromTranscript(transcript: string): Promise<MealSuggestion> {
-  const client = getClient();
-  // YouTube transcripts can be long. The model has its own input cap;
-  // services/ai.ts:suggestMealFromYouTubeUrl truncates before calling
-  // this. Bigger output budget than the text path — transcript recipes
-  // tend to be wordier (ingredients spread across the talk track).
-  const response = await client.chat.completions.create(
-    {
-      model: MODEL,
-      max_tokens: 1500,
-      response_format: {
-        type: "json_schema",
-        json_schema: { name: "meal_suggestion", strict: true, schema: SUGGESTION_SCHEMA }
-      },
-      messages: [
-        { role: "user", content: `${SUGGEST_FROM_YOUTUBE_PROMPT}\n\n${transcript}` }
-      ]
-    },
-    { signal: AbortSignal.timeout(PRIMARY_TIMEOUT_MS) }
-  );
-
-  const usage = response.usage;
-  logger.info("ai_provider_tokens", {
-    provider: "openai",
-    operation: "suggest_meal_from_youtube",
-    input_tokens: usage?.prompt_tokens ?? null,
-    output_tokens: usage?.completion_tokens ?? null
-  });
-
-  const content = response.choices[0]?.message?.content;
-  if (!content) throw new Error("OpenAI returned an empty response.");
-  return parseSuggestion(JSON.parse(content) as Record<string, unknown>);
-}
-
 export async function suggestMealFromVoiceTranscript(
   transcript: string
 ): Promise<MealSuggestion> {
   const client = getClient();
-  // Voice notes typically run shorter than YouTube transcripts but
-  // wordier than pasted text — ramble, corrections, asides. Same
-  // output budget as YouTube; the prompt is responsible for compressing
-  // filler back out.
+  // Voice-note transcripts are wordier than pasted text — ramble,
+  // corrections, asides. Generous output budget so the model can fit
+  // the cleaned-up recipe; the prompt does the filler compression.
   const response = await client.chat.completions.create(
     {
       model: MODEL,

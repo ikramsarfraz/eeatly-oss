@@ -7,10 +7,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
  * Round 15 — Add tab entry. Two cards: manual logging + AI capture.
  *
  * The AI capture card routes to a unified screen where the user picks
- * from four input modes (Photo / Text / Voice / YouTube) via an
- * in-screen tab strip. Earlier rounds had three separate cards (one
- * per input mode) on this tab; consolidated in R15 Task 4 so the
- * mode strip is the source of truth.
+ * from three input modes (Photo / Text / Voice) via an in-screen tab
+ * strip. R16 dropped the original YouTube mode in favor of saving
+ * video sources as `recipeSourceUrl` on the meal log form, then
+ * rendering platform-native embeds on the recipe view.
  *
  * Cards are full-width pressables (≥80px tall) so thumb taps land
  * easily even with wet kitchen hands.
@@ -22,7 +22,7 @@ export default function AddTab() {
         <Text style={styles.heading}>Add a meal</Text>
         <Text style={styles.body}>
           Quick log if you know what you cooked, or let AI extract a
-          recipe from a photo, voice note, pasted text, or YouTube link.
+          recipe from a photo, voice note, or pasted text.
         </Text>
 
         <Card
@@ -36,7 +36,7 @@ export default function AddTab() {
         <Card
           href="/(authed)/add/ai-suggest"
           title="Capture with AI"
-          subtitle="Photo, voice note, pasted text, or YouTube link."
+          subtitle="Photo, voice note, or pasted text."
           icon="sparkles-outline"
         />
       </ScrollView>

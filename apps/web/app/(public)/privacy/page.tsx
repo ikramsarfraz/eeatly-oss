@@ -58,9 +58,9 @@ export default function PrivacyPage() {
           <h2 className="text-xl font-semibold">AI processing</h2>
           <p className="mt-3 text-sm text-muted-foreground">
             When you use the AI suggest feature — to fill a meal from a photo,
-            pasted text, a YouTube link, or a voice note — your input is sent
-            to an AI provider (OpenAI primary, Anthropic as a fallback) to
-            extract the recipe. Two specifics worth being explicit about:
+            pasted text, or a voice note — your input is sent to an AI
+            provider (OpenAI primary, Anthropic as a fallback) to extract the
+            recipe. Two specifics worth being explicit about:
           </p>
           <ul className="mt-2 list-inside list-disc grid gap-1 text-sm text-muted-foreground">
             <li>

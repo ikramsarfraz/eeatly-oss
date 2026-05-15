@@ -10,7 +10,7 @@ import { PricingCard } from "@/components/pricing/pricing-card";
 export const metadata: Metadata = {
   title: "Pricing — eeatly Plus",
   description:
-    "eeatly Plus unlocks AI prefill from photos / text / YouTube, public recipe share links, household sharing, and planning. Free tier keeps your cooking memory."
+    "eeatly Plus unlocks AI prefill from photos / text / voice, public recipe share links, household sharing, and planning. Free tier keeps your cooking memory."
 };
 
 export const dynamic = "force-dynamic";
@@ -58,7 +58,7 @@ export default async function PricingPage() {
         </h1>
         <p className="max-w-xl text-base text-muted-foreground">
           The free plan keeps your cooking history forever. Plus adds AI that
-          fills in a recipe from a photo, a paste, or a YouTube cooking video,
+          fills in a recipe from a photo, a paste, or a voice note,
           public share links you can send to family, household sharing, and
           planning.
         </p>

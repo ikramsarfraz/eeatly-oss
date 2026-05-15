@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 export const metadata: Metadata = {
   title: "Help",
   description:
-    "How to log meals, capture recipes from photos / text / YouTube / voice, share with family, and manage your account."
+    "How to log meals, capture recipes from photos / text / voice, save recipe links, share with family, and manage your account."
 };
 
 type Topic = {
@@ -37,7 +37,7 @@ const topics: Topic[] = [
       <>
         On any meal form, tap{" "}
         <span className="font-medium text-foreground">Help me fill this out</span>.
-        Four inputs work:
+        Three inputs work:
         <ul className="mt-2 list-inside list-disc grid gap-1">
           <li>
             <span className="text-foreground">Photo</span> — snap the dish
@@ -49,15 +49,15 @@ const topics: Topic[] = [
             or just a paragraph about the dish.
           </li>
           <li>
-            <span className="text-foreground">YouTube</span> — drop a link
-            to a cooking video; we read the captions and extract the recipe.
-          </li>
-          <li>
             <span className="text-foreground">Voice note</span> — record in
             the browser or upload a WhatsApp voice note. Speaking in Urdu,
             Hindi, English, or any mix works.
           </li>
         </ul>
+        Saving a recipe from YouTube, TikTok, or Pinterest? Paste the URL
+        into the <span className="font-medium text-foreground">Source URL</span>{" "}
+        field on the meal form — we&apos;ll embed the video or pin on the
+        recipe page so you can play it back when you cook.
         The AI fills the form fields — always review before saving. Your
         voice and audio are processed in-memory and never stored on our
         servers (more in our{" "}

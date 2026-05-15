@@ -10,11 +10,22 @@ const withBundleAnalyzer = nextBundleAnalyzer({
 // inline-hydration scripts or third-party assets. To tighten further (e.g.
 // script-src with nonces, strict img-src), measure first — CSP regressions
 // are subtle and CSP-only docs in production are worth shipping incrementally.
+//
+// Round 16 — added `frame-src` to whitelist the three embed hosts users save
+// recipes from. Without these, the YouTube/TikTok/Pinterest iframes would be
+// blocked. Limit to the canonical hosts (`youtube-nocookie.com` is the
+// privacy-preserving variant we actually embed). The TikTok + Pinterest
+// embed widgets load JS from `tiktok.com` and `assets.pinterest.com`
+// respectively — we don't set an explicit `script-src` directive here
+// because adding one without a nonce would break React's inline-hydration
+// scripts. The browser's default behaviour (no script-src → no allowlist
+// enforcement) covers it.
 const contentSecurityPolicy = [
   "frame-ancestors 'none'",
   "form-action 'self'",
   "base-uri 'self'",
-  "object-src 'none'"
+  "object-src 'none'",
+  "frame-src 'self' https://www.youtube-nocookie.com https://www.tiktok.com https://www.pinterest.com https://assets.pinterest.com"
 ].join("; ");
 
 const nextConfig: NextConfig = {

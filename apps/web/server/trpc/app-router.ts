@@ -16,6 +16,7 @@ import { onboardingRouter } from "./routers/onboarding";
 import { plansRouter } from "./routers/plans";
 import { searchRouter } from "./routers/search";
 import { sharesRouter } from "./routers/shares";
+import { urlPreviewRouter } from "./routers/url-preview";
 
 /**
  * Root tRPC router. Domain routers (meals, households, plans, …) get
@@ -41,7 +42,8 @@ export const appRouter = router({
   onboarding: onboardingRouter,
   plans: plansRouter,
   search: searchRouter,
-  shares: sharesRouter
+  shares: sharesRouter,
+  urlPreview: urlPreviewRouter
 });
 
 export type AppRouter = typeof appRouter;

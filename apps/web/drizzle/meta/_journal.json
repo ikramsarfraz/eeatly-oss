@@ -169,6 +169,13 @@
       "when": 1778691610000,
       "tag": "0024_meal_ingredients",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1778691611000,
+      "tag": "0025_url_previews",
+      "breakpoints": true
     }
   ]
 }

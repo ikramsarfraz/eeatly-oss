@@ -5,9 +5,27 @@ import { IngredientChecklist } from "@/components/meals/ingredient-checklist";
 import { MealBackLink } from "@/components/meals/meal-back-link";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { ShareButton } from "@/components/shares/share-button";
+import { SourceUrlEmbed } from "@/components/embeds/source-url-embed";
+import { detectPlatform } from "@eeatly/shared";
 import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
-import { classifyYoutubeUrl } from "@eeatly/api/validators/ai";
 import { getMealDetail } from "@/services/meals";
+
+function platformLabel(url: string): string | null {
+  const detected = detectPlatform(url);
+  if (!detected) return null;
+  switch (detected.platform) {
+    case "youtube":
+      return "YouTube";
+    case "tiktok":
+      return "TikTok";
+    case "pinterest":
+      return "Pinterest";
+    case "instagram":
+      return "Instagram";
+    case "web":
+      return null;
+  }
+}
 
 export const dynamic = "force-dynamic";
 
@@ -31,18 +49,6 @@ type PageProps = {
   params: Promise<{ id: string }>;
 };
 
-function deriveSourceBadge(recipeSourceUrl: string | null): string | null {
-  // We don't persist an explicit "AI source" column on the meal row, so
-  // the only deterministic signal we have today is the source URL. Only
-  // YouTube shows up here; the photo/voice/text paths leave the URL
-  // empty. Keep this best-effort — wrong is worse than absent for a
-  // micro-badge that adds no real signal beyond the link below.
-  if (!recipeSourceUrl) return null;
-  const cls = classifyYoutubeUrl(recipeSourceUrl);
-  if (cls.kind === "watch") return "From YouTube";
-  return null;
-}
-
 function lastCookedLabel(lastCookedAt: string | null): string | null {
   if (!lastCookedAt) return null;
   const days = differenceInCalendarDays(new Date(), parseISO(lastCookedAt));
@@ -61,7 +67,6 @@ export default async function MealDetailPage({ params }: PageProps) {
     notFound();
   }
 
-  const sourceBadge = deriveSourceBadge(meal.recipeSourceUrl);
   const cookedLabel = lastCookedLabel(meal.lastCookedAt);
   // Attribution for the original add. "by Former member" mirrors the
   // SET-NULL rendering convention from round 4.7 — see
@@ -116,14 +121,6 @@ export default async function MealDetailPage({ params }: PageProps) {
               <span>{cookedLabel}</span>
             </>
           ) : null}
-          {sourceBadge ? (
-            <>
-              <span className="h-0.5 w-0.5 rounded-full bg-current opacity-60" aria-hidden />
-              <span className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-[11px] uppercase tracking-[0.06em]">
-                {sourceBadge}
-              </span>
-            </>
-          ) : null}
         </p>
       </header>
 
@@ -162,16 +159,19 @@ export default async function MealDetailPage({ params }: PageProps) {
           </p>
         )}
         {meal.recipeSourceUrl ? (
-          <p className="text-xs text-muted-foreground">
-            <a
-              href={meal.recipeSourceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline-offset-2 hover:underline"
-            >
-              View original →
-            </a>
-          </p>
+          <div className="grid gap-2">
+            <SourceUrlEmbed url={meal.recipeSourceUrl} mealName={meal.name} />
+            <p className="text-xs text-muted-foreground">
+              <a
+                href={meal.recipeSourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline-offset-2 hover:underline"
+              >
+                View original on {platformLabel(meal.recipeSourceUrl) ?? "the source site"} →
+              </a>
+            </p>
+          </div>
         ) : null}
       </section>
 

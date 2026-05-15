@@ -10,27 +10,17 @@ import {
 } from "@/lib/errors/audio";
 import { FeatureGateDeniedError } from "@/lib/errors/gates";
 import { NoRecipeTextError } from "@/lib/errors/ingredients";
-import {
-  YoutubeAgeRestrictedError,
-  YoutubeFetchFailedError,
-  YoutubeNoTranscriptError,
-  YoutubePlaylistUnsupportedError,
-  YoutubeShortsUnsupportedError,
-  YoutubeUnavailableError
-} from "@/lib/errors/youtube";
 import { logger } from "@/lib/observability/logger";
 import {
   audioInputSchema,
-  MAX_AUDIO_UPLOAD_BYTES,
-  youtubeUrlSchema
+  MAX_AUDIO_UPLOAD_BYTES
 } from "@eeatly/api/validators/ai";
 import {
   extractIngredientsForMeal,
   generateShareableRecipe,
   suggestMealFromAudio,
   suggestMealFromImage,
-  suggestMealFromText,
-  suggestMealFromYouTubeUrl
+  suggestMealFromText
 } from "@/services/ai";
 import {
   gatedProcedure,
@@ -83,66 +73,7 @@ const voiceInputSchema = z.object({
 const mealIdInput = z.object({ mealId: z.string().uuid() });
 
 /**
- * Translate the YouTube extraction errors that come up through the
- * service into structured TRPCErrors. The UI's existing copy in
- * `components/forms/ai-suggest-dialog.tsx` switches on the
- * `cause.reason` strings; preserve the same wire names.
- */
-function mapYoutubeError(error: unknown): TRPCError | null {
-  if (error instanceof YoutubeShortsUnsupportedError) {
-    return new TRPCError({
-      code: "BAD_REQUEST",
-      message: error.message,
-      cause: { reason: "YOUTUBE_SHORTS_UNSUPPORTED" }
-    });
-  }
-  if (error instanceof YoutubePlaylistUnsupportedError) {
-    return new TRPCError({
-      code: "BAD_REQUEST",
-      message: error.message,
-      cause: { reason: "YOUTUBE_PLAYLIST_UNSUPPORTED" }
-    });
-  }
-  if (error instanceof YoutubeNoTranscriptError) {
-    return new TRPCError({
-      code: "NOT_FOUND",
-      message: error.message,
-      cause: { reason: "YOUTUBE_NO_TRANSCRIPT" }
-    });
-  }
-  if (error instanceof YoutubeAgeRestrictedError) {
-    return new TRPCError({
-      code: "FORBIDDEN",
-      message: error.message,
-      cause: { reason: "YOUTUBE_AGE_RESTRICTED" }
-    });
-  }
-  if (error instanceof YoutubeUnavailableError) {
-    return new TRPCError({
-      code: "NOT_FOUND",
-      message: error.message,
-      cause: { reason: "YOUTUBE_UNAVAILABLE" }
-    });
-  }
-  if (error instanceof YoutubeFetchFailedError) {
-    return new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: error.message,
-      cause: { reason: "YOUTUBE_FETCH_FAILED" }
-    });
-  }
-  if (error instanceof Error && error.message.includes("Not a YouTube URL")) {
-    return new TRPCError({
-      code: "BAD_REQUEST",
-      message: "That doesn't look like a YouTube link.",
-      cause: { reason: "INVALID_INPUT" }
-    });
-  }
-  return null;
-}
-
-/**
- * Same for the audio path — typed errors out of the Whisper service
+ * Typed errors out of the Whisper service
  * become structured causes the UI matches on.
  */
 function mapAudioError(error: unknown): TRPCError | null {
@@ -228,31 +159,6 @@ export const aiRouter = router({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "We couldn't read that. Please try again.",
-          cause: { reason: "AI_PROVIDER_ERROR" }
-        });
-      }
-    }),
-
-  suggestFromYouTube: protectedProcedure
-    .use(rateLimit("ai"))
-    .input(youtubeUrlSchema)
-    .mutation(async ({ ctx, input }) => {
-      // Gate fires inside the service via `requireFeatureAccess`.
-      try {
-        return await suggestMealFromYouTubeUrl({
-          userId: ctx.user.id,
-          url: input.url
-        });
-      } catch (error) {
-        const mapped = mapGateError(error) ?? mapYoutubeError(error);
-        if (mapped) throw mapped;
-        logger.warn("trpc_ai_youtube_failed", {
-          userId: ctx.user.id,
-          error: error instanceof Error ? error.message : String(error)
-        });
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "We couldn't read that video. Please try again.",
           cause: { reason: "AI_PROVIDER_ERROR" }
         });
       }

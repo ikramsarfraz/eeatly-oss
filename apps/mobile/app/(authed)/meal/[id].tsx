@@ -13,10 +13,29 @@ import {
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { detectPlatform } from "@eeatly/shared";
 import { formatCookedAt } from "../../../lib/dates";
 import { trpc } from "../../../lib/trpc";
 import { IngredientChecklist } from "../../../components/ingredient-checklist";
 import { ShareSheet } from "../../../components/share-sheet";
+import { SourceUrlEmbed } from "../../../components/embeds/source-url-embed";
+
+function platformLabel(url: string): string | null {
+  const detected = detectPlatform(url);
+  if (!detected) return null;
+  switch (detected.platform) {
+    case "youtube":
+      return "YouTube";
+    case "tiktok":
+      return "TikTok";
+    case "pinterest":
+      return "Pinterest";
+    case "instagram":
+      return "Instagram";
+    case "web":
+      return null;
+  }
+}
 
 /**
  * Round 13 Task 5 — recipe view. Mobile-first single column the wife
@@ -199,6 +218,7 @@ function RecipeSection({
   recipeText: string | null;
   recipeSourceUrl: string | null;
 }) {
+  const label = recipeSourceUrl ? platformLabel(recipeSourceUrl) : null;
   return (
     <View style={styles.section}>
       <Text style={styles.sectionHeading}>Recipe</Text>
@@ -208,13 +228,18 @@ function RecipeSection({
         <Text style={styles.emptyText}>No recipe saved for this meal yet.</Text>
       )}
       {recipeSourceUrl ? (
-        <Pressable
-          onPress={() => Linking.openURL(recipeSourceUrl)}
-          hitSlop={6}
-          style={({ pressed }) => [pressed && styles.pressed]}
-        >
-          <Text style={styles.sourceLink}>View original →</Text>
-        </Pressable>
+        <View style={styles.embedWrap}>
+          <SourceUrlEmbed url={recipeSourceUrl} />
+          <Pressable
+            onPress={() => Linking.openURL(recipeSourceUrl)}
+            hitSlop={6}
+            style={({ pressed }) => [pressed && styles.pressed]}
+          >
+            <Text style={styles.sourceLink}>
+              View original on {label ?? "the source site"} →
+            </Text>
+          </Pressable>
+        </View>
       ) : null}
     </View>
   );
@@ -409,6 +434,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#2f6f58",
     marginTop: 6
+  },
+  embedWrap: {
+    marginTop: 10,
+    gap: 6
   },
   actionRow: {
     flexDirection: "row",
