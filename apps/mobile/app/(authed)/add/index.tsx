@@ -4,13 +4,16 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 /**
- * Round 13 — Add tab entry. Three cards routing to the three capture
- * paths. Cards are full-width pressables (≥80px tall) so thumb taps
- * land easily even with wet kitchen hands.
+ * Round 15 — Add tab entry. Two cards: manual logging + AI capture.
  *
- * Manual logging (Task 3) gets the prominent slot; AI capture (Task
- * 4) is two cards below. Order mirrors web's UX bias: typed input is
- * still the fastest path for someone who knows what they cooked.
+ * The AI capture card routes to a unified screen where the user picks
+ * from four input modes (Photo / Text / Voice / YouTube) via an
+ * in-screen tab strip. Earlier rounds had three separate cards (one
+ * per input mode) on this tab; consolidated in R15 Task 4 so the
+ * mode strip is the source of truth.
+ *
+ * Cards are full-width pressables (≥80px tall) so thumb taps land
+ * easily even with wet kitchen hands.
  */
 export default function AddTab() {
   return (
@@ -19,7 +22,7 @@ export default function AddTab() {
         <Text style={styles.heading}>Add a meal</Text>
         <Text style={styles.body}>
           Quick log if you know what you cooked, or let AI extract a
-          recipe from a photo or pasted text.
+          recipe from a photo, voice note, pasted text, or YouTube link.
         </Text>
 
         <Card
@@ -31,17 +34,10 @@ export default function AddTab() {
         />
 
         <Card
-          href="/(authed)/add/ai-suggest?mode=photo"
-          title="Capture from photo"
-          subtitle="Snap a recipe card, finished dish, or cookbook page."
-          icon="camera-outline"
-        />
-
-        <Card
-          href="/(authed)/add/ai-suggest?mode=text"
-          title="Capture from text"
-          subtitle="Paste a recipe and let AI clean it up."
-          icon="document-text-outline"
+          href="/(authed)/add/ai-suggest"
+          title="Capture with AI"
+          subtitle="Photo, voice note, pasted text, or YouTube link."
+          icon="sparkles-outline"
         />
       </ScrollView>
     </SafeAreaView>
