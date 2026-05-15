@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 const REQUEST_ID_HEADER = "x-request-id";
 
 /**
- * Reads the per-request correlation id set by `middleware.ts`.
+ * Reads the per-request correlation id set by `proxy.ts`.
  * Use it as a `requestId` field on log calls so a user-reported error
  * (with the id echoed in their response headers) can be grep'd across
  * server logs.

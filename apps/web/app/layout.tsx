@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Instrument_Serif, JetBrains_Mono } from "next/font/google";
+import { QueryProvider } from "@/components/providers/query-provider";
+import { ToastProvider } from "@/components/providers/toast-provider";
 import { getPublicEnv } from "@/lib/env/public";
 import "./globals.css";
 
@@ -93,7 +95,9 @@ export default function RootLayout({
         >
           Skip to content
         </a>
-        {children}
+        <QueryProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </QueryProvider>
       </body>
     </html>
   );
