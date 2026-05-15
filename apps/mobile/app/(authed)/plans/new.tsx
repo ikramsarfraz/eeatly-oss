@@ -4,29 +4,28 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import { router, Stack } from "expo-router";
 import {
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
-  TextInput,
   View
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { createPlanSchema } from "@eeatly/api/validators/plans";
 import { trpc } from "../../../lib/trpc";
+import { Button, Card, Input, Screen } from "../../../components/ui";
 
 /**
- * Round 14 Task 2 — create a new plan. Name + scheduled date (required
- * per createPlanSchema). On success, push to the new plan's detail
- * page so the user immediately starts adding dishes.
+ * Round 17 new-plan form — NativeWind rebuild.
  *
- * Plan creation is gated (`plans_create` defaults to `beta_or_paid`);
- * UPGRADE_REQUIRED maps to an inline modal pointing at web /pricing.
+ * Two fields: name (required) + scheduled date. Submit funnels
+ * through `plans.create`. On success, route to the new plan's
+ * detail page so the user can start adding dishes immediately.
+ *
+ * Plans are gated (`plans_create`) — `UPGRADE_REQUIRED` triggers
+ * an in-app upgrade modal that deep-links to the web pricing page.
  */
 function formatYMD(date: Date): string {
   const y = date.getFullYear();
@@ -106,73 +105,68 @@ export default function NewPlanScreen() {
   const canSubmit = name.trim().length > 0 && !submitting;
 
   return (
-    <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <Stack.Screen options={{ title: "New plan", headerBackTitle: "Back" }} />
+    <Screen edges={["bottom"]}>
+      <Stack.Screen
+        options={{
+          title: "New plan",
+          headerBackTitle: "Back",
+          headerStyle: { backgroundColor: "#FBF8F1" },
+          headerTintColor: "#1A1F1B",
+          headerTitleStyle: { fontWeight: "600" }
+        }}
+      />
       <KeyboardAvoidingView
-        style={styles.flex}
+        className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
       >
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerClassName="p-4 pb-12 gap-4"
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.field}>
-            <Text style={styles.label}>
-              Plan name <Text style={styles.required}>*</Text>
-            </Text>
-            <TextInput
-              value={name}
-              onChangeText={(t) => {
-                setName(t);
-                if (nameError) setNameError(null);
-              }}
-              placeholder="Eid 2026, Sunday potluck, …"
-              placeholderTextColor="#999"
-              style={styles.input}
-              autoCapitalize="sentences"
-              autoCorrect
-              maxLength={80}
-              editable={!submitting}
-            />
-            {nameError ? <Text style={styles.error}>{nameError}</Text> : null}
-          </View>
+          <Input
+            label="Plan name"
+            value={name}
+            onChangeText={(t) => {
+              setName(t);
+              if (nameError) setNameError(null);
+            }}
+            placeholder="Eid 2026, Sunday potluck, …"
+            autoCapitalize="sentences"
+            autoCorrect
+            maxLength={80}
+            editable={!submitting}
+            error={nameError ?? undefined}
+          />
 
-          <View style={styles.field}>
-            <Text style={styles.label}>Planned date</Text>
+          <View className="gap-1.5">
+            <Text className="text-caption-strong font-semibold text-foreground">
+              Planned date
+            </Text>
             <Pressable
               onPress={() => setShowDatePicker(true)}
               disabled={submitting}
-              style={({ pressed }) => [
-                styles.input,
-                styles.dateButton,
-                pressed && styles.pressed,
-                submitting && styles.disabled
-              ]}
+              className={`flex-row items-center justify-between rounded-md border border-border bg-background-elevated px-3 h-11 active:bg-background-muted ${
+                submitting ? "opacity-50" : ""
+              }`}
             >
-              <Text style={styles.dateText}>
+              <Text className="text-body text-foreground">
                 {formatDateLabel(scheduledDate)}
               </Text>
-              <Ionicons name="calendar-outline" size={20} color="#666" />
+              <Ionicons name="calendar-outline" size={18} color="#6B7068" />
             </Pressable>
           </View>
 
-          <Pressable
-            onPress={handleSubmit}
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
+            loading={submitting}
             disabled={!canSubmit}
-            style={({ pressed }) => [
-              styles.submit,
-              !canSubmit && styles.submitDisabled,
-              pressed && canSubmit && styles.pressed
-            ]}
-            accessibilityRole="button"
+            onPress={handleSubmit}
           >
-            {submitting ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.submitText}>Create plan</Text>
-            )}
-          </Pressable>
+            Create plan
+          </Button>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -194,32 +188,47 @@ export default function NewPlanScreen() {
         onRequestClose={() => setUpgradeOpen(false)}
       >
         <Pressable
-          style={styles.upgradeBackdrop}
+          className="flex-1 bg-foreground/40 items-center justify-center p-6"
           onPress={() => setUpgradeOpen(false)}
         >
-          <Pressable style={styles.upgradeCard} onPress={() => null}>
-            <Ionicons name="sparkles-outline" size={28} color="#2f6f58" />
-            <Text style={styles.upgradeTitle}>Plans are a Plus feature</Text>
-            <Text style={styles.upgradeBody}>
-              Upgrade on the web to plan menus and clone occasions
-              year-over-year. Manual logging stays free.
-            </Text>
-            <Pressable
-              onPress={() => Linking.openURL("https://eeatly.app/pricing")}
-              style={({ pressed }) => [
-                styles.upgradeCta,
-                pressed && styles.pressed
-              ]}
-            >
-              <Text style={styles.upgradeCtaText}>See Plus on the web</Text>
-            </Pressable>
-            <Pressable onPress={() => setUpgradeOpen(false)} hitSlop={8}>
-              <Text style={styles.upgradeCancel}>Maybe later</Text>
-            </Pressable>
+          <Pressable onPress={() => null} className="self-stretch max-w-[360px] mx-auto">
+            <Card>
+              <View className="px-5 py-6 gap-3 items-center">
+                <View className="h-14 w-14 items-center justify-center rounded-full bg-accent">
+                  <Ionicons name="sparkles-outline" size={26} color="#1A1F1B" />
+                </View>
+                <Text className="text-heading-2 font-semibold text-foreground text-center">
+                  Plans are part of eeatly Plus
+                </Text>
+                <Text className="text-body text-foreground-muted text-center">
+                  Upgrade on the web to plan menus and clone occasions
+                  year-over-year. Manual logging stays free.
+                </Text>
+                <View className="self-stretch gap-2 mt-2">
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    fullWidth
+                    onPress={() =>
+                      Linking.openURL("https://eeatly.app/pricing")
+                    }
+                  >
+                    See Plus on the web
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    fullWidth
+                    onPress={() => setUpgradeOpen(false)}
+                  >
+                    Maybe later
+                  </Button>
+                </View>
+              </View>
+            </Card>
           </Pressable>
         </Pressable>
       </Modal>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
@@ -253,15 +262,23 @@ function DatePickerSheet({
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable style={styles.sheetBackdrop} onPress={onCancel}>
-        <Pressable style={styles.sheet} onPress={() => null}>
-          <View style={styles.sheetHeader}>
+      <Pressable
+        className="flex-1 bg-foreground/40 justify-end"
+        onPress={onCancel}
+      >
+        <Pressable
+          onPress={() => null}
+          className="bg-background-elevated rounded-t-lg pb-6"
+        >
+          <View className="flex-row items-center justify-between px-4 py-3 border-b border-border">
             <Pressable onPress={onCancel} hitSlop={12}>
-              <Text style={styles.sheetCancel}>Cancel</Text>
+              <Text className="text-body text-foreground-muted">Cancel</Text>
             </Pressable>
-            <Text style={styles.sheetTitle}>Plan date</Text>
+            <Text className="text-caption-strong font-semibold text-foreground">
+              Plan date
+            </Text>
             <Pressable onPress={() => onConfirm(formatYMD(draft))} hitSlop={12}>
-              <Text style={styles.sheetDone}>Done</Text>
+              <Text className="text-body font-semibold text-primary">Done</Text>
             </Pressable>
           </View>
           <DateTimePicker
@@ -271,133 +288,10 @@ function DatePickerSheet({
             onChange={(_, next) => {
               if (next) setDraft(next);
             }}
-            style={styles.iosPicker}
+            style={{ alignSelf: "stretch" }}
           />
         </Pressable>
       </Pressable>
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fdfdfa" },
-  flex: { flex: 1 },
-  scroll: {
-    padding: 16,
-    gap: 16,
-    paddingBottom: 48
-  },
-  field: { gap: 6 },
-  label: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#333",
-    letterSpacing: 0.2
-  },
-  required: { color: "#b91c1c" },
-  input: {
-    minHeight: 48,
-    borderColor: "#d4d2cb",
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    backgroundColor: "#fff",
-    color: "#111"
-  },
-  dateButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 12
-  },
-  dateText: { fontSize: 16, color: "#111" },
-  pressed: { opacity: 0.85 },
-  disabled: { opacity: 0.55 },
-  error: { color: "#b91c1c", fontSize: 12 },
-  submit: {
-    marginTop: 8,
-    minHeight: 52,
-    borderRadius: 12,
-    backgroundColor: "#2f6f58",
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  submitDisabled: { backgroundColor: "#a7c6b8" },
-  submitText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600"
-  },
-  sheetBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "flex-end"
-  },
-  sheet: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingBottom: 24
-  },
-  sheetHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: "#e5e3dc"
-  },
-  sheetTitle: { fontSize: 14, fontWeight: "600", color: "#111" },
-  sheetCancel: { fontSize: 15, color: "#666" },
-  sheetDone: { fontSize: 15, color: "#2f6f58", fontWeight: "600" },
-  iosPicker: { alignSelf: "stretch" },
-  upgradeBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24
-  },
-  upgradeCard: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 22,
-    gap: 12,
-    alignItems: "center",
-    maxWidth: 360
-  },
-  upgradeTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#111",
-    textAlign: "center"
-  },
-  upgradeBody: {
-    fontSize: 14,
-    color: "#555",
-    textAlign: "center",
-    lineHeight: 20
-  },
-  upgradeCta: {
-    minHeight: 46,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    backgroundColor: "#2f6f58",
-    alignItems: "center",
-    justifyContent: "center",
-    alignSelf: "stretch"
-  },
-  upgradeCtaText: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600"
-  },
-  upgradeCancel: {
-    color: "#666",
-    fontSize: 14,
-    marginTop: 4
-  }
-});

@@ -2,23 +2,44 @@ import { useEffect, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import {
-  ActivityIndicator,
   Alert,
   Image,
   Linking,
-  Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   View
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { detectPlatform } from "@eeatly/shared";
 import { formatCookedAt } from "../../../lib/dates";
 import { trpc } from "../../../lib/trpc";
 import { IngredientChecklist } from "../../../components/ingredient-checklist";
 import { ShareSheet } from "../../../components/share-sheet";
 import { SourceUrlEmbed } from "../../../components/embeds/source-url-embed";
+import {
+  Button,
+  ErrorScreen,
+  LoadingScreen,
+  Screen,
+  SectionHeader,
+  Tag
+} from "../../../components/ui";
+
+/**
+ * Round 17 recipe view — NativeWind rebuild of the R13 screen.
+ *
+ * Layout, top to bottom:
+ *   - Full-bleed hero (40% screen height aspect) — photo or
+ *     placeholder card with food icon
+ *   - Title + meta row (caption, foreground-muted) + optional
+ *     source-platform tag
+ *   - Embed (R16) if `recipeSourceUrl` is set
+ *   - Ingredients checklist
+ *   - Recipe body (prose, 24px line-height)
+ *   - Sticky action row at bottom: Log again + Share
+ *
+ * The wife's primary screen — every visual choice in here should
+ * make the biryani recipe feel inviting, not like a database row.
+ */
 
 function platformLabel(url: string): string | null {
   const detected = detectPlatform(url);
@@ -36,23 +57,6 @@ function platformLabel(url: string): string | null {
       return null;
   }
 }
-
-/**
- * Round 13 Task 5 — recipe view. Mobile-first single column the wife
- * pulls up at Meijer to see what to buy for biryani.
- *
- * Sections, top to bottom:
- *   - Hero photo (or placeholder block if missing)
- *   - Title + meta line (added by, cook count, last cooked)
- *   - Ingredients (read-only list this round; Task 6 makes them checkable
- *     and adds the shopping-list export)
- *   - Recipe text (pre-wrap preserves the AI-extracted line breaks)
- *   - Source link if present
- *   - Action row: Log again (one-tap re-cook) + Share (RN Share API)
- *
- * Data: `trpc.meals.getById.useQuery({ mealId })` — same procedure web
- * uses, household-scoped at the service.
- */
 
 function lastCookedLabel(value: string | Date | null): string | null {
   if (!value) return null;
@@ -91,26 +95,82 @@ export default function MealDetailScreen() {
   const meal = query.data;
   const title = meal?.name ?? "Meal";
 
-  return (
-    <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <Stack.Screen options={{ title, headerBackTitle: "Back" }} />
-      {query.isPending ? (
-        <View style={styles.center}>
-          <ActivityIndicator color="#2f6f58" />
-        </View>
-      ) : !meal ? (
-        <MissingState />
-      ) : (
-        <ScrollView contentContainerStyle={styles.scroll}>
-          <Hero photoUrl={meal.photoUrl} name={meal.name} />
-          <Header
-            name={meal.name}
-            cookCount={meal.cookCount}
-            lastCookedAt={meal.lastCookedAt}
-            createdByName={meal.createdByName}
+  if (query.isPending) {
+    return (
+      <>
+        <Stack.Screen
+          options={{
+            title,
+            headerBackTitle: "Back",
+            headerStyle: { backgroundColor: "#FBF8F1" },
+            headerTintColor: "#1A1F1B"
+          }}
+        />
+        <LoadingScreen />
+      </>
+    );
+  }
+
+  if (!meal) {
+    return (
+      <>
+        <Stack.Screen options={{ title: "Meal", headerBackTitle: "Back" }} />
+        <View className="flex-1 bg-background">
+          <ErrorScreen
+            title="Meal not found"
+            body="It may have been archived, or you don't have access in this household."
           />
-          <View style={styles.section}>
-            <Text style={styles.sectionHeading}>Ingredients</Text>
+          <View className="px-8 pb-12 -mt-4 items-center">
+            <Button
+              variant="secondary"
+              onPress={() => router.replace("/(authed)/home")}
+            >
+              Back to home
+            </Button>
+          </View>
+        </View>
+      </>
+    );
+  }
+
+  const sourcePlatform = meal.recipeSourceUrl
+    ? platformLabel(meal.recipeSourceUrl)
+    : null;
+
+  return (
+    <Screen edges={["bottom"]}>
+      <Stack.Screen
+        options={{
+          title,
+          headerBackTitle: "Back",
+          headerStyle: { backgroundColor: "#FBF8F1" },
+          headerTintColor: "#1A1F1B",
+          headerTitleStyle: { fontWeight: "600" }
+        }}
+      />
+      <ScrollView contentContainerClassName="pb-12">
+        <Hero photoUrl={meal.photoUrl} name={meal.name} />
+        <Header
+          name={meal.name}
+          cookCount={meal.cookCount}
+          lastCookedAt={meal.lastCookedAt}
+          createdByName={meal.createdByName}
+          sourcePlatform={sourcePlatform}
+        />
+
+        {meal.recipeSourceUrl ? (
+          <View className="px-4 pt-4 gap-2">
+            <SourceUrlEmbed url={meal.recipeSourceUrl} />
+            <SourceLink
+              url={meal.recipeSourceUrl}
+              label={sourcePlatform}
+            />
+          </View>
+        ) : null}
+
+        <View className="mt-2">
+          <SectionHeader title="Ingredients" />
+          <View className="px-4">
             <IngredientChecklist
               ingredients={meal.ingredients}
               mealName={meal.name}
@@ -118,56 +178,57 @@ export default function MealDetailScreen() {
               canExtract={Boolean(meal.recipeText?.trim())}
             />
           </View>
-          <RecipeSection
-            recipeText={meal.recipeText}
-            recipeSourceUrl={meal.recipeSourceUrl}
-          />
-          <ActionRow
-            mealId={meal.id}
-            mealName={meal.name}
-            recipeText={meal.recipeText}
-            recipeSourceUrl={meal.recipeSourceUrl}
-          />
-        </ScrollView>
-      )}
-    </SafeAreaView>
+        </View>
+
+        <View>
+          <SectionHeader title="Recipe" />
+          <View className="px-4">
+            {meal.recipeText ? (
+              <Text className="text-body text-foreground leading-6">
+                {meal.recipeText}
+              </Text>
+            ) : (
+              <Text className="text-body italic text-foreground-muted">
+                No recipe saved for this meal yet.
+              </Text>
+            )}
+          </View>
+        </View>
+
+        <ActionRow
+          mealId={meal.id}
+          mealName={meal.name}
+          recipeText={meal.recipeText}
+          recipeSourceUrl={meal.recipeSourceUrl}
+        />
+      </ScrollView>
+    </Screen>
   );
 }
 
-function MissingState() {
-  return (
-    <View style={styles.center}>
-      <Ionicons name="alert-circle-outline" size={32} color="#888" />
-      <Text style={styles.missingTitle}>Meal not found</Text>
-      <Text style={styles.missingBody}>
-        It may have been archived, or you don't have access in this household.
-      </Text>
-      <Pressable
-        onPress={() => router.replace("/(authed)/home")}
-        style={({ pressed }) => [styles.linkButton, pressed && styles.pressed]}
-      >
-        <Text style={styles.linkText}>Back to home</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-function Hero({ photoUrl, name }: { photoUrl: string | null; name: string }) {
+function Hero({
+  photoUrl,
+  name
+}: {
+  photoUrl: string | null;
+  name: string;
+}) {
   if (photoUrl) {
     return (
       <Image
         source={{ uri: photoUrl }}
-        style={styles.hero}
+        className="w-full bg-background-muted aspect-[4/3]"
         resizeMode="cover"
         accessibilityLabel={`Photo of ${name}`}
       />
     );
   }
   return (
-    <View style={[styles.hero, styles.heroPlaceholder]} accessibilityElementsHidden>
-      <Text style={styles.heroPlaceholderText}>
-        {name.charAt(0).toUpperCase()}
-      </Text>
+    <View
+      className="w-full aspect-[4/3] items-center justify-center bg-primary-muted"
+      accessibilityElementsHidden
+    >
+      <Ionicons name="restaurant-outline" size={56} color="#2C5F3F" />
     </View>
   );
 }
@@ -176,12 +237,14 @@ function Header({
   name,
   cookCount,
   lastCookedAt,
-  createdByName
+  createdByName,
+  sourcePlatform
 }: {
   name: string;
   cookCount: number;
   lastCookedAt: string | Date | null;
   createdByName: string | null;
+  sourcePlatform: string | null;
 }) {
   const addedBy = createdByName ?? "Former member";
   const cookedText =
@@ -192,56 +255,47 @@ function Header({
         : `Cooked ${cookCount} times`;
   const cookedLabel = lastCookedLabel(lastCookedAt);
   return (
-    <View style={styles.header}>
-      <Text style={styles.title}>{name}</Text>
-      <View style={styles.meta}>
-        <Text style={styles.metaText}>
-          Added by <Text style={styles.metaStrong}>{addedBy}</Text>
+    <View className="px-4 pt-4 gap-2">
+      <Text className="text-heading-1 font-bold text-foreground">{name}</Text>
+      <View className="flex-row items-center flex-wrap gap-x-1.5 gap-y-1">
+        <Text className="text-caption text-foreground-muted">
+          Added by{" "}
+          <Text className="text-foreground font-semibold">{addedBy}</Text>
         </Text>
-        <Text style={styles.metaDot}>·</Text>
-        <Text style={styles.metaText}>{cookedText}</Text>
+        <Text className="text-caption text-foreground-subtle">·</Text>
+        <Text className="text-caption text-foreground-muted">{cookedText}</Text>
         {cookedLabel ? (
           <>
-            <Text style={styles.metaDot}>·</Text>
-            <Text style={styles.metaText}>{cookedLabel}</Text>
+            <Text className="text-caption text-foreground-subtle">·</Text>
+            <Text className="text-caption text-foreground-muted">
+              {cookedLabel}
+            </Text>
           </>
         ) : null}
       </View>
+      {sourcePlatform ? (
+        <View className="flex-row mt-1">
+          <Tag variant="accent">{`From ${sourcePlatform}`}</Tag>
+        </View>
+      ) : null}
     </View>
   );
 }
 
-function RecipeSection({
-  recipeText,
-  recipeSourceUrl
+function SourceLink({
+  url,
+  label
 }: {
-  recipeText: string | null;
-  recipeSourceUrl: string | null;
+  url: string;
+  label: string | null;
 }) {
-  const label = recipeSourceUrl ? platformLabel(recipeSourceUrl) : null;
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionHeading}>Recipe</Text>
-      {recipeText ? (
-        <Text style={styles.recipeBody}>{recipeText}</Text>
-      ) : (
-        <Text style={styles.emptyText}>No recipe saved for this meal yet.</Text>
-      )}
-      {recipeSourceUrl ? (
-        <View style={styles.embedWrap}>
-          <SourceUrlEmbed url={recipeSourceUrl} />
-          <Pressable
-            onPress={() => Linking.openURL(recipeSourceUrl)}
-            hitSlop={6}
-            style={({ pressed }) => [pressed && styles.pressed]}
-          >
-            <Text style={styles.sourceLink}>
-              View original on {label ?? "the source site"} →
-            </Text>
-          </Pressable>
-        </View>
-      ) : null}
-    </View>
+    <Text
+      className="text-caption-strong font-semibold text-primary"
+      onPress={() => Linking.openURL(url)}
+    >
+      View original on {label ?? "the source site"} →
+    </Text>
   );
 }
 
@@ -304,49 +358,36 @@ function ActionRow({
   const logged = logState === "logged";
 
   return (
-    <View style={styles.actionRow}>
-      <Pressable
-        onPress={handleLogAgain}
-        disabled={submitting || logged}
-        style={({ pressed }) => [
-          styles.actionButton,
-          styles.actionPrimary,
-          logged && styles.actionLogged,
-          submitting && styles.actionDisabled,
-          pressed && !submitting && !logged && styles.pressed
-        ]}
-        accessibilityRole="button"
-        accessibilityLabel="Log this meal again for today"
-      >
-        {submitting ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <>
+    <View className="px-4 pt-6 flex-row gap-2">
+      <View className="flex-1">
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
+          loading={submitting}
+          disabled={logged}
+          leadingIcon={
             <Ionicons
               name={logged ? "checkmark-circle-outline" : "add-circle-outline"}
               size={18}
-              color="#fff"
+              color="#FBF8F1"
             />
-            <Text style={styles.actionPrimaryText}>
-              {logged ? "Logged for today" : "Log again"}
-            </Text>
-          </>
-        )}
-      </Pressable>
-
-      <Pressable
+          }
+          onPress={handleLogAgain}
+        >
+          {logged ? "Logged for today" : "Log again"}
+        </Button>
+      </View>
+      <Button
+        variant="secondary"
+        size="lg"
+        leadingIcon={
+          <Ionicons name="share-outline" size={18} color="#2C5F3F" />
+        }
         onPress={() => setShareOpen(true)}
-        style={({ pressed }) => [
-          styles.actionButton,
-          styles.actionSecondary,
-          pressed && styles.pressed
-        ]}
-        accessibilityRole="button"
-        accessibilityLabel="Share this recipe"
       >
-        <Ionicons name="share-outline" size={18} color="#2f6f58" />
-        <Text style={styles.actionSecondaryText}>Share</Text>
-      </Pressable>
+        Share
+      </Button>
 
       <ShareSheet
         visible={shareOpen}
@@ -359,149 +400,3 @@ function ActionRow({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fdfdfa" },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-    gap: 8
-  },
-  scroll: {
-    paddingBottom: 40
-  },
-  hero: {
-    width: "100%",
-    aspectRatio: 4 / 3,
-    backgroundColor: "#e8e6df"
-  },
-  heroPlaceholder: {
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  heroPlaceholderText: {
-    fontSize: 56,
-    color: "#9b9b8e",
-    fontWeight: "300"
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 4,
-    gap: 6
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: "600",
-    color: "#111",
-    lineHeight: 32
-  },
-  meta: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    columnGap: 6,
-    rowGap: 2
-  },
-  metaText: { fontSize: 12.5, color: "#666" },
-  metaStrong: { color: "#222", fontWeight: "500" },
-  metaDot: { fontSize: 12.5, color: "#aaa" },
-  section: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    gap: 8
-  },
-  sectionHeading: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#666",
-    textTransform: "uppercase",
-    letterSpacing: 0.6
-  },
-  emptyText: {
-    fontSize: 13,
-    color: "#888",
-    fontStyle: "italic"
-  },
-  recipeBody: {
-    fontSize: 15,
-    color: "#222",
-    lineHeight: 23
-  },
-  sourceLink: {
-    fontSize: 13,
-    color: "#2f6f58",
-    marginTop: 6
-  },
-  embedWrap: {
-    marginTop: 10,
-    gap: 6
-  },
-  actionRow: {
-    flexDirection: "row",
-    gap: 10,
-    paddingHorizontal: 20,
-    paddingTop: 24
-  },
-  actionButton: {
-    minHeight: 48,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6
-  },
-  actionPrimary: {
-    flex: 1,
-    backgroundColor: "#2f6f58"
-  },
-  actionLogged: {
-    backgroundColor: "#3d8a6f"
-  },
-  actionDisabled: {
-    opacity: 0.85
-  },
-  actionPrimaryText: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600"
-  },
-  actionSecondary: {
-    borderWidth: 1,
-    borderColor: "#cfd6cf",
-    backgroundColor: "#fff"
-  },
-  actionSecondaryText: {
-    color: "#2f6f58",
-    fontSize: 15,
-    fontWeight: "500"
-  },
-  pressed: { opacity: 0.85 },
-  missingTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#111",
-    marginTop: 4
-  },
-  missingBody: {
-    fontSize: 13,
-    color: "#666",
-    textAlign: "center",
-    paddingHorizontal: 12
-  },
-  linkButton: {
-    marginTop: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8
-  },
-  linkText: {
-    color: "#2f6f58",
-    fontSize: 14,
-    fontWeight: "500"
-  }
-});

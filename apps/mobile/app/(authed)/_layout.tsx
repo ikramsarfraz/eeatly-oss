@@ -1,33 +1,40 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Link, Tabs } from "expo-router";
-import { Pressable } from "react-native";
+import { Pressable, StyleSheet } from "react-native";
 
 /**
- * Round 13 — authed shell. Three-tab bottom bar (Home / Add / Library)
- * mirrors the structure web uses but flattened to the platform's
- * standard nav pattern. A header settings icon (right) deep-links to
- * `/(authed)/settings`; we don't need a tab for it because settings
- * are infrequent and a header icon stays out of the way of the
- * primary kitchen flows.
+ * Round 17 — authed shell. Three-tab bottom bar (Home / Add / Library)
+ * mirrors the web structure but flattened to the platform's standard
+ * nav pattern. R17 retunes the visual tokens to match the cream +
+ * forest-green design palette.
  *
- * The Add tab is the entry point for both manual logging and AI
- * capture (Tasks 3 + 4). Library is browse/search (Task 1 ships a
- * placeholder; richer search lands when there's data to search
- * against, currently uses `search.meals`).
+ * A header settings icon (right) deep-links to `/(authed)/settings`;
+ * settings are infrequent and a header icon stays out of the way.
  *
- * `meal/[id]` is intentionally absent from `<Tabs>` — it's a stack
- * screen that pushes from any tab and shows its own back button.
- * Same with `settings`. Both must be declared as `Tabs.Screen` with
- * `href: null` to register the route while hiding the tab.
+ * Hidden routes (`meal/[id]`, plans/*, household/*, settings) are
+ * declared with `href: null` so expo-router can push to them from any
+ * tab while keeping them out of the tab bar itself.
  */
 export default function AuthedLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: "#2f6f58",
-        tabBarInactiveTintColor: "#7a7a7a",
-        headerStyle: { backgroundColor: "#fdfdfa" },
-        headerTitleStyle: { fontSize: 17, fontWeight: "600" },
+        tabBarActiveTintColor: "#2C5F3F",
+        tabBarInactiveTintColor: "#9A968A",
+        tabBarStyle: {
+          backgroundColor: "#FFFFFF",
+          borderTopColor: "#E5E0D5",
+          borderTopWidth: StyleSheet.hairlineWidth
+        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
+        tabBarItemStyle: { paddingTop: 6 },
+        headerStyle: {
+          backgroundColor: "#FBF8F1",
+          shadowColor: "transparent",
+          elevation: 0
+        },
+        headerTitleStyle: { fontSize: 16, fontWeight: "600", color: "#1A1F1B" },
+        headerTintColor: "#1A1F1B",
         headerRight: () => (
           <Link href="/(authed)/settings" asChild>
             <Pressable
@@ -36,7 +43,7 @@ export default function AuthedLayout() {
               hitSlop={12}
               style={{ paddingHorizontal: 16 }}
             >
-              <Ionicons name="settings-outline" size={22} color="#444" />
+              <Ionicons name="settings-outline" size={22} color="#2C5F3F" />
             </Pressable>
           </Link>
         )

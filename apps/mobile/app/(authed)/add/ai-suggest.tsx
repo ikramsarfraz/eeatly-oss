@@ -13,36 +13,36 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   View
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import type { MealLogInput } from "@eeatly/api/validators/meals";
 import { MealLogForm } from "../../../components/meal-log-form";
 import { VoiceRecorder } from "../../../components/voice-recorder";
 import { AudioReadError, readAudioForAi } from "../../../lib/audio-upload";
 import { uploadPhoto } from "../../../lib/photo-upload";
 import { trpc } from "../../../lib/trpc";
+import {
+  Button,
+  Card,
+  CardBody,
+  Input,
+  Screen
+} from "../../../components/ui";
 
 /**
- * Round 15 Task 4 — unified AI capture screen with three input modes:
- * Photo / Text / Voice. Replaces the R13 two-mode screen.
+ * Round 17 — unified AI capture screen, NativeWind rebuild.
  *
- * Mode selector is a horizontal pill strip at the top; tap to switch
- * without losing other modes' input state.
+ * Three input modes (Photo / Text / Voice) live behind a pill-style
+ * segmented control at the top. Each mode renders its own input
+ * surface; on success all three converge on the same review phase
+ * which mounts <MealLogForm showRecipePreview /> with the AI's
+ * structured output.
  *
- * Round 16 dropped the original YouTube mode — scraping YouTube
- * transcripts violates their ToS and the upstream library hit
- * permanent bot-detection failures. Video sources (YouTube, TikTok,
- * Pinterest) now ride through the URL-references path on the meal log
- * form — saved as `recipeSourceUrl`, rendered as an embed on the
- * recipe view.
- *
- * All three modes converge on the same review phase, which renders the
- * shared `<MealLogForm>` with `showRecipePreview` and AI-prefilled
- * fields.
+ * Phase machine — `input` → `calling` → (`review` | `upgrade` |
+ * back to `input` on error). The error path always returns to
+ * `input` so the user can retry without losing their place.
  */
 
 type Mode = "photo" | "text" | "voice";
@@ -77,11 +77,11 @@ function getCauseReason(error: unknown): string | null {
 function modeToFeatureLabel(mode: Mode): string {
   switch (mode) {
     case "photo":
-      return "photo capture";
+      return "Photo capture";
     case "text":
-      return "text capture";
+      return "Text capture";
     case "voice":
-      return "voice capture";
+      return "Voice capture";
   }
 }
 
@@ -108,14 +108,12 @@ export default function AiSuggestScreen() {
       setPhase({ kind: "upgrade", feature: modeToFeatureLabel(currentMode) });
       return;
     }
-
-    // Reuse the typed copy from R7 / R8 web flows where possible — the
-    // wire `cause.reason` strings are stable.
     let message: string;
     const fallbackMsg = (error as { message?: string }).message;
     switch (reason) {
       case "RATE_LIMITED":
-        message = "Try again in a moment — that's a lot of AI calls in quick succession.";
+        message =
+          "Try again in a moment — that's a lot of AI calls in quick succession.";
         break;
       case "INVALID_INPUT":
         message = fallbackMsg ?? "That input isn't supported.";
@@ -123,7 +121,6 @@ export default function AiSuggestScreen() {
       case "AI_PROVIDER_ERROR":
         message = "We couldn't read that. Try again or use a different mode.";
         break;
-      // ---- Audio-specific
       case "AUDIO_TOO_LARGE":
         message = "Voice notes max 25 MB. Try a shorter clip.";
         break;
@@ -144,8 +141,6 @@ export default function AiSuggestScreen() {
   }
 
   function withSlowHintTimer(currentMode: Mode): () => void {
-    // Show a "this is taking longer than usual" hint after 5s. Returned
-    // function cancels the timer once the call completes.
     setPhase({ kind: "calling", mode: currentMode, longRunning: false });
     const t = setTimeout(() => {
       setPhase((prev) =>
@@ -179,14 +174,12 @@ export default function AiSuggestScreen() {
       setPhase({ kind: "input" });
       return;
     }
-
     if (!prepared.base64) {
       cancelTimer();
       Alert.alert("Photo error", "Couldn't encode that image. Try again.");
       setPhase({ kind: "input" });
       return;
     }
-
     const [aiResult, uploadResult] = await Promise.allSettled([
       photoMutation.mutateAsync({
         imageBase64: prepared.base64,
@@ -194,7 +187,6 @@ export default function AiSuggestScreen() {
       }),
       uploadPhoto(prepared.uri)
     ]);
-
     cancelTimer();
     if (aiResult.status === "rejected") {
       handleAiError(aiResult.reason, "photo");
@@ -202,7 +194,9 @@ export default function AiSuggestScreen() {
     }
     const suggestion = aiResult.value;
     const photoUrl =
-      uploadResult.status === "fulfilled" ? uploadResult.value.publicUrl : undefined;
+      uploadResult.status === "fulfilled"
+        ? uploadResult.value.publicUrl
+        : undefined;
     setPhase({
       kind: "review",
       initial: {
@@ -255,7 +249,6 @@ export default function AiSuggestScreen() {
       setPhase({ kind: "input" });
       return;
     }
-
     try {
       const suggestion = await voiceMutation.mutateAsync({
         audioBase64: bundle.audioBase64,
@@ -280,17 +273,23 @@ export default function AiSuggestScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <Stack.Screen options={{ title: "Capture with AI", headerBackTitle: "Back" }} />
+    <Screen edges={["bottom"]}>
+      <Stack.Screen
+        options={{
+          title: "Capture with AI",
+          headerBackTitle: "Back",
+          headerStyle: { backgroundColor: "#FBF8F1" },
+          headerTintColor: "#1A1F1B",
+          headerTitleStyle: { fontWeight: "600" }
+        }}
+      />
 
       {phase.kind === "input" ? (
         <>
           <ModeTabs active={mode} onChange={setMode} />
           {mode === "photo" ? <PhotoInputView onPicked={runPhoto} /> : null}
           {mode === "text" ? <TextInputView onSubmit={runText} /> : null}
-          {mode === "voice" ? (
-            <VoiceInputView onPicked={runVoice} />
-          ) : null}
+          {mode === "voice" ? <VoiceInputView onPicked={runVoice} /> : null}
         </>
       ) : null}
 
@@ -310,7 +309,7 @@ export default function AiSuggestScreen() {
           submitLabel="Save this meal"
         />
       ) : null}
-    </SafeAreaView>
+    </Screen>
   );
 }
 
@@ -323,28 +322,32 @@ function ModeTabs({
 }) {
   const modes: Mode[] = ["photo", "text", "voice"];
   return (
-    <View style={styles.tabStrip}>
+    <View className="flex-row gap-1.5 px-4 py-3 border-b border-border bg-background">
       {modes.map((m) => {
         const isActive = active === m;
         return (
           <Pressable
             key={m}
             onPress={() => onChange(m)}
-            style={({ pressed }) => [
-              styles.tab,
-              isActive && styles.tabActive,
-              pressed && !isActive && styles.tabPressed
-            ]}
             accessibilityRole="button"
             accessibilityState={{ selected: isActive }}
             accessibilityLabel={MODE_LABELS[m]}
+            className={`flex-1 flex-row items-center justify-center gap-1.5 rounded-pill h-11 active:opacity-90 ${
+              isActive
+                ? "bg-primary"
+                : "bg-background-elevated border border-border"
+            }`}
           >
             <Ionicons
               name={MODE_ICONS[m]}
               size={16}
-              color={isActive ? "#fff" : "#2f6f58"}
+              color={isActive ? "#FBF8F1" : "#2C5F3F"}
             />
-            <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
+            <Text
+              className={`text-caption-strong font-semibold ${
+                isActive ? "text-primary-foreground" : "text-foreground"
+              }`}
+            >
               {MODE_LABELS[m]}
             </Text>
           </Pressable>
@@ -368,12 +371,14 @@ function CallingView({
         ? "Reading your text…"
         : "Reading your photo…";
   return (
-    <View style={styles.callingWrap}>
-      <ActivityIndicator size="large" color="#2f6f58" />
-      <Text style={styles.callingTitle}>{heading}</Text>
-      <Text style={styles.callingBody}>
+    <View className="flex-1 items-center justify-center px-8 gap-3">
+      <ActivityIndicator size="large" color="#2C5F3F" />
+      <Text className="text-heading-2 font-semibold text-foreground text-center">
+        {heading}
+      </Text>
+      <Text className="text-body text-foreground-muted text-center max-w-[280px]">
         {longRunning
-          ? "Voice notes and longer videos take a moment. Stay on this screen — we'll have a draft for you shortly."
+          ? "Voice notes and longer transcripts take a moment. Stay on this screen — we'll have a draft for you shortly."
           : "This usually takes a few seconds. Stay on this screen."}
       </Text>
     </View>
@@ -382,22 +387,29 @@ function CallingView({
 
 function UpgradeView({ feature }: { feature: string }) {
   return (
-    <View style={styles.upgradeWrap}>
-      <Ionicons name="sparkles-outline" size={32} color="#2f6f58" />
-      <Text style={styles.upgradeTitle}>{feature} is a Plus feature</Text>
-      <Text style={styles.upgradeBody}>
+    <View className="flex-1 items-center justify-center px-8 gap-3">
+      <View className="h-16 w-16 items-center justify-center rounded-full bg-accent">
+        <Ionicons name="sparkles-outline" size={28} color="#1A1F1B" />
+      </View>
+      <Text className="text-heading-2 font-semibold text-foreground text-center">
+        {feature} is part of eeatly Plus
+      </Text>
+      <Text className="text-body text-foreground-muted text-center max-w-[300px]">
         Upgrade on the web to let eeatly extract recipes from photos,
         pasted text, or voice notes. Manual logging stays free.
       </Text>
-      <Pressable
-        onPress={() => Linking.openURL("https://eeatly.app/pricing")}
-        style={({ pressed }) => [styles.upgradeButton, pressed && styles.pressed]}
-      >
-        <Text style={styles.upgradeButtonText}>See Plus on the web</Text>
-      </Pressable>
-      <Pressable onPress={() => router.back()} hitSlop={12}>
-        <Text style={styles.upgradeBack}>Go back</Text>
-      </Pressable>
+      <View className="mt-2 gap-2">
+        <Button
+          variant="primary"
+          size="lg"
+          onPress={() => Linking.openURL("https://eeatly.app/pricing")}
+        >
+          See Plus on the web
+        </Button>
+        <Button variant="ghost" onPress={() => router.back()}>
+          Go back
+        </Button>
+      </View>
     </View>
   );
 }
@@ -469,30 +481,45 @@ function PhotoInputView({ onPicked }: { onPicked: (uri: string) => void }) {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.inputScroll}>
-      <Text style={styles.heading}>Capture a recipe</Text>
-      <Text style={styles.body}>
-        Snap a recipe card, cookbook page, or finished dish. We'll extract
-        the name, recipe text, and ingredients so you can review and save.
-      </Text>
+    <ScrollView contentContainerClassName="p-4 pb-12 gap-4">
+      <View className="gap-1.5">
+        <Text className="text-heading-2 font-semibold text-foreground">
+          Capture a recipe
+        </Text>
+        <Text className="text-body text-foreground-muted">
+          Snap a recipe card, cookbook page, or finished dish. We'll
+          extract the name, recipe text, and ingredients so you can
+          review before saving.
+        </Text>
+      </View>
 
       <Pressable
         onPress={() => setSheetOpen(true)}
-        style={({ pressed }) => [styles.bigCta, pressed && styles.pressed]}
         accessibilityRole="button"
+        className="bg-primary rounded-md py-6 px-5 items-center justify-center gap-1.5 active:opacity-90 shadow-sm"
       >
-        <Ionicons name="camera-outline" size={28} color="#fff" />
-        <Text style={styles.bigCtaText}>Add a photo</Text>
-        <Text style={styles.bigCtaHint}>Camera or library</Text>
+        <Ionicons name="camera-outline" size={32} color="#FBF8F1" />
+        <Text className="text-heading-3 font-semibold text-primary-foreground">
+          Add a photo
+        </Text>
+        <Text className="text-caption text-primary-foreground/80">
+          Camera or library
+        </Text>
       </Pressable>
 
-      {error ? <Text style={styles.inlineError}>{error}</Text> : null}
+      {error ? (
+        <Text className="text-caption text-destructive">{error}</Text>
+      ) : null}
 
-      <View style={styles.tipsBlock}>
-        <Tip text="Hold the phone parallel to the page for sharper text." />
-        <Tip text="Make sure the whole recipe is in frame." />
-        <Tip text="Bright, even light helps the AI read handwriting." />
-      </View>
+      <Card>
+        <CardBody>
+          <View className="gap-2.5">
+            <Tip text="Hold the phone parallel to the page for sharper text." />
+            <Tip text="Make sure the whole recipe is in frame." />
+            <Tip text="Bright, even light helps the AI read handwriting." />
+          </View>
+        </CardBody>
+      </Card>
 
       <Modal
         visible={sheetOpen}
@@ -500,10 +527,22 @@ function PhotoInputView({ onPicked }: { onPicked: (uri: string) => void }) {
         animationType="fade"
         onRequestClose={() => setSheetOpen(false)}
       >
-        <Pressable style={styles.backdrop} onPress={() => setSheetOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => null}>
-            <Text style={styles.sheetHeader}>Add a photo</Text>
-            <SheetOption icon="camera-outline" label="Take photo" onPress={takePhoto} />
+        <Pressable
+          className="flex-1 bg-foreground/40 justify-end"
+          onPress={() => setSheetOpen(false)}
+        >
+          <Pressable
+            onPress={() => null}
+            className="bg-background-elevated rounded-t-lg pt-3 pb-9 px-4 gap-1"
+          >
+            <Text className="text-caption text-foreground-muted text-center py-2">
+              Add a photo
+            </Text>
+            <SheetOption
+              icon="camera-outline"
+              label="Take photo"
+              onPress={takePhoto}
+            />
             <SheetOption
               icon="images-outline"
               label="Choose from library"
@@ -533,49 +572,50 @@ function TextInputView({ onSubmit }: { onSubmit: (text: string) => void }) {
 
   return (
     <KeyboardAvoidingView
-      style={styles.flex}
+      className="flex-1"
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
     >
       <ScrollView
-        contentContainerStyle={styles.inputScroll}
+        contentContainerClassName="p-4 pb-12 gap-4"
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.heading}>Paste a recipe</Text>
-        <Text style={styles.body}>
-          Paste anything you'd cook from — a copied recipe, a description
-          of what you made, even a rough note. The AI will turn it into a
-          structured meal log you can edit before saving.
-        </Text>
+        <View className="gap-1.5">
+          <Text className="text-heading-2 font-semibold text-foreground">
+            Paste a recipe
+          </Text>
+          <Text className="text-body text-foreground-muted">
+            Paste anything you'd cook from — a copied recipe, a description
+            of what you made, even a rough note. The AI will turn it into a
+            structured meal log you can edit before saving.
+          </Text>
+        </View>
 
-        <TextInput
+        <Input
           value={text}
           onChangeText={setText}
           placeholder="Paste recipe text, ingredient list, or describe what you cooked…"
-          placeholderTextColor="#999"
           multiline
           maxLength={20_000}
-          textAlignVertical="top"
-          style={styles.textArea}
           autoCorrect
           autoCapitalize="sentences"
         />
-        <Text style={styles.charCount}>{trimmed.length} / 20,000</Text>
+        <Text className="text-small text-foreground-muted text-right -mt-2">
+          {trimmed.length} / 20,000
+        </Text>
 
-        <Pressable
-          onPress={() => onSubmit(trimmed)}
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
           disabled={!canSubmit}
-          style={({ pressed }) => [
-            styles.bigCta,
-            styles.submitCta,
-            !canSubmit && styles.submitDisabled,
-            pressed && canSubmit && styles.pressed
-          ]}
-          accessibilityRole="button"
+          leadingIcon={
+            <Ionicons name="sparkles-outline" size={18} color="#FBF8F1" />
+          }
+          onPress={() => onSubmit(trimmed)}
         >
-          <Ionicons name="sparkles-outline" size={22} color="#fff" />
-          <Text style={styles.bigCtaText}>Extract recipe</Text>
-        </Pressable>
+          Extract recipe
+        </Button>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -617,44 +657,46 @@ function VoiceInputView({
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.inputScroll}>
-      <Text style={styles.heading}>Voice note</Text>
-      <Text style={styles.body}>
-        Record a quick description, or upload a WhatsApp voice note from
-        your library.
-      </Text>
+    <ScrollView contentContainerClassName="p-4 pb-12 gap-4">
+      <View className="gap-1.5">
+        <Text className="text-heading-2 font-semibold text-foreground">
+          Voice note
+        </Text>
+        <Text className="text-body text-foreground-muted">
+          Record a quick description, or upload a WhatsApp voice note from
+          your library.
+        </Text>
+      </View>
 
-      <View style={styles.subModeRow}>
+      <View className="flex-row gap-2">
         <Pressable
           onPress={() => setSubMode("record")}
-          style={({ pressed }) => [
-            styles.subModeTab,
-            subMode === "record" && styles.subModeTabActive,
-            pressed && subMode !== "record" && styles.tabPressed
-          ]}
+          className={`flex-1 h-11 rounded-md items-center justify-center border ${
+            subMode === "record"
+              ? "bg-foreground border-foreground"
+              : "border-border bg-background-elevated active:bg-background-muted"
+          }`}
         >
           <Text
-            style={[
-              styles.subModeLabel,
-              subMode === "record" && styles.subModeLabelActive
-            ]}
+            className={`text-caption-strong font-semibold ${
+              subMode === "record" ? "text-background" : "text-foreground"
+            }`}
           >
             Record
           </Text>
         </Pressable>
         <Pressable
           onPress={() => setSubMode("upload")}
-          style={({ pressed }) => [
-            styles.subModeTab,
-            subMode === "upload" && styles.subModeTabActive,
-            pressed && subMode !== "upload" && styles.tabPressed
-          ]}
+          className={`flex-1 h-11 rounded-md items-center justify-center border ${
+            subMode === "upload"
+              ? "bg-foreground border-foreground"
+              : "border-border bg-background-elevated active:bg-background-muted"
+          }`}
         >
           <Text
-            style={[
-              styles.subModeLabel,
-              subMode === "upload" && styles.subModeLabelActive
-            ]}
+            className={`text-caption-strong font-semibold ${
+              subMode === "upload" ? "text-background" : "text-foreground"
+            }`}
           >
             Upload
           </Text>
@@ -664,32 +706,39 @@ function VoiceInputView({
       {subMode === "record" ? (
         <VoiceRecorder onRecorded={(uri) => onPicked(uri, "audio/m4a")} />
       ) : (
-        <View style={styles.uploadWrap}>
-          <Ionicons name="cloud-upload-outline" size={36} color="#2f6f58" />
-          <Text style={styles.uploadBody}>
-            Pick an audio file from your phone. WhatsApp voice notes, m4a,
-            mp3, and wav all work.
-          </Text>
-          <Pressable
-            onPress={pickFile}
-            disabled={picking}
-            style={({ pressed }) => [
-              styles.uploadButton,
-              picking && styles.disabled,
-              pressed && !picking && styles.pressed
-            ]}
-            accessibilityRole="button"
-          >
-            {picking ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="folder-open-outline" size={18} color="#fff" />
-                <Text style={styles.uploadButtonText}>Choose audio file</Text>
-              </>
-            )}
-          </Pressable>
-        </View>
+        <Card>
+          <CardBody>
+            <View className="items-center gap-3 py-4">
+              <View className="h-14 w-14 items-center justify-center rounded-full bg-primary-muted">
+                <Ionicons
+                  name="cloud-upload-outline"
+                  size={28}
+                  color="#2C5F3F"
+                />
+              </View>
+              <Text className="text-body text-foreground-muted text-center max-w-[280px]">
+                Pick an audio file from your phone. WhatsApp voice notes,
+                m4a, mp3, and wav all work.
+              </Text>
+              <Button
+                variant="primary"
+                size="md"
+                loading={picking}
+                disabled={picking}
+                leadingIcon={
+                  <Ionicons
+                    name="folder-open-outline"
+                    size={18}
+                    color="#FBF8F1"
+                  />
+                }
+                onPress={pickFile}
+              >
+                Choose audio file
+              </Button>
+            </View>
+          </CardBody>
+        </Card>
       )}
     </ScrollView>
   );
@@ -697,9 +746,9 @@ function VoiceInputView({
 
 function Tip({ text }: { text: string }) {
   return (
-    <View style={styles.tipRow}>
-      <Ionicons name="bulb-outline" size={16} color="#888" />
-      <Text style={styles.tipText}>{text}</Text>
+    <View className="flex-row items-center gap-2.5">
+      <Ionicons name="bulb-outline" size={16} color="#6B7068" />
+      <Text className="text-caption text-foreground-muted flex-1">{text}</Text>
     </View>
   );
 }
@@ -718,22 +767,21 @@ function SheetOption({
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.sheetOption,
-        pressed && styles.pressed,
-        variant === "cancel" && styles.sheetCancel
-      ]}
+      className={`flex-row items-center gap-3.5 px-2 py-3.5 rounded-sm min-h-[56px] active:opacity-70 ${
+        variant === "cancel" ? "mt-1 border-t border-border" : ""
+      }`}
     >
       <Ionicons
         name={icon}
         size={22}
-        color={variant === "cancel" ? "#888" : "#2f6f58"}
+        color={variant === "cancel" ? "#6B7068" : "#2C5F3F"}
       />
       <Text
-        style={[
-          styles.sheetOptionLabel,
-          variant === "cancel" && styles.sheetCancelLabel
-        ]}
+        className={`text-body ${
+          variant === "cancel"
+            ? "text-foreground-muted"
+            : "text-foreground font-semibold"
+        }`}
       >
         {label}
       </Text>
@@ -741,274 +789,3 @@ function SheetOption({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fdfdfa" },
-  flex: { flex: 1 },
-  tabStrip: {
-    flexDirection: "row",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: "#e5e3dc"
-  },
-  tab: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    minHeight: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "#cfe1d7",
-    backgroundColor: "#eef5f1"
-  },
-  tabActive: { backgroundColor: "#2f6f58", borderColor: "#2f6f58" },
-  tabPressed: { opacity: 0.85 },
-  tabLabel: {
-    color: "#1f4a3b",
-    fontSize: 12,
-    fontWeight: "600",
-    letterSpacing: 0.3
-  },
-  tabLabelActive: { color: "#fff" },
-  inputScroll: {
-    padding: 16,
-    gap: 14,
-    paddingBottom: 48
-  },
-  heading: {
-    fontSize: 22,
-    fontWeight: "600",
-    color: "#111",
-    marginTop: 4
-  },
-  body: {
-    fontSize: 14,
-    color: "#555",
-    lineHeight: 20
-  },
-  bigCta: {
-    backgroundColor: "#2f6f58",
-    borderRadius: 14,
-    paddingVertical: 22,
-    paddingHorizontal: 18,
-    minHeight: 96,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4
-  },
-  submitCta: {
-    minHeight: 56,
-    flexDirection: "row",
-    gap: 10
-  },
-  submitDisabled: { backgroundColor: "#a7c6b8" },
-  bigCtaText: {
-    color: "#fff",
-    fontSize: 17,
-    fontWeight: "600"
-  },
-  bigCtaHint: {
-    color: "rgba(255,255,255,0.8)",
-    fontSize: 12
-  },
-  pressed: { opacity: 0.85 },
-  disabled: { opacity: 0.55 },
-  inlineError: {
-    color: "#b91c1c",
-    fontSize: 13
-  },
-  tipsBlock: {
-    marginTop: 6,
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: "#fbfaf6",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#e5e3dc",
-    gap: 8
-  },
-  tipRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8
-  },
-  tipText: {
-    fontSize: 13,
-    color: "#555",
-    flex: 1
-  },
-  textArea: {
-    minHeight: 220,
-    maxHeight: 360,
-    borderColor: "#d4d2cb",
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 15,
-    backgroundColor: "#fff",
-    color: "#111",
-    lineHeight: 21
-  },
-  charCount: {
-    fontSize: 11,
-    color: "#888",
-    textAlign: "right",
-    marginTop: -8
-  },
-  subModeRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 4
-  },
-  subModeTab: {
-    flex: 1,
-    minHeight: 40,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#d4d2cb",
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  subModeTabActive: { backgroundColor: "#1f4a3b", borderColor: "#1f4a3b" },
-  subModeLabel: { color: "#444", fontSize: 13, fontWeight: "500" },
-  subModeLabelActive: { color: "#fff" },
-  uploadWrap: {
-    alignItems: "center",
-    paddingVertical: 24,
-    paddingHorizontal: 16,
-    gap: 14,
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#e5e3dc",
-    backgroundColor: "#fbfaf6"
-  },
-  uploadBody: {
-    fontSize: 13,
-    color: "#555",
-    textAlign: "center",
-    lineHeight: 19
-  },
-  uploadButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    minHeight: 48,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    backgroundColor: "#2f6f58",
-    alignSelf: "stretch"
-  },
-  uploadButtonText: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600"
-  },
-  callingWrap: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-    gap: 12
-  },
-  callingTitle: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#111"
-  },
-  callingBody: {
-    fontSize: 13,
-    color: "#666",
-    textAlign: "center"
-  },
-  upgradeWrap: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-    gap: 14
-  },
-  upgradeTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#111",
-    textAlign: "center"
-  },
-  upgradeBody: {
-    fontSize: 14,
-    color: "#555",
-    textAlign: "center",
-    lineHeight: 20
-  },
-  upgradeButton: {
-    minHeight: 48,
-    paddingHorizontal: 20,
-    backgroundColor: "#2f6f58",
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  upgradeButtonText: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600"
-  },
-  upgradeBack: {
-    color: "#2f6f58",
-    fontSize: 14,
-    marginTop: 4
-  },
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "flex-end"
-  },
-  sheet: {
-    backgroundColor: "#fff",
-    paddingTop: 12,
-    paddingBottom: 36,
-    paddingHorizontal: 16,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    gap: 4
-  },
-  sheetHeader: {
-    fontSize: 13,
-    color: "#888",
-    textAlign: "center",
-    paddingVertical: 8
-  },
-  sheetOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    minHeight: 56
-  },
-  sheetOptionLabel: {
-    fontSize: 16,
-    color: "#111",
-    fontWeight: "500"
-  },
-  sheetCancel: {
-    marginTop: 4,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: "#e5e3dc",
-    borderRadius: 0,
-    paddingTop: 14
-  },
-  sheetCancelLabel: {
-    color: "#666",
-    fontWeight: "400"
-  }
-});

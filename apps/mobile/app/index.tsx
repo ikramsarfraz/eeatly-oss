@@ -1,19 +1,16 @@
 import { useEffect, useState } from "react";
 import { router } from "expo-router";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { getSessionToken } from "../lib/auth/session";
+import { LoadingScreen } from "../components/ui";
 
 /**
  * Round 12 / 13 — landing route. Checks SecureStore for a persisted
  * session token and routes accordingly:
- *   - token present → `/(authed)/home` (Round 13 added the tab-bar
- *     shell; explicitly target the home tab so the first frame is
- *     deterministic regardless of expo-router's tab-resolution rules)
+ *   - token present → `/(authed)/home`
  *   - no token → `/(auth)/sign-in`
  *
- * Renders a centered spinner while the SecureStore read settles.
- * SecureStore is async and may take a frame; without the loading
- * state the screen would briefly flash empty.
+ * Renders the shared loading screen on cream while the SecureStore
+ * read settles (R17 — was a bare ActivityIndicator before).
  */
 export default function Index() {
   const [routed, setRouted] = useState(false);
@@ -33,18 +30,5 @@ export default function Index() {
   }, []);
 
   if (routed) return null;
-
-  return (
-    <View style={styles.container}>
-      <ActivityIndicator />
-    </View>
-  );
+  return <LoadingScreen />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center"
-  }
-});

@@ -1,22 +1,19 @@
 import { useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View
-} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { KeyboardAvoidingView, Platform, Text, View } from "react-native";
 import { authClient } from "../../lib/auth/client";
+import { Button, Input, Screen } from "../../components/ui";
 
 /**
- * Round 12 — magic-link sign-in. The user enters their email and the
- * mobile app asks the server to dispatch a sign-in link. The actual
- * verification happens in `app/verify.tsx` after the user taps the
- * email link (the server emits a deep link for `eeatly://` callbacks
- * thanks to `pickMagicLinkUrl` in `apps/web/lib/auth/index.ts`).
+ * Round 17 sign-in — NativeWind rebuild.
  *
- * Phase-1 styling: raw RN primitives. UI library decisions are Phase 2.
+ * Centered single-column layout. Magic-link auth: user types email,
+ * we ask the server to dispatch a sign-in link with our `eeatly://`
+ * deep-link callback. The actual verification happens in
+ * `app/verify.tsx` after the user taps the link.
+ *
+ * "Check your email" success state replaces the form rather than
+ * stacking under it — feels more decisive on a small screen.
  */
 export default function SignIn() {
   const [email, setEmail] = useState("");
@@ -37,15 +34,13 @@ export default function SignIn() {
     try {
       const { error } = await authClient.signIn.magicLink({
         email: trimmed,
-        // The server-side `pickMagicLinkUrl` helper sees this scheme
-        // and substitutes a `eeatly://verify?token=…` link in the
-        // email body so iOS/Android open the app directly.
         callbackURL: "eeatly://verify"
       });
       if (error) {
         setState({
           kind: "error",
-          message: error.message ?? "Couldn't send the sign-in link. Try again."
+          message:
+            error.message ?? "Couldn't send the sign-in link. Try again."
         });
         return;
       }
@@ -63,121 +58,79 @@ export default function SignIn() {
 
   if (state.kind === "sent") {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Check your email</Text>
-        <Text style={styles.body}>
-          We sent a sign-in link to {email.trim().toLowerCase()}. Tap it on this
-          phone to finish signing in.
-        </Text>
-        <Pressable
-          onPress={() => setState({ kind: "idle" })}
-          style={styles.linkButton}
-        >
-          <Text style={styles.linkText}>Use a different email</Text>
-        </Pressable>
-      </View>
+      <Screen edges={["top", "bottom"]}>
+        <View className="flex-1 items-center justify-center px-8 gap-3">
+          <View className="h-16 w-16 items-center justify-center rounded-full bg-primary-muted">
+            <Ionicons name="mail-outline" size={32} color="#2C5F3F" />
+          </View>
+          <Text className="text-heading-1 font-bold text-foreground text-center">
+            Check your email
+          </Text>
+          <Text className="text-body text-foreground-muted text-center max-w-[320px]">
+            We sent a sign-in link to{" "}
+            <Text className="font-semibold text-foreground">
+              {email.trim().toLowerCase()}
+            </Text>
+            . Tap it on this phone to finish signing in.
+          </Text>
+          <View className="mt-2">
+            <Button
+              variant="ghost"
+              onPress={() => setState({ kind: "idle" })}
+            >
+              Use a different email
+            </Button>
+          </View>
+        </View>
+      </Screen>
     );
   }
 
   const isSending = state.kind === "sending";
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>eeatly</Text>
-      <Text style={styles.subtitle}>Sign in with your email</Text>
-
-      <TextInput
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        autoCorrect={false}
-        autoComplete="email"
-        keyboardType="email-address"
-        textContentType="emailAddress"
-        placeholder="you@example.com"
-        placeholderTextColor="#999"
-        editable={!isSending}
-        style={styles.input}
-      />
-
-      {state.kind === "error" ? (
-        <Text style={styles.error}>{state.message}</Text>
-      ) : null}
-
-      <Pressable
-        onPress={handleSubmit}
-        disabled={isSending}
-        style={({ pressed }) => [
-          styles.button,
-          (isSending || pressed) && styles.buttonPressed
-        ]}
+    <Screen edges={["top", "bottom"]}>
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        {isSending ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Send sign-in link</Text>
-        )}
-      </Pressable>
+        <View className="flex-1 justify-center px-8 gap-4">
+          <View className="gap-1">
+            <Text className="text-display font-bold text-primary">eeatly</Text>
+            <Text className="text-body text-foreground-muted">
+              Sign in with your email — no password needed.
+            </Text>
+          </View>
 
-      <Text style={styles.body}>
-        We'll email you a link. No password needed.
-      </Text>
-    </View>
+          <Input
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="email"
+            keyboardType="email-address"
+            textContentType="emailAddress"
+            placeholder="you@example.com"
+            editable={!isSending}
+            error={state.kind === "error" ? state.message : undefined}
+          />
+
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
+            loading={isSending}
+            onPress={handleSubmit}
+          >
+            Send sign-in link
+          </Button>
+
+          <Text className="text-small text-foreground-muted text-center">
+            We&apos;ll email you a link that opens directly in this app.
+          </Text>
+        </View>
+      </KeyboardAvoidingView>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    padding: 24,
-    gap: 12
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "600"
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#444",
-    marginBottom: 4
-  },
-  input: {
-    height: 48,
-    borderColor: "#ccc",
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    fontSize: 16
-  },
-  button: {
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: "#2f6f58",
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  buttonPressed: {
-    opacity: 0.85
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600"
-  },
-  body: {
-    fontSize: 13,
-    color: "#666"
-  },
-  error: {
-    color: "#b91c1c",
-    fontSize: 13
-  },
-  linkButton: {
-    marginTop: 4
-  },
-  linkText: {
-    color: "#2f6f58",
-    fontSize: 14
-  }
-});

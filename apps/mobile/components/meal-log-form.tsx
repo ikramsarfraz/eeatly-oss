@@ -3,16 +3,13 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import {
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
-  TextInput,
   View
 } from "react-native";
 import { mealLogInputSchema } from "@eeatly/api/validators/meals";
@@ -20,19 +17,22 @@ import type { MealLogInput } from "@eeatly/api/validators/meals";
 import { trpc } from "../lib/trpc";
 import { PhotoPicker } from "./photo-picker";
 import { SourceUrlInputPreview } from "./embeds/source-url-input-preview";
+import { Button, Card, CardBody, Input, ListItem } from "./ui";
 
 /**
- * Round 13 — shared meal log form. Two callers:
- *   - `/add/log` (Task 3): plain manual log, autocompletes against the
+ * Round 17 meal log form — NativeWind rebuild of the R13 form.
+ *
+ * Two callers:
+ *   - `/add/log` — plain manual log, autocompletes against the
  *     household library, no recipe preview.
- *   - `/add/ai-suggest` (Task 4): review-and-edit after the AI returns a
- *     suggestion. Recipe text + extracted ingredients show as a read-only
- *     preview block above the fields; the user can still tweak name/
- *     effort/notes/photo before saving.
+ *   - `/add/ai-suggest` — review-and-edit after the AI returns a
+ *     suggestion. Recipe text + extracted ingredients show as a
+ *     read-only preview card above the fields.
  *
  * Submit funnels through `meals.createLog` either way; the server's
- * `(householdId, normalizedName)` idempotency means typing an existing
- * name (or AI guessing one) produces a re-cook log, not a duplicate meal.
+ * `(householdId, normalizedName)` idempotency means typing an
+ * existing name (or AI guessing one) produces a re-cook log, not a
+ * duplicate meal.
  */
 
 type EffortValue = MealLogInput["effortLevel"];
@@ -44,7 +44,6 @@ const EFFORT_OPTIONS: Array<{ value: EffortValue; label: string }> = [
   { value: "high_effort", label: "High" }
 ];
 
-/** Format a Date as `YYYY-MM-DD` using local components, not UTC. */
 function formatYMD(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -85,15 +84,10 @@ function getCauseReason(error: unknown): string | null {
 }
 
 export type MealLogFormProps = {
-  /** Pre-fill any subset of fields. The AI review path fills name/effort/notes/recipeText/ingredients. */
   initialValues?: Partial<MealLogInput>;
-  /** Show a read-only preview block (recipe + ingredients) above the fields. AI flow only. */
   showRecipePreview?: boolean;
-  /** Funnel telemetry — distinguishes a fresh log from an AI-driven one. Defaults to "quick_log". */
   submitSource?: "quick_log" | "log_again";
-  /** Hide the meal-name autocomplete (AI flow already gave us a name). */
   hideAutocomplete?: boolean;
-  /** Label for the submit button. Defaults to "Save meal log". */
   submitLabel?: string;
 };
 
@@ -120,16 +114,9 @@ export function MealLogForm({
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
 
-  // Recipe / ingredients ride through invisibly when the AI prefilled
-  // them. No UI field to edit them on mobile (matches Task 3's "keep the
-  // form small" cap) — but the values still post on submit so the recipe
-  // view renders them properly.
   const recipeText = initialValues?.recipeText ?? "";
   const ingredients = initialValues?.ingredients;
 
-  // Round 16 — Source URL is now an editable field. Users paste recipe
-  // links (YouTube, TikTok, blog posts) here; the saved meal renders the
-  // embedded media or an OG preview card on the detail screen.
   const [recipeSourceUrl, setRecipeSourceUrl] = useState(
     initialValues?.recipeSourceUrl ?? ""
   );
@@ -162,7 +149,9 @@ export function MealLogForm({
     if (hideAutocomplete) return [];
     const data = searchQuery.data ?? [];
     const lower = mealName.trim().toLowerCase();
-    return data.filter((m) => m.name.trim().toLowerCase() !== lower).slice(0, 5);
+    return data
+      .filter((m) => m.name.trim().toLowerCase() !== lower)
+      .slice(0, 5);
   }, [searchQuery.data, mealName, hideAutocomplete]);
 
   const createLog = trpc.meals.createLog.useMutation({
@@ -201,7 +190,8 @@ export function MealLogForm({
       photoUrl: photoUrl ?? undefined,
       recipeText: recipeText || undefined,
       recipeSourceUrl: recipeSourceUrl.trim() || undefined,
-      ingredients: ingredients && ingredients.length > 0 ? ingredients : undefined
+      ingredients:
+        ingredients && ingredients.length > 0 ? ingredients : undefined
     };
     const parsed = mealLogInputSchema.safeParse(payload);
     if (!parsed.success) {
@@ -220,108 +210,132 @@ export function MealLogForm({
 
   return (
     <KeyboardAvoidingView
-      style={styles.flex}
+      className="flex-1"
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
     >
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerClassName="p-4 pb-12 gap-4"
         keyboardShouldPersistTaps="handled"
       >
-        {showRecipePreview && (recipeText || (ingredients?.length ?? 0) > 0) ? (
-          <View style={styles.recipePreview}>
-            <View style={styles.recipePreviewHeader}>
-              <Ionicons name="sparkles-outline" size={16} color="#2f6f58" />
-              <Text style={styles.recipePreviewTitle}>What the AI read</Text>
-            </View>
-            {ingredients && ingredients.length > 0 ? (
-              <View style={styles.ingredientsBlock}>
-                <Text style={styles.ingredientsHeading}>Ingredients</Text>
-                {ingredients.map((line, i) => (
-                  <Text key={`${line}-${i}`} style={styles.ingredientLine}>
-                    • {line}
+        {showRecipePreview &&
+        (recipeText || (ingredients?.length ?? 0) > 0) ? (
+          <Card>
+            <CardBody>
+              <View className="flex-row items-center gap-2 mb-2">
+                <Ionicons name="sparkles-outline" size={16} color="#2C5F3F" />
+                <Text className="text-caption-strong font-semibold uppercase tracking-wider text-primary">
+                  What the AI read
+                </Text>
+              </View>
+              {ingredients && ingredients.length > 0 ? (
+                <View className="gap-1 mb-3">
+                  <Text className="text-caption-strong font-semibold text-foreground">
+                    Ingredients
                   </Text>
-                ))}
-              </View>
-            ) : null}
-            {recipeText ? (
-              <View style={styles.recipeTextBlock}>
-                <Text style={styles.ingredientsHeading}>Recipe</Text>
-                <Text style={styles.recipeText}>{recipeText}</Text>
-              </View>
-            ) : null}
-            <Text style={styles.recipePreviewHint}>
-              Saved as-is when you tap save. Edit the name, photo, or effort
-              below if the AI got something off.
-            </Text>
-          </View>
+                  {ingredients.map((line, i) => (
+                    <Text
+                      key={`${line}-${i}`}
+                      className="text-caption text-foreground"
+                    >
+                      •  {line}
+                    </Text>
+                  ))}
+                </View>
+              ) : null}
+              {recipeText ? (
+                <View className="gap-1">
+                  <Text className="text-caption-strong font-semibold text-foreground">
+                    Recipe
+                  </Text>
+                  <Text className="text-caption text-foreground leading-5">
+                    {recipeText}
+                  </Text>
+                </View>
+              ) : null}
+              <Text className="text-small italic text-foreground-muted mt-3">
+                Saved as-is when you tap save. Edit the name, photo, or
+                effort below if the AI got something off.
+              </Text>
+            </CardBody>
+          </Card>
         ) : null}
 
-        <Field label="Meal name" required>
-          <TextInput
-            value={mealName}
-            onChangeText={(t) => {
-              setMealName(t);
-              setSuggestionsHidden(false);
-              if (nameError) setNameError(null);
-            }}
-            placeholder="What did you cook?"
-            placeholderTextColor="#999"
-            style={styles.input}
-            autoCapitalize="sentences"
-            autoCorrect
-            returnKeyType="next"
-            editable={!submitting}
-          />
-          {nameError ? <Text style={styles.fieldError}>{nameError}</Text> : null}
-          {suggestions.length > 0 ? (
-            <View style={styles.suggestions}>
-              {suggestions.map((s) => (
-                <Pressable
-                  key={s.id}
-                  onPress={() => handleSelectSuggestion(s.name)}
-                  style={({ pressed }) => [
-                    styles.suggestionRow,
-                    pressed && styles.suggestionPressed
-                  ]}
-                >
-                  <Ionicons name="restaurant-outline" size={16} color="#2f6f58" />
-                  <Text style={styles.suggestionText} numberOfLines={1}>
-                    {s.name}
-                  </Text>
-                  <Text style={styles.suggestionHint}>Log again</Text>
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
-        </Field>
+        <Input
+          label="Meal name"
+          value={mealName}
+          onChangeText={(t) => {
+            setMealName(t);
+            setSuggestionsHidden(false);
+            if (nameError) setNameError(null);
+          }}
+          placeholder="What did you cook?"
+          autoCapitalize="sentences"
+          autoCorrect
+          returnKeyType="next"
+          editable={!submitting}
+          error={nameError ?? undefined}
+        />
 
-        <Field label="When did you cook this?">
+        {suggestions.length > 0 ? (
+          <Card variant="outlined">
+            {suggestions.map((s, i) => (
+              <ListItem
+                key={s.id}
+                title={s.name}
+                leading={
+                  <Ionicons
+                    name="restaurant-outline"
+                    size={20}
+                    color="#2C5F3F"
+                  />
+                }
+                trailing={
+                  <Text className="text-caption-strong font-semibold text-primary">
+                    Log again
+                  </Text>
+                }
+                onPress={() => handleSelectSuggestion(s.name)}
+                divider={i < suggestions.length - 1}
+              />
+            ))}
+          </Card>
+        ) : null}
+
+        <View className="gap-1.5">
+          <Text className="text-caption-strong font-semibold text-foreground">
+            When did you cook this?
+          </Text>
           <Pressable
             onPress={() => setShowDatePicker(true)}
             disabled={submitting}
-            style={({ pressed }) => [
-              styles.input,
-              styles.dateButton,
-              pressed && styles.pressed,
-              submitting && styles.disabled
-            ]}
+            className={`flex-row items-center justify-between rounded-md border border-border bg-background-elevated px-3 h-11 active:bg-background-muted ${
+              submitting ? "opacity-50" : ""
+            }`}
           >
-            <Text style={styles.dateText}>{formatDateLabel(cookedDate)}</Text>
-            <Ionicons name="calendar-outline" size={20} color="#666" />
+            <Text className="text-body text-foreground">
+              {formatDateLabel(cookedDate)}
+            </Text>
+            <Ionicons name="calendar-outline" size={18} color="#6B7068" />
           </Pressable>
-        </Field>
+        </View>
 
-        <Field label="Photo">
+        <View className="gap-1.5">
+          <Text className="text-caption-strong font-semibold text-foreground">
+            Photo
+          </Text>
           <PhotoPicker
             value={photoUrl}
             onChange={setPhotoUrl}
             disabled={submitting}
           />
-        </Field>
+        </View>
 
-        <Field label="Effort">
-          <View style={styles.segmented}>
+        <View className="gap-1.5">
+          <Text className="text-caption-strong font-semibold text-foreground">
+            Effort
+          </Text>
+          <View className="flex-row rounded-md border border-border bg-background-elevated overflow-hidden">
             {EFFORT_OPTIONS.map((opt, idx) => {
               const active = effort === opt.value;
               return (
@@ -329,20 +343,16 @@ export function MealLogForm({
                   key={opt.value}
                   onPress={() => setEffort(opt.value)}
                   disabled={submitting}
-                  style={({ pressed }) => [
-                    styles.segment,
-                    idx > 0 && styles.segmentDivider,
-                    active && styles.segmentActive,
-                    pressed && !active && styles.segmentPressed
-                  ]}
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
+                  className={`flex-1 h-11 items-center justify-center ${
+                    idx > 0 ? "border-l border-border" : ""
+                  } ${active ? "bg-primary" : "active:bg-background-muted"}`}
                 >
                   <Text
-                    style={[
-                      styles.segmentLabel,
-                      active && styles.segmentLabelActive
-                    ]}
+                    className={`text-caption-strong font-semibold ${
+                      active ? "text-primary-foreground" : "text-foreground"
+                    }`}
                   >
                     {opt.label}
                   </Text>
@@ -350,59 +360,46 @@ export function MealLogForm({
               );
             })}
           </View>
-        </Field>
+        </View>
 
-        <Field label="Notes" hint="What worked, what to change next time. Optional.">
-          <TextInput
-            value={notes}
-            onChangeText={setNotes}
-            placeholder="Doubled the garlic, used chicken stock instead of water…"
-            placeholderTextColor="#999"
-            multiline
-            numberOfLines={4}
-            maxLength={1000}
-            textAlignVertical="top"
-            style={[styles.input, styles.notesInput]}
-            editable={!submitting}
-          />
-        </Field>
+        <Input
+          label="Notes"
+          helper="What worked, what to change next time. Optional."
+          value={notes}
+          onChangeText={setNotes}
+          placeholder="Doubled the garlic, used chicken stock instead of water…"
+          multiline
+          maxLength={1000}
+          editable={!submitting}
+        />
 
-        <Field
-          label="Source URL"
-          hint="YouTube, TikTok, Pinterest, or any recipe link. Optional."
-        >
-          <TextInput
+        <View className="gap-1.5">
+          <Input
+            label="Source URL"
+            helper="YouTube, TikTok, Pinterest, or any recipe link. Optional."
             value={recipeSourceUrl}
             onChangeText={setRecipeSourceUrl}
             placeholder="https://youtube.com/…"
-            placeholderTextColor="#999"
             autoCapitalize="none"
             autoCorrect={false}
             autoComplete="url"
             keyboardType="url"
             textContentType="URL"
-            style={styles.input}
             editable={!submitting}
           />
           <SourceUrlInputPreview url={recipeSourceUrl} />
-        </Field>
+        </View>
 
-        <Pressable
-          onPress={handleSubmit}
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
+          loading={submitting}
           disabled={!canSubmit}
-          style={({ pressed }) => [
-            styles.submitButton,
-            !canSubmit && styles.submitDisabled,
-            pressed && canSubmit && styles.submitPressed
-          ]}
-          accessibilityRole="button"
+          onPress={handleSubmit}
         >
-          {submitting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.submitText}>{submitLabel}</Text>
-          )}
-        </Pressable>
+          {submitLabel}
+        </Button>
       </ScrollView>
 
       {showDatePicker ? (
@@ -419,33 +416,6 @@ export function MealLogForm({
   );
 }
 
-function Field({
-  label,
-  hint,
-  required,
-  children
-}: {
-  label: string;
-  hint?: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <View style={styles.field}>
-      <Text style={styles.label}>
-        {label}
-        {required ? <Text style={styles.required}> *</Text> : null}
-      </Text>
-      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
-      {children}
-    </View>
-  );
-}
-
-/**
- * Native date picker wrapped in a bottom sheet so Android (modal dialog)
- * and iOS (inline spinner) both feel platform-native.
- */
 function DatePickerSheet({
   value,
   onConfirm,
@@ -480,15 +450,23 @@ function DatePickerSheet({
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable style={styles.backdrop} onPress={onCancel}>
-        <Pressable style={styles.sheet} onPress={() => null}>
-          <View style={styles.sheetHeader}>
+      <Pressable
+        className="flex-1 bg-foreground/40 justify-end"
+        onPress={onCancel}
+      >
+        <Pressable
+          onPress={() => null}
+          className="bg-background-elevated rounded-t-lg pb-6"
+        >
+          <View className="flex-row items-center justify-between px-4 py-3 border-b border-border">
             <Pressable onPress={onCancel} hitSlop={12}>
-              <Text style={styles.sheetCancel}>Cancel</Text>
+              <Text className="text-body text-foreground-muted">Cancel</Text>
             </Pressable>
-            <Text style={styles.sheetTitle}>When did you cook this?</Text>
+            <Text className="text-caption-strong font-semibold text-foreground">
+              When did you cook this?
+            </Text>
             <Pressable onPress={() => onConfirm(formatYMD(draft))} hitSlop={12}>
-              <Text style={styles.sheetDone}>Done</Text>
+              <Text className="text-body font-semibold text-primary">Done</Text>
             </Pressable>
           </View>
           <DateTimePicker
@@ -499,185 +477,10 @@ function DatePickerSheet({
             onChange={(_, next) => {
               if (next) setDraft(next);
             }}
-            style={styles.iosPicker}
+            style={{ alignSelf: "stretch" }}
           />
         </Pressable>
       </Pressable>
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  scroll: {
-    padding: 16,
-    gap: 16,
-    paddingBottom: 48
-  },
-  field: { gap: 6 },
-  label: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#333",
-    letterSpacing: 0.2
-  },
-  required: { color: "#b91c1c" },
-  hint: { fontSize: 12, color: "#777", marginBottom: 2 },
-  input: {
-    minHeight: 48,
-    borderColor: "#d4d2cb",
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    backgroundColor: "#fff",
-    color: "#111"
-  },
-  notesInput: {
-    minHeight: 96
-  },
-  fieldError: { color: "#b91c1c", fontSize: 12 },
-  suggestions: {
-    marginTop: 6,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#e5e3dc",
-    borderRadius: 10,
-    backgroundColor: "#fff",
-    overflow: "hidden"
-  },
-  suggestionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    minHeight: 44
-  },
-  suggestionPressed: { backgroundColor: "#f3f1ea" },
-  suggestionText: { flex: 1, fontSize: 15, color: "#111" },
-  suggestionHint: { fontSize: 11, color: "#2f6f58", fontWeight: "500" },
-  dateButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 12
-  },
-  dateText: { fontSize: 16, color: "#111" },
-  pressed: { opacity: 0.85 },
-  disabled: { opacity: 0.55 },
-  segmented: {
-    flexDirection: "row",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#d4d2cb",
-    overflow: "hidden",
-    backgroundColor: "#fff"
-  },
-  segment: {
-    flex: 1,
-    minHeight: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10
-  },
-  segmentDivider: {
-    borderLeftWidth: StyleSheet.hairlineWidth,
-    borderColor: "#d4d2cb"
-  },
-  segmentActive: {
-    backgroundColor: "#2f6f58"
-  },
-  segmentPressed: {
-    backgroundColor: "#eef2ef"
-  },
-  segmentLabel: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#333"
-  },
-  segmentLabelActive: {
-    color: "#fff"
-  },
-  submitButton: {
-    marginTop: 8,
-    minHeight: 52,
-    borderRadius: 12,
-    backgroundColor: "#2f6f58",
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  submitPressed: { opacity: 0.85 },
-  submitDisabled: { backgroundColor: "#a7c6b8" },
-  submitText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600"
-  },
-  recipePreview: {
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: "#eef5f1",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#cfe1d7",
-    gap: 10
-  },
-  recipePreviewHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6
-  },
-  recipePreviewTitle: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#2f6f58",
-    letterSpacing: 0.3,
-    textTransform: "uppercase"
-  },
-  ingredientsBlock: { gap: 2 },
-  recipeTextBlock: { gap: 2 },
-  ingredientsHeading: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#444"
-  },
-  ingredientLine: {
-    fontSize: 13,
-    color: "#222",
-    lineHeight: 18
-  },
-  recipeText: {
-    fontSize: 13,
-    color: "#222",
-    lineHeight: 19
-  },
-  recipePreviewHint: {
-    fontSize: 12,
-    color: "#557",
-    fontStyle: "italic"
-  },
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "flex-end"
-  },
-  sheet: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingBottom: 24
-  },
-  sheetHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: "#e5e3dc"
-  },
-  sheetTitle: { fontSize: 14, fontWeight: "600", color: "#111" },
-  sheetCancel: { fontSize: 15, color: "#666" },
-  sheetDone: { fontSize: 15, color: "#2f6f58", fontWeight: "600" },
-  iosPicker: { alignSelf: "stretch" }
-});

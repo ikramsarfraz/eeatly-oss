@@ -7,32 +7,30 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   View
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { authClient } from "../../../lib/auth/client";
 import { trpc } from "../../../lib/trpc";
+import {
+  Avatar,
+  Button,
+  Card,
+  ErrorScreen,
+  LoadingScreen,
+  Screen,
+  SectionHeader,
+  Tag
+} from "../../../components/ui";
 
 /**
- * Round 14 Task 5 — household management screen.
+ * Round 17 household — NativeWind rebuild.
  *
- * Surfaces:
- *   - Kitchen name + member count
- *   - Members list with owner badge + join date
- *   - Pending invitations (owner-only) with per-row Cancel
- *   - "Invite someone" CTA (visible only to the owner)
+ * Kitchen header card → invite button (owner only) → members list →
+ * pending invitations list (owner only) → leave kitchen button.
  *
- * Auth nuance: `households.pendingInvitations` is `householdOwnerProcedure`,
- * so a non-owner gets `NOT_HOUSEHOLD_OWNER`. We probe the user's role
- * from `households.current` and only enable the pending-invites query
- * + invite CTA when they're owner. Non-owners see members only.
- *
- * `households.leaveHousehold` doesn't exist yet (see Round 14 follow-up
- * notes). The "Leave kitchen" affordance is therefore intentionally
- * omitted on mobile this round — implementing it would require a backend
- * procedure, which R14 disallowed. Logged as an R14.5 follow-up.
+ * Member rows use the Avatar primitive with deterministic colors so
+ * each household member is visually distinguishable.
  */
 
 function getCauseReason(error: unknown): string | null {
@@ -49,6 +47,15 @@ function formatJoined(d: string | Date): string {
     day: "numeric",
     year: "numeric"
   });
+}
+
+function initialsFor(name: string, email: string): string {
+  const source = name.trim() || email.trim();
+  const parts = source.split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return source.slice(0, 2).toUpperCase();
 }
 
 export default function HouseholdScreen() {
@@ -79,8 +86,6 @@ export default function HouseholdScreen() {
   const isOwner =
     !!currentUserId && !!ownerRow && ownerRow.userId === currentUserId;
 
-  // Pending invites — only request when owner; otherwise the procedure
-  // would 403 (FORBIDDEN_ROLE) and we'd surface a confusing error.
   const pending = trpc.households.pendingInvitations.useQuery(undefined, {
     enabled: isOwner,
     staleTime: 30_000
@@ -112,9 +117,6 @@ export default function HouseholdScreen() {
 
   const leaveMutation = trpc.households.leaveHousehold.useMutation({
     onSuccess: async (result) => {
-      // Invalidate every query that depends on the current household so
-      // the next sign-in lands in the fresh personal kitchen
-      // ensureHouseholdForUser will seed on next session.
       await Promise.all([
         utils.households.current.invalidate(),
         utils.dashboard.meals.invalidate(),
@@ -124,12 +126,7 @@ export default function HouseholdScreen() {
       Alert.alert(
         "Left the kitchen",
         `You're no longer a member of ${result.householdName}. Your recipes stay credited to you as "Former member."`,
-        [
-          {
-            text: "OK",
-            onPress: () => router.replace("/(authed)/home")
-          }
-        ]
+        [{ text: "OK", onPress: () => router.replace("/(authed)/home") }]
       );
     },
     onError: (error) => {
@@ -190,85 +187,137 @@ export default function HouseholdScreen() {
     );
   }
 
+  if (current.isPending) {
+    return (
+      <>
+        <Stack.Screen
+          options={{
+            title: "Kitchen",
+            headerBackTitle: "Back",
+            headerStyle: { backgroundColor: "#FBF8F1" },
+            headerTintColor: "#1A1F1B"
+          }}
+        />
+        <LoadingScreen />
+      </>
+    );
+  }
+
+  if (!household) {
+    return (
+      <>
+        <Stack.Screen
+          options={{
+            title: "Kitchen",
+            headerBackTitle: "Back",
+            headerStyle: { backgroundColor: "#FBF8F1" },
+            headerTintColor: "#1A1F1B"
+          }}
+        />
+        <ErrorScreen
+          title="Kitchen not loaded"
+          body="Try again or head back to home."
+        />
+      </>
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <Stack.Screen options={{ title: "Kitchen", headerBackTitle: "Back" }} />
-
-      {current.isPending ? (
-        <View style={styles.center}>
-          <ActivityIndicator color="#2f6f58" />
-        </View>
-      ) : !household ? (
-        <View style={styles.center}>
-          <Text style={styles.emptyTitle}>Kitchen not loaded</Text>
-          <Pressable
-            onPress={() => router.replace("/(authed)/home")}
-            style={({ pressed }) => [styles.linkButton, pressed && styles.pressed]}
-          >
-            <Text style={styles.linkText}>Back to home</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          refreshControl={
-            <RefreshControl
-              refreshing={current.isFetching && !current.isPending}
-              onRefresh={() => {
-                current.refetch();
-                if (isOwner) pending.refetch();
-              }}
-              tintColor="#2f6f58"
-            />
-          }
-        >
-          <View style={styles.headerBlock}>
-            <Text style={styles.kitchenName}>{household.name}</Text>
-            <Text style={styles.kitchenMeta}>
-              {household.memberCount === 1
-                ? "Just you for now"
-                : `${household.memberCount} members`}
-            </Text>
-          </View>
-
+    <Screen edges={["bottom"]}>
+      <Stack.Screen
+        options={{
+          title: "Kitchen",
+          headerBackTitle: "Back",
+          headerStyle: { backgroundColor: "#FBF8F1" },
+          headerTintColor: "#1A1F1B",
+          headerTitleStyle: { fontWeight: "600" }
+        }}
+      />
+      <ScrollView
+        contentContainerClassName="pb-12"
+        refreshControl={
+          <RefreshControl
+            refreshing={current.isFetching && !current.isPending}
+            onRefresh={() => {
+              current.refetch();
+              if (isOwner) pending.refetch();
+            }}
+            tintColor="#2C5F3F"
+          />
+        }
+      >
+        <View className="px-4 pt-4 gap-2">
+          <Text className="text-heading-1 font-bold text-foreground">
+            {household.name}
+          </Text>
+          <Text className="text-caption text-foreground-muted">
+            {household.memberCount === 1
+              ? "Just you for now"
+              : `${household.memberCount} members`}
+          </Text>
           {isOwner ? (
-            <Link href="/(authed)/household/invite" asChild>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.inviteButton,
-                  pressed && styles.pressed
-                ]}
-                accessibilityRole="button"
-              >
-                <Ionicons name="person-add-outline" size={18} color="#fff" />
-                <Text style={styles.inviteButtonText}>Invite someone</Text>
-              </Pressable>
-            </Link>
+            <View className="mt-2">
+              <Link href="/(authed)/household/invite" asChild>
+                <Pressable>
+                  <Button
+                    variant="primary"
+                    size="md"
+                    leadingIcon={
+                      <Ionicons
+                        name="person-add-outline"
+                        size={18}
+                        color="#FBF8F1"
+                      />
+                    }
+                  >
+                    Invite someone
+                  </Button>
+                </Pressable>
+              </Link>
+            </View>
           ) : null}
+        </View>
 
-          <Text style={styles.sectionHeading}>Members</Text>
-          <View style={styles.list}>
-            {members.map((m) => {
+        <SectionHeader title="Members" />
+        <View className="px-4">
+          <Card>
+            {members.map((m, i) => {
               const isMe = currentUserId === m.userId;
-              const canRemove =
-                isOwner && !isMe && m.role !== "owner";
+              const canRemove = isOwner && !isMe && m.role !== "owner";
               return (
-                <View key={m.userId} style={styles.row}>
-                  <View style={styles.rowBody}>
-                    <Text style={styles.memberName} numberOfLines={1}>
+                <View
+                  key={m.userId}
+                  className={`flex-row items-start gap-3 p-3.5 ${
+                    i < members.length - 1 ? "border-b border-border" : ""
+                  }`}
+                >
+                  <Avatar
+                    size="md"
+                    initials={initialsFor(m.name, m.email)}
+                  />
+                  <View className="flex-1 gap-0.5">
+                    <Text
+                      className="text-body font-semibold text-foreground"
+                      numberOfLines={1}
+                    >
                       {m.name}
-                      {isMe ? <Text style={styles.youTag}> (you)</Text> : null}
+                      {isMe ? (
+                        <Text className="text-caption text-foreground-muted font-normal">
+                          {"  "}(you)
+                        </Text>
+                      ) : null}
                     </Text>
-                    <Text style={styles.memberEmail} numberOfLines={1}>
+                    <Text
+                      className="text-caption text-foreground-muted"
+                      numberOfLines={1}
+                    >
                       {m.email}
                     </Text>
-                    <View style={styles.metaLine}>
+                    <View className="flex-row items-center flex-wrap gap-1.5 mt-1">
                       {m.role === "owner" ? (
-                        <View style={styles.ownerBadge}>
-                          <Text style={styles.ownerBadgeText}>Owner</Text>
-                        </View>
+                        <Tag variant="primary">Owner</Tag>
                       ) : null}
-                      <Text style={styles.joinedText}>
+                      <Text className="text-small text-foreground-subtle">
                         Joined {formatJoined(m.joinedAt)}
                       </Text>
                     </View>
@@ -278,36 +327,48 @@ export default function HouseholdScreen() {
                       onPress={() => confirmRemove(m.userId, m.name)}
                       hitSlop={6}
                       disabled={removeMutation.isPending}
-                      style={({ pressed }) => [
-                        styles.removeButton,
-                        pressed && styles.pressed,
-                        removeMutation.isPending && styles.disabled
-                      ]}
+                      className={`px-3 py-2 rounded-sm border border-destructive/30 bg-destructive/10 active:opacity-70 ${
+                        removeMutation.isPending ? "opacity-50" : ""
+                      }`}
                       accessibilityRole="button"
                       accessibilityLabel={`Remove ${m.name}`}
                     >
-                      <Text style={styles.removeText}>Remove</Text>
+                      <Text className="text-caption-strong font-semibold text-destructive">
+                        Remove
+                      </Text>
                     </Pressable>
                   ) : null}
                 </View>
               );
             })}
-          </View>
+          </Card>
+        </View>
 
-          {isOwner ? (
-            <>
-              <Text style={styles.sectionHeading}>Pending invitations</Text>
+        {isOwner ? (
+          <>
+            <SectionHeader title="Pending invitations" />
+            <View className="px-4">
               {pending.isPending ? (
-                <ActivityIndicator color="#2f6f58" />
+                <ActivityIndicator color="#2C5F3F" />
               ) : pending.data && pending.data.length > 0 ? (
-                <View style={styles.list}>
-                  {pending.data.map((p) => (
-                    <View key={p.id} style={styles.row}>
-                      <View style={styles.rowBody}>
-                        <Text style={styles.memberEmail} numberOfLines={1}>
+                <Card>
+                  {pending.data.map((p, i) => (
+                    <View
+                      key={p.id}
+                      className={`flex-row items-center gap-3 p-3.5 ${
+                        i < (pending.data?.length ?? 0) - 1
+                          ? "border-b border-border"
+                          : ""
+                      }`}
+                    >
+                      <View className="flex-1 gap-0.5">
+                        <Text
+                          className="text-body text-foreground"
+                          numberOfLines={1}
+                        >
                           {p.email}
                         </Text>
-                        <Text style={styles.joinedText}>
+                        <Text className="text-small text-foreground-muted">
                           Sent {formatJoined(p.createdAt)} · expires{" "}
                           {formatJoined(p.expiresAt)}
                         </Text>
@@ -316,179 +377,47 @@ export default function HouseholdScreen() {
                         onPress={() => confirmCancel(p.id, p.email)}
                         hitSlop={6}
                         disabled={cancelMutation.isPending}
-                        style={({ pressed }) => [
-                          styles.removeButton,
-                          pressed && styles.pressed,
-                          cancelMutation.isPending && styles.disabled
-                        ]}
+                        className={`px-3 py-2 rounded-sm border border-destructive/30 bg-destructive/10 active:opacity-70 ${
+                          cancelMutation.isPending ? "opacity-50" : ""
+                        }`}
                         accessibilityRole="button"
                       >
-                        <Text style={styles.removeText}>Cancel</Text>
+                        <Text className="text-caption-strong font-semibold text-destructive">
+                          Cancel
+                        </Text>
                       </Pressable>
                     </View>
                   ))}
-                </View>
+                </Card>
               ) : (
-                <Text style={styles.emptyText}>
+                <Text className="text-caption italic text-foreground-muted px-1">
                   No pending invitations.
                 </Text>
               )}
-            </>
-          ) : null}
+            </View>
+          </>
+        ) : null}
 
-          <View style={styles.footerSpace}>
-            <Pressable
-              onPress={() => confirmLeave(household.name)}
-              disabled={leaveMutation.isPending}
-              style={({ pressed }) => [
-                styles.leaveButton,
-                leaveMutation.isPending && styles.disabled,
-                pressed && !leaveMutation.isPending && styles.pressed
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel={`Leave ${household.name}`}
-            >
-              <Text style={styles.leaveText}>
-                {leaveMutation.isPending ? "Leaving…" : "Leave kitchen"}
-              </Text>
-            </Pressable>
-            <Text style={styles.fineprint}>
-              Your recipes stay credited to you. You'll land in a fresh
-              personal kitchen.
+        <View className="mt-8 px-8 items-center gap-2">
+          <Pressable
+            onPress={() => confirmLeave(household.name)}
+            disabled={leaveMutation.isPending}
+            accessibilityRole="button"
+            accessibilityLabel={`Leave ${household.name}`}
+            className={`min-h-[44px] px-4 py-2.5 rounded-sm border border-destructive/30 bg-destructive/10 active:opacity-70 ${
+              leaveMutation.isPending ? "opacity-50" : ""
+            }`}
+          >
+            <Text className="text-caption-strong font-semibold text-destructive">
+              {leaveMutation.isPending ? "Leaving…" : "Leave kitchen"}
             </Text>
-          </View>
-        </ScrollView>
-      )}
-    </SafeAreaView>
+          </Pressable>
+          <Text className="text-small text-foreground-muted text-center max-w-[280px]">
+            Your recipes stay credited to you. You&apos;ll land in a fresh
+            personal kitchen.
+          </Text>
+        </View>
+      </ScrollView>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fdfdfa" },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-    gap: 8
-  },
-  scroll: {
-    padding: 16,
-    paddingBottom: 48,
-    gap: 14
-  },
-  headerBlock: { gap: 4, paddingBottom: 4 },
-  kitchenName: { fontSize: 24, fontWeight: "600", color: "#111" },
-  kitchenMeta: { fontSize: 13, color: "#666" },
-  inviteButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    minHeight: 48,
-    borderRadius: 10,
-    backgroundColor: "#2f6f58"
-  },
-  inviteButtonText: { color: "#fff", fontSize: 15, fontWeight: "600" },
-  sectionHeading: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#666",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-    marginTop: 6
-  },
-  list: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#e5e3dc"
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    minHeight: 72,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: "#e5e3dc"
-  },
-  rowBody: { flex: 1, gap: 3 },
-  memberName: { fontSize: 15, fontWeight: "500", color: "#111" },
-  memberEmail: { fontSize: 13, color: "#555" },
-  metaLine: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    flexWrap: "wrap",
-    marginTop: 2
-  },
-  joinedText: { fontSize: 11, color: "#888" },
-  ownerBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    backgroundColor: "#eef5f1",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#cfe1d7"
-  },
-  ownerBadgeText: {
-    fontSize: 10.5,
-    color: "#1f4a3b",
-    fontWeight: "600",
-    letterSpacing: 0.4
-  },
-  youTag: { fontSize: 13, color: "#888", fontWeight: "400" },
-  removeButton: {
-    minHeight: 36,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#f0c5c2",
-    backgroundColor: "#fdecea"
-  },
-  removeText: { color: "#b91c1c", fontSize: 13, fontWeight: "500" },
-  emptyText: {
-    fontSize: 13,
-    color: "#888",
-    fontStyle: "italic",
-    paddingVertical: 8
-  },
-  pressed: { opacity: 0.85 },
-  disabled: { opacity: 0.55 },
-  emptyTitle: { fontSize: 18, fontWeight: "600", color: "#111" },
-  linkButton: {
-    marginTop: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10
-  },
-  linkText: { color: "#2f6f58", fontSize: 14, fontWeight: "500" },
-  footerSpace: {
-    marginTop: 20,
-    paddingHorizontal: 4,
-    alignItems: "center",
-    gap: 8
-  },
-  leaveButton: {
-    minHeight: 44,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#f0c5c2",
-    backgroundColor: "#fdecea"
-  },
-  leaveText: {
-    color: "#b91c1c",
-    fontSize: 14,
-    fontWeight: "500"
-  },
-  fineprint: {
-    fontSize: 12,
-    color: "#888",
-    textAlign: "center",
-    lineHeight: 17
-  }
-});

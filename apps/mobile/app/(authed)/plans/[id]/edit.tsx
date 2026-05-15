@@ -3,29 +3,27 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import {
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
-  TextInput,
   View
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { updatePlanSchema } from "@eeatly/api/validators/plans";
 import { trpc } from "../../../../lib/trpc";
+import {
+  Button,
+  Input,
+  LoadingScreen,
+  Screen
+} from "../../../../components/ui";
 
 /**
- * Round 14 Task 2 — edit plan metadata (name + scheduled date only).
- * Dish editing happens on the plan detail page.
- *
- * Form lives behind a save button rather than per-field auto-save —
- * fewer round trips for metadata edits which are infrequent and worth
- * confirming explicitly.
+ * Round 17 edit-plan — NativeWind rebuild. Metadata only (name +
+ * scheduled date); dish editing happens on the plan detail page.
  */
 
 function formatYMD(date: Date): string {
@@ -77,8 +75,7 @@ export default function EditPlanScreen() {
       ]);
       router.back();
     },
-    onError: (e) =>
-      Alert.alert("Couldn't save", e.message || "Try again.")
+    onError: (e) => Alert.alert("Couldn't save", e.message || "Try again.")
   });
 
   function handleSubmit() {
@@ -102,79 +99,85 @@ export default function EditPlanScreen() {
   const loading = planQuery.isPending;
   const canSubmit = name.trim().length > 0 && !submitting;
 
+  if (loading) {
+    return (
+      <>
+        <Stack.Screen
+          options={{
+            title: "Edit plan",
+            headerBackTitle: "Back",
+            headerStyle: { backgroundColor: "#FBF8F1" },
+            headerTintColor: "#1A1F1B"
+          }}
+        />
+        <LoadingScreen />
+      </>
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <Stack.Screen options={{ title: "Edit plan", headerBackTitle: "Back" }} />
+    <Screen edges={["bottom"]}>
+      <Stack.Screen
+        options={{
+          title: "Edit plan",
+          headerBackTitle: "Back",
+          headerStyle: { backgroundColor: "#FBF8F1" },
+          headerTintColor: "#1A1F1B",
+          headerTitleStyle: { fontWeight: "600" }
+        }}
+      />
       <KeyboardAvoidingView
-        style={styles.flex}
+        className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
       >
-        {loading ? (
-          <View style={styles.center}>
-            <ActivityIndicator color="#2f6f58" />
-          </View>
-        ) : (
-          <ScrollView
-            contentContainerStyle={styles.scroll}
-            keyboardShouldPersistTaps="handled"
-          >
-            <View style={styles.field}>
-              <Text style={styles.label}>
-                Plan name <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                value={name}
-                onChangeText={(t) => {
-                  setName(t);
-                  if (nameError) setNameError(null);
-                }}
-                style={styles.input}
-                autoCapitalize="sentences"
-                autoCorrect
-                maxLength={80}
-                editable={!submitting}
-              />
-              {nameError ? <Text style={styles.error}>{nameError}</Text> : null}
-            </View>
+        <ScrollView
+          contentContainerClassName="p-4 pb-12 gap-4"
+          keyboardShouldPersistTaps="handled"
+        >
+          <Input
+            label="Plan name"
+            value={name}
+            onChangeText={(t) => {
+              setName(t);
+              if (nameError) setNameError(null);
+            }}
+            autoCapitalize="sentences"
+            autoCorrect
+            maxLength={80}
+            editable={!submitting}
+            error={nameError ?? undefined}
+          />
 
-            <View style={styles.field}>
-              <Text style={styles.label}>Planned date</Text>
-              <Pressable
-                onPress={() => setShowDatePicker(true)}
-                disabled={submitting}
-                style={({ pressed }) => [
-                  styles.input,
-                  styles.dateButton,
-                  pressed && styles.pressed,
-                  submitting && styles.disabled
-                ]}
-              >
-                <Text style={styles.dateText}>
-                  {formatDateLabel(scheduledDate)}
-                </Text>
-                <Ionicons name="calendar-outline" size={20} color="#666" />
-              </Pressable>
-            </View>
-
+          <View className="gap-1.5">
+            <Text className="text-caption-strong font-semibold text-foreground">
+              Planned date
+            </Text>
             <Pressable
-              onPress={handleSubmit}
-              disabled={!canSubmit}
-              style={({ pressed }) => [
-                styles.submit,
-                !canSubmit && styles.submitDisabled,
-                pressed && canSubmit && styles.pressed
-              ]}
-              accessibilityRole="button"
+              onPress={() => setShowDatePicker(true)}
+              disabled={submitting}
+              className={`flex-row items-center justify-between rounded-md border border-border bg-background-elevated px-3 h-11 active:bg-background-muted ${
+                submitting ? "opacity-50" : ""
+              }`}
             >
-              {submitting ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.submitText}>Save changes</Text>
-              )}
+              <Text className="text-body text-foreground">
+                {formatDateLabel(scheduledDate)}
+              </Text>
+              <Ionicons name="calendar-outline" size={18} color="#6B7068" />
             </Pressable>
-          </ScrollView>
-        )}
+          </View>
+
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
+            loading={submitting}
+            disabled={!canSubmit}
+            onPress={handleSubmit}
+          >
+            Save changes
+          </Button>
+        </ScrollView>
       </KeyboardAvoidingView>
 
       {showDatePicker ? (
@@ -187,7 +190,7 @@ export default function EditPlanScreen() {
           onCancel={() => setShowDatePicker(false)}
         />
       ) : null}
-    </SafeAreaView>
+    </Screen>
   );
 }
 
@@ -221,15 +224,23 @@ function DatePickerSheet({
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable style={styles.sheetBackdrop} onPress={onCancel}>
-        <Pressable style={styles.sheet} onPress={() => null}>
-          <View style={styles.sheetHeader}>
+      <Pressable
+        className="flex-1 bg-foreground/40 justify-end"
+        onPress={onCancel}
+      >
+        <Pressable
+          onPress={() => null}
+          className="bg-background-elevated rounded-t-lg pb-6"
+        >
+          <View className="flex-row items-center justify-between px-4 py-3 border-b border-border">
             <Pressable onPress={onCancel} hitSlop={12}>
-              <Text style={styles.sheetCancel}>Cancel</Text>
+              <Text className="text-body text-foreground-muted">Cancel</Text>
             </Pressable>
-            <Text style={styles.sheetTitle}>Plan date</Text>
+            <Text className="text-caption-strong font-semibold text-foreground">
+              Plan date
+            </Text>
             <Pressable onPress={() => onConfirm(formatYMD(draft))} hitSlop={12}>
-              <Text style={styles.sheetDone}>Done</Text>
+              <Text className="text-body font-semibold text-primary">Done</Text>
             </Pressable>
           </View>
           <DateTimePicker
@@ -239,92 +250,10 @@ function DatePickerSheet({
             onChange={(_, next) => {
               if (next) setDraft(next);
             }}
-            style={styles.iosPicker}
+            style={{ alignSelf: "stretch" }}
           />
         </Pressable>
       </Pressable>
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fdfdfa" },
-  flex: { flex: 1 },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  scroll: {
-    padding: 16,
-    gap: 16,
-    paddingBottom: 48
-  },
-  field: { gap: 6 },
-  label: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#333",
-    letterSpacing: 0.2
-  },
-  required: { color: "#b91c1c" },
-  input: {
-    minHeight: 48,
-    borderColor: "#d4d2cb",
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    backgroundColor: "#fff",
-    color: "#111"
-  },
-  dateButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 12
-  },
-  dateText: { fontSize: 16, color: "#111" },
-  pressed: { opacity: 0.85 },
-  disabled: { opacity: 0.55 },
-  error: { color: "#b91c1c", fontSize: 12 },
-  submit: {
-    marginTop: 8,
-    minHeight: 52,
-    borderRadius: 12,
-    backgroundColor: "#2f6f58",
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  submitDisabled: { backgroundColor: "#a7c6b8" },
-  submitText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600"
-  },
-  sheetBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "flex-end"
-  },
-  sheet: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingBottom: 24
-  },
-  sheetHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: "#e5e3dc"
-  },
-  sheetTitle: { fontSize: 14, fontWeight: "600", color: "#111" },
-  sheetCancel: { fontSize: 15, color: "#666" },
-  sheetDone: { fontSize: 15, color: "#2f6f58", fontWeight: "600" },
-  iosPicker: { alignSelf: "stretch" }
-});

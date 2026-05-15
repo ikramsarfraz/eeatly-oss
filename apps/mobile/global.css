@@ -1,0 +1,9 @@
+/* Round 17 — Tailwind directives consumed by NativeWind's Metro
+ * transform. NativeWind generates a virtual stylesheet at build time
+ * from these directives + the tokens in `tailwind.config.js`, then
+ * `react-native-css-interop` hydrates it at runtime. Imported once
+ * from `app/_layout.tsx`. */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

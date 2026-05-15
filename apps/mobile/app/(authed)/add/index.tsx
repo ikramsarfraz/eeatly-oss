@@ -1,91 +1,138 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Link } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import { Card, Screen, SectionHeader } from "../../../components/ui";
 
 /**
- * Round 15 — Add tab entry. Two cards: manual logging + AI capture.
+ * Round 17 — Add tab entry.
  *
- * The AI capture card routes to a unified screen where the user picks
- * from three input modes (Photo / Text / Voice) via an in-screen tab
- * strip. R16 dropped the original YouTube mode in favor of saving
- * video sources as `recipeSourceUrl` on the meal log form, then
- * rendering platform-native embeds on the recipe view.
+ * Three large interactive cards, each with icon + title + subtitle:
+ *   1. Log a meal I cooked — manual entry (the everyday path).
+ *   2. Capture with AI — opens the unified AI screen
+ *      (Photo / Text / Voice modes).
+ *   3. Save a link — placeholder for the R16 URL-references flow.
+ *      Today it routes to the manual log form with a URL field
+ *      focused; a future round can give it its own screen.
  *
- * Cards are full-width pressables (≥80px tall) so thumb taps land
- * easily even with wet kitchen hands.
+ * Cards are full-width pressables (≥96 px tall), 20 px internal
+ * padding so each option feels generous on a phone. Tap targets
+ * exceed the iOS HIG 44 pt minimum by a margin.
  */
 export default function AddTab() {
   return (
-    <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.heading}>Add a meal</Text>
-        <Text style={styles.body}>
-          Quick log if you know what you cooked, or let AI extract a
-          recipe from a photo, voice note, or pasted text.
-        </Text>
+    <Screen edges={["bottom"]}>
+      <ScrollView contentContainerClassName="px-4 pb-12">
+        <View className="pt-2 pb-2">
+          <Text className="text-heading-1 font-bold text-foreground">
+            Add a meal
+          </Text>
+          <Text className="text-body text-foreground-muted mt-1">
+            Quick log if you know what you cooked, or let AI extract a recipe
+            from a photo, voice note, or pasted text.
+          </Text>
+        </View>
 
-        <Card
-          href="/(authed)/add/log"
-          title="Log a meal I cooked"
-          subtitle="Name, when, optional photo + notes."
-          icon="restaurant-outline"
-          primary
-        />
+        <View className="gap-3 mt-4">
+          <AddOption
+            href="/(authed)/add/log"
+            icon="restaurant-outline"
+            title="Log a meal I cooked"
+            subtitle="Name, when, optional photo + notes."
+            primary
+          />
+          <AddOption
+            href="/(authed)/add/ai-suggest"
+            icon="sparkles-outline"
+            title="Capture with AI"
+            subtitle="Photo, voice note, or pasted text."
+          />
+          <AddOption
+            href="/(authed)/add/log"
+            icon="link-outline"
+            title="Save a link"
+            subtitle="YouTube, TikTok, Pinterest, or a recipe URL."
+          />
+        </View>
 
-        <Card
-          href="/(authed)/add/ai-suggest"
-          title="Capture with AI"
-          subtitle="Photo, voice note, or pasted text."
-          icon="sparkles-outline"
-        />
+        <SectionHeader title="Plans" />
+        <Link href="/(authed)/plans" asChild>
+          <Pressable>
+            <Card variant="interactive">
+              <View className="flex-row items-center gap-3 p-4">
+                <View className="h-11 w-11 items-center justify-center rounded-full bg-primary-muted">
+                  <Ionicons
+                    name="calendar-outline"
+                    size={22}
+                    color="#2C5F3F"
+                  />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-body font-semibold text-foreground">
+                    Plan an occasion menu
+                  </Text>
+                  <Text className="text-caption text-foreground-muted">
+                    Eid, Diwali, dinner party.
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#9A968A" />
+              </View>
+            </Card>
+          </Pressable>
+        </Link>
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
-function Card({
+function AddOption({
   href,
+  icon,
   title,
   subtitle,
-  icon,
   primary
 }: {
   href: string;
+  icon: keyof typeof Ionicons.glyphMap;
   title: string;
   subtitle: string;
-  icon: keyof typeof Ionicons.glyphMap;
   primary?: boolean;
 }) {
   return (
     <Link href={href as never} asChild>
       <Pressable
         accessibilityRole="button"
-        style={({ pressed }) => [
-          styles.card,
-          primary && styles.cardPrimary,
-          pressed && styles.cardPressed
-        ]}
+        accessibilityLabel={`${title}. ${subtitle}`}
+        className={`flex-row items-center gap-4 rounded-md p-5 min-h-[96px] shadow-sm active:opacity-90 ${
+          primary
+            ? "bg-primary"
+            : "bg-background-elevated border border-border"
+        }`}
       >
         <View
-          style={[styles.cardIcon, primary && styles.cardIconPrimary]}
+          className={`h-12 w-12 items-center justify-center rounded-full ${
+            primary ? "bg-primary-foreground/20" : "bg-primary-muted"
+          }`}
         >
           <Ionicons
             name={icon}
             size={24}
-            color={primary ? "#fff" : "#2f6f58"}
+            color={primary ? "#FBF8F1" : "#2C5F3F"}
           />
         </View>
-        <View style={styles.cardBody}>
+        <View className="flex-1 gap-0.5">
           <Text
-            style={[styles.cardTitle, primary && styles.cardTitlePrimary]}
-            numberOfLines={1}
+            className={`text-heading-3 font-semibold ${
+              primary ? "text-primary-foreground" : "text-foreground"
+            }`}
           >
             {title}
           </Text>
           <Text
-            style={[styles.cardSubtitle, primary && styles.cardSubtitlePrimary]}
-            numberOfLines={2}
+            className={`text-caption ${
+              primary
+                ? "text-primary-foreground/80"
+                : "text-foreground-muted"
+            }`}
           >
             {subtitle}
           </Text>
@@ -93,77 +140,9 @@ function Card({
         <Ionicons
           name="chevron-forward"
           size={20}
-          color={primary ? "rgba(255,255,255,0.7)" : "#aaa"}
+          color={primary ? "rgba(251,248,241,0.6)" : "#9A968A"}
         />
       </Pressable>
     </Link>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fdfdfa" },
-  scrollContent: {
-    padding: 16,
-    gap: 12,
-    paddingBottom: 32
-  },
-  heading: {
-    fontSize: 26,
-    fontWeight: "600",
-    color: "#111",
-    marginTop: 4
-  },
-  body: {
-    fontSize: 14,
-    color: "#555",
-    marginBottom: 16
-  },
-  card: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: "#fff",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#e5e3dc",
-    minHeight: 80
-  },
-  cardPrimary: {
-    backgroundColor: "#2f6f58",
-    borderColor: "#2f6f58"
-  },
-  cardPressed: {
-    opacity: 0.85
-  },
-  cardIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#eef2ef",
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  cardIconPrimary: {
-    backgroundColor: "rgba(255,255,255,0.18)"
-  },
-  cardBody: {
-    flex: 1,
-    gap: 2
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#111"
-  },
-  cardTitlePrimary: {
-    color: "#fff"
-  },
-  cardSubtitle: {
-    fontSize: 13,
-    color: "#666"
-  },
-  cardSubtitlePrimary: {
-    color: "rgba(255,255,255,0.85)"
-  }
-});
