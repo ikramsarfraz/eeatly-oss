@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // log correlation across hops. Otherwise we mint a fresh one.
 const REQUEST_ID_HEADER = "x-request-id";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const incomingId = request.headers.get(REQUEST_ID_HEADER);
   const requestId = incomingId && incomingId.trim().length > 0
     ? incomingId

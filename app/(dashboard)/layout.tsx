@@ -3,8 +3,6 @@ import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { users } from "@/db/schema";
 import { AppShell } from "@/components/layout/app-shell";
-import { QueryProvider } from "@/components/providers/query-provider";
-import { ToastProvider } from "@/components/providers/toast-provider";
 import { getCurrentHousehold, requireCurrentUser } from "@/lib/auth/session";
 import { db } from "@/lib/db/client";
 import { countHouseholdMembers } from "@/services/households";
@@ -40,12 +38,8 @@ export default async function DashboardLayout({
   const householdLabel = memberCount > 1 ? household.name : null;
 
   return (
-    <QueryProvider>
-      <ToastProvider>
-        <AppShell user={user} householdLabel={householdLabel}>
-          {children}
-        </AppShell>
-      </ToastProvider>
-    </QueryProvider>
+    <AppShell user={user} householdLabel={householdLabel}>
+      {children}
+    </AppShell>
   );
 }
