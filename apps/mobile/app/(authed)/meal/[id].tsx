@@ -51,7 +51,27 @@ import {
  *   - Bottom forest CTA: "Log a cook".
  */
 
-type Step = { number: number; title: string; ingredients: string[] };
+type Step = {
+  number: number;
+  title: string;
+  /** Free-form time string, rendered as-is in mono caps (e.g. "10 min · then 20 min rest"). */
+  time: string | null;
+  /** Instruction paragraph rendered under the title. Empty when the
+   *  step's block is just the title with no follow-on text. */
+  body: string;
+  ingredients: string[];
+};
+
+/** Parsed ingredient line — name + optional quantity + optional prep note. */
+type ParsedIngredient = {
+  /** Display label for the ingredient name. */
+  name: string;
+  /** Free-form quantity string (e.g. "400 g", "1 tsp", "2 cups"). `null` when
+   *  the source string has no detectable quantity. */
+  qty: string | null;
+  /** Optional prep note (e.g. "julienned", "boneless, sliced"). */
+  note: string | null;
+};
 
 function platformLabel(url: string): string | null {
   const detected = detectPlatform(url);
@@ -111,9 +131,16 @@ function splitTitle(name: string): { kicker: string | null; main: string } {
  *   2. Blank-line separated paragraphs (each = one step)
  *   3. Falls back to a single step containing the whole text
  *
- * Step titles try to lift the first short line/sentence; the rest is
- * implicit. Per-step ingredients are inferred by matching the meal's
- * ingredient list against the step body (case-insensitive substring).
+ * For each block we try to lift:
+ *   - title — first short clause (up to a punctuation break)
+ *   - time  — a `(10 min)` parenthetical or trailing `· 10 min` on the
+ *             title line; captured verbatim and rendered in mono caps
+ *   - body  — the prose after the title, joined back into a single
+ *             paragraph for readable rendering
+ *
+ * Per-step ingredients are inferred by matching the meal's ingredient
+ * list against the block body (case-insensitive substring on each
+ * stored name; rough but workable until we ship structured steps).
  */
 function parseSteps(recipeText: string, ingredients: string[]): Step[] {
   const text = recipeText.trim();
@@ -138,21 +165,168 @@ function parseSteps(recipeText: string, ingredients: string[]): Step[] {
   return blocks.map((block, i) => {
     const lines = block.split(/\n/).map((l) => l.trim()).filter(Boolean);
     const firstLine = lines[0] ?? "";
-    // Prefer the first short clause as the step title (up to first `.` or `,`).
-    const titleMatch = firstLine.match(/^(.{0,60}?)(?:[.,;]|$)/);
-    const titleRaw = (titleMatch?.[1] ?? firstLine).trim();
+
+    // Pull a parenthetical time off the title line ("Marinate the chicken (10 min)").
+    let titleSource = firstLine;
+    let time: string | null = null;
+    const parenTime = firstLine.match(
+      /\s*[(\[]\s*((?:~?\d[\d\s./·–—-]*(?:min|minute|minutes|hr|hour|hours|sec|s)(?:[^)\]]*)?))[)\]]\s*$/i
+    );
+    if (parenTime) {
+      time = parenTime[1].trim();
+      titleSource = firstLine.slice(0, parenTime.index).trim();
+    } else {
+      // Trailing " — 10 min" or " · 10 min" after the title.
+      const trailingTime = firstLine.match(
+        /^(.*?)\s*[·\-–—]\s*(~?\d[\d\s./·–—-]*(?:min|minute|minutes|hr|hour|hours|sec|s)(?:.*)?)$/i
+      );
+      if (trailingTime) {
+        titleSource = trailingTime[1].trim();
+        time = trailingTime[2].trim();
+      }
+    }
+
+    // First short clause becomes the title; the rest of the line + any
+    // following lines fold into the body.
+    const titleMatch = titleSource.match(/^(.{0,60}?)(?:[.;]|$)/);
+    const titleRaw = (titleMatch?.[1] ?? titleSource).trim();
     const title = titleRaw.length > 0 ? titleRaw : `Step ${i + 1}`;
-    const used = ingredients.filter((ing) => {
-      const needle = ing.trim().toLowerCase();
-      if (!needle) return false;
-      return block.toLowerCase().includes(needle);
-    });
+
+    // Body = everything after the title clause + any subsequent lines.
+    const remainderOfFirstLine = titleSource.slice(titleRaw.length).trim();
+    const trimmedRemainder = remainderOfFirstLine.replace(/^[.;,\s]+/, "").trim();
+    const followOnLines = lines.slice(1).join(" ").trim();
+    const body = [trimmedRemainder, followOnLines]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+
+    const used = ingredients
+      .map(parseIngredientLine)
+      .filter((ing) => {
+        const needle = ing.name.trim().toLowerCase();
+        if (!needle) return false;
+        return block.toLowerCase().includes(needle);
+      })
+      .map((ing) => ing.name);
+
     return {
       number: i + 1,
       title: title.charAt(0).toUpperCase() + title.slice(1),
+      time,
+      body,
       ingredients: used
     };
   });
+}
+
+const FRACTION_RE = "[¼½¾⅐⅑⅒⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]";
+const UNIT_WORDS =
+  "g|kg|mg|ml|l|tsp|tbsp|cup|cups|oz|lb|lbs|pinch|pinches|piece|pieces|small|medium|large|cloves?|slices?|sprigs?|cans?|sticks?";
+const QTY_HEAD_RE = new RegExp(
+  `^((?:\\d+(?:\\s*${FRACTION_RE})?|${FRACTION_RE})` +
+    `(?:\\s*[-–—/]\\s*\\d+(?:\\s*${FRACTION_RE})?)?` +
+    `(?:\\s*(?:${UNIT_WORDS}))?)` +
+    `\\b\\s+(.+)$`,
+  "i"
+);
+const QTY_TAIL_RE = new RegExp(
+  `^(.+?)\\s*[\\-–—,:]\\s*` +
+    `((?:\\d+(?:\\s*${FRACTION_RE})?|${FRACTION_RE})` +
+    `(?:\\s*[-–—/]\\s*\\d+(?:\\s*${FRACTION_RE})?)?` +
+    `(?:\\s*(?:${UNIT_WORDS}))?)\\s*$`,
+  "i"
+);
+
+/**
+ * Best-effort split of a stored ingredient string into name + qty + note.
+ *
+ * Recognises three common shapes:
+ *   1. Leading qty: "400 g chicken" → qty="400 g", name="chicken"
+ *   2. Trailing qty:  "Salt — 1 tsp" or "Salt, 1 tsp" → qty="1 tsp", name="Salt"
+ *   3. Parenthetical or trailing-comma note: "Carrot (julienned)" or
+ *      "Carrot, julienned" → name="Carrot", note="julienned"
+ *
+ * Quantity strings are returned verbatim so the user's chosen unit
+ * survives unchanged. Names are title-cased on the first character so
+ * a downstream renderer doesn't have to.
+ */
+function parseIngredientLine(raw: string): ParsedIngredient {
+  const initial = raw.trim();
+  if (!initial) return { name: "", qty: null, note: null };
+
+  let working = initial;
+  let qty: string | null = null;
+  let note: string | null = null;
+
+  // Pull a parenthetical first — keeps the qty regex from accidentally
+  // matching numbers inside the parens.
+  const parenMatch = working.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+  if (parenMatch) {
+    working = parenMatch[1].trim();
+    note = parenMatch[2].trim();
+  }
+
+  // Leading qty? "400 g chicken"
+  const head = working.match(QTY_HEAD_RE);
+  if (head) {
+    qty = head[1].trim();
+    working = head[2].trim();
+  } else {
+    // Trailing qty? "Salt — 1 tsp"
+    const tail = working.match(QTY_TAIL_RE);
+    if (tail) {
+      qty = tail[2].trim();
+      working = tail[1].trim();
+    }
+  }
+
+  // Comma-suffix note when we don't already have one. "Carrot, julienned"
+  // — but only when the second half doesn't look like a quantity (so we
+  // don't eat "Salt, 1 tsp" again).
+  if (!note) {
+    const commaSplit = working.match(/^(.+?),\s*(.+)$/);
+    if (commaSplit) {
+      const after = commaSplit[2].trim();
+      const looksLikeQty = /\d/.test(after);
+      if (!looksLikeQty) {
+        working = commaSplit[1].trim();
+        note = after;
+      }
+    }
+  }
+
+  const name = working
+    ? working.charAt(0).toUpperCase() + working.slice(1)
+    : initial;
+
+  return { name, qty, note };
+}
+
+/**
+ * Sum step times where parseable, return a hand-tuned-ish display
+ * string like "~30 min". Returns `null` when no step times were
+ * captured or when the total comes out to zero.
+ */
+function totalStepTimeLabel(steps: Step[]): string | null {
+  let totalMinutes = 0;
+  let anyParsed = false;
+  for (const step of steps) {
+    if (!step.time) continue;
+    const matches = step.time.matchAll(/(\d+(?:\.\d+)?)\s*(min|minute|minutes|hr|hour|hours)/gi);
+    for (const m of matches) {
+      const n = Number(m[1]);
+      if (!Number.isFinite(n)) continue;
+      const unit = m[2].toLowerCase();
+      totalMinutes += unit.startsWith("h") ? n * 60 : n;
+      anyParsed = true;
+    }
+  }
+  if (!anyParsed || totalMinutes <= 0) return null;
+  if (totalMinutes < 60) return `~${Math.round(totalMinutes / 5) * 5 || totalMinutes} min`;
+  const hours = Math.floor(totalMinutes / 60);
+  const rem = totalMinutes - hours * 60;
+  return rem === 0 ? `~${hours} hr` : `~${hours} hr ${rem} min`;
 }
 
 function buildShoppingListText(mealName: string, items: string[]): string {
@@ -243,6 +417,7 @@ function MealDetailBody({
     () => (meal.recipeText ? parseSteps(meal.recipeText, ingredients) : []),
     [meal.recipeText, ingredients]
   );
+  const totalTime = useMemo(() => totalStepTimeLabel(steps), [steps]);
 
   const sourcePlatform = meal.recipeSourceUrl
     ? platformLabel(meal.recipeSourceUrl)
@@ -353,7 +528,11 @@ function MealDetailBody({
               {EFFORT_LABEL[meal.effortLevel]}
             </Chip>
           ) : null}
-          <Chip tone="ghost">{`${ingredients.length} ingredient${ingredients.length === 1 ? "" : "s"}`}</Chip>
+          {totalTime ? (
+            <Chip tone="ghost">{totalTime}</Chip>
+          ) : (
+            <Chip tone="ghost">{`${ingredients.length} ingredient${ingredients.length === 1 ? "" : "s"}`}</Chip>
+          )}
           {steps.length > 0 ? (
             <Chip tone="wheat">{`${steps.length} step${steps.length === 1 ? "" : "s"}`}</Chip>
           ) : null}
@@ -378,10 +557,25 @@ function MealDetailBody({
 
         {steps.length > 0 ? (
           <View style={{ marginBottom: 18 }}>
-            <SectionLabel>Recipe</SectionLabel>
+            <SectionLabel
+              action={
+                <Text
+                  className="font-mono text-eyebrow text-ink-3 uppercase"
+                  style={{ letterSpacing: 1.2 }}
+                >
+                  Follow in order
+                </Text>
+              }
+            >
+              Recipe
+            </SectionLabel>
             <View style={{ gap: 14 }}>
-              {steps.map((step) => (
-                <StepCard key={step.number} step={step} />
+              {steps.map((step, idx) => (
+                <StepCard
+                  key={step.number}
+                  step={step}
+                  isLast={idx === steps.length - 1}
+                />
               ))}
             </View>
           </View>
@@ -588,15 +782,18 @@ function IngredientsSection({
       </SectionLabel>
 
       <Card style={{ marginBottom: 14, overflow: "hidden" }}>
-        {ingredients.map((ing, i) => (
-          <IngredientRow
-            key={`${ing}-${i}`}
-            label={ing}
-            checked={!!checked[i]}
-            isFirst={i === 0}
-            onToggle={() => toggle(i)}
-          />
-        ))}
+        {ingredients.map((ing, i) => {
+          const parsed = parseIngredientLine(ing);
+          return (
+            <IngredientRow
+              key={`${ing}-${i}`}
+              parsed={parsed}
+              checked={!!checked[i]}
+              isFirst={i === 0}
+              onToggle={() => toggle(i)}
+            />
+          );
+        })}
       </Card>
 
       <View style={{ flexDirection: "row", gap: 10 }}>
@@ -665,22 +862,25 @@ function IngredientsSection({
 }
 
 function IngredientRow({
-  label,
+  parsed,
   checked,
   isFirst,
   onToggle
 }: {
-  label: string;
+  parsed: ParsedIngredient;
   checked: boolean;
   isFirst: boolean;
   onToggle: () => void;
 }) {
+  const a11yLabel = [parsed.qty, parsed.name, parsed.note]
+    .filter(Boolean)
+    .join(" ");
   return (
     <Pressable
       onPress={onToggle}
       accessibilityRole="checkbox"
       accessibilityState={{ checked }}
-      accessibilityLabel={label}
+      accessibilityLabel={a11yLabel || parsed.name}
       style={{
         flexDirection: "row",
         alignItems: "center",
@@ -708,26 +908,66 @@ function IngredientRow({
           <Ionicons name="checkmark" size={14} color={colors.forestText} />
         ) : null}
       </View>
-      <Text
+      <View
         style={{
           flex: 1,
-          fontFamily: "Geist_500Medium",
-          fontSize: 14.5,
-          color: checked ? colors.ink3 : colors.ink,
-          letterSpacing: -0.1,
-          textDecorationLine: checked ? "line-through" : "none",
-          textDecorationColor: colors.ink4
+          minWidth: 0,
+          flexDirection: "row",
+          alignItems: "baseline",
+          flexWrap: "wrap",
+          gap: 8
         }}
       >
-        {label}
-      </Text>
+        <Text
+          style={{
+            fontFamily: "Geist_500Medium",
+            fontSize: 14.5,
+            color: checked ? colors.ink3 : colors.ink,
+            letterSpacing: -0.1,
+            textDecorationLine: checked ? "line-through" : "none",
+            textDecorationColor: colors.ink4
+          }}
+        >
+          {parsed.name}
+        </Text>
+        {parsed.note ? (
+          <Text
+            style={{
+              fontFamily: "InstrumentSerif_400Regular_Italic",
+              fontSize: 11.5,
+              color: colors.ink3,
+              textDecorationLine: checked ? "line-through" : "none",
+              textDecorationColor: colors.ink4
+            }}
+          >
+            {parsed.note}
+          </Text>
+        ) : null}
+      </View>
+      {parsed.qty ? (
+        <Text
+          style={{
+            fontFamily: "JetBrainsMono_400Regular",
+            fontSize: 11.5,
+            color: checked ? colors.ink4 : colors.ink2,
+            letterSpacing: 0.4,
+            textDecorationLine: checked ? "line-through" : "none",
+            textDecorationColor: colors.ink4
+          }}
+          numberOfLines={1}
+        >
+          {parsed.qty}
+        </Text>
+      ) : null}
     </Pressable>
   );
 }
 
 /* ─── Step card ─────────────────────────────────────────────────── */
 
-function StepCard({ step }: { step: Step }) {
+function StepCard({ step, isLast }: { step: Step; isLast: boolean }) {
+  const hasBody = step.body.length > 0;
+  const hasItems = step.ingredients.length > 0;
   return (
     <Card>
       <View style={{ padding: 18 }}>
@@ -736,7 +976,7 @@ function StepCard({ step }: { step: Step }) {
             flexDirection: "row",
             alignItems: "baseline",
             gap: 12,
-            marginBottom: step.ingredients.length > 0 ? 12 : 0
+            marginBottom: hasBody || hasItems ? 8 : 0
           }}
         >
           <Text
@@ -746,30 +986,61 @@ function StepCard({ step }: { step: Step }) {
               lineHeight: 32,
               color: colors.forest,
               letterSpacing: -0.64,
-              minWidth: 24
+              minWidth: 28
             }}
           >
             {step.number}.
           </Text>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text
+              style={{
+                fontFamily: "InstrumentSerif_400Regular",
+                fontSize: 22,
+                lineHeight: 22 * 1.05,
+                color: colors.ink,
+                letterSpacing: -0.44
+              }}
+            >
+              {step.title}
+            </Text>
+            {step.time ? (
+              <Text
+                style={{
+                  fontFamily: "JetBrainsMono_400Regular",
+                  fontSize: 10.5,
+                  color: colors.ink3,
+                  letterSpacing: 1.2,
+                  textTransform: "uppercase",
+                  marginTop: 4
+                }}
+              >
+                {step.time}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+        {hasBody ? (
           <Text
             style={{
-              flex: 1,
-              fontFamily: "InstrumentSerif_400Regular",
-              fontSize: 22,
-              lineHeight: 22 * 1.05,
-              color: colors.ink,
-              letterSpacing: -0.44
+              fontFamily: "Geist_400Regular",
+              fontSize: 14,
+              lineHeight: 21,
+              color: colors.ink2,
+              letterSpacing: -0.1,
+              marginLeft: 40,
+              marginBottom: hasItems ? 12 : 0
             }}
           >
-            {step.title}
+            {step.body}
           </Text>
-        </View>
-        {step.ingredients.length > 0 ? (
+        ) : null}
+        {hasItems ? (
           <View
             style={{
               flexDirection: "row",
               flexWrap: "wrap",
-              gap: 6
+              gap: 6,
+              marginLeft: 40
             }}
           >
             {step.ingredients.map((it) => (
@@ -796,6 +1067,32 @@ function StepCard({ step }: { step: Step }) {
                 </Text>
               </View>
             ))}
+          </View>
+        ) : null}
+        {!isLast ? (
+          <View
+            style={{
+              marginLeft: 12,
+              marginTop: 14,
+              marginBottom: -4,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8
+            }}
+            accessibilityElementsHidden
+          >
+            <Ionicons name="arrow-down" size={14} color={colors.ink4} />
+            <Text
+              style={{
+                fontFamily: "JetBrainsMono_400Regular",
+                fontSize: 10,
+                letterSpacing: 1.2,
+                textTransform: "uppercase",
+                color: colors.ink4
+              }}
+            >
+              Then
+            </Text>
           </View>
         ) : null}
       </View>
