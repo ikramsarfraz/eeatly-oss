@@ -12,12 +12,12 @@ import {
   View
 } from "react-native";
 import { detectPlatform } from "@eeatly/shared";
-import { formatCookedAt } from "../../../lib/dates";
-import { colors } from "../../../lib/design/tokens";
-import { trpc } from "../../../lib/trpc";
-import { ShareSheet } from "../../../components/share-sheet";
-import { SourceUrlEmbed } from "../../../components/embeds/source-url-embed";
-import { TopNav } from "../../../components/top-nav";
+import { formatCookedAt } from "../../../../lib/dates";
+import { colors } from "../../../../lib/design/tokens";
+import { trpc } from "../../../../lib/trpc";
+import { ShareSheet } from "../../../../components/share-sheet";
+import { SourceUrlEmbed } from "../../../../components/embeds/source-url-embed";
+import { TopNav } from "../../../../components/top-nav";
 import {
   Button,
   Card,
@@ -27,7 +27,7 @@ import {
   MealTile,
   Screen,
   SectionLabel
-} from "../../../components/ui";
+} from "../../../../components/ui";
 
 /**
  * Round 18 recipe view — editorial rebuild matching the recipe-detail
@@ -440,12 +440,9 @@ function MealDetailBody({
           <Pressable
             hitSlop={10}
             accessibilityRole="button"
-            accessibilityLabel="Edit recipe"
+            accessibilityLabel="Refine recipe"
             onPress={() =>
-              Alert.alert(
-                "Edit recipe",
-                "Recipe editing lives on the web for now — open eeatly.app to make changes."
-              )
+              router.push(`/(authed)/meal/${meal.id}/refine` as never)
             }
           >
             <Ionicons name="create-outline" size={22} color={colors.forest} />

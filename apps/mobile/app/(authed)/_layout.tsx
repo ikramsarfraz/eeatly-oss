@@ -23,7 +23,15 @@ export default function AuthedLayout() {
       <Tabs.Screen name="home/index" options={{ title: "Home" }} />
       <Tabs.Screen name="add/index" options={{ title: "Add" }} />
       <Tabs.Screen name="library/index" options={{ title: "Library" }} />
-      <Tabs.Screen name="meal/[id]" options={{ href: null }} />
+      <Tabs.Screen name="meal/[id]/index" options={{ href: null }} />
+      <Tabs.Screen
+        name="meal/[id]/refine/index"
+        options={{ href: null, title: "Refine recipe" }}
+      />
+      <Tabs.Screen
+        name="meal/[id]/refine/review"
+        options={{ href: null, title: "Review changes" }}
+      />
       <Tabs.Screen
         name="add/log"
         options={{ href: null, title: "Log a meal" }}
