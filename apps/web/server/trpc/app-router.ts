@@ -14,6 +14,7 @@ import { mealsRouter } from "./routers/meals";
 import { notificationsRouter } from "./routers/notifications";
 import { onboardingRouter } from "./routers/onboarding";
 import { plansRouter } from "./routers/plans";
+import { refineRouter } from "./routers/refine";
 import { searchRouter } from "./routers/search";
 import { sharesRouter } from "./routers/shares";
 import { urlPreviewRouter } from "./routers/url-preview";
@@ -41,6 +42,7 @@ export const appRouter = router({
   notifications: notificationsRouter,
   onboarding: onboardingRouter,
   plans: plansRouter,
+  refine: refineRouter,
   search: searchRouter,
   shares: sharesRouter,
   urlPreview: urlPreviewRouter

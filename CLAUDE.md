@@ -100,8 +100,21 @@ Core tables live in `apps/web/db/schema/`:
 - `url_previews` — R16 cache of OG/Twitter-card metadata fetched server-side. Primary key is the URL itself; successful rows live 7d, failures 1h.
 - `email_delivery` — Resend webhook delivery receipts
 - `users.preferredTenantId` — scaffold column for future multi-tenancy; always null in current product logic. No `tenants` or `tenant_members` table exists yet.
+- `meal_ingredients` (R18, `0026_structured_recipe.sql`) — structured per-row ingredient storage with `name`, `quantity_string` (free-form), `prep_note`, and explicit `position`. Sits alongside the legacy `meals.ingredients` text[]. New code writes here on Refine save; readers prefer rows when present, fall back to the legacy array when not.
+- `recipe_steps` (R18, same migration) — structured steps with `title`, free-form `time` ("10 min · then 20 min rest"), `body`, and `ingredient_ids: text[]` referencing `meal_ingredients.id`. Legacy `meals.recipe_text` blob remains the fallback for unstructured recipes.
+- `refine_sessions` / `refine_turns` / `refine_pending_changes` (R18, `0027_refine_sessions.sql`) — back the chat-style "Refine recipe" editor. Per-device per-recipe-per-user; one active session at a time enforced by a partial unique index. See **Refine recipe** below.
 
 Always run `pnpm db:generate` then `pnpm db:migrate` after schema changes. Never hand-edit files in `apps/web/drizzle/` (auto-generated migration history).
+
+### Refine recipe (AI-prompted editing) — Round 18
+
+A refine session is a per-device draft layered on top of a meal. The user prompts the AI (text / voice / photo); each prompt becomes a `refine_turn` row recording the proposed `PendingChange[]`; accepted turns aggregate into `refine_pending_changes`; the Save mutation applies them atomically to `meal_ingredients` / `recipe_steps` / `meals` and closes the session.
+
+- **Lifecycle**: `active` → `saved` or `discarded`. A partial unique index on `(meal_id, user_id, device_id) WHERE status = 'active'` enforces one in-progress session per device per recipe.
+- **Authorization**: sessions are user-scoped — household members do **not** share refine drafts. Service-layer `requireHouseholdMember` runs against the meal's household at session start; every subsequent procedure asserts session ownership.
+- **AI service**: `apps/web/services/ai-refine.ts` (text / voice / photo). Reuses the provider fallback (`withFallback`) + Whisper transcription. Different prompt from Capture: Refine diffs against an existing recipe; Capture extracts from scratch. Same `PendingChange[]` wire shape between client + AI + DB.
+- **Heads-up rules**: `apps/web/lib/refine/heads-up-rules.ts` — pure functions over `(recipe, changes)`. Four rules ship in v1 (heavy-ingredient quantity bump, bulk ingredient growth, long new step time, empty quantity). Not AI-generated.
+- **Idempotency on save**: a save with zero pending changes is a no-op + close; a save on an already-saved session rejects with `CONFLICT`. Last-write-wins between concurrent sessions on different devices — `meal_version` snapshotting is parked for v2.
 
 ### Environment variables
 

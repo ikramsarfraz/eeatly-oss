@@ -134,6 +134,21 @@ const featureOverridesServiceMock = vi.hoisted(() => ({
 }));
 vi.mock("@/services/feature-overrides", () => featureOverridesServiceMock);
 
+// Round 18 — Refine service mock. Each public function returns a
+// sentinel so the procedure tests can assert call-shape without
+// reaching the real DB / AI provider chain.
+const refineServiceMock = vi.hoisted(() => ({
+  startSession: vi.fn(),
+  getSessionState: vi.fn(),
+  submitTextTurn: vi.fn(),
+  submitVoiceTurn: vi.fn(),
+  submitPhotoTurn: vi.fn(),
+  toggleTurnAccepted: vi.fn(),
+  saveSession: vi.fn(),
+  discardSession: vi.fn()
+}));
+vi.mock("@/services/refine", () => refineServiceMock);
+
 import { createCallerFactory } from "../trpc";
 import { appRouter } from "../app-router";
 import type { TRPCContext } from "../context";
@@ -180,7 +195,8 @@ beforeEach(() => {
     sharesServiceMock,
     billingServiceMock,
     notificationsServiceMock,
-    featureOverridesServiceMock
+    featureOverridesServiceMock,
+    refineServiceMock
   ]) {
     for (const fn of Object.values(map)) fn.mockReset();
   }
@@ -597,5 +613,145 @@ describe("adminRouter", () => {
         feature: "not_a_feature"
       })
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+});
+
+describe("refineRouter (Round 18)", () => {
+  const sentinelState = {
+    sessionId: "s-1",
+    mealId: "m-1",
+    startedAt: new Date(),
+    turns: [],
+    pendingChanges: [],
+    summary: { additions: 0, changes: 0, removals: 0 },
+    headsUp: []
+  };
+
+  it("startSession rejects unauthenticated callers", async () => {
+    await expect(
+      call(null).refine.startSession({
+        mealId: "11111111-1111-4111-8111-111111111111",
+        deviceId: "dev-1"
+      })
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
+  it("startSession passes user + meal + device through to the service", async () => {
+    refineServiceMock.startSession.mockResolvedValueOnce(sentinelState);
+    const result = await call(makeUser()).refine.startSession({
+      mealId: "11111111-1111-4111-8111-111111111111",
+      deviceId: "dev-1"
+    });
+    expect(result).toEqual(sentinelState);
+    expect(refineServiceMock.startSession).toHaveBeenCalledWith({
+      userId: "u-1",
+      mealId: "11111111-1111-4111-8111-111111111111",
+      deviceId: "dev-1"
+    });
+  });
+
+  it("submitTextTurn forwards prompt + checks AI rate limit", async () => {
+    refineServiceMock.submitTextTurn.mockResolvedValueOnce(sentinelState);
+    await call(makeUser()).refine.submitTextTurn({
+      sessionId: "22222222-2222-4222-8222-222222222222",
+      prompt: "Bump chicken to 600 g"
+    });
+    expect(rateLimitMock.checkAiCallLimit).toHaveBeenCalledWith("u-1");
+    expect(refineServiceMock.submitTextTurn).toHaveBeenCalledWith({
+      userId: "u-1",
+      sessionId: "22222222-2222-4222-8222-222222222222",
+      prompt: "Bump chicken to 600 g"
+    });
+  });
+
+  it("submitVoiceTurn decodes the base64 audio buffer", async () => {
+    refineServiceMock.submitVoiceTurn.mockResolvedValueOnce({
+      ...sentinelState,
+      transcript: "test"
+    });
+    const payload = Buffer.from("hello").toString("base64");
+    await call(makeUser()).refine.submitVoiceTurn({
+      sessionId: "22222222-2222-4222-8222-222222222222",
+      audioBase64: payload,
+      mediaType: "audio/m4a"
+    });
+    const call0 = refineServiceMock.submitVoiceTurn.mock.calls[0]?.[0] as {
+      audioBuffer: Buffer;
+    };
+    expect(call0.audioBuffer).toBeInstanceOf(Buffer);
+    expect(call0.audioBuffer.toString()).toBe("hello");
+  });
+
+  it("submitPhotoTurn forwards base64 + media type", async () => {
+    refineServiceMock.submitPhotoTurn.mockResolvedValueOnce(sentinelState);
+    await call(makeUser()).refine.submitPhotoTurn({
+      sessionId: "22222222-2222-4222-8222-222222222222",
+      imageBase64: "iVBORw",
+      mediaType: "image/png"
+    });
+    expect(refineServiceMock.submitPhotoTurn).toHaveBeenCalledWith({
+      userId: "u-1",
+      sessionId: "22222222-2222-4222-8222-222222222222",
+      imageBase64: "iVBORw",
+      mediaType: "image/png"
+    });
+  });
+
+  it("toggleTurnAccepted threads accepted flag through", async () => {
+    refineServiceMock.toggleTurnAccepted.mockResolvedValueOnce(sentinelState);
+    await call(makeUser()).refine.toggleTurnAccepted({
+      sessionId: "22222222-2222-4222-8222-222222222222",
+      turnId: "33333333-3333-4333-8333-333333333333",
+      accepted: false
+    });
+    expect(refineServiceMock.toggleTurnAccepted).toHaveBeenCalledWith({
+      userId: "u-1",
+      sessionId: "22222222-2222-4222-8222-222222222222",
+      turnId: "33333333-3333-4333-8333-333333333333",
+      accepted: false
+    });
+  });
+
+  it("save calls saveSession + checks mutation rate limit", async () => {
+    refineServiceMock.saveSession.mockResolvedValueOnce({
+      mealId: "m-1",
+      applied: 3
+    });
+    const result = await call(makeUser()).refine.save({
+      sessionId: "22222222-2222-4222-8222-222222222222"
+    });
+    expect(result).toEqual({ mealId: "m-1", applied: 3 });
+    expect(rateLimitMock.checkMealMutationLimit).toHaveBeenCalledWith("u-1");
+  });
+
+  it("discard calls discardSession", async () => {
+    refineServiceMock.discardSession.mockResolvedValueOnce({ discarded: true });
+    const result = await call(makeUser()).refine.discard({
+      sessionId: "22222222-2222-4222-8222-222222222222"
+    });
+    expect(result).toEqual({ discarded: true });
+  });
+
+  it("maps 'Refine session not found.' to a NOT_FOUND error", async () => {
+    refineServiceMock.getSessionState.mockRejectedValueOnce(
+      new Error("Refine session not found.")
+    );
+    await expect(
+      call(makeUser()).refine.getPendingChanges({
+        sessionId: "22222222-2222-4222-8222-222222222222"
+      })
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("maps 'Refine session is closed.' to a CONFLICT error", async () => {
+    refineServiceMock.submitTextTurn.mockRejectedValueOnce(
+      new Error("Refine session is closed.")
+    );
+    await expect(
+      call(makeUser()).refine.submitTextTurn({
+        sessionId: "22222222-2222-4222-8222-222222222222",
+        prompt: "any"
+      })
+    ).rejects.toMatchObject({ code: "CONFLICT" });
   });
 });

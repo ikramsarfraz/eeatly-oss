@@ -4,12 +4,17 @@ import { getAnthropicClient } from "@/lib/ai/client";
 import {
   buildSharePrompt,
   EXTRACT_INGREDIENTS_FROM_TEXT_PROMPT,
+  REFINE_RECIPE_PROMPT,
   SUGGEST_FROM_IMAGE_PROMPT,
   SUGGEST_FROM_TEXT_PROMPT,
   SUGGEST_FROM_VOICE_NOTE_PROMPT
 } from "@/lib/ai/prompts";
 import { logger } from "@/lib/observability/logger";
 import type { MealSuggestion } from "@/types";
+import {
+  proposeChangesResponseSchema,
+  type ProposeChangesResponse
+} from "@eeatly/api/validators/refine";
 
 type SupportedMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
 
@@ -253,4 +258,61 @@ export async function generateShareText(
   const textBlock = response.content.find((b) => b.type === "text");
   if (!textBlock || textBlock.type !== "text") throw new Error("Anthropic did not generate share text.");
   return { text: textBlock.text.trim() };
+}
+
+/**
+ * Round 18 — refine a recipe against a user instruction. Fallback path
+ * mirrors OpenAI's behaviour: same prompt + same response schema. The
+ * model is asked to emit raw JSON; Zod validates on the way out.
+ *
+ * Photo refinement is handled here when this provider is selected —
+ * Anthropic accepts image blocks the same way OpenAI's vision API does.
+ */
+export async function proposeRefineChanges(args: {
+  recipeJson: string;
+  instruction: string;
+  image?: { base64: string; mediaType: string };
+}): Promise<ProposeChangesResponse> {
+  const client = getAnthropicClient();
+  const userBlocks: Array<
+    | { type: "image"; source: { type: "base64"; media_type: SupportedMediaType; data: string } }
+    | { type: "text"; text: string }
+  > = [];
+  if (args.image) {
+    userBlocks.push({
+      type: "image",
+      source: {
+        type: "base64",
+        media_type: args.image.mediaType as SupportedMediaType,
+        data: args.image.base64
+      }
+    });
+  }
+  userBlocks.push({
+    type: "text",
+    text: `Current recipe (JSON):\n${args.recipeJson}\n\nUser instruction:\n${args.instruction}\n\nReturn ONLY the JSON object described above.`
+  });
+
+  const response = await client.messages.create(
+    {
+      model: "claude-sonnet-4-6",
+      max_tokens: 2048,
+      system: REFINE_RECIPE_PROMPT,
+      messages: [{ role: "user", content: userBlocks }]
+    },
+    { signal: AbortSignal.timeout(FALLBACK_TIMEOUT_MS) }
+  );
+
+  logger.info("ai_provider_tokens", {
+    provider: "anthropic",
+    operation: "refine_propose_changes",
+    input_tokens: response.usage.input_tokens,
+    output_tokens: response.usage.output_tokens
+  });
+
+  const textBlock = response.content.find((b) => b.type === "text");
+  if (!textBlock || textBlock.type !== "text") {
+    throw new Error("Anthropic did not return a refinement.");
+  }
+  return proposeChangesResponseSchema.parse(JSON.parse(textBlock.text));
 }
