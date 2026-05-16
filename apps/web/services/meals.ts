@@ -533,6 +533,17 @@ export type MealDetailView = {
   cookCount: number;
   lastCookedAt: string | null;
   createdAt: string;
+  /**
+   * Modal effort across all logs of this meal — `null` when there are
+   * no logs yet (a meal can be added without being cooked, e.g. via
+   * AI re-extract flows that save a recipe before the first cook).
+   *
+   * "Modal" rather than "most recent" so a one-off weeknight rush
+   * doesn't override the typical effort the cook reaches for. Ties
+   * resolve toward the heavier effort (`high_effort` > `medium` >
+   * `easy` > `quick`) — better to over-prepare than under.
+   */
+  effortLevel: "quick" | "easy" | "medium" | "high_effort" | null;
 };
 
 export async function getMealDetail(
@@ -581,6 +592,25 @@ export async function getMealDetail(
       )
     );
 
+  // Modal effort — count logs per effort bucket so the recipe-detail
+  // chip reflects the typical effort the cook reaches for, not the
+  // last (possibly atypical) cook. Empty rows produce 0 counts; we
+  // fall back to `null` when there are no logs at all.
+  const effortRows = await db
+    .select({
+      effortLevel: mealLogs.effortLevel,
+      n: count(mealLogs.id)
+    })
+    .from(mealLogs)
+    .where(
+      and(
+        eq(mealLogs.mealId, mealId),
+        eq(mealLogs.householdId, householdId),
+        isNull(mealLogs.deletedAt)
+      )
+    )
+    .groupBy(mealLogs.effortLevel);
+
   return {
     id: row.id,
     name: row.name,
@@ -593,8 +623,39 @@ export async function getMealDetail(
     createdByName: row.createdByName,
     cookCount: Number(stats?.cookCount ?? 0),
     lastCookedAt: stats?.lastCookedAt ?? null,
-    createdAt: row.createdAt.toISOString()
+    createdAt: row.createdAt.toISOString(),
+    effortLevel: pickModalEffort(effortRows)
   };
+}
+
+/**
+ * Pick the most-frequent effort across logs. Ties resolve toward the
+ * heavier effort so the chip reads slightly conservative rather than
+ * optimistic. Returns `null` when there are no logs.
+ */
+function pickModalEffort(
+  rows: ReadonlyArray<{
+    effortLevel: "quick" | "easy" | "medium" | "high_effort";
+    n: number;
+  }>
+): "quick" | "easy" | "medium" | "high_effort" | null {
+  if (rows.length === 0) return null;
+  const weight: Record<"quick" | "easy" | "medium" | "high_effort", number> = {
+    quick: 0,
+    easy: 1,
+    medium: 2,
+    high_effort: 3
+  };
+  let best = rows[0];
+  for (const r of rows) {
+    if (
+      Number(r.n) > Number(best.n) ||
+      (Number(r.n) === Number(best.n) && weight[r.effortLevel] > weight[best.effortLevel])
+    ) {
+      best = r;
+    }
+  }
+  return best.effortLevel;
 }
 
 export async function deleteMealLog(
