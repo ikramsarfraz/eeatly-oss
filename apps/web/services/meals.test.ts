@@ -118,6 +118,11 @@ describe("getMealDetail (Round 10)", () => {
         lastCookedAt: "2026-05-10"
       }
     ]);
+    // Effort aggregate — two medium, one high. Modal = medium.
+    queue([
+      { effortLevel: "medium", n: 2 },
+      { effortLevel: "high_effort", n: 1 }
+    ]);
 
     const result = await getMealDetail("u-member", "h-a", "m-1");
 
@@ -133,7 +138,8 @@ describe("getMealDetail (Round 10)", () => {
       createdByName: "Ali",
       cookCount: 3,
       lastCookedAt: "2026-05-10",
-      createdAt: "2026-04-01T12:00:00.000Z"
+      createdAt: "2026-04-01T12:00:00.000Z",
+      effortLevel: "medium"
     });
   });
 
@@ -153,6 +159,8 @@ describe("getMealDetail (Round 10)", () => {
       }
     ]);
     queue([{ cookCount: 0, lastCookedAt: null }]);
+    // No logs → empty effort aggregate → effortLevel: null.
+    queue([] as Array<{ effortLevel: "quick" | "easy" | "medium" | "high_effort"; n: number }>);
 
     const result = await getMealDetail("u-member", "h-a", "m-legacy");
 
@@ -162,5 +170,6 @@ describe("getMealDetail (Round 10)", () => {
     expect(result?.cookCount).toBe(0);
     expect(result?.lastCookedAt).toBeNull();
     expect(result?.createdByUserId).toBeNull();
+    expect(result?.effortLevel).toBeNull();
   });
 });

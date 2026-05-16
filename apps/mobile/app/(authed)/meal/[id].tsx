@@ -213,6 +213,15 @@ export default function MealDetailScreen() {
   return <MealDetailBody meal={meal} />;
 }
 
+type EffortLevel = "quick" | "easy" | "medium" | "high_effort";
+
+const EFFORT_LABEL: Record<EffortLevel, string> = {
+  quick: "Quick to make",
+  easy: "Easy effort",
+  medium: "Medium effort",
+  high_effort: "High effort"
+};
+
 function MealDetailBody({
   meal
 }: {
@@ -226,6 +235,7 @@ function MealDetailBody({
     cookCount: number;
     lastCookedAt: string | Date | null;
     createdByName: string | null;
+    effortLevel: EffortLevel | null;
   };
 }) {
   const ingredients = meal.ingredients ?? [];
@@ -329,6 +339,20 @@ function MealDetailBody({
             marginBottom: 26
           }}
         >
+          {meal.effortLevel ? (
+            <Chip
+              tone="sage"
+              icon={
+                <Ionicons
+                  name="speedometer-outline"
+                  size={14}
+                  color={colors.forest}
+                />
+              }
+            >
+              {EFFORT_LABEL[meal.effortLevel]}
+            </Chip>
+          ) : null}
           <Chip tone="ghost">{`${ingredients.length} ingredient${ingredients.length === 1 ? "" : "s"}`}</Chip>
           {steps.length > 0 ? (
             <Chip tone="wheat">{`${steps.length} step${steps.length === 1 ? "" : "s"}`}</Chip>
