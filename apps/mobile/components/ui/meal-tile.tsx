@@ -40,17 +40,22 @@ const FONT_SIZE: Record<MealTileSize, number> = {
   xl: 124,
   lg: 96,
   md: 64,
-  sm: 40
+  sm: 40,
 };
 
 const DEFAULT_RADIUS: Record<MealTileSize, number> = {
   xl: 10,
   lg: 8,
   md: 8,
-  sm: 8
+  sm: 8,
 };
 
-export function MealTile({ name, size = "lg", photoUrl, radius }: MealTileProps) {
+export function MealTile({
+  name,
+  size = "lg",
+  photoUrl,
+  radius,
+}: MealTileProps) {
   const r = radius ?? DEFAULT_RADIUS[size];
 
   if (photoUrl) {
@@ -63,7 +68,7 @@ export function MealTile({ name, size = "lg", photoUrl, radius }: MealTileProps)
           width: "100%",
           height: "100%",
           borderRadius: r,
-          backgroundColor: "#EFE7D6"
+          backgroundColor: "#EFE7D6",
         }}
         resizeMode="cover"
       />
@@ -81,14 +86,13 @@ export function MealTile({ name, size = "lg", photoUrl, radius }: MealTileProps)
         height: "100%",
         borderRadius: r,
         backgroundColor: palette.bg,
-        overflow: "hidden"
+        overflow: "hidden",
       }}
     >
       <DotTexture color={palette.dot} />
       <View
         style={{
           ...StyleSheetCenter,
-          paddingTop: fontSize * 0.04
         }}
       >
         <Text
@@ -96,8 +100,6 @@ export function MealTile({ name, size = "lg", photoUrl, radius }: MealTileProps)
             fontFamily: fonts.displayItalic,
             color: palette.fg,
             fontSize,
-            lineHeight: fontSize * 0.9,
-            letterSpacing: -fontSize * 0.04
           }}
           allowFontScaling={false}
         >
@@ -114,7 +116,7 @@ export function MealTile({ name, size = "lg", photoUrl, radius }: MealTileProps)
           bottom: 6,
           borderRadius: Math.max(0, r - 2),
           borderWidth: 1,
-          borderColor: palette.dot + "66"
+          borderColor: palette.dot + "66",
         }}
       />
     </View>
@@ -142,7 +144,7 @@ function DotTexture({ color }: { color: string }) {
         left: 0,
         right: 0,
         bottom: 0,
-        opacity: 0.55
+        opacity: 0.55,
       }}
     >
       {dots.map((d, idx) => (
@@ -157,7 +159,7 @@ function DotTexture({ color }: { color: string }) {
             marginLeft: -1,
             marginTop: -1,
             borderRadius: 1,
-            backgroundColor: color
+            backgroundColor: color,
           }}
         />
       ))}
@@ -172,5 +174,5 @@ const StyleSheetCenter = {
   right: 0,
   bottom: 0,
   alignItems: "center" as const,
-  justifyContent: "center" as const
+  justifyContent: "center" as const,
 };
