@@ -48,6 +48,12 @@ export function YouTubeEmbed({ videoId }: Props) {
   );
 }
 
+// Container + webview bgs stay literal black in both light + dark
+// modes — the YouTube player itself renders dark video content, so a
+// black surface matches what fills it once the player paints. Using
+// `cream` in light mode would create a brief warm-cream flash at load
+// time that doesn't help anyone. Theme-aware bg is intentionally NOT
+// applied here.
 const styles = StyleSheet.create({
   container: {
     width: "100%",

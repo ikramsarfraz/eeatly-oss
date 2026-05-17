@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import {
   AudioModule,
@@ -18,6 +18,8 @@ import {
   Text,
   View
 } from "react-native";
+import type { ThemeColors } from "../lib/design/tokens";
+import { useThemeColors } from "../lib/design/use-theme-colors";
 
 /**
  * Round 15 Task 1 — voice recorder primitive used by the AI capture
@@ -36,6 +38,14 @@ import {
  *   - preview   — playback bar + "Use this" + "Re-record" buttons.
  *
  * Uses `expo-audio` (SDK 54 ships v1.1.x; `expo-av` is deprecated).
+ *
+ * R19.7: theme-aware — every color reads from `useThemeColors()`; the
+ * StyleSheet is memoised against the palette reference. White icon /
+ * label glyphs that ride on the forest CTA use `colors.forestText`
+ * (cream in light, near-black in dark) so they stay legible after the
+ * CTA inverts to sage-green in dark mode. Text on the danger CTA stays
+ * literal white — the danger token is saturated red in both palettes,
+ * white contrast holds.
  */
 
 const MAX_DURATION_MS = 5 * 60 * 1000;
@@ -59,6 +69,9 @@ function formatMs(ms: number): string {
 }
 
 export function VoiceRecorder({ onRecorded, disabled }: VoiceRecorderProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [pending, setPending] = useState(false);
   const [permissionError, setPermissionError] = useState<string | null>(null);
@@ -198,10 +211,10 @@ export function VoiceRecorder({ onRecorded, disabled }: VoiceRecorderProps) {
           accessibilityRole="button"
         >
           {pending ? (
-            <ActivityIndicator color="#fff" size="large" />
+            <ActivityIndicator color={colors.forestText} size="large" />
           ) : (
             <>
-              <Ionicons name="mic" size={36} color="#fff" />
+              <Ionicons name="mic" size={36} color={colors.forestText} />
               <Text style={styles.recordLabel}>Record</Text>
             </>
           )}
@@ -277,6 +290,9 @@ function PreviewView({
   onReRecord: () => void;
   disabled?: boolean;
 }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const player = useAudioPlayer(uri);
   const status = useAudioPlayerStatus(player);
 
@@ -312,12 +328,12 @@ function PreviewView({
           accessibilityLabel={status.playing ? "Pause playback" : "Play recording"}
         >
           {!status.isLoaded ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={colors.forestText} />
           ) : (
             <Ionicons
               name={status.playing ? "pause" : "play"}
               size={20}
-              color="#fff"
+              color={colors.forestText}
             />
           )}
         </Pressable>
@@ -335,7 +351,7 @@ function PreviewView({
         ]}
         accessibilityRole="button"
       >
-        <Ionicons name="checkmark" size={20} color="#fff" />
+        <Ionicons name="checkmark" size={20} color={colors.forestText} />
         <Text style={styles.primaryCtaText}>Use this</Text>
       </Pressable>
       <Pressable
@@ -349,153 +365,161 @@ function PreviewView({
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: {
-    alignItems: "center",
-    paddingVertical: 18,
-    paddingHorizontal: 16,
-    gap: 12
-  },
-  body: {
-    fontSize: 13,
-    color: "#555",
-    textAlign: "center",
-    lineHeight: 19,
-    paddingHorizontal: 8
-  },
-  hint: {
-    fontSize: 11,
-    color: "#888",
-    textAlign: "center",
-    lineHeight: 16,
-    paddingHorizontal: 12,
-    marginTop: 4
-  },
-  recordButton: {
-    width: 132,
-    height: 132,
-    borderRadius: 66,
-    backgroundColor: "#2f6f58",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 2,
-    shadowColor: "#000",
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6
-  },
-  recordLabel: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "600",
-    letterSpacing: 0.5
-  },
-  recordingDotRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8
-  },
-  recordingDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#b91c1c"
-  },
-  recordingLabel: {
-    fontSize: 13,
-    color: "#b91c1c",
-    fontWeight: "600",
-    letterSpacing: 0.4
-  },
-  timer: {
-    fontSize: 44,
-    fontWeight: "300",
-    color: "#111",
-    fontVariant: ["tabular-nums"]
-  },
-  timerCap: {
-    fontSize: 12,
-    color: "#888",
-    marginTop: -4
-  },
-  stopButton: {
-    minHeight: 52,
-    minWidth: 160,
-    paddingHorizontal: 24,
-    borderRadius: 28,
-    backgroundColor: "#b91c1c",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    marginTop: 8
-  },
-  stopLabel: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600"
-  },
-  cancelLink: {
-    color: "#666",
-    fontSize: 14,
-    marginTop: 4
-  },
-  previewHeading: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#444"
-  },
-  playerCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-    backgroundColor: "#eef5f1",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#cfe1d7",
-    alignSelf: "stretch"
-  },
-  playButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#2f6f58",
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  playerTime: {
-    fontSize: 14,
-    color: "#1f4a3b",
-    fontVariant: ["tabular-nums"]
-  },
-  primaryCta: {
-    alignSelf: "stretch",
-    minHeight: 52,
-    borderRadius: 12,
-    backgroundColor: "#2f6f58",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    marginTop: 4
-  },
-  primaryCtaText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600"
-  },
-  reRecordLink: {
-    color: "#2f6f58",
-    fontSize: 14,
-    fontWeight: "500"
-  },
-  pressed: { opacity: 0.85 },
-  disabled: { opacity: 0.55 },
-  error: {
-    color: "#b91c1c",
-    fontSize: 12
-  }
-});
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    wrap: {
+      alignItems: "center",
+      paddingVertical: 18,
+      paddingHorizontal: 16,
+      gap: 12
+    },
+    body: {
+      fontSize: 13,
+      color: colors.ink2,
+      textAlign: "center",
+      lineHeight: 19,
+      paddingHorizontal: 8
+    },
+    hint: {
+      fontSize: 11,
+      color: colors.ink3,
+      textAlign: "center",
+      lineHeight: 16,
+      paddingHorizontal: 12,
+      marginTop: 4
+    },
+    recordButton: {
+      width: 132,
+      height: 132,
+      borderRadius: 66,
+      backgroundColor: colors.forest,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 2,
+      // Shadow stays literal black — drop shadows read the same in both
+      // appearance modes; theming them to the surface color would erase
+      // the elevation cue.
+      shadowColor: "#000",
+      shadowOpacity: 0.18,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6
+    },
+    recordLabel: {
+      color: colors.forestText,
+      fontSize: 14,
+      fontWeight: "600",
+      letterSpacing: 0.5
+    },
+    recordingDotRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8
+    },
+    recordingDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: colors.danger
+    },
+    recordingLabel: {
+      fontSize: 13,
+      color: colors.danger,
+      fontWeight: "600",
+      letterSpacing: 0.4
+    },
+    timer: {
+      fontSize: 44,
+      fontWeight: "300",
+      color: colors.ink,
+      fontVariant: ["tabular-nums"]
+    },
+    timerCap: {
+      fontSize: 12,
+      color: colors.ink3,
+      marginTop: -4
+    },
+    stopButton: {
+      minHeight: 52,
+      minWidth: 160,
+      paddingHorizontal: 24,
+      borderRadius: 28,
+      backgroundColor: colors.danger,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      marginTop: 8
+    },
+    stopLabel: {
+      // The danger token stays a saturated red in both palettes — white
+      // glyphs hold contrast in light + dark mode, so this can stay
+      // literal rather than chasing a `dangerText` semantic.
+      color: "#fff",
+      fontSize: 15,
+      fontWeight: "600"
+    },
+    cancelLink: {
+      color: colors.ink2,
+      fontSize: 14,
+      marginTop: 4
+    },
+    previewHeading: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: colors.ink
+    },
+    playerCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 14,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 14,
+      backgroundColor: colors.sageBg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.sageDeep,
+      alignSelf: "stretch"
+    },
+    playButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.forest,
+      alignItems: "center",
+      justifyContent: "center"
+    },
+    playerTime: {
+      fontSize: 14,
+      color: colors.forestDeep,
+      fontVariant: ["tabular-nums"]
+    },
+    primaryCta: {
+      alignSelf: "stretch",
+      minHeight: 52,
+      borderRadius: 12,
+      backgroundColor: colors.forest,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      marginTop: 4
+    },
+    primaryCtaText: {
+      color: colors.forestText,
+      fontSize: 16,
+      fontWeight: "600"
+    },
+    reRecordLink: {
+      color: colors.forest,
+      fontSize: 14,
+      fontWeight: "500"
+    },
+    pressed: { opacity: 0.85 },
+    disabled: { opacity: 0.55 },
+    error: {
+      color: colors.danger,
+      fontSize: 12
+    }
+  });
+}

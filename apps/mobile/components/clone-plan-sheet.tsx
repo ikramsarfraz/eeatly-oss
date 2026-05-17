@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
@@ -19,6 +19,8 @@ import {
 import { clonePlanSchema } from "@eeatly/api/validators/plans";
 import { bumpYearInName } from "@eeatly/shared";
 import { trpc } from "../lib/trpc";
+import type { ThemeColors } from "../lib/design/tokens";
+import { useThemeColors } from "../lib/design/use-theme-colors";
 
 /**
  * Round 14 Task 3 — clone-past-plan sheet. Triggered by long-press on
@@ -31,6 +33,11 @@ import { trpc } from "../lib/trpc";
  * On success: invalidates the plans list (so the new clone shows
  * up at the top) and navigates to its detail page where hints will
  * render automatically via `plans.previousAnnotationsByMeal`.
+ *
+ * R19.7: every color reads from `useThemeColors()`; the StyleSheet is
+ * memoised on the palette reference. The scrim stays a literal
+ * translucent black — it reads as the same dimming overlay in both
+ * appearance modes.
  */
 
 function formatYMD(date: Date): string {
@@ -66,12 +73,17 @@ export type ClonePlanSheetProps = {
   sourceName: string;
 };
 
+type Styles = ReturnType<typeof makeStyles>;
+
 export function ClonePlanSheet({
   visible,
   onClose,
   sourcePlanId,
   sourceName
 }: ClonePlanSheetProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const utils = trpc.useUtils();
 
   const [name, setName] = useState(() => bumpYearInName(sourceName));
@@ -175,6 +187,7 @@ export function ClonePlanSheet({
                   autoCorrect
                   maxLength={80}
                   editable={!submitting}
+                  placeholderTextColor={colors.ink3}
                 />
                 {nameError ? (
                   <Text style={styles.error}>{nameError}</Text>
@@ -196,7 +209,11 @@ export function ClonePlanSheet({
                   <Text style={styles.dateText}>
                     {formatDateLabel(scheduledDate)}
                   </Text>
-                  <Ionicons name="calendar-outline" size={20} color="#666" />
+                  <Ionicons
+                    name="calendar-outline"
+                    size={20}
+                    color={colors.ink2}
+                  />
                 </Pressable>
               </View>
 
@@ -211,7 +228,7 @@ export function ClonePlanSheet({
                 accessibilityRole="button"
               >
                 {submitting ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color={colors.forestText} />
                 ) : (
                   <Text style={styles.submitText}>Clone plan</Text>
                 )}
@@ -239,6 +256,7 @@ export function ClonePlanSheet({
             setShowDatePicker(false);
           }}
           onCancel={() => setShowDatePicker(false)}
+          styles={styles}
         />
       ) : null}
 
@@ -253,7 +271,11 @@ export function ClonePlanSheet({
           onPress={() => setUpgradeOpen(false)}
         >
           <Pressable style={styles.upgradeCard} onPress={() => null}>
-            <Ionicons name="sparkles-outline" size={28} color="#2f6f58" />
+            <Ionicons
+              name="sparkles-outline"
+              size={28}
+              color={colors.forest}
+            />
             <Text style={styles.upgradeTitle}>Cloning is a Plus feature</Text>
             <Text style={styles.upgradeBody}>
               Upgrade on the web to clone past plans and bring last year's
@@ -281,11 +303,13 @@ export function ClonePlanSheet({
 function DatePickerSheet({
   value,
   onConfirm,
-  onCancel
+  onCancel,
+  styles
 }: {
   value: string;
   onConfirm: (next: string) => void;
   onCancel: () => void;
+  styles: Styles;
 }) {
   const [draft, setDraft] = useState<Date>(() => {
     const [y, m, d] = value.split("-").map(Number);
@@ -332,143 +356,156 @@ function DatePickerSheet({
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "flex-end"
-  },
-  sheet: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    maxHeight: "90%"
-  },
-  handleWrap: { alignItems: "center", paddingVertical: 10 },
-  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: "#dcd9d2" },
-  body: {
-    paddingHorizontal: 20,
-    paddingBottom: 28,
-    gap: 14
-  },
-  title: { fontSize: 18, fontWeight: "600", color: "#111" },
-  subtitle: { fontSize: 13, color: "#555", lineHeight: 19 },
-  field: { gap: 6 },
-  label: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#333",
-    letterSpacing: 0.2
-  },
-  required: { color: "#b91c1c" },
-  input: {
-    minHeight: 46,
-    borderColor: "#d4d2cb",
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    backgroundColor: "#fff",
-    color: "#111"
-  },
-  dateButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 12
-  },
-  dateText: { fontSize: 16, color: "#111" },
-  error: { color: "#b91c1c", fontSize: 12 },
-  pressed: { opacity: 0.85 },
-  disabled: { opacity: 0.55 },
-  submit: {
-    marginTop: 6,
-    minHeight: 50,
-    borderRadius: 12,
-    backgroundColor: "#2f6f58",
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  submitDisabled: { backgroundColor: "#a7c6b8" },
-  submitText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600"
-  },
-  cancelRow: {
-    alignItems: "center",
-    paddingTop: 4
-  },
-  cancelText: { color: "#666", fontSize: 14 },
-  sheetBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "flex-end"
-  },
-  datePickSheet: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingBottom: 24
-  },
-  sheetHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: "#e5e3dc"
-  },
-  sheetHeaderTitle: { fontSize: 14, fontWeight: "600", color: "#111" },
-  sheetCancel: { fontSize: 15, color: "#666" },
-  sheetDone: { fontSize: 15, color: "#2f6f58", fontWeight: "600" },
-  iosPicker: { alignSelf: "stretch" },
-  upgradeBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24
-  },
-  upgradeCard: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 22,
-    gap: 12,
-    alignItems: "center",
-    maxWidth: 360
-  },
-  upgradeTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#111",
-    textAlign: "center"
-  },
-  upgradeBody: {
-    fontSize: 14,
-    color: "#555",
-    textAlign: "center",
-    lineHeight: 20
-  },
-  upgradeCta: {
-    minHeight: 46,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    backgroundColor: "#2f6f58",
-    alignItems: "center",
-    justifyContent: "center",
-    alignSelf: "stretch"
-  },
-  upgradeCtaText: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600"
-  },
-  upgradeCancel: {
-    color: "#666",
-    fontSize: 14,
-    marginTop: 4
-  }
-});
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    backdrop: {
+      flex: 1,
+      // Scrim is intentionally literal — a translucent black overlay
+      // reads as a dimming effect against both cream (light) and warm
+      // near-black (dark) surfaces.
+      backgroundColor: "rgba(0,0,0,0.45)",
+      justifyContent: "flex-end"
+    },
+    sheet: {
+      backgroundColor: colors.paper,
+      borderTopLeftRadius: 18,
+      borderTopRightRadius: 18,
+      maxHeight: "90%"
+    },
+    handleWrap: { alignItems: "center", paddingVertical: 10 },
+    handle: {
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.ink4
+    },
+    body: {
+      paddingHorizontal: 20,
+      paddingBottom: 28,
+      gap: 14
+    },
+    title: { fontSize: 18, fontWeight: "600", color: colors.ink },
+    subtitle: { fontSize: 13, color: colors.ink2, lineHeight: 19 },
+    field: { gap: 6 },
+    label: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: colors.ink,
+      letterSpacing: 0.2
+    },
+    required: { color: colors.danger },
+    input: {
+      minHeight: 46,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 16,
+      backgroundColor: colors.surface,
+      color: colors.ink
+    },
+    dateButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingVertical: 12
+    },
+    dateText: { fontSize: 16, color: colors.ink },
+    error: { color: colors.danger, fontSize: 12 },
+    pressed: { opacity: 0.85 },
+    disabled: { opacity: 0.55 },
+    submit: {
+      marginTop: 6,
+      minHeight: 50,
+      borderRadius: 12,
+      backgroundColor: colors.forest,
+      alignItems: "center",
+      justifyContent: "center"
+    },
+    // `forestSoft` is the "lighter forest" sibling token — exactly the
+    // role the original pale-green disabled bg played, and it inverts
+    // correctly in dark mode (light sage instead of darker green).
+    submitDisabled: { backgroundColor: colors.forestSoft },
+    submitText: {
+      color: colors.forestText,
+      fontSize: 16,
+      fontWeight: "600"
+    },
+    cancelRow: {
+      alignItems: "center",
+      paddingTop: 4
+    },
+    cancelText: { color: colors.ink2, fontSize: 14 },
+    sheetBackdrop: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.45)",
+      justifyContent: "flex-end"
+    },
+    datePickSheet: {
+      backgroundColor: colors.paper,
+      borderTopLeftRadius: 16,
+      borderTopRightRadius: 16,
+      paddingBottom: 24
+    },
+    sheetHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.borderSoft
+    },
+    sheetHeaderTitle: { fontSize: 14, fontWeight: "600", color: colors.ink },
+    sheetCancel: { fontSize: 15, color: colors.ink2 },
+    sheetDone: { fontSize: 15, color: colors.forest, fontWeight: "600" },
+    iosPicker: { alignSelf: "stretch" },
+    upgradeBackdrop: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.45)",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 24
+    },
+    upgradeCard: {
+      backgroundColor: colors.paper,
+      borderRadius: 16,
+      padding: 22,
+      gap: 12,
+      alignItems: "center",
+      maxWidth: 360
+    },
+    upgradeTitle: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: colors.ink,
+      textAlign: "center"
+    },
+    upgradeBody: {
+      fontSize: 14,
+      color: colors.ink2,
+      textAlign: "center",
+      lineHeight: 20
+    },
+    upgradeCta: {
+      minHeight: 46,
+      paddingHorizontal: 20,
+      borderRadius: 10,
+      backgroundColor: colors.forest,
+      alignItems: "center",
+      justifyContent: "center",
+      alignSelf: "stretch"
+    },
+    upgradeCtaText: {
+      color: colors.forestText,
+      fontSize: 15,
+      fontWeight: "600"
+    },
+    upgradeCancel: {
+      color: colors.ink2,
+      fontSize: 14,
+      marginTop: 4
+    }
+  });
+}

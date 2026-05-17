@@ -1,5 +1,7 @@
+import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { WebView } from "react-native-webview";
+import { useThemeColors } from "../../lib/design/use-theme-colors";
 
 /**
  * Mobile Pinterest pin embed. Same approach as the TikTok embed:
@@ -9,12 +11,42 @@ import { WebView } from "react-native-webview";
  *
  * Pinterest pins are usually portrait (taller than wide). Height
  * 500 fits most without scrolling; the embed itself is fluid inside.
+ *
+ * R19.7: wrapper bg + border are theme-aware. The HTML body inside the
+ * WebView stays light because Pinterest's `pinit.js` widget renders
+ * white. Pinterest's embed iframe doesn't accept a theme parameter —
+ * documented limitation.
  */
 type Props = {
   url: string;
 };
 
 export function PinterestEmbed({ url }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          width: "100%",
+          height: 500,
+          borderRadius: 10,
+          overflow: "hidden",
+          // WebView body is hard-coded to white — match it so the
+          // border doesn't show a colored sliver while the WebView
+          // boots. Wrapper bg only matters for the brief load window
+          // before the WebView paints its first frame.
+          backgroundColor: "#FFFFFF",
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: colors.border
+        },
+        webview: {
+          flex: 1,
+          backgroundColor: "#FFFFFF"
+        }
+      }),
+    [colors]
+  );
+
   const safeUrl = url.replace(/["\\]/g, "");
   const html = `<!DOCTYPE html>
 <html>
@@ -49,19 +81,3 @@ export function PinterestEmbed({ url }: Props) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    width: "100%",
-    height: 500,
-    borderRadius: 10,
-    overflow: "hidden",
-    backgroundColor: "#fff",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#e5e3dc"
-  },
-  webview: {
-    flex: 1,
-    backgroundColor: "#fff"
-  }
-});
