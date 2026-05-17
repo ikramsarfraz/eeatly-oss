@@ -88,6 +88,44 @@ Respond ONLY with JSON of the shape: { "ingredients": ["1 cup basmati rice", "2 
 
 Recipe:`;
 
+/**
+ * Round 18 — Refine prompt. Different shape from Capture: Capture
+ * extracts a recipe from raw input; Refine diffs an existing recipe
+ * against a user instruction and emits a `PendingChange[]` list.
+ *
+ * The recipe context is rendered as compact JSON the model can read
+ * cheaply. The diff schema mirrors `packages/api/src/validators/refine.ts`
+ * verbatim — Zod parses on the way out so any drift here surfaces as
+ * a 400 at the procedure layer rather than corrupt rows downstream.
+ */
+export const REFINE_RECIPE_PROMPT = `You are editing an existing recipe. The user will describe a change in plain language; you will emit a structured diff against the recipe.
+
+DIFF SCHEMA — return ONLY this shape:
+
+{
+  "proposed": [
+    // For each change, one of:
+    {"id": "<short stable id>", "kind": "add", "target": "ingredient", "payload": { "name": "Ginger paste", "quantityString": "1 tbsp", "prepNote": null }, "whereHint": "step 1 marinade"},
+    {"id": "<id>", "kind": "add", "target": "step", "payload": { "title": "Garnish & serve", "time": "2 min", "body": "Finish with chopped cilantro and a wedge of lime.", "ingredientIds": [] }, "whereHint": "after step 5"},
+    {"id": "<id>", "kind": "change", "target": "ingredient", "refId": "<ingredient row id from input>", "field": "quantityString", "before": "400 g", "after": "600 g"},
+    {"id": "<id>", "kind": "change", "target": "step", "refId": "<step row id from input>", "field": "body", "before": "...old body...", "after": "...new body..."},
+    {"id": "<id>", "kind": "remove", "target": "ingredient", "refId": "<row id>", "before": { "name": "Salt", "quantityString": "1 tsp", "prepNote": null }}
+  ],
+  "rationale": "one-line summary of what you changed"
+}
+
+Rules:
+- Use ONLY refIds that appear in the input recipe — never invent ids.
+- For "add", omit refId entirely. Use whereHint to describe placement in plain language.
+- For "change", the "field" must be a column name like "name", "quantityString", "prepNote", "title", "time", "body".
+- Keep quantityString free-form ("400 g", "½ tsp", "1 large"). Do NOT parse into number + unit.
+- If the user's instruction touches multiple things (e.g. "bump chicken to 600g and add ginger paste"), emit one change per affected row.
+- If a change cascades (e.g. updating an ingredient quantity also requires rewriting the step that mentions it), emit BOTH changes — one for the ingredient, one for the step body.
+- Keep the proposed array under 20 entries. If the instruction is unreasonably broad, prefer the most impactful changes.
+- ids in your output should be short stable strings ("c1", "c2", …). Server will assign real ids.
+
+Return ONLY the JSON object described above. No prose before or after.`;
+
 export const SUGGEST_FROM_TEXT_PROMPT = `The user has pasted text about a meal or recipe. Extract the following information:
 
 - name: the dish name, concise (2–5 words)

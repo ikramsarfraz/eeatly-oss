@@ -4,6 +4,7 @@ import OpenAI, { toFile } from "openai";
 import {
   buildSharePrompt,
   EXTRACT_INGREDIENTS_FROM_TEXT_PROMPT,
+  REFINE_RECIPE_PROMPT,
   SUGGEST_FROM_IMAGE_PROMPT,
   SUGGEST_FROM_TEXT_PROMPT,
   SUGGEST_FROM_VOICE_NOTE_PROMPT
@@ -11,6 +12,10 @@ import {
 import { logger } from "@/lib/observability/logger";
 import { getServerEnv } from "@/lib/env/server";
 import type { MealSuggestion } from "@/types";
+import {
+  proposeChangesResponseSchema,
+  type ProposeChangesResponse
+} from "@eeatly/api/validators/refine";
 
 let _client: OpenAI | null = null;
 
@@ -312,4 +317,64 @@ export async function generateShareText(
   const content = response.choices[0]?.message?.content;
   if (!content) throw new Error("OpenAI returned an empty response.");
   return { text: content.trim() };
+}
+
+/**
+ * Round 18 — refine a recipe against a user instruction. Returns a
+ * structured diff (`PendingChange[]`) rather than a full extraction.
+ *
+ * The recipe context is serialised to compact JSON and prefixed onto
+ * the user message; the system prompt sets the diff schema. We avoid
+ * strict JSON-schema mode here (the discriminated-union shape doesn't
+ * map cleanly to OpenAI's strict-mode constraints) and instead validate
+ * the model's response with Zod on the way out.
+ *
+ * `image` is supplied for photo-mode refinement — the recipe + image
+ * + instruction all go to the vision-capable model in a single call.
+ */
+export async function proposeRefineChanges(args: {
+  recipeJson: string;
+  instruction: string;
+  image?: { base64: string; mediaType: string };
+}): Promise<ProposeChangesResponse> {
+  const client = getClient();
+  const userContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [];
+  if (args.image) {
+    userContent.push({
+      type: "image_url",
+      image_url: {
+        url: `data:${args.image.mediaType};base64,${args.image.base64}`,
+        detail: "high"
+      }
+    });
+  }
+  userContent.push({
+    type: "text",
+    text: `Current recipe (JSON):\n${args.recipeJson}\n\nUser instruction:\n${args.instruction}`
+  });
+
+  const response = await client.chat.completions.create(
+    {
+      model: MODEL,
+      max_tokens: 2048,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: REFINE_RECIPE_PROMPT },
+        { role: "user", content: userContent }
+      ]
+    },
+    { signal: AbortSignal.timeout(PRIMARY_TIMEOUT_MS) }
+  );
+
+  const usage = response.usage;
+  logger.info("ai_provider_tokens", {
+    provider: "openai",
+    operation: "refine_propose_changes",
+    input_tokens: usage?.prompt_tokens ?? null,
+    output_tokens: usage?.completion_tokens ?? null
+  });
+
+  const content = response.choices[0]?.message?.content;
+  if (!content) throw new Error("OpenAI returned an empty response.");
+  return proposeChangesResponseSchema.parse(JSON.parse(content));
 }

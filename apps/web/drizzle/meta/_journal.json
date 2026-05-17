@@ -176,6 +176,20 @@
       "when": 1778691611000,
       "tag": "0025_url_previews",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1779580800000,
+      "tag": "0026_structured_recipe",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1779580801000,
+      "tag": "0027_refine_sessions",
+      "breakpoints": true
     }
   ]
 }

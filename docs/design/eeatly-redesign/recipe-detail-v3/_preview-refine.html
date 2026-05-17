@@ -1,0 +1,73 @@
+<!doctype html>
+<html><head><meta charset="utf-8" /><title>Refine · single preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  html,body{margin:0;padding:0;background:#28251f;font-family:'Geist',system-ui,sans-serif}
+  body.light{background:#efe6d2}
+  body.dark{background:#15140f}
+  .stage{display:flex;align-items:flex-start;justify-content:center;padding:40px;min-height:100vh}
+</style></head><body><div id="app"></div>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="./ios-frame.jsx"></script>
+<script type="text/babel" src="./eeatly-shell.jsx"></script>
+<script type="text/babel" src="./eeatly-screens.jsx"></script>
+<script type="text/babel">
+const FlatPhone = ({ children, dark = false }) => {
+  const theme = dark ? E_DARK : E_LIGHT;
+  return (
+    <ThemeCtx.Provider value={theme}>
+      <div style={{
+        width: 393, borderRadius: 48, overflow: 'hidden', position: 'relative',
+        background: theme.cream, color: theme.ink,
+        boxShadow: '0 40px 80px rgba(0,0,0,0.22), 0 0 0 1px rgba(0,0,0,0.12)',
+        fontFamily: F.body, WebkitFontSmoothing: 'antialiased',
+      }}>
+        <div style={{ position:'absolute', top:11, left:'50%', transform:'translateX(-50%)', width:126, height:37, borderRadius:24, background:'#000', zIndex:50 }} />
+        <div style={{ display:'flex', flexDirection:'column' }}>{children}</div>
+        <div style={{ height:34, display:'flex', justifyContent:'center', alignItems:'flex-end', paddingBottom:8 }}>
+          <div style={{ width:139, height:5, borderRadius:100, background: dark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.25)' }} />
+        </div>
+      </div>
+    </ThemeCtx.Provider>
+  );
+};
+const FlatContent = ({ children, pad = 20 }) => <div style={{ padding: `8px ${pad}px 24px` }}>{children}</div>;
+const FlatTabBar = ({ active = 'home' }) => {
+  const E = useT();
+  const tabs = [
+    { id:'home', label:'Home', icon:I.home, iconActive:I.homeFill },
+    { id:'add', label:'Add', icon:I.plusCircle, iconActive:I.plusCircleFill },
+    { id:'library', label:'Library', icon:I.book, iconActive:I.bookFill },
+  ];
+  return (
+    <div style={{ paddingTop:10, paddingBottom:12, paddingLeft:8, paddingRight:8, background:E.cream, borderTop:`1px solid ${E.border}`, display:'flex', justifyContent:'space-around', alignItems:'center' }}>
+      {tabs.map(t=>{ const on=active===t.id; return (
+        <div key={t.id} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4, color:on?E.forest:E.ink3 }}>
+          <div style={{ padding:'4px 14px', borderRadius:99, background:on?E.sageBg:'transparent', display:'flex', alignItems:'center', justifyContent:'center' }}>{on?t.iconActive(22):t.icon(22)}</div>
+          <span style={{ fontSize:10.5, fontWeight:on?600:500, letterSpacing:0.2 }}>{t.label}</span>
+        </div>
+      );})}
+    </div>
+  );
+};
+window.Phone = FlatPhone; window.Content = FlatContent; window.TabBar = FlatTabBar;
+
+function App(){
+  const p = new URLSearchParams(window.location.search);
+  const dark = p.get('mode') === 'dark';
+  const screen = p.get('screen') || 'refine-text';
+  React.useEffect(()=>{ document.body.classList.add(dark?'dark':'light'); },[]);
+  let body;
+  if (screen === 'refine-text')   body = <ScreenRefineRecipe mode="text"  dark={dark} />;
+  else if (screen === 'refine-voice') body = <ScreenRefineRecipe mode="voice" dark={dark} />;
+  else if (screen === 'refine-photo') body = <ScreenRefineRecipe mode="photo" dark={dark} />;
+  else if (screen === 'review')   body = <ScreenRefineReview dark={dark} />;
+  else body = <ScreenRefineRecipe mode="text" dark={dark} />;
+  return <div className="stage">{body}</div>;
+}
+ReactDOM.createRoot(document.getElementById('app')).render(<App/>);
+</script></body></html>
