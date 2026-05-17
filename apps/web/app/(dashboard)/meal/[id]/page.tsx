@@ -3,9 +3,12 @@ import type { Route } from "next";
 import { notFound } from "next/navigation";
 import { IngredientChecklist } from "@/components/meals/ingredient-checklist";
 import { MealBackLink } from "@/components/meals/meal-back-link";
+import { StepCard, type StepCardData } from "@/components/meals/step-card";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { ShareButton } from "@/components/shares/share-button";
 import { SourceUrlEmbed } from "@/components/embeds/source-url-embed";
+import { PageTitle } from "@/components/ui/page-title";
+import { SectionLabel } from "@/components/ui/section-label";
 import { detectPlatform } from "@eeatly/shared";
 import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
 import { getMealDetail } from "@/services/meals";
@@ -30,23 +33,41 @@ function platformLabel(url: string): string | null {
 export const dynamic = "force-dynamic";
 
 /**
- * Round 10 — authenticated, household-scoped recipe view.
+ * Round 21 — recipe view with web read-parity for the R18 structured
+ * recipe tables. Prefer `meals.structuredIngredients` /
+ * `meals.structuredSteps` when populated; fall back to the legacy
+ * `meals.ingredients` text[] and `meals.recipeText` blob when not.
+ * This mirrors the mobile read pattern at
+ * `apps/mobile/app/(authed)/meal/[id]/index.tsx` (lines 437–483) and
+ * closes the silent data-fidelity bug where a meal refined on mobile
+ * appeared unchanged on web.
  *
- * Mobile-first single column (max-width ~720px on desktop). This is the
- * page the wife pulls up at Meijer to check what she needs for biryani,
- * so tap targets stay ≥44px and the ingredient checklist gets the
- * prominent slot. Recipe text is server-rendered with `whitespace-pre-wrap`
- * so the AI-extracted plain-text recipe reads naturally without a
- * separate markdown pass.
- *
- * Auth: viewer must be a member of the meal's household. A non-member
- * lands in the same `notFound()` branch as a totally-bogus mealId — we
- * don't want to leak which other households a stranger could
- * enumerate via 403-vs-404 differences.
+ * Page stays SSR — `getMealDetail` already returns the structured
+ * fields, no need to move to client-side tRPC. Mobile-first single
+ * column (max-width ~720px). Auth: viewer must be a household member;
+ * non-members hit `notFound()` so 404-vs-403 doesn't leak which other
+ * households exist.
  */
 
 type PageProps = {
   params: Promise<{ id: string }>;
+};
+
+type StructuredIngredient = {
+  id: string;
+  position: number;
+  name: string;
+  quantityString: string;
+  prepNote: string | null;
+};
+
+type StructuredStep = {
+  id: string;
+  position: number;
+  title: string;
+  time: string | null;
+  body: string;
+  ingredientIds: string[];
 };
 
 function lastCookedLabel(lastCookedAt: string | null): string | null {
@@ -56,6 +77,20 @@ function lastCookedLabel(lastCookedAt: string | null): string | null {
   if (days === 1) return "Cooked yesterday";
   if (days < 7) return `Cooked ${days} days ago`;
   return `Last cooked ${format(parseISO(lastCookedAt), "MMM d, yyyy")}`;
+}
+
+/**
+ * Flatten one structured ingredient row into the single-string shape
+ * `IngredientChecklist` already consumes. Combining qty/name/note here
+ * avoids reshaping the checklist's prop contract and keeps the
+ * WhatsApp / Copy shopping-list export feeding off the same lines the
+ * user sees on screen.
+ */
+function flattenStructuredIngredient(row: StructuredIngredient): string {
+  const qty = row.quantityString.trim();
+  const note = row.prepNote?.trim();
+  const head = qty ? `${qty} ${row.name}` : row.name;
+  return note ? `${head} (${note})` : head;
 }
 
 export default async function MealDetailPage({ params }: PageProps) {
@@ -76,6 +111,43 @@ export default async function MealDetailPage({ params }: PageProps) {
   const addedBy = meal.createdByUserId
     ? meal.createdByName ?? "Former member"
     : "Former member";
+
+  // Structured-prefer with legacy fallback — mirrors the mobile read
+  // pattern. When the structured tables are empty (meal predates the
+  // Refine flow), fall through to the R10 text[] / R7 recipeText blob.
+  const structuredIngredients = (meal.structuredIngredients ??
+    []) as StructuredIngredient[];
+  const structuredSteps = (meal.structuredSteps ?? []) as StructuredStep[];
+
+  const displayIngredientLines: string[] | null =
+    structuredIngredients.length > 0
+      ? structuredIngredients
+          .slice()
+          .sort((a, b) => a.position - b.position)
+          .map(flattenStructuredIngredient)
+      : meal.ingredients;
+
+  // Resolve `ingredientIds` to display names via the structured map.
+  // Stale ids (ingredient deleted but still referenced) get filtered
+  // out — matches the mobile tolerance for out-of-sync denormalisation.
+  let stepCards: StepCardData[] = [];
+  if (structuredSteps.length > 0) {
+    const nameById = new Map<string, string>(
+      structuredIngredients.map((row) => [row.id, row.name])
+    );
+    stepCards = structuredSteps
+      .slice()
+      .sort((a, b) => a.position - b.position)
+      .map((row, idx) => ({
+        number: idx + 1,
+        title: row.title,
+        time: row.time,
+        body: row.body,
+        ingredients: row.ingredientIds
+          .map((iid) => nameById.get(iid))
+          .filter((name): name is string => Boolean(name))
+      }));
+  }
 
   return (
     <article className="mx-auto grid w-full max-w-[720px] gap-5 px-4 pb-12 pt-3 sm:px-6 sm:pt-4">
@@ -99,10 +171,8 @@ export default async function MealDetailPage({ params }: PageProps) {
         </div>
       )}
 
-      <header className="grid gap-1.5">
-        <h1 className="font-serif text-[28px] font-normal leading-tight tracking-[-0.005em] sm:text-[34px]">
-          {meal.name}
-        </h1>
+      <header className="grid gap-2">
+        <PageTitle title={meal.name} size="l" />
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-muted-foreground">
           <span>
             Added by <strong className="text-foreground">{addedBy}</strong>
@@ -125,14 +195,9 @@ export default async function MealDetailPage({ params }: PageProps) {
       </header>
 
       <section aria-labelledby="ingredients-heading" className="grid gap-2.5">
-        <h2
-          id="ingredients-heading"
-          className="text-[13px] font-semibold uppercase tracking-[0.06em] text-muted-foreground"
-        >
-          Ingredients
-        </h2>
+        <SectionLabel id="ingredients-heading">Ingredients</SectionLabel>
         <IngredientChecklist
-          ingredients={meal.ingredients}
+          ingredients={displayIngredientLines}
           mealName={meal.name}
           mealId={meal.id}
           canExtract={Boolean(meal.recipeText?.trim())}
@@ -140,13 +205,16 @@ export default async function MealDetailPage({ params }: PageProps) {
       </section>
 
       <section aria-labelledby="recipe-heading" className="grid gap-2.5">
-        <h2
-          id="recipe-heading"
-          className="text-[13px] font-semibold uppercase tracking-[0.06em] text-muted-foreground"
-        >
-          Recipe
-        </h2>
-        {meal.recipeText ? (
+        <SectionLabel id="recipe-heading">Recipe</SectionLabel>
+        {stepCards.length > 0 ? (
+          <ol className="grid list-none gap-2.5">
+            {stepCards.map((step) => (
+              <li key={step.number}>
+                <StepCard step={step} />
+              </li>
+            ))}
+          </ol>
+        ) : meal.recipeText ? (
           // pre-wrap preserves the AI-extracted line breaks; font-sans
           // overrides the <pre> default so the recipe reads as prose,
           // not code. Comfortable reading line-height for mobile.
