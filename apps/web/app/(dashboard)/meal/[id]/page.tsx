@@ -1,12 +1,15 @@
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
+import Link from "next/link";
 import type { Route } from "next";
 import { notFound } from "next/navigation";
+import { Sparkles } from "lucide-react";
 import { IngredientChecklist } from "@/components/meals/ingredient-checklist";
 import { MealBackLink } from "@/components/meals/meal-back-link";
 import { StepCard, type StepCardData } from "@/components/meals/step-card";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { ShareButton } from "@/components/shares/share-button";
 import { SourceUrlEmbed } from "@/components/embeds/source-url-embed";
+import { Button } from "@/components/ui/button";
 import { PageTitle } from "@/components/ui/page-title";
 import { SectionLabel } from "@/components/ui/section-label";
 import { detectPlatform } from "@eeatly/shared";
@@ -243,11 +246,17 @@ export default async function MealDetailPage({ params }: PageProps) {
         ) : null}
       </section>
 
-      {/* Action row — share + log again. Edit/delete aren't surfaced
-          here because the app doesn't yet have a meal-level edit or
-          archive flow (only the per-log delete on /history). Add when
-          those flows exist. */}
+      {/* Action row — refine + share + log again. Edit/delete aren't
+          surfaced here because the app doesn't yet have a meal-level
+          edit or archive flow (only the per-log delete on /history).
+          Add when those flows exist. */}
       <div className="flex flex-wrap items-center gap-2 pt-2">
+        <Button asChild variant="default" className="min-h-[40px]">
+          <Link href={`/meal/${meal.id}/refine` as Route}>
+            <Sparkles className="h-3.5 w-3.5" />
+            Refine recipe
+          </Link>
+        </Button>
         <LogAgainButton
           mealName={meal.name}
           variant="default"
