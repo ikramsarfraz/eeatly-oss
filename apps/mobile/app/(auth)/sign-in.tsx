@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { KeyboardAvoidingView, Platform, Text, View } from "react-native";
 import { authClient } from "../../lib/auth/client";
-import { colors } from "../../lib/design/tokens";
+import { useThemeColors } from "../../lib/design/use-theme-colors";
 import { Button, Input, PageTitle, Screen } from "../../components/ui";
 
 /**
@@ -14,6 +14,7 @@ import { Button, Input, PageTitle, Screen } from "../../components/ui";
  * taps the link.
  */
 export default function SignIn() {
+  const colors = useThemeColors();
   const [email, setEmail] = useState("");
   const [state, setState] = useState<
     | { kind: "idle" }
@@ -71,14 +72,14 @@ export default function SignIn() {
             <Ionicons name="mail-outline" size={30} color={colors.forest} />
           </View>
           <Text
-            className="font-display text-display-xs text-ink text-center"
+            className="font-display text-display-xs text-ink dark:text-ink-dark text-center"
             style={{ letterSpacing: -0.4 }}
           >
             Check your email.
           </Text>
-          <Text className="font-body text-body-lg text-ink-2 text-center max-w-[320px]">
+          <Text className="font-body text-body-lg text-ink-2 dark:text-ink-2-dark text-center max-w-[320px]">
             We sent a sign-in link to{" "}
-            <Text className="font-body-semibold text-ink">
+            <Text className="font-body-semibold text-ink dark:text-ink-dark">
               {email.trim().toLowerCase()}
             </Text>
             . Tap it on this phone to finish signing in.
@@ -107,14 +108,14 @@ export default function SignIn() {
         <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: 30, gap: 18 }}>
           <View>
             <Text
-              className="font-display-italic text-kicker text-ink-2"
+              className="font-display-italic text-kicker text-ink-2 dark:text-ink-2-dark"
               style={{ marginBottom: 4 }}
             >
               Welcome to
             </Text>
             <PageTitle title="eeatly." size="lg" />
             <Text
-              className="font-body text-body-lg text-ink-2 mt-3"
+              className="font-body text-body-lg text-ink-2 dark:text-ink-2-dark mt-3"
               style={{ lineHeight: 22 }}
             >
               Sign in with your email — no password needed.
@@ -147,7 +148,7 @@ export default function SignIn() {
           </Button>
 
           <Text
-            className="font-mono text-eyebrow text-ink-3 uppercase text-center"
+            className="font-mono text-eyebrow text-ink-3 dark:text-ink-3-dark uppercase text-center"
             style={{ letterSpacing: 1.2 }}
           >
             Magic link · no password

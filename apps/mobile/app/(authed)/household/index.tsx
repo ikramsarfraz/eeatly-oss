@@ -11,7 +11,7 @@ import {
   View
 } from "react-native";
 import { authClient } from "../../../lib/auth/client";
-import { colors } from "../../../lib/design/tokens";
+import { useThemeColors } from "../../../lib/design/use-theme-colors";
 import { trpc } from "../../../lib/trpc";
 import { TopNav } from "../../../components/top-nav";
 import {
@@ -76,6 +76,7 @@ function kitchenKicker(name: string): { kicker: string; title: string } {
 }
 
 export default function HouseholdScreen() {
+  const colors = useThemeColors();
   const current = trpc.households.current.useQuery(undefined, {
     staleTime: 30_000
   });
@@ -264,20 +265,20 @@ export default function HouseholdScreen() {
                   <View style={{ flex: 1, gap: 4 }}>
                     <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
                       <Text
-                        className="font-body-semibold text-body-lg text-ink"
+                        className="font-body-semibold text-body-lg text-ink dark:text-ink-dark"
                         style={{ letterSpacing: -0.1 }}
                         numberOfLines={1}
                       >
                         {m.name}
                       </Text>
                       {isMe ? (
-                        <Text className="font-body text-chip text-ink-3">
+                        <Text className="font-body text-chip text-ink-3 dark:text-ink-3-dark">
                           (you)
                         </Text>
                       ) : null}
                     </View>
                     <Text
-                      className="font-mono text-eyebrow text-ink-3"
+                      className="font-mono text-eyebrow text-ink-3 dark:text-ink-3-dark"
                       style={{ letterSpacing: 0.4 }}
                       numberOfLines={1}
                     >
@@ -294,7 +295,7 @@ export default function HouseholdScreen() {
                     >
                       {m.role === "owner" ? <Chip tone="sage">Owner</Chip> : null}
                       <Text
-                        className="font-mono text-eyebrow-xs text-ink-3 uppercase"
+                        className="font-mono text-eyebrow-xs text-ink-3 dark:text-ink-3-dark uppercase"
                         style={{ letterSpacing: 0.6 }}
                       >
                         {formatJoinedEyebrow(m.joinedAt)}
@@ -325,14 +326,14 @@ export default function HouseholdScreen() {
                     >
                       <View style={{ flex: 1 }}>
                         <Text
-                          className="font-body-semibold text-body-md text-ink"
+                          className="font-body-semibold text-body-md text-ink dark:text-ink-dark"
                           style={{ letterSpacing: -0.1 }}
                           numberOfLines={1}
                         >
                           {p.email}
                         </Text>
                         <Text
-                          className="font-mono text-eyebrow-xs text-ink-3 uppercase mt-1"
+                          className="font-mono text-eyebrow-xs text-ink-3 dark:text-ink-3-dark uppercase mt-1"
                           style={{ letterSpacing: 0.5 }}
                         >
                           {formatInviteEyebrow(p.createdAt, p.expiresAt)}
@@ -367,7 +368,7 @@ export default function HouseholdScreen() {
                 ))}
               </View>
             ) : (
-              <Text className="font-display-italic text-body-md text-ink-3 mb-7">
+              <Text className="font-display-italic text-body-md text-ink-3 dark:text-ink-3-dark mb-7">
                 No pending invitations.
               </Text>
             )}
@@ -385,7 +386,7 @@ export default function HouseholdScreen() {
             Leave kitchen
           </Button>
           <Text
-            className="font-body text-body-sm text-ink-3 text-center mt-3"
+            className="font-body text-body-sm text-ink-3 dark:text-ink-3-dark text-center mt-3"
             style={{ maxWidth: 280, lineHeight: 19 }}
           >
             Your recipes stay credited to you. You&apos;ll land in a fresh

@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { createPlanSchema } from "@eeatly/api/validators/plans";
 import { TopNav } from "../../../components/top-nav";
-import { colors } from "../../../lib/design/tokens";
+import { useThemeColors } from "../../../lib/design/use-theme-colors";
 import { trpc } from "../../../lib/trpc";
 import {
   Button,
@@ -55,6 +55,7 @@ function getCauseReason(error: unknown): string | null {
 }
 
 export default function NewPlanScreen() {
+  const colors = useThemeColors();
   const [name, setName] = useState("");
   const [scheduledDate, setScheduledDate] = useState<string>(() =>
     formatYMD(new Date())
@@ -153,7 +154,7 @@ export default function NewPlanScreen() {
 
             <View style={{ gap: 8 }}>
               <Text
-                className="font-body-semibold text-body-md text-ink"
+                className="font-body-semibold text-body-md text-ink dark:text-ink-dark"
                 style={{ letterSpacing: -0.1 }}
               >
                 Planned date
@@ -243,12 +244,12 @@ export default function NewPlanScreen() {
                   <Ionicons name="sparkles-outline" size={26} color={colors.ink} />
                 </View>
                 <Text
-                  className="font-display text-display-xs text-ink text-center"
+                  className="font-display text-display-xs text-ink dark:text-ink-dark text-center"
                   style={{ letterSpacing: -0.4 }}
                 >
                   Plans are part of eeatly Plus
                 </Text>
-                <Text className="font-body text-body-md text-ink-2 text-center">
+                <Text className="font-body text-body-md text-ink-2 dark:text-ink-2-dark text-center">
                   Upgrade on the web to plan menus and clone occasions
                   year-over-year. Manual logging stays free.
                 </Text>
@@ -289,6 +290,7 @@ function DatePickerSheet({
   onConfirm: (next: string) => void;
   onCancel: () => void;
 }) {
+  const colors = useThemeColors();
   const [draft, setDraft] = useState<Date>(() => {
     const [y, m, d] = value.split("-").map(Number);
     return new Date(y ?? 2000, (m ?? 1) - 1, d ?? 1);

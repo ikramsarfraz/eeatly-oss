@@ -171,16 +171,16 @@ export function PhotoPicker({ value, onChange, disabled }: PhotoPickerProps) {
           disabled={disabled}
           accessibilityRole="button"
           accessibilityLabel="Add a photo"
-          className={`h-[180px] rounded-lg border border-dashed border-border bg-cream-soft items-center justify-center px-4 py-4 active:opacity-70 ${
+          className={`h-[180px] rounded-lg border border-dashed border-border dark:border-border-dark bg-cream-soft dark:bg-cream-soft-dark items-center justify-center px-4 py-4 active:opacity-70 ${
             disabled ? "opacity-50" : ""
           }`}
         >
           <Ionicons name="image-outline" size={28} color="#2E5739" />
-          <Text className="font-body-semibold text-body-lg text-ink mt-2">
+          <Text className="font-body-semibold text-body-lg text-ink dark:text-ink-dark mt-2">
             Add a photo
           </Text>
           <Text
-            className="font-mono text-eyebrow text-ink-3 uppercase mt-1"
+            className="font-mono text-eyebrow text-ink-3 dark:text-ink-3-dark uppercase mt-1"
             style={{ letterSpacing: 0.6 }}
           >
             Camera or library
@@ -247,7 +247,7 @@ function SheetOption({
     <Pressable
       onPress={onPress}
       className={`flex-row items-center gap-3.5 px-2 py-3.5 rounded-sm min-h-[56px] active:opacity-70 ${
-        variant === "cancel" ? "mt-1 border-t border-border" : ""
+        variant === "cancel" ? "mt-1 border-t border-border dark:border-border-dark" : ""
       }`}
     >
       <Ionicons

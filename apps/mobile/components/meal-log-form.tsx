@@ -16,7 +16,7 @@ import {
 import { mealLogInputSchema } from "@eeatly/api/validators/meals";
 import type { MealLogInput } from "@eeatly/api/validators/meals";
 import { trpc } from "../lib/trpc";
-import { colors } from "../lib/design/tokens";
+import { useThemeColors } from "../lib/design/use-theme-colors";
 import { PhotoPicker } from "./photo-picker";
 import { SourceUrlInputPreview } from "./embeds/source-url-input-preview";
 import { Button, Card, CardBody, Input, ListItem } from "./ui";
@@ -105,12 +105,12 @@ function FieldLabel({
 }) {
   return (
     <Text
-      className="font-body-semibold text-body-md text-ink mb-2"
+      className="font-body-semibold text-body-md text-ink dark:text-ink-dark mb-2"
       style={{ letterSpacing: -0.1 }}
     >
       {children}
       {optional ? (
-        <Text className="font-body text-body-md text-ink-3"> · optional</Text>
+        <Text className="font-body text-body-md text-ink-3 dark:text-ink-3-dark"> · optional</Text>
       ) : null}
     </Text>
   );
@@ -123,6 +123,7 @@ export function MealLogForm({
   hideAutocomplete,
   submitLabel = "Save meal log"
 }: MealLogFormProps) {
+  const colors = useThemeColors();
   const utils = trpc.useUtils();
 
   const [mealName, setMealName] = useState(initialValues?.mealName ?? "");
@@ -262,7 +263,7 @@ export function MealLogForm({
                   color={colors.forest}
                 />
                 <Text
-                  className="font-body-semibold text-label text-forest uppercase"
+                  className="font-body-semibold text-label text-forest dark:text-forest-dark uppercase"
                   style={{ letterSpacing: 1.4 }}
                 >
                   What the AI read
@@ -271,7 +272,7 @@ export function MealLogForm({
               {ingredients && ingredients.length > 0 ? (
                 <View style={{ gap: 4, marginBottom: 12 }}>
                   <Text
-                    className="font-body-semibold text-body-md text-ink"
+                    className="font-body-semibold text-body-md text-ink dark:text-ink-dark"
                     style={{ letterSpacing: -0.1 }}
                   >
                     Ingredients
@@ -279,7 +280,7 @@ export function MealLogForm({
                   {ingredients.map((line: string, i: number) => (
                     <Text
                       key={`${line}-${i}`}
-                      className="font-body text-body-md text-ink"
+                      className="font-body text-body-md text-ink dark:text-ink-dark"
                     >
                       •  {line}
                     </Text>
@@ -289,20 +290,20 @@ export function MealLogForm({
               {recipeText ? (
                 <View style={{ gap: 4 }}>
                   <Text
-                    className="font-body-semibold text-body-md text-ink"
+                    className="font-body-semibold text-body-md text-ink dark:text-ink-dark"
                     style={{ letterSpacing: -0.1 }}
                   >
                     Recipe
                   </Text>
                   <Text
-                    className="font-body text-body-md text-ink"
+                    className="font-body text-body-md text-ink dark:text-ink-dark"
                     style={{ lineHeight: 21 }}
                   >
                     {recipeText}
                   </Text>
                 </View>
               ) : null}
-              <Text className="font-display-italic text-body-md text-ink-3 mt-3">
+              <Text className="font-display-italic text-body-md text-ink-3 dark:text-ink-3-dark mt-3">
                 Saved as-is when you tap save. Edit the name, photo, or
                 effort below if the AI got something off.
               </Text>
@@ -342,7 +343,7 @@ export function MealLogForm({
                   />
                 }
                 trailing={
-                  <Text className="font-body-semibold text-body-sm text-forest">
+                  <Text className="font-body-semibold text-body-sm text-forest dark:text-forest-dark">
                     Log again
                   </Text>
                 }
@@ -509,6 +510,7 @@ function DatePickerSheet({
   onConfirm: (next: string) => void;
   onCancel: () => void;
 }) {
+  const colors = useThemeColors();
   const [draft, setDraft] = useState<Date>(() => {
     const [y, m, d] = value.split("-").map(Number);
     return new Date(y ?? 2000, (m ?? 1) - 1, d ?? 1);

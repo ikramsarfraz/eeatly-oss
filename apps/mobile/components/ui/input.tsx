@@ -1,10 +1,10 @@
 import { forwardRef, useState } from "react";
 import { Text, TextInput, View } from "react-native";
 import type { TextInputProps } from "react-native";
-import { colors } from "../../lib/design/tokens";
+import { useThemeColors } from "../../lib/design/use-theme-colors";
 
 /**
- * Round 18 — Input primitive.
+ * Round 18/19/19.5 — Input primitive.
  *
  * Composes a label + TextInput + helper/error row. Multiline grows to
  * `minHeight=96` so longer notes have room to breathe.
@@ -13,6 +13,11 @@ import { colors } from "../../lib/design/tokens";
  * visibly responds without going green/blue like a system input. The
  * error variant overrides everything else and shows a danger border +
  * danger helper text.
+ *
+ * R19.5: dark-mode aware. Border + bg + text colors all carry `dark:`
+ * variants; the placeholder tint reads from `useThemeColors()` so the
+ * RN `placeholderTextColor` prop (which doesn't accept Tailwind
+ * classes) flips with system appearance.
  */
 type InputProps = Omit<TextInputProps, "style"> & {
   label?: string;
@@ -44,14 +49,15 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
   },
   ref
 ) {
+  const colors = useThemeColors();
   const [focused, setFocused] = useState(false);
   const isError = variant === "error" || Boolean(error);
 
   const borderClass = isError
-    ? "border-danger"
+    ? "border-danger dark:border-danger-dark"
     : focused
-      ? "border-sage-deep"
-      : "border-border";
+      ? "border-sage-deep dark:border-sage-deep-dark"
+      : "border-border dark:border-border-dark";
 
   const fontClass = mono
     ? "font-mono"
@@ -63,7 +69,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
     <View className={`gap-2 ${className ?? ""}`}>
       {label ? (
         <Text
-          className="font-body-semibold text-body-md text-ink"
+          className="font-body-semibold text-body-md text-ink dark:text-ink-dark"
           style={{ letterSpacing: -0.1 }}
         >
           {label}
@@ -73,9 +79,9 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
         ref={ref}
         placeholderTextColor={colors.ink3}
         className={`
-          rounded-md border bg-surface
+          rounded-md border bg-surface dark:bg-surface-dark
           px-4 ${multiline ? "py-3.5 min-h-[96px]" : "h-12"}
-          text-body-lg text-ink
+          text-body-lg text-ink dark:text-ink-dark
           ${fontClass}
           ${borderClass}
         `}
@@ -92,10 +98,12 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
         {...rest}
       />
       {error ? (
-        <Text className="font-body text-body-md text-danger">{error}</Text>
+        <Text className="font-body text-body-md text-danger dark:text-danger-dark">
+          {error}
+        </Text>
       ) : helper ? (
         <Text
-          className="font-mono text-eyebrow text-ink-3 uppercase"
+          className="font-mono text-eyebrow text-ink-3 dark:text-ink-3-dark uppercase"
           style={{ letterSpacing: 0.5 }}
         >
           {helper}

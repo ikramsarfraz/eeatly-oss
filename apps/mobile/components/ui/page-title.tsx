@@ -46,12 +46,12 @@ export function PageTitle({
   return (
     <View className={`gap-1.5 ${className ?? ""}`}>
       {kicker ? (
-        <Text className="font-display-italic text-kicker text-ink-2">
+        <Text className="font-display-italic text-kicker text-ink-2 dark:text-ink-2-dark">
           {kicker}
         </Text>
       ) : null}
       <Text
-        className={`font-display ${SIZE_TO_TOKEN[size]} text-ink`}
+        className={`font-display ${SIZE_TO_TOKEN[size]} text-ink dark:text-ink-dark`}
         style={{ letterSpacing: -0.6 }}
         allowFontScaling
       >
@@ -59,14 +59,14 @@ export function PageTitle({
       </Text>
       {eyebrow ? (
         <Text
-          className="font-mono text-label text-ink-3 uppercase mt-1"
+          className="font-mono text-label text-ink-3 dark:text-ink-3-dark uppercase mt-1"
           style={{ letterSpacing: 1.5 }}
         >
           {eyebrow}
         </Text>
       ) : null}
       {subtitle ? (
-        <Text className="font-body text-body-md text-ink-2 mt-1">
+        <Text className="font-body text-body-md text-ink-2 dark:text-ink-2-dark mt-1">
           {subtitle}
         </Text>
       ) : null}

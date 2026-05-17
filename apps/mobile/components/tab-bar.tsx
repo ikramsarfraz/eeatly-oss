@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors } from "../lib/design/tokens";
+import { useThemeColors } from "../lib/design/use-theme-colors";
 
 /**
  * Round 18 — custom bottom tab bar that mirrors the design handoff:
@@ -36,6 +36,7 @@ const ICON_BY_ROUTE: Record<
 };
 
 export function EeatlyTabBar({ state, navigation }: BottomTabBarProps) {
+  const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const visibleRoutes = state.routes.filter((r) => ICON_BY_ROUTE[r.name]);
 

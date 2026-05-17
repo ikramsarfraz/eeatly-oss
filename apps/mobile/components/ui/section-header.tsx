@@ -19,7 +19,7 @@ export function SectionHeader({ title, action, className }: SectionHeaderProps) 
       className={`flex-row items-baseline justify-between px-5 pt-6 pb-3 ${className ?? ""}`}
     >
       <Text
-        className="font-body-semibold text-label uppercase text-ink-2"
+        className="font-body-semibold text-label uppercase text-ink-2 dark:text-ink-2-dark"
         style={{ letterSpacing: 1.4 }}
       >
         {title.toUpperCase()}

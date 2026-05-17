@@ -6,7 +6,7 @@ import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { API_BASE_URL } from "../../lib/api-base";
 import { authClient } from "../../lib/auth/client";
 import { clearSessionToken } from "../../lib/auth/session";
-import { colors } from "../../lib/design/tokens";
+import { useThemeColors } from "../../lib/design/use-theme-colors";
 import { trpc } from "../../lib/trpc";
 import { TopNav } from "../../components/top-nav";
 import {
@@ -28,6 +28,7 @@ import {
  * → footer "EEATLY · V2.1" → bottom Sign out CTA.
  */
 export default function Settings() {
+  const colors = useThemeColors();
   const [profile, setProfile] = useState<
     { name: string; email: string } | null
   >(null);
@@ -178,7 +179,7 @@ export default function Settings() {
         </View>
 
         <Text
-          className="font-mono text-eyebrow text-ink-3 uppercase text-center mt-7"
+          className="font-mono text-eyebrow text-ink-3 dark:text-ink-3-dark uppercase text-center mt-7"
           style={{ letterSpacing: 1.4 }}
         >
           eeatly · v2.1

@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { PlanAnnotationSheet } from "../../../../components/plan-annotation-sheet";
 import { TopNav } from "../../../../components/top-nav";
-import { colors } from "../../../../lib/design/tokens";
+import { useThemeColors } from "../../../../lib/design/use-theme-colors";
 import { trpc } from "../../../../lib/trpc";
 import {
   Button,
@@ -74,6 +74,7 @@ function formatPlanEyebrow(ymd: string | null): string | null {
 }
 
 export default function PlanDetailScreen() {
+  const colors = useThemeColors();
   const { id } = useLocalSearchParams<{ id: string }>();
   const planId = typeof id === "string" ? id : "";
 
@@ -309,6 +310,7 @@ function EffortChip({
       }
     | undefined;
 }) {
+  const colors = useThemeColors();
   if (!data) return null;
   const total =
     data.quick + data.easy + data.medium + data.high_effort + data.unrated;
@@ -355,6 +357,7 @@ function DishRow({
   onEdit: () => void;
   onLongPress: () => void;
 }) {
+  const colors = useThemeColors();
   const verdictDisplay = verdict ? VERDICT_DISPLAY[verdict] : null;
   const effortLabel = effort ? EFFORT_LABEL[effort] : null;
   const hintLabels: string[] = [];
@@ -392,7 +395,7 @@ function DishRow({
             <Link href={`/(authed)/meal/${mealId}` as never} asChild>
               <Pressable hitSlop={4} className="active:opacity-70">
                 <Text
-                  className="font-body-semibold text-body-lg text-ink"
+                  className="font-body-semibold text-body-lg text-ink dark:text-ink-dark"
                   style={{ letterSpacing: -0.1 }}
                   numberOfLines={1}
                 >
@@ -444,6 +447,7 @@ function AddDishSheet({
   onClose: () => void;
   planId: string;
 }) {
+  const colors = useThemeColors();
   const utils = trpc.useUtils();
   const [query, setQuery] = useState("");
   const [adding, setAdding] = useState<string | null>(null);
@@ -510,7 +514,7 @@ function AddDishSheet({
           </View>
           <View style={{ paddingHorizontal: 22, paddingTop: 14 }}>
             <Text
-              className="font-display text-display-xs text-ink"
+              className="font-display text-display-xs text-ink dark:text-ink-dark"
               style={{ letterSpacing: -0.4, marginBottom: 14 }}
             >
               Add a dish
@@ -553,7 +557,7 @@ function AddDishSheet({
                 style={{ marginTop: 12 }}
               />
             ) : rows.length === 0 ? (
-              <Text className="font-body italic text-body-md text-ink-2 py-3">
+              <Text className="font-body italic text-body-md text-ink-2 dark:text-ink-2-dark py-3">
                 {query.trim()
                   ? "No matches. Try a different search."
                   : "Your meal library is empty. Add a meal log first."}
@@ -581,7 +585,7 @@ function AddDishSheet({
                       <MealTile name={m.name} size="sm" radius={8} />
                     </View>
                     <Text
-                      className="flex-1 font-body-semibold text-body-md text-ink"
+                      className="flex-1 font-body-semibold text-body-md text-ink dark:text-ink-dark"
                       style={{ letterSpacing: -0.1 }}
                       numberOfLines={1}
                     >
