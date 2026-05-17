@@ -20,6 +20,7 @@ import {
   MAX_AUDIO_UPLOAD_BYTES,
   SUPPORTED_AUDIO_MEDIA_TYPES
 } from "@eeatly/api/validators/ai";
+import { blobToBase64, useVoiceRecorder } from "@/lib/refine/use-voice-recorder";
 import type { MealSuggestion } from "@/types";
 
 type Tab = "photo" | "text" | "voice";
@@ -28,26 +29,6 @@ type VoiceMode = "record" | "upload";
 type AiSuggestDialogProps = {
   onSuggestion: (suggestion: MealSuggestion) => void;
 };
-
-/**
- * Convert binary `Blob` / `File` → base64 string suitable for the
- * tRPC procedure's JSON body. Read via `arrayBuffer()` (vs. `FileReader`)
- * for cleaner async flow; the result is a Node-style base64 string the
- * server-side `Buffer.from(_, 'base64')` decodes losslessly.
- */
-async function blobToBase64(blob: Blob): Promise<string> {
-  const buf = await blob.arrayBuffer();
-  const bytes = new Uint8Array(buf);
-  // btoa needs a binary string. For typical photo (a few MB) and voice
-  // (up to 25 MB) sizes this stays well below the call-stack limit for
-  // String.fromCharCode.apply(...); chunked when above 16k bytes.
-  const CHUNK = 0x8000;
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
-  }
-  return btoa(binary);
-}
 
 export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
   const photoMutation = trpc.ai.suggestFromPhoto.useMutation();
@@ -77,111 +58,48 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
     return () => window.clearTimeout(handle);
   }, [isPending]);
 
-  // Voice tab state. Two sub-modes — "record" uses MediaRecorder,
-  // "upload" accepts a file. The record path is hidden entirely if the
-  // browser doesn't support MediaRecorder (older iOS, some embedded
-  // webviews) and we auto-switch to upload mode.
+  // Voice tab state. Two sub-modes — "record" uses MediaRecorder via
+  // the shared `useVoiceRecorder` hook (R22 extraction), "upload"
+  // accepts a file. The record path is hidden entirely if the browser
+  // doesn't support MediaRecorder (older iOS, some embedded webviews)
+  // and we auto-switch to upload mode.
   const [voiceMode, setVoiceMode] = React.useState<VoiceMode>("record");
-  const [recordingState, setRecordingState] = React.useState<
-    "idle" | "requesting" | "recording" | "ready" | "denied" | "error"
-  >("idle");
-  const [recordedBlob, setRecordedBlob] = React.useState<Blob | null>(null);
-  const [recordedUrl, setRecordedUrl] = React.useState<string | null>(null);
-  const [recordSeconds, setRecordSeconds] = React.useState(0);
-  const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
-  const recordedChunksRef = React.useRef<Blob[]>([]);
-  const recordTimerRef = React.useRef<number | null>(null);
-  const recorderSupported = React.useMemo(
-    () => typeof window !== "undefined" && typeof window.MediaRecorder !== "undefined",
-    []
-  );
+  const recorder = useVoiceRecorder();
+  const {
+    state: recordingState,
+    blob: recordedBlob,
+    url: recordedUrl,
+    seconds: recordSeconds,
+    supported: recorderSupported,
+    errorMessage: recorderErrorMessage,
+    start: recorderStart,
+    stop: recorderStop,
+    reset: recorderReset
+  } = recorder;
+
+  // Recorder errors compose with whatever the dialog's local `error`
+  // already holds — computed during render so we don't trip the
+  // setState-in-effect lint.
+  const displayError = error ?? recorderErrorMessage;
 
   const [audioFile, setAudioFile] = React.useState<File | null>(null);
   const audioInputRef = React.useRef<HTMLInputElement>(null);
 
   function resetVoiceState() {
-    // Stop any in-flight recording + release the mic. MediaRecorder.stop
-    // is a no-op if not recording, but the tracks need an explicit stop
-    // so the browser's red mic indicator goes away.
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      try {
-        mediaRecorderRef.current.stop();
-      } catch {
-        // Already stopped — ignore.
-      }
-    }
-    mediaRecorderRef.current?.stream.getTracks().forEach((t) => t.stop());
-    mediaRecorderRef.current = null;
-    recordedChunksRef.current = [];
-    if (recordTimerRef.current) {
-      window.clearInterval(recordTimerRef.current);
-      recordTimerRef.current = null;
-    }
-    if (recordedUrl) URL.revokeObjectURL(recordedUrl);
-    setRecordedBlob(null);
-    setRecordedUrl(null);
-    setRecordSeconds(0);
-    setRecordingState("idle");
+    // Wipe the recording side via the hook, then clear the upload-side
+    // state the dialog still owns (audioFile + the file input element).
+    recorderReset();
     setAudioFile(null);
     if (audioInputRef.current) audioInputRef.current.value = "";
   }
 
-  async function startRecording() {
-    if (!recorderSupported) {
-      setRecordingState("error");
-      setError("Recording isn't supported in this browser. Try uploading a file instead.");
-      return;
-    }
+  function startRecording() {
     setError(null);
-    setRecordingState("requesting");
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = recorder;
-      recordedChunksRef.current = [];
-      recorder.addEventListener("dataavailable", (event) => {
-        if (event.data.size > 0) recordedChunksRef.current.push(event.data);
-      });
-      recorder.addEventListener("stop", () => {
-        // `recorder.mimeType` is the browser's chosen container (typically
-        // "audio/webm;codecs=opus" on Chrome/Firefox, "audio/mp4" on
-        // recent Safari). Strip codec params for the Blob's type so the
-        // server-side validator sees a recognized MIME.
-        const rawMime = recorder.mimeType || "audio/webm";
-        const cleanMime = rawMime.split(";")[0]?.trim() || "audio/webm";
-        const blob = new Blob(recordedChunksRef.current, { type: cleanMime });
-        if (recordedUrl) URL.revokeObjectURL(recordedUrl);
-        setRecordedBlob(blob);
-        setRecordedUrl(URL.createObjectURL(blob));
-        setRecordingState("ready");
-        stream.getTracks().forEach((t) => t.stop());
-        if (recordTimerRef.current) {
-          window.clearInterval(recordTimerRef.current);
-          recordTimerRef.current = null;
-        }
-      });
-      recorder.start();
-      setRecordingState("recording");
-      setRecordSeconds(0);
-      recordTimerRef.current = window.setInterval(
-        () => setRecordSeconds((s) => s + 1),
-        1000
-      );
-    } catch {
-      // Permission denied or unavailable mic — surface the path that
-      // recovers (upload). NotAllowedError, SecurityError, NotFoundError
-      // all converge here; the user-facing message is the same.
-      setRecordingState("denied");
-      setError(
-        "We need microphone access to record. You can switch to upload mode instead."
-      );
-    }
+    void recorderStart();
   }
 
   function stopRecording() {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-      mediaRecorderRef.current.stop();
-    }
+    recorderStop();
   }
 
   function cancelRecording() {
@@ -666,8 +584,8 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
           </div>
         )}
 
-        {error && (
-          <p className="text-[12.5px] text-destructive">{error}</p>
+        {displayError && (
+          <p className="text-[12.5px] text-destructive">{displayError}</p>
         )}
 
         <Button
