@@ -8,7 +8,7 @@ import type { RediscoverySuggestion } from "@/types";
 const reasonConfig = {
   neglected: {
     icon: History,
-    colorClass: "bg-[var(--accent-soft)] text-[#8c4a25]",
+    colorClass: "bg-[var(--accent-soft)] text-[#8c4a25] dark:text-[color:var(--terra-fg)]",
     label: "Neglected"
   },
   frequent: {
@@ -23,7 +23,7 @@ const reasonConfig = {
   },
   favorite: {
     icon: Sparkles,
-    colorClass: "bg-[#f3e8c8] text-[#8a6a1c]",
+    colorClass: "bg-[#f3e8c8] text-[#8a6a1c] dark:bg-wheat dark:text-[color:var(--wheat-fg)]",
     label: "Favorite"
   }
 } as const;
@@ -31,7 +31,7 @@ const reasonConfig = {
 const effortBadgeClass = {
   quick: "bg-[var(--primary-soft)] text-primary border-transparent",
   easy: "bg-[var(--primary-soft)] text-primary border-transparent",
-  medium: "bg-[var(--accent-soft)] text-[#8c4a25] border-transparent",
+  medium: "bg-[var(--accent-soft)] text-[#8c4a25] border-transparent dark:text-[color:var(--terra-fg)]",
   high_effort: "bg-muted text-muted-foreground"
 };
 

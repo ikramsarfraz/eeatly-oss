@@ -91,12 +91,17 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
             <SidebarMenuButton
               onClick={openQuickLog}
               aria-haspopup="dialog"
-              className="bg-foreground text-background hover:bg-[#2a3431] hover:text-background active:bg-[#2a3431] active:text-background"
+              // R23 — the button inverts ground↔text. In light mode it's
+              // a dark-green pill; in dark mode it's a cream pill on the
+              // dark sidebar. The hover hex (`#2a3431`) is the
+              // pre-dark-mode foreground shade and stays on light only;
+              // dark mode uses a lighter cream-soft for hover.
+              className="bg-foreground text-background hover:bg-[#2a3431] hover:text-background active:bg-[#2a3431] active:text-background dark:hover:bg-[color:var(--ink-2,#a8a28f)] dark:active:bg-[color:var(--ink-2,#a8a28f)]"
               tooltip="Log a meal"
             >
               <Plus className="h-4 w-4 shrink-0" />
               <span>Log a meal</span>
-              <span className="ml-auto rounded bg-white/[0.06] px-[5px] py-px font-mono-brand text-[10.5px] text-[#b8c4be] group-data-[collapsible=icon]:hidden">
+              <span className="ml-auto rounded bg-white/[0.06] px-[5px] py-px font-mono-brand text-[10.5px] text-[#b8c4be] group-data-[collapsible=icon]:hidden dark:bg-black/10 dark:text-[#4a463a]">
                 ⌘E
               </span>
             </SidebarMenuButton>

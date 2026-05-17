@@ -44,7 +44,11 @@ function retentionBadgePresentation(status: RetentionStatus): {
     case "new_user":
       return { variant: "outline" };
     case "at_risk":
-      return { variant: "outline", className: "border-amber-500/70 text-amber-950" };
+      return {
+        variant: "outline",
+        className:
+          "border-amber-500/70 text-amber-950 dark:border-amber-600/60 dark:text-amber-200"
+      };
     default:
       return {
         variant: "outline",
