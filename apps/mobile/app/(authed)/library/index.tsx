@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { TopNav } from "../../../components/top-nav";
 import { formatCookedAt } from "../../../lib/dates";
-import { colors } from "../../../lib/design/tokens";
+import { useThemeColors } from "../../../lib/design/use-theme-colors";
 import { trpc } from "../../../lib/trpc";
 import {
   Card,
@@ -48,6 +48,7 @@ const FILTERS: Array<{ id: Filter; label: string }> = [
 ];
 
 export default function LibraryTab() {
+  const colors = useThemeColors();
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
@@ -317,6 +318,7 @@ function LibraryRow({
   lastCookedAt: string | Date | null;
   effort: string | null;
 }) {
+  const colors = useThemeColors();
   const eyebrow = buildEyebrow(lastCookedAt, effort);
   return (
     <Link href={`/(authed)/meal/${mealId}` as never} asChild>
@@ -335,7 +337,7 @@ function LibraryRow({
             </View>
             <View style={{ flex: 1 }}>
               <Text
-                className="font-body-semibold text-body-md text-ink"
+                className="font-body-semibold text-body-md text-ink dark:text-ink-dark"
                 style={{ letterSpacing: -0.1, marginBottom: 2 }}
                 numberOfLines={1}
               >
@@ -343,7 +345,7 @@ function LibraryRow({
               </Text>
               {eyebrow ? (
                 <Text
-                  className="font-mono text-eyebrow text-ink-3 uppercase"
+                  className="font-mono text-eyebrow text-ink-3 dark:text-ink-3-dark uppercase"
                   style={{ letterSpacing: 0.5 }}
                   numberOfLines={1}
                 >

@@ -5,12 +5,12 @@ import {
   Easing,
   Pressable,
   StyleSheet,
-  Text,
-  View
+  Text
 } from "react-native";
+import { useThemeColors } from "../../lib/design/use-theme-colors";
 
 /**
- * Round 17 — top-of-screen toast.
+ * Round 17/19.5 — top-of-screen toast.
  *
  * Variants:
  *   - `info`    — neutral cream w/ green accent (default).
@@ -38,15 +38,15 @@ type ToastProps = {
 };
 
 const containerByVariant: Record<ToastVariant, string> = {
-  info: "bg-surface border border-forest",
-  success: "bg-forest",
-  error: "bg-danger"
+  info: "bg-surface dark:bg-surface-dark border border-forest dark:border-forest-dark",
+  success: "bg-forest dark:bg-forest-dark",
+  error: "bg-danger dark:bg-danger-dark"
 };
 
 const labelByVariant: Record<ToastVariant, string> = {
-  info: "text-ink",
-  success: "text-forest-text",
-  error: "text-forest-text"
+  info: "text-ink dark:text-ink-dark",
+  success: "text-forest-text dark:text-forest-text-dark",
+  error: "text-forest-text dark:text-forest-text-dark"
 };
 
 const iconNameByVariant: Record<
@@ -58,12 +58,6 @@ const iconNameByVariant: Record<
   error: "alert-circle"
 };
 
-const iconColorByVariant: Record<ToastVariant, string> = {
-  info: "#2E5739",
-  success: "#F5EFE2",
-  error: "#F5EFE2"
-};
-
 export function Toast({
   visible,
   message,
@@ -71,6 +65,15 @@ export function Toast({
   onDismiss,
   durationMs = 3000
 }: ToastProps) {
+  const colors = useThemeColors();
+  // Icon tint flips with the appearance setting. `info`'s icon stays
+  // forest-tinted (light or dark variant); success + error keep their
+  // cream icon on the colored background.
+  const iconColorByVariant: Record<ToastVariant, string> = {
+    info: colors.forest,
+    success: colors.forestText,
+    error: colors.forestText
+  };
   const translateY = useRef(new Animated.Value(-80)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 

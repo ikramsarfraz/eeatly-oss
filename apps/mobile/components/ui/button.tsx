@@ -1,10 +1,10 @@
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import type { PressableProps } from "react-native";
 import type { ReactNode } from "react";
-import { colors } from "../../lib/design/tokens";
+import { useThemeColors } from "../../lib/design/use-theme-colors";
 
 /**
- * Round 18 — primary Button.
+ * Round 18/19/19.5 — primary Button.
  *
  * Variants:
  *   - `primary` — forest bg, cream label. The default CTA.
@@ -24,6 +24,10 @@ import { colors } from "../../lib/design/tokens";
  *
  * Buttons render pill-shaped (rounded-pill). `leadingIcon` accepts any
  * ReactNode so callers can use Ionicons or any svg.
+ *
+ * R19.5: dark-mode aware. Every variant pairs light + dark NativeWind
+ * classes; the spinner color reads from `useThemeColors()` so the
+ * forest token flips correctly when the system appearance changes.
  */
 export type ButtonVariant =
   | "primary"
@@ -44,20 +48,23 @@ type ButtonProps = Omit<PressableProps, "children" | "style"> & {
 };
 
 const containerByVariant: Record<ButtonVariant, string> = {
-  primary: "bg-forest active:bg-forest-deep",
-  secondary: "bg-surface border border-sage-deep active:bg-sage-bg",
-  ghost: "bg-transparent active:bg-sage-bg",
-  destructive: "bg-danger-soft active:opacity-80",
+  primary:
+    "bg-forest dark:bg-forest-dark active:bg-forest-deep dark:active:bg-forest-deep-dark",
+  secondary:
+    "bg-surface dark:bg-surface-dark border border-sage-deep dark:border-sage-deep-dark active:bg-sage-bg dark:active:bg-sage-bg-dark",
+  ghost:
+    "bg-transparent active:bg-sage-bg dark:active:bg-sage-bg-dark",
+  destructive: "bg-danger-soft dark:bg-danger-soft-dark active:opacity-80",
   "outline-destructive":
-    "bg-transparent border border-danger/40 active:bg-danger-soft"
+    "bg-transparent border border-danger/40 dark:border-danger-dark/40 active:bg-danger-soft dark:active:bg-danger-soft-dark"
 };
 
 const labelByVariant: Record<ButtonVariant, string> = {
-  primary: "text-forest-text",
-  secondary: "text-forest",
-  ghost: "text-forest",
-  destructive: "text-danger",
-  "outline-destructive": "text-danger"
+  primary: "text-forest-text dark:text-forest-text-dark",
+  secondary: "text-forest dark:text-forest-dark",
+  ghost: "text-forest dark:text-forest-dark",
+  destructive: "text-danger dark:text-danger-dark",
+  "outline-destructive": "text-danger dark:text-danger-dark"
 };
 
 const heightBySize: Record<ButtonSize, string> = {
@@ -72,14 +79,6 @@ const labelSizeBySize: Record<ButtonSize, string> = {
   lg: "text-body-lg"
 };
 
-const spinnerColorByVariant: Record<ButtonVariant, string> = {
-  primary: colors.forestText,
-  secondary: colors.forest,
-  ghost: colors.forest,
-  destructive: colors.danger,
-  "outline-destructive": colors.danger
-};
-
 export function Button({
   children,
   variant = "primary",
@@ -91,6 +90,16 @@ export function Button({
   className,
   ...rest
 }: ButtonProps) {
+  const colors = useThemeColors();
+  // Spinner color matches the label color of the variant — keeps the
+  // loading state visually consistent without an extra prop.
+  const spinnerColorByVariant: Record<ButtonVariant, string> = {
+    primary: colors.forestText,
+    secondary: colors.forest,
+    ghost: colors.forest,
+    destructive: colors.danger,
+    "outline-destructive": colors.danger
+  };
   const isDisabled = disabled || loading;
   return (
     <Pressable

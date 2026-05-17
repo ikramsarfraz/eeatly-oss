@@ -13,7 +13,7 @@ import {
   View
 } from "react-native";
 import { createInvitationSchema } from "@eeatly/api/validators/households";
-import { colors } from "../../../lib/design/tokens";
+import { useThemeColors } from "../../../lib/design/use-theme-colors";
 import { trpc } from "../../../lib/trpc";
 import { TopNav } from "../../../components/top-nav";
 import {
@@ -37,6 +37,7 @@ function getCauseReason(error: unknown): string | null {
 }
 
 export default function InviteScreen() {
+  const colors = useThemeColors();
   const utils = trpc.useUtils();
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
@@ -183,12 +184,12 @@ export default function InviteScreen() {
                   <Ionicons name="sparkles-outline" size={26} color={colors.ink} />
                 </View>
                 <Text
-                  className="font-display text-display-xs text-ink text-center"
+                  className="font-display text-display-xs text-ink dark:text-ink-dark text-center"
                   style={{ letterSpacing: -0.4 }}
                 >
                   Inviting is part of eeatly Plus
                 </Text>
-                <Text className="font-body text-body-md text-ink-2 text-center">
+                <Text className="font-body text-body-md text-ink-2 dark:text-ink-2-dark text-center">
                   Upgrade on the web to add family members to your shared
                   kitchen. Solo cooking stays free.
                 </Text>

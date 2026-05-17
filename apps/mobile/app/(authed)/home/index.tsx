@@ -12,7 +12,7 @@ import { authClient } from "../../../lib/auth/client";
 import { clearSessionToken } from "../../../lib/auth/session";
 import { dateEyebrow, displayFirstName, greetingFor } from "../../../lib/design/greeting";
 import { formatCookedAt } from "../../../lib/dates";
-import { colors } from "../../../lib/design/tokens";
+import { useThemeColors } from "../../../lib/design/use-theme-colors";
 import { trpc } from "../../../lib/trpc";
 import { TopNav } from "../../../components/top-nav";
 import {
@@ -43,6 +43,7 @@ import {
  * collections, matching the handoff's editorial restraint.
  */
 export default function HomeTab() {
+  const colors = useThemeColors();
   const [firstName, setFirstName] = useState<string | null>(null);
   const dashboard = trpc.dashboard.meals.useQuery(undefined, {
     staleTime: 30_000
@@ -226,14 +227,14 @@ function RecentTile({
           <MealTile name={mealName} size="xl" photoUrl={photoUrl} radius={10} />
         </View>
         <Text
-          className="font-body-semibold text-body-md text-ink mb-0.5"
+          className="font-body-semibold text-body-md text-ink dark:text-ink-dark mb-0.5"
           style={{ letterSpacing: -0.1, lineHeight: 18 }}
           numberOfLines={2}
         >
           {mealName}
         </Text>
         <Text
-          className="font-mono text-eyebrow text-ink-3 uppercase"
+          className="font-mono text-eyebrow text-ink-3 dark:text-ink-3-dark uppercase"
           style={{ letterSpacing: 0.6 }}
           numberOfLines={1}
         >
@@ -262,14 +263,14 @@ function MostCookedTile({
         accessibilityRole="button"
         accessibilityLabel={`${mealName}, cooked ${cookCount} times`}
         style={{ width: "48%" }}
-        className="bg-surface rounded-md border border-border-soft overflow-hidden active:opacity-90"
+        className="bg-surface dark:bg-surface-dark rounded-md border border-border-soft dark:border-border-soft-dark overflow-hidden active:opacity-90"
       >
         <View style={{ height: 90 }}>
           <MealTile name={mealName} size="md" photoUrl={photoUrl} radius={0} />
         </View>
         <View style={{ paddingHorizontal: 12, paddingVertical: 10 }}>
           <Text
-            className="font-body-semibold text-body-sm text-ink"
+            className="font-body-semibold text-body-sm text-ink dark:text-ink-dark"
             style={{ letterSpacing: -0.1 }}
             numberOfLines={1}
           >
@@ -277,13 +278,13 @@ function MostCookedTile({
           </Text>
           <View className="flex-row items-baseline mt-1" style={{ gap: 4 }}>
             <Text
-              className="font-display-italic text-kicker text-forest"
+              className="font-display-italic text-kicker text-forest dark:text-forest-dark"
               style={{ lineHeight: 18 }}
             >
               ×{cookCount}
             </Text>
             <Text
-              className="font-mono text-eyebrow-xs text-ink-3 uppercase"
+              className="font-mono text-eyebrow-xs text-ink-3 dark:text-ink-3-dark uppercase"
               style={{ letterSpacing: 0.5 }}
             >
               cooked
@@ -297,6 +298,7 @@ function MostCookedTile({
 
 /* ─── Upcoming plans section ─────────────────────────────────── */
 function PlansSection() {
+  const colors = useThemeColors();
   const plans = trpc.plans.list.useQuery(undefined, { staleTime: 60_000 });
   const data = plans.data ?? [];
   const featured = data[0];
@@ -311,7 +313,7 @@ function PlansSection() {
         action={
           <Link href="/(authed)/plans" asChild>
             <Pressable hitSlop={6} accessibilityRole="button">
-              <Text className="font-body-semibold text-chip text-forest">
+              <Text className="font-body-semibold text-chip text-forest dark:text-forest-dark">
                 View all
               </Text>
             </Pressable>
@@ -335,13 +337,13 @@ function PlansSection() {
                 </IconBubble>
                 <View className="flex-1 gap-1">
                   <Text
-                    className="font-body-semibold text-body-lg text-ink"
+                    className="font-body-semibold text-body-lg text-ink dark:text-ink-dark"
                     style={{ letterSpacing: -0.1 }}
                   >
                     Plan an occasion menu
                   </Text>
                   <Text
-                    className="font-mono text-eyebrow text-ink-3 uppercase"
+                    className="font-mono text-eyebrow text-ink-3 dark:text-ink-3-dark uppercase"
                     style={{ letterSpacing: 0.6 }}
                   >
                     Eid · Diwali · dinner party
@@ -366,14 +368,14 @@ function PlansSection() {
                 </IconBubble>
                 <View className="flex-1 gap-1">
                   <Text
-                    className="font-body-semibold text-body-lg text-ink"
+                    className="font-body-semibold text-body-lg text-ink dark:text-ink-dark"
                     style={{ letterSpacing: -0.1 }}
                     numberOfLines={1}
                   >
                     {featured.name}
                   </Text>
                   <Text
-                    className="font-mono text-eyebrow text-ink-3 uppercase"
+                    className="font-mono text-eyebrow text-ink-3 dark:text-ink-3-dark uppercase"
                     style={{ letterSpacing: 0.6 }}
                   >
                     {planEyebrow(featured.scheduledDate, featured.dishCount)}

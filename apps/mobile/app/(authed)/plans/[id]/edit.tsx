@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { updatePlanSchema } from "@eeatly/api/validators/plans";
 import { TopNav } from "../../../../components/top-nav";
-import { colors } from "../../../../lib/design/tokens";
+import { useThemeColors } from "../../../../lib/design/use-theme-colors";
 import { trpc } from "../../../../lib/trpc";
 import {
   Input,
@@ -47,6 +47,7 @@ function formatDateValue(ymd: string): string {
 }
 
 export default function EditPlanScreen() {
+  const colors = useThemeColors();
   const { id } = useLocalSearchParams<{ id: string }>();
   const planId = typeof id === "string" ? id : "";
 
@@ -177,7 +178,7 @@ export default function EditPlanScreen() {
 
             <View style={{ gap: 8 }}>
               <Text
-                className="font-body-semibold text-body-md text-ink"
+                className="font-body-semibold text-body-md text-ink dark:text-ink-dark"
                 style={{ letterSpacing: -0.1 }}
               >
                 Planned date
@@ -231,13 +232,13 @@ export default function EditPlanScreen() {
           >
             <View style={{ flex: 1 }}>
               <Text
-                className="font-body-semibold text-body-md text-danger"
+                className="font-body-semibold text-body-md text-danger dark:text-danger-dark"
                 style={{ letterSpacing: -0.1 }}
               >
                 Delete plan
               </Text>
               <Text
-                className="font-body text-body-sm text-danger mt-0.5"
+                className="font-body text-body-sm text-danger dark:text-danger-dark mt-0.5"
                 style={{ opacity: 0.75 }}
               >
                 Dishes stay in your library.
@@ -271,6 +272,7 @@ function DatePickerSheet({
   onConfirm: (next: string) => void;
   onCancel: () => void;
 }) {
+  const colors = useThemeColors();
   const [draft, setDraft] = useState<Date>(() => {
     const [y, m, d] = value.split("-").map(Number);
     return new Date(y ?? 2000, (m ?? 1) - 1, d ?? 1);

@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Link } from "expo-router";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { TopNav } from "../../../components/top-nav";
-import { colors } from "../../../lib/design/tokens";
+import { useThemeColors } from "../../../lib/design/use-theme-colors";
 import {
   IconBubble,
   PageTitle,
@@ -88,6 +88,7 @@ function AddOption({
   subtitle: string;
   primary?: boolean;
 }) {
+  const colors = useThemeColors();
   const iconColor = primary ? colors.forestText : colors.forest;
   const titleColor = primary ? "#F5EFE2" : colors.ink;
   const subtitleColor = primary ? "rgba(245,239,226,0.75)" : colors.ink2;

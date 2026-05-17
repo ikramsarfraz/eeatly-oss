@@ -12,7 +12,7 @@ import {
 import { ClonePlanSheet } from "../../../components/clone-plan-sheet";
 import { TopNav } from "../../../components/top-nav";
 import { formatCookedAt } from "../../../lib/dates";
-import { colors } from "../../../lib/design/tokens";
+import { useThemeColors } from "../../../lib/design/use-theme-colors";
 import { trpc } from "../../../lib/trpc";
 import {
   Card,
@@ -33,6 +33,7 @@ import {
  * "+ new plan".
  */
 export default function PlansListScreen() {
+  const colors = useThemeColors();
   const list = trpc.plans.list.useQuery(undefined, { staleTime: 30_000 });
   const [cloneSource, setCloneSource] = useState<{
     id: string;
@@ -100,13 +101,13 @@ export default function PlansListScreen() {
         ListEmptyComponent={
           <View style={{ alignItems: "center", marginTop: 16 }}>
             <Text
-              className="font-display-italic text-display-xs text-ink-2"
+              className="font-display-italic text-display-xs text-ink-2 dark:text-ink-2-dark"
               style={{ letterSpacing: -0.3, marginBottom: 8 }}
             >
               No plans yet.
             </Text>
             <Text
-              className="font-body text-body-md text-ink-3 text-center"
+              className="font-body text-body-md text-ink-3 dark:text-ink-3-dark text-center"
               style={{ maxWidth: 260, lineHeight: 21 }}
             >
               Use plans for menus tied to a date — Eid, Diwali, a dinner party.
@@ -117,13 +118,13 @@ export default function PlansListScreen() {
           plans.length > 0 ? (
             <View style={{ alignItems: "center", marginTop: 36 }}>
               <Text
-                className="font-display-italic text-display-xs text-ink-2"
+                className="font-display-italic text-display-xs text-ink-2 dark:text-ink-2-dark"
                 style={{ letterSpacing: -0.3, marginBottom: 8 }}
               >
                 {plans.length === 1 ? "One plan so far." : "That's all for now."}
               </Text>
               <Text
-                className="font-body text-body-md text-ink-3 text-center"
+                className="font-body text-body-md text-ink-3 dark:text-ink-3-dark text-center"
                 style={{ maxWidth: 260, lineHeight: 21 }}
               >
                 Use plans for menus tied to a date — Eid, Diwali, a dinner party.
@@ -199,6 +200,7 @@ function PlanTile({
   dishCount: number;
   onLongPress?: () => void;
 }) {
+  const colors = useThemeColors();
   return (
     <Link href={`/(authed)/plans/${id}` as never} asChild>
       <Pressable
@@ -222,14 +224,14 @@ function PlanTile({
             </IconBubble>
             <View className="flex-1 gap-1">
               <Text
-                className="font-body-semibold text-title-md text-ink"
+                className="font-body-semibold text-title-md text-ink dark:text-ink-dark"
                 style={{ letterSpacing: -0.1 }}
                 numberOfLines={1}
               >
                 {name}
               </Text>
               <Text
-                className="font-mono text-eyebrow text-ink-3 uppercase"
+                className="font-mono text-eyebrow text-ink-3 dark:text-ink-3-dark uppercase"
                 style={{ letterSpacing: 0.6 }}
                 numberOfLines={1}
               >

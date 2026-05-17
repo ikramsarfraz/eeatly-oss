@@ -1,6 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Text, View } from "react-native";
-import { colors } from "../../lib/design/tokens";
+// Aliased static palette for module-scope use; component body still picks
+// up theme-aware text/icon colors via useThemeColors below.
+import { colors as colorsLight } from "../../lib/design/tokens";
+import { useThemeColors } from "../../lib/design/use-theme-colors";
 
 /**
  * Round 20 — small diff row used inside the AI reply card on Refine
@@ -20,9 +23,9 @@ const PALETTES: Record<
   DiffKind,
   { bg: string; fg: string; icon: keyof typeof Ionicons.glyphMap }
 > = {
-  add: { bg: colors.sageBg, fg: colors.forest, icon: "add" },
+  add: { bg: colorsLight.sageBg, fg: colorsLight.forest, icon: "add" },
   change: { bg: "#F4EEDB", fg: "#8A6B22", icon: "arrow-forward" },
-  remove: { bg: colors.dangerSoft, fg: colors.danger, icon: "remove" }
+  remove: { bg: colorsLight.dangerSoft, fg: colorsLight.danger, icon: "remove" }
 };
 
 export function DiffRow({
@@ -34,6 +37,7 @@ export function DiffRow({
   label: string;
   note?: string | null;
 }) {
+  const colors = useThemeColors();
   const palette = PALETTES[kind];
   return (
     <View

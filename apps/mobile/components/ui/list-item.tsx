@@ -33,11 +33,16 @@ export function ListItem({
   divider = true,
   destructive
 }: ListItemProps) {
-  const titleColor = destructive ? "text-danger" : "text-ink";
+  // R19.5: title color picks the dark variant alongside the destructive
+  // override so dark-mode list items don't render their titles in the
+  // light `ink` hex.
+  const titleColor = destructive
+    ? "text-danger dark:text-danger-dark"
+    : "text-ink dark:text-ink-dark";
   const inner = (
     <View
       className={`flex-row items-center gap-3 px-4 py-3.5 min-h-[56px] ${
-        divider ? "border-t border-border-soft" : ""
+        divider ? "border-t border-border-soft dark:border-border-soft-dark" : ""
       }`}
     >
       {leading ? <View>{leading}</View> : null}
@@ -51,7 +56,7 @@ export function ListItem({
         </Text>
         {subtitle ? (
           <Text
-            className="font-body text-body-md text-ink-2"
+            className="font-body text-body-md text-ink-2 dark:text-ink-2-dark"
             numberOfLines={2}
           >
             {subtitle}
@@ -60,7 +65,7 @@ export function ListItem({
       </View>
       {value ? (
         <Text
-          className="font-mono text-chip text-ink-2"
+          className="font-mono text-chip text-ink-2 dark:text-ink-2-dark"
           style={{ letterSpacing: 0.2 }}
         >
           {value}
@@ -79,7 +84,7 @@ export function ListItem({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={subtitle ? `${title}, ${subtitle}` : title}
-      className="active:bg-sage-bg/40"
+      className="active:bg-sage-bg/40 dark:active:bg-sage-bg-dark/40"
     >
       {inner}
     </Pressable>

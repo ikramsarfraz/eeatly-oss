@@ -22,7 +22,7 @@ import { TopNav } from "../../../components/top-nav";
 import { VoiceRecorder } from "../../../components/voice-recorder";
 import { AudioReadError, readAudioForAi } from "../../../lib/audio-upload";
 import { uploadPhoto } from "../../../lib/photo-upload";
-import { colors } from "../../../lib/design/tokens";
+import { useThemeColors } from "../../../lib/design/use-theme-colors";
 import { trpc } from "../../../lib/trpc";
 import {
   Button,
@@ -309,6 +309,7 @@ function ModeTabs({
   active: Mode;
   onChange: (m: Mode) => void;
 }) {
+  const colors = useThemeColors();
   const modes: Mode[] = ["photo", "text", "voice"];
   return (
     <View
@@ -371,6 +372,7 @@ function CallingView({
   mode: Mode;
   longRunning: boolean;
 }) {
+  const colors = useThemeColors();
   const heading =
     mode === "voice"
       ? "Listening…"
@@ -389,12 +391,12 @@ function CallingView({
     >
       <ActivityIndicator size="large" color={colors.forest} />
       <Text
-        className="font-display text-display-xs text-ink text-center"
+        className="font-display text-display-xs text-ink dark:text-ink-dark text-center"
         style={{ letterSpacing: -0.4 }}
       >
         {heading}
       </Text>
-      <Text className="font-body text-body-lg text-ink-2 text-center max-w-[280px]">
+      <Text className="font-body text-body-lg text-ink-2 dark:text-ink-2-dark text-center max-w-[280px]">
         {longRunning
           ? "Voice notes and longer transcripts take a moment. Stay on this screen — we'll have a draft for you shortly."
           : "This usually takes a few seconds. Stay on this screen."}
@@ -404,6 +406,7 @@ function CallingView({
 }
 
 function UpgradeView({ feature }: { feature: string }) {
+  const colors = useThemeColors();
   return (
     <View
       style={{
@@ -427,12 +430,12 @@ function UpgradeView({ feature }: { feature: string }) {
         <Ionicons name="sparkles-outline" size={26} color={colors.ink} />
       </View>
       <Text
-        className="font-display text-display-xs text-ink text-center"
+        className="font-display text-display-xs text-ink dark:text-ink-dark text-center"
         style={{ letterSpacing: -0.4 }}
       >
         {feature} is part of eeatly Plus
       </Text>
-      <Text className="font-body text-body-lg text-ink-2 text-center max-w-[300px]">
+      <Text className="font-body text-body-lg text-ink-2 dark:text-ink-2-dark text-center max-w-[300px]">
         Upgrade on the web to let eeatly extract recipes from photos,
         pasted text, or voice notes. Manual logging stays free.
       </Text>
@@ -456,6 +459,7 @@ function UpgradeView({ feature }: { feature: string }) {
 /* ─── Photo input ─────────────────────────────────────────────── */
 
 function PhotoInputView({ onPicked }: { onPicked: (uri: string) => void }) {
+  const colors = useThemeColors();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -588,13 +592,13 @@ function PhotoInputView({ onPicked }: { onPicked: (uri: string) => void }) {
       </Pressable>
 
       {error ? (
-        <Text className="font-body text-body-md text-danger">{error}</Text>
+        <Text className="font-body text-body-md text-danger dark:text-danger-dark">{error}</Text>
       ) : null}
 
       <Card>
         <CardBody>
           <Text
-            className="font-body-semibold text-label text-ink-3 uppercase mb-2.5"
+            className="font-body-semibold text-label text-ink-3 dark:text-ink-3-dark uppercase mb-2.5"
             style={{ letterSpacing: 1.4 }}
           >
             For sharper results
@@ -631,7 +635,7 @@ function PhotoInputView({ onPicked }: { onPicked: (uri: string) => void }) {
             }}
           >
             <Text
-              className="font-mono text-eyebrow text-ink-3 uppercase text-center py-2"
+              className="font-mono text-eyebrow text-ink-3 dark:text-ink-3-dark uppercase text-center py-2"
               style={{ letterSpacing: 1.2 }}
             >
               Add a photo
@@ -662,6 +666,7 @@ function PhotoInputView({ onPicked }: { onPicked: (uri: string) => void }) {
 /* ─── Text input ──────────────────────────────────────────────── */
 
 function TextInputView({ onSubmit }: { onSubmit: (text: string) => void }) {
+  const colors = useThemeColors();
   const [text, setText] = useState("");
   const trimmed = text.trim();
   const canSubmit = trimmed.length > 0 && trimmed.length <= 20_000;
@@ -697,7 +702,7 @@ function TextInputView({ onSubmit }: { onSubmit: (text: string) => void }) {
           autoCapitalize="sentences"
         />
         <Text
-          className="font-mono text-eyebrow text-ink-3 text-right -mt-2"
+          className="font-mono text-eyebrow text-ink-3 dark:text-ink-3-dark text-right -mt-2"
           style={{ letterSpacing: 0.5 }}
         >
           {trimmed.length} / 20,000
@@ -731,6 +736,7 @@ function VoiceInputView({
 }: {
   onPicked: (uri: string, mimeHint?: string | null) => void;
 }) {
+  const colors = useThemeColors();
   const [subMode, setSubMode] = useState<"record" | "upload">("record");
   const [picking, setPicking] = useState(false);
 
@@ -829,7 +835,7 @@ function VoiceInputView({
                   color={colors.forest}
                 />
               </View>
-              <Text className="font-body text-body-lg text-ink-2 text-center max-w-[280px]">
+              <Text className="font-body text-body-lg text-ink-2 dark:text-ink-2-dark text-center max-w-[280px]">
                 Pick an audio file from your phone. WhatsApp voice notes,
                 m4a, mp3, and wav all work.
               </Text>
@@ -858,6 +864,7 @@ function VoiceInputView({
 }
 
 function Tip({ text }: { text: string }) {
+  const colors = useThemeColors();
   return (
     <View
       style={{
@@ -868,7 +875,7 @@ function Tip({ text }: { text: string }) {
       }}
     >
       <Ionicons name="bulb-outline" size={16} color={colors.forest} />
-      <Text className="font-body text-body-sm text-ink flex-1" style={{ lineHeight: 20 }}>
+      <Text className="font-body text-body-sm text-ink dark:text-ink-dark flex-1" style={{ lineHeight: 20 }}>
         {text}
       </Text>
     </View>
@@ -886,6 +893,7 @@ function SheetOption({
   onPress: () => void;
   variant?: "default" | "cancel";
 }) {
+  const colors = useThemeColors();
   return (
     <Pressable
       onPress={onPress}
