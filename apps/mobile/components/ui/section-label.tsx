@@ -24,7 +24,7 @@ export function SectionLabel({ children, action, className }: SectionLabelProps)
       className={`flex-row items-baseline justify-between mb-3 mt-1 ${className ?? ""}`}
     >
       <Text
-        className="font-body-semibold text-label uppercase text-ink-2"
+        className="font-body-semibold text-label uppercase text-ink-2 dark:text-ink-2-dark"
         style={{ letterSpacing: 1.4 }}
       >
         {children}

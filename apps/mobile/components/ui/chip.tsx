@@ -23,29 +23,33 @@ type ChipProps = {
   icon?: ReactNode;
 };
 
+// Tone palettes carry both light + dark variants. NativeWind picks the
+// right side via the `dark:` prefix when `useColorScheme()` returns
+// "dark" — see tailwind.config.js `darkMode: 'media'`.
 const toneClasses: Record<
   ChipTone,
   { container: string; text: string }
 > = {
   sage: {
-    container: "bg-sage-bg",
-    text: "text-forest"
+    container: "bg-sage-bg dark:bg-sage-bg-dark",
+    text: "text-forest dark:text-forest-soft-dark"
   },
   wheat: {
-    container: "bg-[#EDDFB7]",
-    text: "text-[#6F571E]"
+    container: "bg-[#EDDFB7] dark:bg-[#3A2F18]",
+    text: "text-[#6F571E] dark:text-wheat-dark"
   },
   terra: {
-    container: "bg-[#EFD5C9]",
-    text: "text-[#7A3A1B]"
+    container: "bg-[#EFD5C9] dark:bg-[#3A2A20]",
+    text: "text-[#7A3A1B] dark:text-terra-dark"
   },
   ghost: {
-    container: "bg-transparent border border-border",
-    text: "text-ink-2"
+    container:
+      "bg-transparent border border-border dark:border-border-dark",
+    text: "text-ink-2 dark:text-ink-2-dark"
   },
   danger: {
-    container: "bg-danger-soft",
-    text: "text-danger"
+    container: "bg-danger-soft dark:bg-danger-soft-dark",
+    text: "text-danger dark:text-danger-dark"
   }
 };
 

@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { detectPlatform } from "@eeatly/shared";
 import { formatCookedAt } from "../../../../lib/dates";
-import { colors } from "../../../../lib/design/tokens";
+import { useThemeColors } from "../../../../lib/design/use-theme-colors";
 import { trpc } from "../../../../lib/trpc";
 import { ShareSheet } from "../../../../components/share-sheet";
 import { SourceUrlEmbed } from "../../../../components/embeds/source-url-embed";
@@ -396,6 +396,23 @@ const EFFORT_LABEL: Record<EffortLevel, string> = {
   high_effort: "High effort"
 };
 
+type StructuredIngredient = {
+  id: string;
+  position: number;
+  name: string;
+  quantityString: string;
+  prepNote: string | null;
+};
+
+type StructuredStep = {
+  id: string;
+  position: number;
+  title: string;
+  time: string | null;
+  body: string;
+  ingredientIds: string[];
+};
+
 function MealDetailBody({
   meal
 }: {
@@ -410,14 +427,62 @@ function MealDetailBody({
     lastCookedAt: string | Date | null;
     createdByName: string | null;
     effortLevel: EffortLevel | null;
+    /** R18/R19 — structured rows. When non-empty, the screen prefers
+     *  these over the parsed-from-prose fallback. */
+    structuredIngredients?: StructuredIngredient[];
+    structuredSteps?: StructuredStep[];
   };
 }) {
-  const ingredients = meal.ingredients ?? [];
-  const steps = useMemo(
-    () => (meal.recipeText ? parseSteps(meal.recipeText, ingredients) : []),
-    [meal.recipeText, ingredients]
-  );
+  const colors = useThemeColors();
+  const structuredIngredients = meal.structuredIngredients ?? [];
+  const structuredSteps = meal.structuredSteps ?? [];
+  // Display ingredients: prefer structured rows (already carry name +
+  // qty + prep note); fall back to parsing legacy `ingredients` text[]
+  // when the meal predates the Refine flow.
+  const legacyIngredients = meal.ingredients ?? [];
+  const displayIngredients: ParsedIngredient[] = useMemo(() => {
+    if (structuredIngredients.length > 0) {
+      return structuredIngredients
+        .slice()
+        .sort((a, b) => a.position - b.position)
+        .map((row) => ({
+          name: row.name,
+          qty: row.quantityString.trim() || null,
+          note: row.prepNote
+        }));
+    }
+    return legacyIngredients.map(parseIngredientLine);
+  }, [structuredIngredients, legacyIngredients]);
+  // Display steps: prefer structured rows when present.
+  const steps: Step[] = useMemo(() => {
+    if (structuredSteps.length > 0) {
+      const ingredientNameById = new Map<string, string>(
+        structuredIngredients.map((i) => [i.id, i.name])
+      );
+      return structuredSteps
+        .slice()
+        .sort((a, b) => a.position - b.position)
+        .map((row, idx) => ({
+          number: idx + 1,
+          title: row.title,
+          time: row.time,
+          body: row.body,
+          ingredients: row.ingredientIds
+            .map((id) => ingredientNameById.get(id))
+            .filter((name): name is string => Boolean(name))
+        }));
+    }
+    return meal.recipeText
+      ? parseSteps(meal.recipeText, legacyIngredients)
+      : [];
+  }, [
+    structuredSteps,
+    structuredIngredients,
+    meal.recipeText,
+    legacyIngredients
+  ]);
   const totalTime = useMemo(() => totalStepTimeLabel(steps), [steps]);
+  const ingredientCount = displayIngredients.length;
 
   const sourcePlatform = meal.recipeSourceUrl
     ? platformLabel(meal.recipeSourceUrl)
@@ -495,7 +560,7 @@ function MealDetailBody({
             {main}
           </Text>
           <Text
-            className="font-mono text-label text-ink-3 uppercase"
+            className="font-mono text-label text-ink-3 dark:text-ink-3-dark uppercase"
             style={{ letterSpacing: 1.3 }}
             numberOfLines={2}
           >
@@ -528,7 +593,7 @@ function MealDetailBody({
           {totalTime ? (
             <Chip tone="ghost">{totalTime}</Chip>
           ) : (
-            <Chip tone="ghost">{`${ingredients.length} ingredient${ingredients.length === 1 ? "" : "s"}`}</Chip>
+            <Chip tone="ghost">{`${ingredientCount} ingredient${ingredientCount === 1 ? "" : "s"}`}</Chip>
           )}
           {steps.length > 0 ? (
             <Chip tone="wheat">{`${steps.length} step${steps.length === 1 ? "" : "s"}`}</Chip>
@@ -548,7 +613,7 @@ function MealDetailBody({
         <IngredientsSection
           mealId={meal.id}
           mealName={meal.name}
-          ingredients={ingredients}
+          displayIngredients={displayIngredients}
           canExtract={Boolean(meal.recipeText?.trim())}
         />
 
@@ -557,7 +622,7 @@ function MealDetailBody({
             <SectionLabel
               action={
                 <Text
-                  className="font-mono text-eyebrow text-ink-3 uppercase"
+                  className="font-mono text-eyebrow text-ink-3 dark:text-ink-3-dark uppercase"
                   style={{ letterSpacing: 1.2 }}
                 >
                   Follow in order
@@ -582,7 +647,7 @@ function MealDetailBody({
             <Card>
               <View style={{ padding: 18 }}>
                 <Text
-                  className="font-body text-body-lg text-ink"
+                  className="font-body text-body-lg text-ink dark:text-ink-dark"
                   style={{ lineHeight: 24 }}
                 >
                   {meal.recipeText}
@@ -593,7 +658,7 @@ function MealDetailBody({
         ) : (
           <View style={{ marginBottom: 18 }}>
             <SectionLabel>Recipe</SectionLabel>
-            <Text className="font-display-italic text-body-lg text-ink-3">
+            <Text className="font-display-italic text-body-lg text-ink-3 dark:text-ink-3-dark">
               No recipe saved for this dish yet.
             </Text>
           </View>
@@ -636,7 +701,7 @@ function SourceLink({
 }) {
   return (
     <Text
-      className="font-body-semibold text-body-sm text-forest"
+      className="font-body-semibold text-body-sm text-forest dark:text-forest-dark"
       style={{ letterSpacing: -0.1 }}
       onPress={() => Linking.openURL(url)}
     >
@@ -650,26 +715,27 @@ function SourceLink({
 function IngredientsSection({
   mealId,
   mealName,
-  ingredients,
+  displayIngredients,
   canExtract
 }: {
   mealId: string;
   mealName: string;
-  ingredients: string[];
+  displayIngredients: ParsedIngredient[];
   canExtract: boolean;
 }) {
+  const colors = useThemeColors();
   const utils = trpc.useUtils();
   const [checked, setChecked] = useState<boolean[]>(() =>
-    ingredients.map(() => false)
+    displayIngredients.map(() => false)
   );
 
   useEffect(() => {
     setChecked((prev) =>
-      prev.length === ingredients.length
+      prev.length === displayIngredients.length
         ? prev
-        : ingredients.map(() => false)
+        : displayIngredients.map(() => false)
     );
-  }, [ingredients.length]);
+  }, [displayIngredients.length]);
 
   const extract = trpc.ai.extractIngredientsForMeal.useMutation({
     onSuccess: async () => {
@@ -690,13 +756,13 @@ function IngredientsSection({
     }
   });
 
-  if (ingredients.length === 0) {
+  if (displayIngredients.length === 0) {
     return (
       <View style={{ marginBottom: 30 }}>
         <SectionLabel>Ingredients</SectionLabel>
         {canExtract ? (
           <View style={{ gap: 10 }}>
-            <Text className="font-display-italic text-body-lg text-ink-3">
+            <Text className="font-display-italic text-body-lg text-ink-3 dark:text-ink-3-dark">
               No ingredients saved yet. AI can read them from the recipe.
             </Text>
             <Button
@@ -717,7 +783,7 @@ function IngredientsSection({
             </Button>
           </View>
         ) : (
-          <Text className="font-display-italic text-body-lg text-ink-3">
+          <Text className="font-display-italic text-body-lg text-ink-3 dark:text-ink-3-dark">
             No ingredients saved yet. Edit on the web to add them.
           </Text>
         )}
@@ -725,8 +791,13 @@ function IngredientsSection({
     );
   }
 
-  const remaining = ingredients.filter((_, i) => !checked[i]);
-  const remainingCount = remaining.length;
+  const remainingIngredients = displayIngredients.filter(
+    (_, i) => !checked[i]
+  );
+  const remainingCount = remainingIngredients.length;
+  const remainingLines = remainingIngredients.map((ing) =>
+    [ing.qty, ing.name, ing.note].filter(Boolean).join(" ")
+  );
 
   function toggle(index: number) {
     setChecked((prev) => {
@@ -744,7 +815,7 @@ function IngredientsSection({
     try {
       await Share.share({
         title: `Shopping list — ${mealName}`,
-        message: buildShoppingListText(mealName, remaining)
+        message: buildShoppingListText(mealName, remainingLines)
       });
     } catch {
       /* user cancelled */
@@ -756,7 +827,9 @@ function IngredientsSection({
       Alert.alert("Nothing to copy", "You've got everything checked off.");
       return;
     }
-    await Clipboard.setStringAsync(buildShoppingListText(mealName, remaining));
+    await Clipboard.setStringAsync(
+      buildShoppingListText(mealName, remainingLines)
+    );
     Alert.alert(
       "Copied",
       `${remainingCount} item${remainingCount === 1 ? "" : "s"} copied to clipboard.`
@@ -768,10 +841,10 @@ function IngredientsSection({
       <SectionLabel
         action={
           <Text
-            className="font-mono text-eyebrow text-ink-3 uppercase"
+            className="font-mono text-eyebrow text-ink-3 dark:text-ink-3-dark uppercase"
             style={{ letterSpacing: 1.2 }}
           >
-            {`${remainingCount} of ${ingredients.length} to buy`}
+            {`${remainingCount} of ${displayIngredients.length} to buy`}
           </Text>
         }
       >
@@ -779,18 +852,15 @@ function IngredientsSection({
       </SectionLabel>
 
       <Card style={{ marginBottom: 14, overflow: "hidden" }}>
-        {ingredients.map((ing, i) => {
-          const parsed = parseIngredientLine(ing);
-          return (
-            <IngredientRow
-              key={`${ing}-${i}`}
-              parsed={parsed}
-              checked={!!checked[i]}
-              isFirst={i === 0}
-              onToggle={() => toggle(i)}
-            />
-          );
-        })}
+        {displayIngredients.map((parsed, i) => (
+          <IngredientRow
+            key={`${parsed.name}-${i}`}
+            parsed={parsed}
+            checked={!!checked[i]}
+            isFirst={i === 0}
+            onToggle={() => toggle(i)}
+          />
+        ))}
       </Card>
 
       <View style={{ flexDirection: "row", gap: 10 }}>
@@ -869,6 +939,7 @@ function IngredientRow({
   isFirst: boolean;
   onToggle: () => void;
 }) {
+  const colors = useThemeColors();
   const a11yLabel = [parsed.qty, parsed.name, parsed.note]
     .filter(Boolean)
     .join(" ");
@@ -963,6 +1034,7 @@ function IngredientRow({
 /* ─── Step card ─────────────────────────────────────────────────── */
 
 function StepCard({ step, isLast }: { step: Step; isLast: boolean }) {
+  const colors = useThemeColors();
   const hasBody = step.body.length > 0;
   const hasItems = step.ingredients.length > 0;
   return (
@@ -1110,6 +1182,7 @@ function LogACookCta({
   recipeText: string | null;
   recipeSourceUrl: string | null;
 }) {
+  const colors = useThemeColors();
   const utils = trpc.useUtils();
   const [logState, setLogState] = useState<"idle" | "logged">("idle");
   const [shareOpen, setShareOpen] = useState(false);

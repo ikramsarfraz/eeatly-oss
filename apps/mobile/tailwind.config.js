@@ -1,17 +1,24 @@
 /** @type {import('tailwindcss').Config} */
-// Round 18 — eeatly mobile design tokens, redesigned to match the
-// "warm editorial cookbook" handoff.
+// Round 19 — eeatly mobile design tokens, dark-mode aware.
 //
 // Color philosophy: no pure white, no pure black, no jewel tones. Every
-// surface sits on a warm cream ground; the only accents are forest
-// green for actions and dusty terracotta/wheat for meal tile palettes.
-// Tokens are exposed by semantic name so the dark-mode pass (a future
-// round) is a config swap, not a screen-by-screen sweep.
+// surface sits on a warm cream ground in light mode; in dark mode the
+// cream rotates to a warm near-black with the same forest/sage/wheat
+// accent system retuned so contrast survives the inversion.
+//
+// Dark mode strategy: NativeWind v4 emits the `dark:` variant when
+// `darkMode: 'media'` and the system appearance is dark. Each semantic
+// token has a sibling `-dark` value so callers can write
+// `bg-cream dark:bg-cream-dark`. Inline style consumers (where
+// className isn't enough — e.g. dynamic `style={{ color: x }}`) read
+// from `lib/design/use-theme-colors.ts`, which mirrors this palette
+// off `useColorScheme()`.
 //
 // `content` is the NativeWind v4 glob — every file that uses className
 // must match, otherwise Metro's nativewind transform skips it and the
 // styles silently disappear at runtime.
 module.exports = {
+  darkMode: "media",
   content: [
     "./app/**/*.{js,jsx,ts,tsx}",
     "./components/**/*.{js,jsx,ts,tsx}"
@@ -22,52 +29,77 @@ module.exports = {
       colors: {
         // Cream / paper grounds. `cream` is the app background, `paper`
         // is the warmer sheet/surface variant, `surface` is the elevated
-        // card/input bg, `creamSoft` is a slightly darker neutral used
+        // card/input bg, `cream-soft` is a slightly darker neutral used
         // for dashed photo zones and other "subtle alt" backgrounds.
         cream: "#F5EFE2",
+        "cream-dark": "#15140F",
         "cream-soft": "#EFE7D6",
+        "cream-soft-dark": "#1C1A14",
         paper: "#FBF6EA",
+        "paper-dark": "#1A1812",
         surface: "#FFFFFF",
+        "surface-dark": "#1F1D17",
 
-        // Ink / text scale. `ink` is the primary text; ink2/ink3 step
-        // down for secondary and tertiary. ink4 is reserved for hairline
-        // dividers and the bottom-sheet handle.
+        // Ink / text scale. `ink` is the primary text; ink-2/ink-3 step
+        // down for secondary and tertiary. ink-4 is reserved for hairline
+        // dividers and strikethrough decoration.
         ink: "#1A1F1A",
+        "ink-dark": "#F0E9D9",
         "ink-2": "#5F665B",
+        "ink-2-dark": "#A8A28F",
         "ink-3": "#9C9787",
+        "ink-3-dark": "#736F5E",
         "ink-4": "#C7C1B0",
+        "ink-4-dark": "#3A382E",
 
         // Forest greens. `forest` is the primary CTA bg + active state
-        // color. `forest-text` is what's drawn ON the forest bg (cream).
-        // `forest-deep` is the optional pressed state.
+        // color in light mode; in dark mode the brand inverts to a
+        // lighter sage-green so the CTA reads against the warm-black
+        // background. `forest-text` is what's drawn ON the forest bg.
         forest: "#2E5739",
+        "forest-dark": "#88B894",
         "forest-deep": "#1F3D29",
+        "forest-deep-dark": "#6FA37D",
         "forest-soft": "#3C6B47",
+        "forest-soft-dark": "#A1CBA9",
         "forest-text": "#F5EFE2",
+        "forest-text-dark": "#10180F",
 
         // Sage tints. `sage-bg` is the active tab pill, icon-bubble bg,
         // and sage chip — the "softly highlighted" surface that signals
         // selection without competing with the primary CTA.
         sage: "#D4DCC5",
+        "sage-dark": "#445040",
         "sage-deep": "#BFCBB1",
+        "sage-deep-dark": "#576550",
         "sage-bg": "#E3E8D5",
+        "sage-bg-dark": "#2A3022",
 
         // Accent palettes used in a few places.
         terra: "#C66B47",
+        "terra-dark": "#D88865",
         wheat: "#D9C68C",
+        "wheat-dark": "#C9B176",
 
         // Borders. `border` is the standard card/input edge; border-soft
         // is the inner divider between grouped-card rows.
         border: "#E6DCC4",
+        "border-dark": "#2D2B22",
         "border-soft": "#EEE5D0",
+        "border-soft-dark": "#26241D",
 
         // Destructive treatments. danger is the text/icon color, danger-soft
         // is the bg of the destructive button / row.
         danger: "#A8413A",
+        "danger-dark": "#D88078",
         "danger-soft": "#F0DBD8",
+        "danger-soft-dark": "#3A211E",
 
-        // Compat aliases so screens not yet migrated keep rendering. New
-        // code should NOT use these — they map onto the redesign tokens.
+        // Compat aliases so R17 screens (Home, Library, Settings, Plans,
+        // Household, etc.) keep rendering. Do NOT use these in new code —
+        // they map onto the redesign tokens above. Dark variants for
+        // these inherited screens are picked up via the underlying token
+        // names, not these aliases.
         background: {
           DEFAULT: "#F5EFE2",
           elevated: "#FFFFFF",
@@ -99,6 +131,7 @@ module.exports = {
         sm: "8px",
         md: "12px",
         lg: "14px",
+        card: "14px",
         xl: "18px",
         "2xl": "22px",
         pill: "9999px"
@@ -162,6 +195,10 @@ module.exports = {
         tight: "-0.1px",
         eyebrow: "1.4px",
         eyebrowLg: "1.5px"
+      },
+      lineHeight: {
+        "0.98": "0.98",
+        "1.05": "1.05"
       }
     }
   },

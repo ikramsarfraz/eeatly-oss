@@ -123,6 +123,29 @@ describe("getMealDetail (Round 10)", () => {
       { effortLevel: "medium", n: 2 },
       { effortLevel: "high_effort", n: 1 }
     ]);
+    // R19 — structured ingredients + steps queries (in parallel). The
+    // proxy db.queue serialises both Promise.all branches; queue order
+    // is "ingredients first, then steps" because the destructured array
+    // resolves left-to-right under microtask ordering.
+    queue([
+      {
+        id: "mi-1",
+        position: 0,
+        name: "Chicken",
+        quantityString: "400 g",
+        prepNote: "boneless, sliced"
+      }
+    ]);
+    queue([
+      {
+        id: "rs-1",
+        position: 0,
+        title: "Marinate the chicken",
+        time: "10 min",
+        body: "Combine with spices and rest.",
+        ingredientIds: ["mi-1"]
+      }
+    ]);
 
     const result = await getMealDetail("u-member", "h-a", "m-1");
 
@@ -139,7 +162,26 @@ describe("getMealDetail (Round 10)", () => {
       cookCount: 3,
       lastCookedAt: "2026-05-10",
       createdAt: "2026-04-01T12:00:00.000Z",
-      effortLevel: "medium"
+      effortLevel: "medium",
+      structuredIngredients: [
+        {
+          id: "mi-1",
+          position: 0,
+          name: "Chicken",
+          quantityString: "400 g",
+          prepNote: "boneless, sliced"
+        }
+      ],
+      structuredSteps: [
+        {
+          id: "rs-1",
+          position: 0,
+          title: "Marinate the chicken",
+          time: "10 min",
+          body: "Combine with spices and rest.",
+          ingredientIds: ["mi-1"]
+        }
+      ]
     });
   });
 
@@ -161,6 +203,22 @@ describe("getMealDetail (Round 10)", () => {
     queue([{ cookCount: 0, lastCookedAt: null }]);
     // No logs → empty effort aggregate → effortLevel: null.
     queue([] as Array<{ effortLevel: "quick" | "easy" | "medium" | "high_effort"; n: number }>);
+    // R19 — legacy meal has no structured ingredient/step rows either.
+    queue([] as Array<{
+      id: string;
+      position: number;
+      name: string;
+      quantityString: string;
+      prepNote: string | null;
+    }>);
+    queue([] as Array<{
+      id: string;
+      position: number;
+      title: string;
+      time: string | null;
+      body: string;
+      ingredientIds: string[];
+    }>);
 
     const result = await getMealDetail("u-member", "h-a", "m-legacy");
 
@@ -171,5 +229,7 @@ describe("getMealDetail (Round 10)", () => {
     expect(result?.lastCookedAt).toBeNull();
     expect(result?.createdByUserId).toBeNull();
     expect(result?.effortLevel).toBeNull();
+    expect(result?.structuredIngredients).toEqual([]);
+    expect(result?.structuredSteps).toEqual([]);
   });
 });

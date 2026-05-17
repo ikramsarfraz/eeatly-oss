@@ -1,12 +1,18 @@
 import "server-only";
 
-import { and, count, desc, eq, inArray, isNull, max, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull, max, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { requireHouseholdMember } from "@/lib/auth/session";
 import { withSuggestions } from "@/lib/meals/rediscovery";
 import { normalizeMealName } from "@/lib/utils";
 import { mealLogInputSchema, type MealLogInput } from "@eeatly/api/validators/meals";
-import { mealLogs, meals, users } from "@/db/schema";
+import {
+  mealIngredients,
+  mealLogs,
+  meals,
+  recipeSteps,
+  users
+} from "@/db/schema";
 import type { DashboardMeals, MealStat, RecentMeal } from "@/types";
 
 // Round-4 scopes are household-level. The first arg of every public service
@@ -544,6 +550,32 @@ export type MealDetailView = {
    * `easy` > `quick`) — better to over-prepare than under.
    */
   effortLevel: "quick" | "easy" | "medium" | "high_effort" | null;
+  /**
+   * Round 18 — structured ingredient rows. Empty when the meal predates
+   * the structured-ingredient migration (Refine save path). Mobile readers
+   * prefer this when populated and fall back to `ingredients: string[]`
+   * (the R10 free-form array) when empty.
+   */
+  structuredIngredients: Array<{
+    id: string;
+    position: number;
+    name: string;
+    quantityString: string;
+    prepNote: string | null;
+  }>;
+  /**
+   * Round 18 — structured step rows. Empty when the meal predates the
+   * Refine flow. Readers prefer this when populated and fall back to
+   * `recipeText` (the R7 prose blob) when empty.
+   */
+  structuredSteps: Array<{
+    id: string;
+    position: number;
+    title: string;
+    time: string | null;
+    body: string;
+    ingredientIds: string[];
+  }>;
 };
 
 export async function getMealDetail(
@@ -611,6 +643,36 @@ export async function getMealDetail(
     )
     .groupBy(mealLogs.effortLevel);
 
+  // Round 18 — structured ingredient + step rows. The Refine save path
+  // (R18) writes here; legacy meals stay empty until a Refine round-trip
+  // upgrades them. Read both in parallel and let the mobile UI pick
+  // structured-when-present, legacy-when-not.
+  const [structuredIngredientRows, structuredStepRows] = await Promise.all([
+    db
+      .select({
+        id: mealIngredients.id,
+        position: mealIngredients.position,
+        name: mealIngredients.name,
+        quantityString: mealIngredients.quantityString,
+        prepNote: mealIngredients.prepNote
+      })
+      .from(mealIngredients)
+      .where(eq(mealIngredients.mealId, mealId))
+      .orderBy(asc(mealIngredients.position)),
+    db
+      .select({
+        id: recipeSteps.id,
+        position: recipeSteps.position,
+        title: recipeSteps.title,
+        time: recipeSteps.time,
+        body: recipeSteps.body,
+        ingredientIds: recipeSteps.ingredientIds
+      })
+      .from(recipeSteps)
+      .where(eq(recipeSteps.mealId, mealId))
+      .orderBy(asc(recipeSteps.position))
+  ]);
+
   return {
     id: row.id,
     name: row.name,
@@ -624,7 +686,9 @@ export async function getMealDetail(
     cookCount: Number(stats?.cookCount ?? 0),
     lastCookedAt: stats?.lastCookedAt ?? null,
     createdAt: row.createdAt.toISOString(),
-    effortLevel: pickModalEffort(effortRows)
+    effortLevel: pickModalEffort(effortRows),
+    structuredIngredients: structuredIngredientRows,
+    structuredSteps: structuredStepRows
   };
 }
 

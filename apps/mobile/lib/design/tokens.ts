@@ -1,5 +1,5 @@
 /**
- * Round 18 — design token constants.
+ * Round 18/19 — design token constants.
  *
  * NativeWind covers most of the styling, but some primitives (icons,
  * ActivityIndicator, status bar, native nav header) accept color
@@ -7,10 +7,37 @@
  * raw hex values here keeps those callsites in sync with the
  * tailwind.config.js — change a hex in one place, update both.
  *
- * Light theme only for now; the dark-mode pass (see handoff) is a
- * future round.
+ * `colors` is the LIGHT-mode palette. `colorsDark` mirrors it for the
+ * R19 dark-mode pass. Callers that can use NativeWind classes should
+ * prefer `bg-cream dark:bg-cream-dark` instead of touching these
+ * objects — these are for inline-style consumers (dynamic colors fed
+ * into `style={{ color: ... }}`, RN icon `color` props, etc.).
  */
-export const colors = {
+export type ThemeColors = {
+  cream: string;
+  creamSoft: string;
+  paper: string;
+  surface: string;
+  ink: string;
+  ink2: string;
+  ink3: string;
+  ink4: string;
+  forest: string;
+  forestDeep: string;
+  forestSoft: string;
+  forestText: string;
+  sage: string;
+  sageDeep: string;
+  sageBg: string;
+  terra: string;
+  wheat: string;
+  border: string;
+  borderSoft: string;
+  danger: string;
+  dangerSoft: string;
+};
+
+export const colors: ThemeColors = {
   cream: "#F5EFE2",
   creamSoft: "#EFE7D6",
   paper: "#FBF6EA",
@@ -32,7 +59,35 @@ export const colors = {
   borderSoft: "#EEE5D0",
   danger: "#A8413A",
   dangerSoft: "#F0DBD8"
-} as const;
+};
+
+/** Round 19 — dark-mode palette mirror. Same semantic keys, retuned
+ *  for a warm near-black ground. Forest greens INVERT to a lighter
+ *  sage-green so the primary CTA still pops against the dark surface;
+ *  `forestText` is dark in dark mode (text on the inverted CTA). */
+export const colorsDark: ThemeColors = {
+  cream: "#15140F",
+  creamSoft: "#1C1A14",
+  paper: "#1A1812",
+  surface: "#1F1D17",
+  ink: "#F0E9D9",
+  ink2: "#A8A28F",
+  ink3: "#736F5E",
+  ink4: "#3A382E",
+  forest: "#88B894",
+  forestDeep: "#6FA37D",
+  forestSoft: "#A1CBA9",
+  forestText: "#10180F",
+  sage: "#445040",
+  sageDeep: "#576550",
+  sageBg: "#2A3022",
+  terra: "#D88865",
+  wheat: "#C9B176",
+  border: "#2D2B22",
+  borderSoft: "#26241D",
+  danger: "#D88078",
+  dangerSoft: "#3A211E"
+};
 
 export const fonts = {
   display: "InstrumentSerif_400Regular",

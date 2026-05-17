@@ -2,38 +2,47 @@ import "../global.css";
 
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { View } from "react-native";
+import { View, useColorScheme } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AppProviders } from "../lib/providers";
 import { useAppFonts } from "../lib/design/use-app-fonts";
-import { colors } from "../lib/design/tokens";
+import { colors, colorsDark } from "../lib/design/tokens";
 
 /**
- * Round 18 root layout. Loads the three editorial families
- * (Instrument Serif, Geist, JetBrains Mono) before rendering the nav
- * tree — without them every screen would flash in the platform default
- * before the warm-cream UI snaps in.
+ * Round 19 root layout. Loads the three editorial families (Instrument
+ * Serif, Geist, JetBrains Mono) before rendering the nav tree, and
+ * flips the status-bar tint + content background between the light
+ * and dark cream palettes based on `useColorScheme()`.
  *
  * `global.css` must be the very first import so NativeWind's runtime
  * registry is populated before any screen reads it. `AppProviders`
  * wraps TRPC + React Query so every screen can use the typed hooks.
+ *
+ * The pre-fonts loading state still paints the cream ground so the
+ * splash → first-frame transition stays warm (no white flash).
  */
 export default function RootLayout() {
   const [fontsLoaded] = useAppFonts();
+  const scheme = useColorScheme();
+  const isDark = scheme === "dark";
+  const groundColor = isDark ? colorsDark.cream : colors.cream;
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="dark" backgroundColor={colors.cream} />
+      <StatusBar
+        style={isDark ? "light" : "dark"}
+        backgroundColor={groundColor}
+      />
       <AppProviders>
         {fontsLoaded ? (
           <Stack
             screenOptions={{
               headerShown: false,
-              contentStyle: { backgroundColor: colors.cream }
+              contentStyle: { backgroundColor: groundColor }
             }}
           />
         ) : (
-          <View style={{ flex: 1, backgroundColor: colors.cream }} />
+          <View style={{ flex: 1, backgroundColor: groundColor }} />
         )}
       </AppProviders>
     </SafeAreaProvider>
