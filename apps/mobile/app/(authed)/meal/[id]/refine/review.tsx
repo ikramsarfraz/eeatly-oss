@@ -2,115 +2,268 @@ import { useMemo, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import {
-  Alert,
+  ActivityIndicator,
   Pressable,
   ScrollView,
   Text,
   View
 } from "react-native";
+import type {
+  HeadsUp,
+  PendingChange
+} from "@eeatly/api/validators/refine";
 import { TopNav } from "../../../../../components/top-nav";
-import { colors } from "../../../../../lib/design/tokens";
 import {
-  useRefineSession,
-  type PendingChange
-} from "../../../../../lib/refine-session";
+  useThemeColors,
+  useIsDark
+} from "../../../../../lib/design/use-theme-colors";
+import type { ThemeColors } from "../../../../../lib/design/tokens";
+
+/**
+ * Wheat palette mirror of the Chip primitive's "wheat" tone, exposed
+ * inline so the diff-card change icon and heads-up warn surface can
+ * tint without wrapping in `<Chip>`. Dark variant retunes for warm
+ * near-black ground.
+ */
+function wheatPalette(isDark: boolean): {
+  bg: string;
+  fg: string;
+  border: string;
+} {
+  return isDark
+    ? { bg: "#3A2F18", fg: "#C9B176", border: "#4A3F28" }
+    : { bg: "#EDDFB7", fg: "#6F571E", border: "#E2D6AC" };
+}
+import {
+  describePendingChange,
+  summariseCounts,
+  type DisplayChange
+} from "../../../../../lib/refine-format";
 import { trpc } from "../../../../../lib/trpc";
 import {
   Card,
   Chip,
   EmptyState,
+  ErrorScreen,
+  LoadingScreen,
   Screen,
-  SectionLabel
+  SectionLabel,
+  Toast
 } from "../../../../../components/ui";
 
 /**
  * Round 20 — Review changes screen.
  *
- * Reached from the Refine screen's "Review & save" CTA. Renders the
- * flattened diff before committing.
+ * Reached from the Refine screen's "Review & save" CTA, which passes
+ * `?sessionId=<uuid>` so this screen reads the same draft. We never
+ * try to look up an active session by `(mealId, deviceId)` here — the
+ * session id ride along makes the relationship explicit and lets the
+ * Review screen survive an app cold start if the user deep-links into
+ * it directly.
  *
  * Stack:
- *   - TopNav with text "Back" left + "Save" right (right is the
- *     primary commit affordance; the bottom CTA mirrors for thumb
- *     reach).
- *   - Editorial headline — italic "N changes," kicker + serif "ready
- *     to save." + mono "RECIPE NAME · REFINED JUST NOW".
- *   - Totals chip row — `+N additions` (sage), `~N changes` (wheat),
- *     `N removals` (ghost).
- *   - Diff list — grouped Card with one row per change: dot icon +
- *     title + mono "<Action> · <where>" + chevron, and an indented
- *     mono diff (before / after).
- *   - Heads-up sage card explaining a known side effect when a
- *     pending change crosses an effort threshold (rule-based, not AI).
- *   - Footer: forest "Save N changes" + outline "Keep refining".
+ *   - TopNav (Back / "Review changes" / Save)
+ *   - Editorial headline: italic "N changes," + serif "ready to save."
+ *     + mono "{NAME} · REFINED JUST NOW"
+ *   - Chip row: +N additions / ~N changes / N removals
+ *   - Diff list: one row per pending change with target-specific
+ *     before/after rendering
+ *   - Heads-up cards (stacked) — server-computed (`detectHeadsUp`
+ *     rule engine, R18). Render the body verbatim. Interactive
+ *     `suggestedAction` overrides are deferred (R20 spec).
+ *   - Footer: forest "Save N changes" pill + "Keep refining" link
  *
- * Save is a UI no-op for now — calls `applyPending` which simulates a
- * round-trip and clears the session. Will become a real
- * `meals.applyRefinements` mutation when the backend procedure ships.
+ * Save flow:
+ *   - `trpc.refine.save.mutate({ sessionId })` runs the R18 atomic
+ *     apply (ingredients/steps/meals in one transaction, session
+ *     status → 'saved'). On success: invalidate `meals.getById` so
+ *     the recipe detail repaints with the new rows, show a toast, and
+ *     `router.replace` back to recipe detail. We replace rather than
+ *     push so the back-stack doesn't strand the saved-and-closed
+ *     Refine + Review pair behind the user.
+ *   - Errors stay on the screen; the user can retry or hop back to
+ *     Refine and tweak.
  */
 
 export default function RefineReviewScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const mealId = typeof id === "string" ? id : "";
+  const colors = useThemeColors();
+  const isDark = useIsDark();
+  const wheat = wheatPalette(isDark);
+  const params = useLocalSearchParams<{
+    id: string;
+    sessionId?: string | string[];
+  }>();
+  const mealId = typeof params.id === "string" ? params.id : "";
+  const sessionId =
+    typeof params.sessionId === "string"
+      ? params.sessionId
+      : Array.isArray(params.sessionId)
+        ? params.sessionId[0]
+        : null;
 
-  const query = trpc.meals.getById.useQuery(
+  const mealQuery = trpc.meals.getById.useQuery(
     { mealId },
     { enabled: mealId.length > 0, staleTime: 30_000 }
   );
-  const { session, counts, applyPending } = useRefineSession(mealId);
-  const [saving, setSaving] = useState(false);
-
-  const headsUp = useMemo(
-    () => computeHeadsUp(session.pending, query.data?.effortLevel ?? null),
-    [session.pending, query.data?.effortLevel]
+  const sessionQuery = trpc.refine.getPendingChanges.useQuery(
+    { sessionId: sessionId ?? "" },
+    {
+      enabled: !!sessionId,
+      // The cache may already hold a fresh copy seeded by the Refine
+      // screen. Re-running invalidates it if anything changed while
+      // we navigated.
+      staleTime: 5_000
+    }
   );
 
-  async function handleSave() {
-    setSaving(true);
-    try {
-      await applyPending();
-      // No tRPC invalidation yet — `applyPending` is a no-op until the
-      // backend procedure exists. Once wired, invalidate
-      // `meals.getById` so the detail screen reflects the save.
-      Alert.alert(
-        "Saved",
-        "Refinement save is wired through the UI only — backend persistence ships in the next round."
-      );
-      router.replace(`/(authed)/meal/${mealId}` as never);
-    } catch (e) {
-      Alert.alert(
-        "Couldn't save",
-        e instanceof Error ? e.message : "Try again."
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
+  const utils = trpc.useUtils();
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    message: string;
+    variant: "info" | "success" | "error";
+  }>({ visible: false, message: "", variant: "info" });
 
-  if (counts.total === 0) {
+  const saveMut = trpc.refine.save.useMutation({
+    onSuccess: async (result) => {
+      // Bust the meal detail cache so structured ingredients/steps
+      // repaint with the new rows.
+      await Promise.all([
+        utils.meals.getById.invalidate({ mealId }),
+        utils.dashboard.meals.invalidate()
+      ]);
+      setToast({
+        visible: true,
+        message:
+          result.applied > 0
+            ? `${result.applied} change${result.applied === 1 ? "" : "s"} saved`
+            : "Session closed",
+        variant: "success"
+      });
+      // Small delay so the user actually sees the toast before navigation.
+      setTimeout(() => {
+        router.replace(`/(authed)/meal/${mealId}` as never);
+      }, 600);
+    },
+    onError: (err) => {
+      setToast({
+        visible: true,
+        message: err.message ?? "Couldn't save those changes.",
+        variant: "error"
+      });
+    }
+  });
+
+  /* ─── Loading / guard rails ─────────────────────────────────── */
+
+  if (!sessionId) {
     return (
       <Screen edges={["top", "bottom"]}>
         <TopNav title="Review changes" back showSettings={false} />
-        <EmptyState
-          icon={
-            <Ionicons name="sparkles-outline" size={28} color={colors.forest} />
-          }
-          title="Nothing to review"
-          body="Head back to Refine and try a prompt — your changes batch here for one save."
+        <ErrorScreen
+          title="No refine session"
+          body="Open the refine flow first, then come back here to review."
         />
       </Screen>
     );
   }
 
-  const recipeName = query.data?.name ?? "Recipe";
-  const refinedEyebrow = `${recipeName} · refined just now`.toUpperCase();
+  if (mealQuery.isPending || sessionQuery.isPending) {
+    return (
+      <Screen edges={["top", "bottom"]}>
+        <TopNav title="Review changes" back showSettings={false} />
+        <LoadingScreen />
+      </Screen>
+    );
+  }
+
+  if (!mealQuery.data || !sessionQuery.data) {
+    return (
+      <Screen edges={["top", "bottom"]}>
+        <TopNav title="Review changes" back showSettings={false} />
+        <ErrorScreen
+          title="Couldn't load review"
+          body={
+            sessionQuery.error?.message ??
+            mealQuery.error?.message ??
+            "Try going back and re-opening Refine."
+          }
+        />
+      </Screen>
+    );
+  }
+
+  const meal = mealQuery.data;
+  const session = sessionQuery.data;
+  const pending = session.pendingChanges;
+  const counts = summariseCounts(pending);
+
+  const resolverCtx = {
+    ingredients: meal.structuredIngredients ?? [],
+    steps: meal.structuredSteps ?? []
+  };
+
+  if (counts.total === 0) {
+    return (
+      <Screen edges={["top", "bottom"]}>
+        <TopNav
+          title="Review changes"
+          back
+          showSettings={false}
+        />
+        <EmptyState
+          icon={
+            <Ionicons
+              name="sparkles-outline"
+              size={28}
+              color={colors.forest}
+            />
+          }
+          title="Nothing to review"
+          body="Head back to Refine and send a prompt — your changes batch here for one save."
+        />
+        <View style={{ paddingHorizontal: 22, paddingBottom: 24 }}>
+          <Pressable
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Back to Refine"
+            style={{
+              paddingVertical: 14,
+              paddingHorizontal: 22,
+              borderRadius: 99,
+              borderWidth: 1,
+              borderColor: colors.border,
+              alignItems: "center"
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: "Geist_600SemiBold",
+                fontSize: 14,
+                color: colors.ink2,
+                letterSpacing: -0.05
+              }}
+            >
+              Keep refining
+            </Text>
+          </Pressable>
+        </View>
+      </Screen>
+    );
+  }
+
+  const saving = saveMut.isPending;
+  const refinedEyebrow = `${meal.name} · refined just now`.toUpperCase();
+
+  function handleSave() {
+    if (!sessionId || saving) return;
+    saveMut.mutate({ sessionId });
+  }
 
   return (
     <Screen edges={["top", "bottom"]}>
       <TopNav
         title="Review changes"
-        leftLabel="Back"
-        onLeftPress={() => router.back()}
+        back
         showSettings={false}
         right={
           <Pressable
@@ -195,9 +348,9 @@ export default function RefineReviewScreen() {
           action={
             <Text
               style={{
-                fontFamily: "Geist_600SemiBold",
+                fontFamily: "Geist_500Medium",
                 fontSize: 12.5,
-                color: colors.forest,
+                color: colors.ink4,
                 letterSpacing: -0.05
               }}
             >
@@ -209,58 +362,28 @@ export default function RefineReviewScreen() {
         </SectionLabel>
 
         <Card style={{ marginBottom: 18, overflow: "hidden" }}>
-          {session.pending.map((change, i) => (
+          {pending.map((change, i) => (
             <ReviewRow
               key={change.id}
               change={change}
-              isLast={i === session.pending.length - 1}
+              resolverCtx={resolverCtx}
+              isLast={i === pending.length - 1}
+              colors={colors}
+              wheat={wheat}
             />
           ))}
         </Card>
 
-        {headsUp ? (
-          <View
-            style={{
-              flexDirection: "row",
-              gap: 12,
-              alignItems: "flex-start",
-              padding: 16,
-              borderRadius: 14,
-              backgroundColor: "#EDEEDF",
-              borderWidth: 1,
-              borderColor: "#DBDFC4",
-              marginBottom: 22
-            }}
-          >
-            <Ionicons
-              name="sparkles-outline"
-              size={18}
-              color={colors.forest}
-              style={{ marginTop: 1 }}
-            />
-            <View style={{ flex: 1 }}>
-              <Text
-                style={{
-                  fontFamily: "Geist_600SemiBold",
-                  fontSize: 13,
-                  color: colors.ink,
-                  letterSpacing: -0.1,
-                  marginBottom: 4
-                }}
-              >
-                Heads up
-              </Text>
-              <Text
-                style={{
-                  fontFamily: "Geist_400Regular",
-                  fontSize: 12.5,
-                  color: colors.ink2,
-                  lineHeight: 18
-                }}
-              >
-                {headsUp}
-              </Text>
-            </View>
+        {session.headsUp.length > 0 ? (
+          <View style={{ gap: 10, marginBottom: 22 }}>
+            {session.headsUp.map((h) => (
+              <HeadsUpCard
+                key={h.id}
+                headsUp={h}
+                colors={colors}
+                wheat={wheat}
+              />
+            ))}
           </View>
         ) : null}
 
@@ -286,9 +409,16 @@ export default function RefineReviewScreen() {
               shadowRadius: 20,
               elevation: 4
             }}
-            className="active:opacity-90"
           >
-            <Ionicons name="checkmark" size={18} color={colors.forestText} />
+            {saving ? (
+              <ActivityIndicator color={colors.forestText} />
+            ) : (
+              <Ionicons
+                name="checkmark"
+                size={18}
+                color={colors.forestText}
+              />
+            )}
             <Text
               style={{
                 fontFamily: "Geist_600SemiBold",
@@ -306,6 +436,7 @@ export default function RefineReviewScreen() {
             onPress={() => router.back()}
             accessibilityRole="button"
             accessibilityLabel="Keep refining"
+            disabled={saving}
             style={{
               paddingVertical: 14,
               paddingHorizontal: 22,
@@ -313,7 +444,8 @@ export default function RefineReviewScreen() {
               borderWidth: 1,
               borderColor: colors.border,
               backgroundColor: "transparent",
-              alignItems: "center"
+              alignItems: "center",
+              opacity: saving ? 0.5 : 1
             }}
           >
             <Text
@@ -329,38 +461,37 @@ export default function RefineReviewScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        variant={toast.variant}
+        onDismiss={() => setToast((t) => ({ ...t, visible: false }))}
+      />
     </Screen>
   );
 }
 
+/* ─── Sub-components ──────────────────────────────────────────── */
+
 function ReviewRow({
   change,
-  isLast
+  resolverCtx,
+  isLast,
+  colors,
+  wheat
 }: {
   change: PendingChange;
+  resolverCtx: Parameters<typeof describePendingChange>[1];
   isLast: boolean;
+  colors: ThemeColors;
+  wheat: { bg: string; fg: string; border: string };
 }) {
-  const palette =
-    change.kind === "add"
-      ? {
-          bg: colors.sageBg,
-          fg: colors.forest,
-          icon: "add" as const,
-          label: "Added"
-        }
-      : change.kind === "change"
-        ? {
-            bg: "#F4EEDB",
-            fg: "#8A6B22",
-            icon: "arrow-forward" as const,
-            label: "Changed"
-          }
-        : {
-            bg: colors.dangerSoft,
-            fg: colors.danger,
-            icon: "remove" as const,
-            label: "Removed"
-          };
+  const display = useMemo(
+    () => describePendingChange(change, resolverCtx),
+    [change, resolverCtx]
+  );
+  const palette = paletteFor(change.kind, colors, wheat);
   return (
     <View
       style={{
@@ -375,7 +506,7 @@ function ReviewRow({
           flexDirection: "row",
           alignItems: "center",
           gap: 10,
-          marginBottom: 8
+          marginBottom: display.before || display.after ? 8 : 0
         }}
       >
         <View
@@ -385,7 +516,8 @@ function ReviewRow({
             borderRadius: 99,
             backgroundColor: palette.bg,
             alignItems: "center",
-            justifyContent: "center"
+            justifyContent: "center",
+            flexShrink: 0
           }}
         >
           <Ionicons name={palette.icon} size={12} color={palette.fg} />
@@ -400,7 +532,7 @@ function ReviewRow({
             }}
             numberOfLines={2}
           >
-            {change.label}
+            {display.title}
           </Text>
           <Text
             style={{
@@ -413,76 +545,146 @@ function ReviewRow({
             }}
             numberOfLines={2}
           >
-            {`${palette.label} · ${change.where}`}
+            {display.typeLabel}
           </Text>
         </View>
-        <Ionicons name="chevron-forward" size={16} color={colors.ink3} />
       </View>
-      {change.kind === "change" || change.kind === "remove" ? (
-        <View style={{ marginLeft: 32, gap: 4 }}>
-          <Text
-            style={{
-              fontFamily: "JetBrainsMono_400Regular",
-              fontSize: 12.5,
-              color: colors.ink3,
-              letterSpacing: 0.3,
-              textDecorationLine: "line-through",
-              textDecorationColor: colors.ink4
-            }}
-          >
-            {change.before}
-          </Text>
-          {change.kind === "change" ? (
-            <Text
-              style={{
-                fontFamily: "JetBrainsMono_600SemiBold",
-                fontSize: 12.5,
-                color: colors.ink2,
-                letterSpacing: 0.3
-              }}
-            >
-              {change.after}
-            </Text>
-          ) : null}
-        </View>
+      {renderDiff(display, colors)}
+    </View>
+  );
+}
+
+function renderDiff(display: DisplayChange, colors: ThemeColors) {
+  if (display.before === null && display.after === null) return null;
+  return (
+    <View style={{ marginLeft: 32, gap: 4 }}>
+      {display.before !== null ? (
+        <Text
+          style={{
+            fontFamily: "JetBrainsMono_400Regular",
+            fontSize: 12.5,
+            color: colors.ink3,
+            letterSpacing: 0.3,
+            textDecorationLine:
+              display.verb === "Changed" || display.verb === "Removed"
+                ? "line-through"
+                : "none",
+            textDecorationColor: colors.ink4
+          }}
+        >
+          {display.before}
+        </Text>
       ) : null}
-      {change.kind === "add" ? (
-        <View style={{ marginLeft: 32 }}>
-          <Text
-            style={{
-              fontFamily: "JetBrainsMono_600SemiBold",
-              fontSize: 12.5,
-              color: colors.ink2,
-              letterSpacing: 0.3
-            }}
-          >
-            {change.after}
-          </Text>
-        </View>
+      {display.after !== null ? (
+        <Text
+          style={{
+            fontFamily: "JetBrainsMono_600SemiBold",
+            fontSize: 12.5,
+            color: colors.ink2,
+            letterSpacing: 0.3
+          }}
+        >
+          {display.after}
+        </Text>
       ) : null}
     </View>
   );
 }
 
-/**
- * Rule-based heads-up generator. The handoff specifies a small table of
- * threshold checks (chicken weight bumping effort, ingredient count
- * exceeding effort tier, etc.). This first cut covers just the chicken
- * weight case shown in the mock — additional rules can layer in as we
- * discover more side effects worth surfacing.
- */
-function computeHeadsUp(
-  pending: PendingChange[],
-  currentEffort: string | null
-): string | null {
-  if (!currentEffort || currentEffort === "high_effort") return null;
-  const chickenBump = pending.find(
-    (p) =>
-      p.kind === "change" &&
-      /chicken/i.test(p.label) &&
-      /600\s*g/.test(p.after) &&
-      /400\s*g/.test(p.before)
+function paletteFor(
+  kind: PendingChange["kind"],
+  colors: ThemeColors,
+  wheat: { bg: string; fg: string }
+) {
+  if (kind === "add") {
+    return {
+      bg: colors.sageBg,
+      fg: colors.forest,
+      icon: "add" as keyof typeof Ionicons.glyphMap
+    };
+  }
+  if (kind === "change") {
+    return {
+      bg: wheat.bg,
+      fg: wheat.fg,
+      icon: "arrow-forward" as keyof typeof Ionicons.glyphMap
+    };
+  }
+  return {
+    bg: colors.dangerSoft,
+    fg: colors.danger,
+    icon: "remove" as keyof typeof Ionicons.glyphMap
+  };
+}
+
+function HeadsUpCard({
+  headsUp,
+  colors,
+  wheat
+}: {
+  headsUp: HeadsUp;
+  colors: ThemeColors;
+  wheat: { bg: string; fg: string; border: string };
+}) {
+  const warn = headsUp.severity === "warn";
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        gap: 12,
+        alignItems: "flex-start",
+        padding: 16,
+        borderRadius: 14,
+        backgroundColor: warn ? wheat.bg : colors.sageBg,
+        borderWidth: 1,
+        borderColor: warn ? wheat.border : colors.sageDeep
+      }}
+    >
+      <Ionicons
+        name={warn ? "alert-circle-outline" : "sparkles-outline"}
+        size={18}
+        color={warn ? wheat.fg : colors.forest}
+        style={{ marginTop: 1 }}
+      />
+      <View style={{ flex: 1 }}>
+        <Text
+          style={{
+            fontFamily: "Geist_600SemiBold",
+            fontSize: 13,
+            color: colors.ink,
+            letterSpacing: -0.1,
+            marginBottom: 4
+          }}
+        >
+          {headsUp.title || "Heads up"}
+        </Text>
+        <Text
+          style={{
+            fontFamily: "Geist_400Regular",
+            fontSize: 12.5,
+            color: colors.ink2,
+            lineHeight: 18
+          }}
+        >
+          {headsUp.body}
+        </Text>
+        {headsUp.suggestedAction ? (
+          // R20 spec: render the suggested-action label as visible but
+          // non-functional. The action plumb-through (e.g. "Tap to keep
+          // medium" overriding an effort tier) is parked for R20.5+.
+          <Text
+            style={{
+              fontFamily: "Geist_500Medium",
+              fontSize: 12,
+              color: colors.ink3,
+              marginTop: 6,
+              letterSpacing: -0.05
+            }}
+          >
+            {headsUp.suggestedAction.label}
+          </Text>
+        ) : null}
+      </View>
+    </View>
   );
-  if (!chickenBump) return null;
-  return "Bumping the chicken to 600 g pushes effort from medium to high. Tap to keep medium.";
 }
