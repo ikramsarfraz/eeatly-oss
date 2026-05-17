@@ -51,6 +51,17 @@ const ACTIVE_STATUS = "active" as const;
 const SAVED_STATUS = "saved" as const;
 const DISCARDED_STATUS = "discarded" as const;
 
+// Synthetic id prefix used by loadRecipeContext when a meal has no
+// structured `meal_ingredients` rows yet — the position-indexed id lets
+// the AI diff against legacy `meals.ingredients[]` entries. The save
+// path materialises these into real rows and remaps refIds before
+// applying changes.
+const LEGACY_INGREDIENT_PREFIX = "legacy-ingredient-";
+
+function isLegacyIngredientId(id: string): boolean {
+  return id.startsWith(LEGACY_INGREDIENT_PREFIX);
+}
+
 export type SessionState = {
   sessionId: string;
   mealId: string;
@@ -124,7 +135,7 @@ async function loadRecipeContext(mealId: string): Promise<RecipeContext> {
           prepNote: r.prepNote
         }))
       : (mealRow.ingredients ?? []).map((line, idx) => ({
-          id: `legacy-ingredient-${idx}`,
+          id: `${LEGACY_INGREDIENT_PREFIX}${idx}`,
           position: idx,
           name: line,
           quantityString: "",
@@ -665,9 +676,83 @@ export async function saveSession(args: {
   }
 
   await db.transaction(async (tx) => {
-    for (const row of pending) {
-      const change = parseProposed([pendingRowToChange(row)])[0];
-      if (!change) continue;
+    // Parse pending up-front so we can scan for legacy-ingredient refs
+    // before applying anything.
+    const parsedChanges = pending
+      .map((row) => parseProposed([pendingRowToChange(row)])[0])
+      .filter((c): c is PendingChange => Boolean(c));
+
+    // If any change targets a synthetic `legacy-ingredient-N` id,
+    // materialise `meals.ingredients[]` into real `meal_ingredients`
+    // rows inside this transaction so updates/deletes target valid
+    // UUIDs. Rolls back with the rest of the save on failure.
+    const referencesLegacy = parsedChanges.some((ch) => {
+      if (
+        (ch.kind === "change" || ch.kind === "remove") &&
+        ch.target === "ingredient" &&
+        isLegacyIngredientId(ch.refId)
+      ) {
+        return true;
+      }
+      if (ch.kind === "add" && ch.target === "step") {
+        const payload = ch.payload as { ingredientIds?: string[] };
+        if (payload.ingredientIds?.some(isLegacyIngredientId)) return true;
+      }
+      if (
+        ch.kind === "change" &&
+        ch.target === "step" &&
+        ch.field === "ingredientIds" &&
+        Array.isArray(ch.after)
+      ) {
+        if (
+          (ch.after as unknown[]).some(
+            (v) => typeof v === "string" && isLegacyIngredientId(v)
+          )
+        ) {
+          return true;
+        }
+      }
+      return false;
+    });
+
+    const legacyIdMap = new Map<string, string>();
+    if (referencesLegacy) {
+      const existing = await tx
+        .select({ id: mealIngredients.id })
+        .from(mealIngredients)
+        .where(eq(mealIngredients.mealId, session.mealId))
+        .limit(1);
+      if (existing.length === 0) {
+        const legacyArr = mealRow.ingredients ?? [];
+        if (legacyArr.length > 0) {
+          const inserted = await tx
+            .insert(mealIngredients)
+            .values(
+              legacyArr.map((line, idx) => ({
+                mealId: session.mealId,
+                position: idx,
+                name: line,
+                quantityString: "",
+                prepNote: null
+              }))
+            )
+            .returning({
+              id: mealIngredients.id,
+              position: mealIngredients.position
+            });
+          for (const row of inserted) {
+            legacyIdMap.set(
+              `${LEGACY_INGREDIENT_PREFIX}${row.position}`,
+              row.id
+            );
+          }
+        }
+      }
+    }
+
+    const remapId = (id: string): string => legacyIdMap.get(id) ?? id;
+
+    for (const change of parsedChanges) {
       if (change.kind === "add") {
         if (change.target === "ingredient") {
           const payload = change.payload as {
@@ -714,11 +799,23 @@ export async function saveSession(args: {
             title: payload.title ?? "Step",
             time: payload.time ?? null,
             body: payload.body ?? "",
-            ingredientIds: payload.ingredientIds ?? []
+            ingredientIds: (payload.ingredientIds ?? []).map(remapId)
           });
         }
       } else if (change.kind === "change") {
         if (change.target === "ingredient") {
+          const refId = remapId(change.refId);
+          if (isLegacyIngredientId(refId)) {
+            // Unmapped legacy ref — meal already had structured rows
+            // when the materialisation guard ran, or the position
+            // didn't exist. Skip rather than blow up the whole save.
+            logger.warn("refine_skipped_unmapped_legacy_ref", {
+              sessionId: session.id,
+              refId: change.refId,
+              field: change.field
+            });
+            continue;
+          }
           const after = change.after;
           const update: Partial<typeof mealIngredients.$inferInsert> = {
             updatedAt: new Date()
@@ -747,7 +844,7 @@ export async function saveSession(args: {
             .set(update)
             .where(
               and(
-                eq(mealIngredients.id, change.refId),
+                eq(mealIngredients.id, refId),
                 eq(mealIngredients.mealId, session.mealId)
               )
             );
@@ -768,9 +865,9 @@ export async function saveSession(args: {
               break;
             case "ingredientIds":
               if (Array.isArray(after)) {
-                update.ingredientIds = (after as unknown[]).filter(
-                  (v): v is string => typeof v === "string"
-                );
+                update.ingredientIds = (after as unknown[])
+                  .filter((v): v is string => typeof v === "string")
+                  .map(remapId);
               }
               break;
             case "position":
@@ -820,11 +917,20 @@ export async function saveSession(args: {
         }
       } else if (change.kind === "remove") {
         if (change.target === "ingredient") {
+          const refId = remapId(change.refId);
+          if (isLegacyIngredientId(refId)) {
+            logger.warn("refine_skipped_unmapped_legacy_ref", {
+              sessionId: session.id,
+              refId: change.refId,
+              kind: "remove"
+            });
+            continue;
+          }
           await tx
             .delete(mealIngredients)
             .where(
               and(
-                eq(mealIngredients.id, change.refId),
+                eq(mealIngredients.id, refId),
                 eq(mealIngredients.mealId, session.mealId)
               )
             );
