@@ -114,6 +114,45 @@ export default function PlanDetailScreen() {
       Alert.alert("Couldn't remove dish", e.message || "Try again.")
   });
 
+  // R24 — archive / unarchive. Both invalidate `plans.list` so the
+  // plans index repaints with the plan in / out of the default
+  // filter view; archive sends the user back to the list afterward so
+  // they see the immediate effect. Unarchive stays on the detail
+  // screen because the user likely wants to keep working with it.
+  const archiveMutation = trpc.plans.archive.useMutation({
+    onSuccess: () => {
+      utils.plans.list.invalidate();
+      utils.plans.getById.invalidate({ planId });
+      router.replace("/(authed)/plans");
+    },
+    onError: (e) =>
+      Alert.alert("Couldn't archive", e.message || "Try again.")
+  });
+
+  const unarchiveMutation = trpc.plans.unarchive.useMutation({
+    onSuccess: () => {
+      utils.plans.list.invalidate();
+      utils.plans.getById.invalidate({ planId });
+    },
+    onError: (e) =>
+      Alert.alert("Couldn't unarchive", e.message || "Try again.")
+  });
+
+  function confirmArchive() {
+    Alert.alert(
+      "Archive plan?",
+      "It'll move out of your default plans list. You can bring it back later via the archived filter.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Archive",
+          style: "destructive",
+          onPress: () => archiveMutation.mutate({ planId })
+        }
+      ]
+    );
+  }
+
   const plan = planQuery.data;
   const dishes = plan?.dishes ?? [];
 
@@ -274,6 +313,37 @@ export default function PlanDetailScreen() {
           >
             Add dish to plan
           </Button>
+        </View>
+
+        {/* R24 — archive / unarchive lives at the bottom so it doesn't
+            compete with the primary "Add dish" CTA. Archived plans get
+            an "Archived" eyebrow above the action so the state is
+            visible without scrolling back up. */}
+        <View style={{ marginTop: 32, gap: 8 }}>
+          {plan.archivedAt ? (
+            <>
+              <Chip tone="ghost">Archived</Chip>
+              <Button
+                variant="secondary"
+                size="md"
+                fullWidth
+                loading={unarchiveMutation.isPending}
+                onPress={() => unarchiveMutation.mutate({ planId })}
+              >
+                Unarchive plan
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="outline-destructive"
+              size="md"
+              fullWidth
+              loading={archiveMutation.isPending}
+              onPress={confirmArchive}
+            >
+              Archive plan
+            </Button>
+          )}
         </View>
       </ScrollView>
 
