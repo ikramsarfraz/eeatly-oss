@@ -308,7 +308,11 @@ function KindIcon({ kind }: { kind: PendingChange["kind"] }) {
   }
   if (kind === "change") {
     return (
-      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#EDDFB7] text-[#6F571E]">
+      // R23 — wheat tone is now a CSS variable pair (`--wheat` /
+      // `--wheat-fg`), defined in `globals.css` with light + dark
+      // siblings. Same visual contract; the swap on dark mode happens
+      // through `prefers-color-scheme` automatically.
+      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-wheat text-[color:var(--wheat-fg)]">
         <ArrowRight className="h-3 w-3" strokeWidth={3} />
       </span>
     );
@@ -328,14 +332,14 @@ function HeadsUpCard({ headsUp }: { headsUp: HeadsUp }) {
       className={cn(
         "flex gap-3 rounded-xl border p-3.5",
         warn
-          ? "border-[#E2D6AC] bg-[#EDDFB7]/40"
+          ? "border-wheat bg-wheat/40"
           : "border-[var(--primary-soft)] bg-[var(--primary-soft)]/40"
       )}
     >
       <Icon
         className={cn(
           "mt-0.5 h-4 w-4 shrink-0",
-          warn ? "text-[#6F571E]" : "text-[color:var(--secondary-foreground)]"
+          warn ? "text-[color:var(--wheat-fg)]" : "text-[color:var(--secondary-foreground)]"
         )}
       />
       <div className="grid gap-1">

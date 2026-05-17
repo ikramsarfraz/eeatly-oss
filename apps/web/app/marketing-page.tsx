@@ -53,7 +53,17 @@ export default function MarketingPage({ monthlyPriceDisplay }: MarketingPageProp
   const prefersReducedMotion = useReducedMotion();
 
   return (
-    <main id="main" tabIndex={-1} className="min-h-screen bg-background">
+    // R23 — marketing landing is brand-locked to the light editorial
+    // palette. The `marketing-light-only` class sets `color-scheme:
+    // light` on this subtree, and the explicit hex overrides on `bg-`
+    // / `text-` ensure CSS variable swaps in `@media (prefers-color-
+    // scheme: dark)` don't leak through onto a page meant to read as
+    // cream-and-green regardless of OS preference.
+    <main
+      id="main"
+      tabIndex={-1}
+      className="marketing-light-only min-h-screen bg-[#f7f5ee] text-[#1b2220]"
+    >
       <Header />
       <HeroSection prefersReducedMotion={prefersReducedMotion} />
       <TrustBadges />

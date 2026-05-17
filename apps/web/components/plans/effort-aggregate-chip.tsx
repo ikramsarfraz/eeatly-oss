@@ -45,7 +45,9 @@ export function EffortAggregateChip({ aggregate }: { aggregate: EffortAggregate 
     <div
       className={cn(
         "inline-flex flex-wrap items-center gap-1.5 rounded-full border bg-background/60 px-2.5 py-1 text-[11px]",
-        ambitious ? "border-amber-200 bg-amber-50 text-amber-900" : "text-muted-foreground"
+        ambitious
+          ? "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-200"
+          : "text-muted-foreground"
       )}
       role="status"
       aria-label={ambitious ? "Plan looks ambitious" : "Effort breakdown"}

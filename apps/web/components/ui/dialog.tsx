@@ -17,8 +17,11 @@ const DialogOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
     ref={ref}
+    // R23 — fixed dark scrim. `bg-foreground/35` would flip to a
+    // cream-tinted overlay on dark mode (foreground == cream there);
+    // black at higher opacity reads as a dimming layer in both.
     className={cn(
-      "fixed inset-0 z-50 bg-foreground/35 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out",
+      "fixed inset-0 z-50 bg-black/35 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out dark:bg-black/60",
       className
     )}
     {...props}

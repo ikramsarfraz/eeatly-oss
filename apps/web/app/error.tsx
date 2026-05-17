@@ -28,7 +28,7 @@ export default function RootError({
 
   return (
     <main id="main" tabIndex={-1} className="mx-auto flex min-h-screen w-full max-w-xl flex-col items-center justify-center gap-5 px-6 py-16 text-center">
-      <span className="grid h-12 w-12 place-items-center rounded-full bg-[var(--accent-soft)] text-[#8c4a25]">
+      <span className="grid h-12 w-12 place-items-center rounded-full bg-[var(--accent-soft)] text-[#8c4a25] dark:text-[color:var(--terra-fg)]">
         <AlertTriangle className="h-6 w-6" />
       </span>
       <div className="grid gap-2">

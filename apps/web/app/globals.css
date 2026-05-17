@@ -42,6 +42,15 @@
   --color-accent-soft: var(--accent-soft);
   --color-border-strong: var(--border-strong);
   --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-sage: var(--sage);
+  --color-sage-soft: var(--sage-soft);
+  --color-wheat: var(--wheat);
+  --color-wheat-soft: var(--wheat-soft);
+  --color-terra: var(--terra);
+  --color-terra-soft: var(--terra-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -52,6 +61,8 @@
 }
 
 :root {
+  color-scheme: light dark;
+
   --background: #f7f5ee;
   --foreground: #1b2220;
   --card: #fdfcf7;
@@ -95,6 +106,24 @@
   --subtle-fg: #6f7872;
   --warn: #c08a2a;
   --warn-soft: #f3e8c8;
+
+  /* R23 — Badge tone palette promoted from inline hex (R22). Light
+     siblings mirror mobile's Chip primitive; dark siblings are tuned
+     for contrast on the warm near-black ground. `ghost` is semantic
+     (subtle neutral) and uses the muted family directly. */
+  --sage: #dde9e2;
+  --sage-soft: #eef3ef;
+  --wheat: #eddfb7;
+  --wheat-soft: #f5ecd4;
+  --terra: #efd5c9;
+  --terra-soft: #f7e5db;
+  --danger: #c44949;
+  --danger-soft: #f4dada;
+  --sage-fg: #1c4738;
+  --wheat-fg: #6f571e;
+  --terra-fg: #7a3a1b;
+  --danger-fg: #8a2424;
+
   --shadow-sm: 0 1px 0 rgba(27,34,32,0.04), 0 1px 2px rgba(27,34,32,0.04);
   --shadow-md: 0 1px 0 rgba(27,34,32,0.05), 0 8px 24px -12px rgba(27,34,32,0.16);
   --sidebar-w: 256px;
@@ -105,6 +134,82 @@
   --font-sans-val: var(--font-sans-loaded), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-serif-val: var(--font-serif-loaded), "Cormorant Garamond", Georgia, serif;
   --font-mono-val: var(--font-mono-loaded), ui-monospace, monospace;
+}
+
+/* R23 — dark mode. Media-based per the R20 audit decision; no toggle.
+   Hex values pulled from `apps/mobile/lib/design/tokens.ts` (the
+   `colorsDark` block) where the semantic role matches. Web-only
+   palettes (accent / warn / shadcn sidebar) get derivations in the
+   same hue family, darker / lower-saturation so they read against the
+   warm near-black `--background`. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #15140f;
+    --foreground: #f0e9d9;
+    --card: #1f1d17;
+    --card-foreground: #f0e9d9;
+    --popover: #1f1d17;
+    --popover-foreground: #f0e9d9;
+    /* Forest inverts to lighter sage-green so the primary CTA still
+       reads against the dark ground. `--primary-foreground` flips
+       accordingly so text on the CTA stays legible. */
+    --primary: #88b894;
+    --primary-foreground: #10180f;
+    --secondary: #2a3022;
+    --secondary-foreground: #a1cba9;
+    --muted: #1c1a14;
+    --muted-foreground: #a8a28f;
+    /* Burnt-orange accent: warm, lower saturation, sits between
+       light's #d77a4a and a dark-mode-readable mid-tone. */
+    --accent: #c4683c;
+    --accent-foreground: #15140f;
+    --destructive: #d88078;
+    --destructive-foreground: #15140f;
+    --border: #2d2b22;
+    --input: #2d2b22;
+    --ring: rgba(136, 184, 148, 0.45);
+
+    /* Sidebar palette mirrors the main tokens. */
+    --sidebar: #1f1d17;
+    --sidebar-foreground: #f0e9d9;
+    --sidebar-border: #2d2b22;
+    --sidebar-accent: #2a3022;
+    --sidebar-accent-foreground: #a1cba9;
+    --sidebar-primary: #88b894;
+    --sidebar-primary-foreground: #10180f;
+    --sidebar-ring: rgba(136, 184, 148, 0.45);
+
+    /* Extended tokens. `--surface` is the elevated card bg; `--surface-2`
+       is the slightly-darker neutral used for dashed input zones and
+       muted alt backgrounds. */
+    --surface: #1f1d17;
+    --surface-2: #1c1a14;
+    --primary-soft: #2a3022;
+    --accent-soft: #3a2820;
+    --border-strong: #3a382e;
+    --subtle-fg: #8e887a;
+    /* `--warn` (amber) — no mobile equivalent. Hue family preserved,
+       luminance dropped enough to sit on dark cream without screaming. */
+    --warn: #d4a247;
+    --warn-soft: #3a2f18;
+
+    /* Badge tone palette dark siblings. */
+    --sage: #2a3022;
+    --sage-soft: #1f2418;
+    --sage-fg: #a1cba9;
+    --wheat: #3a2f18;
+    --wheat-soft: #2a2210;
+    --wheat-fg: #c9b176;
+    --terra: #3a2a20;
+    --terra-soft: #281c14;
+    --terra-fg: #d88865;
+    --danger: #d88078;
+    --danger-soft: #3a211e;
+    --danger-fg: #f0b8b0;
+
+    --shadow-sm: 0 1px 0 rgba(0,0,0,0.45), 0 1px 2px rgba(0,0,0,0.55);
+    --shadow-md: 0 1px 0 rgba(0,0,0,0.5), 0 8px 24px -12px rgba(0,0,0,0.7);
+  }
 }
 
 * {
@@ -130,6 +235,12 @@ select {
   background: rgba(47, 111, 88, 0.22);
 }
 
+@media (prefers-color-scheme: dark) {
+  ::selection {
+    background: rgba(136, 184, 148, 0.28);
+  }
+}
+
 /* Serif utility */
 .font-serif {
   font-family: var(--font-serif-val);
@@ -138,6 +249,14 @@ select {
 /* Mono utility */
 .font-mono-brand {
   font-family: var(--font-mono-val);
+}
+
+/* R23 — marketing landing opt-out. `app/marketing-page.tsx` keeps its
+   light editorial palette regardless of OS preference. This class is
+   applied at the root of that page so emerald CTAs + cream sections
+   read as intended (the brand surface stays consistent). */
+.marketing-light-only {
+  color-scheme: light;
 }
 
 /* Suppress iOS auto-zoom on input focus.

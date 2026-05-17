@@ -4,11 +4,16 @@ import { Badge } from "./badge";
 
 describe("Badge (R22 tones)", () => {
   it.each([
-    ["sage", /var\(--primary-soft\)/],
-    ["wheat", /#EDDFB7/],
-    ["terra", /#EFD5C9/],
+    // R23 promoted the R22 inline hex values to CSS variables in
+    // globals.css. Each tone now resolves via a Tailwind utility that
+    // maps through `@theme inline` (e.g. `bg-sage` → `--color-sage` →
+    // `--sage`), so the assertions key off the utility name rather
+    // than the underlying hex.
+    ["sage", /bg-sage/],
+    ["wheat", /bg-wheat/],
+    ["terra", /bg-terra/],
     ["ghost", /bg-transparent/],
-    ["danger", /var\(--destructive\)/]
+    ["danger", /bg-danger-soft/]
   ] as const)("renders the %s tone with the right class signature", (tone, pattern) => {
     render(<Badge variant={tone}>{tone}</Badge>);
     const node = screen.getByText(tone);

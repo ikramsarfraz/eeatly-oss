@@ -423,7 +423,11 @@ function FilterSheet({
             <button
               type="button"
               onClick={apply}
-              className="rounded-md bg-primary px-4 py-2 text-[13px] font-medium text-primary-foreground transition-colors hover:bg-[#266a51]"
+              // R23 — `#266a51` is the darker forest hover. In dark
+              // mode `--primary` flips to a lighter sage, so the
+              // hardcoded darken doesn't apply; use opacity for the
+              // hover signal instead.
+              className="rounded-md bg-primary px-4 py-2 text-[13px] font-medium text-primary-foreground transition-colors hover:bg-[#266a51] dark:hover:bg-primary/85"
             >
               Apply filters
             </button>

@@ -61,22 +61,27 @@ function verdictMeta(
   switch (verdict) {
     case "repeat":
       // Subtle green — positive but not loud. The user might still want
-      // to swap it out; the hint is advisory.
+      // to swap it out; the hint is advisory. R23: dark siblings keep
+      // the same hue family at lower luminance so it reads on the
+      // warm near-black ground.
       return {
         label: "Last time: hit",
-        className: "border-emerald-200 bg-emerald-50 text-emerald-900"
+        className:
+          "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200"
       };
     case "modify":
       return {
         label: "Last time: needs tweaking",
-        className: "border-amber-200 bg-amber-50 text-amber-900"
+        className:
+          "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-200"
       };
     case "do_not_repeat":
       // Red-tinted but not aggressive — the dish is still on the plan; we
       // don't want to scream at the user about their own past choice.
       return {
         label: "Last time: don't repeat",
-        className: "border-rose-200 bg-rose-50 text-rose-900"
+        className:
+          "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/40 dark:text-rose-200"
       };
     default:
       return null;

@@ -36,7 +36,13 @@ function SheetOverlay({
   return (
     <SheetPrimitive.Overlay
       data-slot="sheet-overlay"
-      className={cn("fixed inset-0 z-50 bg-black/10 backdrop-blur-xs", className)}
+      // R23 — translucent black scrim works in both modes (cream `bg-
+      // foreground/X` would light-tint the dark overlay; pure black
+      // stays a dimming layer regardless of theme).
+      className={cn(
+        "fixed inset-0 z-50 bg-black/20 backdrop-blur-xs dark:bg-black/55",
+        className
+      )}
       {...props}
     />
   );

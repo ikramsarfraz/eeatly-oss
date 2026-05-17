@@ -11,17 +11,17 @@ const badgeVariants = cva(
         secondary: "border-transparent bg-secondary text-secondary-foreground",
         outline: "border-border text-foreground",
         warm: "border-transparent bg-accent/20 text-accent-foreground",
-        // Round 22 — tone extension mirroring mobile's Chip primitive
-        // (apps/mobile/components/ui/chip.tsx). Sage uses existing CSS
-        // vars; wheat and terra have no web variables yet so the spec
-        // says hardcode mobile's light-mode hex inline. Ghost is a
-        // neutral outline; danger uses the existing `--destructive`.
-        sage: "border-[var(--primary-soft)] bg-[var(--primary-soft)] text-[color:var(--secondary-foreground)]",
-        wheat: "border-[#E2D6AC] bg-[#EDDFB7] text-[#6F571E]",
-        terra: "border-[#E5C8B9] bg-[#EFD5C9] text-[#7A3A1B]",
+        // Round 22 / R23 — tone extension mirroring mobile's Chip
+        // primitive. Each tone resolves to CSS variables defined in
+        // `globals.css` (with light + dark siblings), so the OS-driven
+        // dark variant flips them automatically without a `dark:`
+        // utility per tone. `ghost` stays semantic (subtle neutral).
+        sage: "border-sage bg-sage text-[color:var(--sage-fg)]",
+        wheat: "border-wheat bg-wheat text-[color:var(--wheat-fg)]",
+        terra: "border-terra bg-terra text-[color:var(--terra-fg)]",
         ghost: "border-border bg-transparent text-muted-foreground",
         danger:
-          "border-[color:var(--destructive)]/30 bg-[color:var(--destructive)]/10 text-[color:var(--destructive)]"
+          "border-danger-soft bg-danger-soft text-[color:var(--danger-fg)]"
       }
     },
     defaultVariants: {
