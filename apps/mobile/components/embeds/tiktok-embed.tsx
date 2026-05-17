@@ -61,6 +61,11 @@ export function TikTokEmbed({ url }: Props) {
   );
 }
 
+// Container + webview bgs stay literal black in both light + dark
+// modes — TikTok's embed body is hardcoded `#000` (see the inline
+// HTML above), and the player itself renders dark video content. A
+// theme-aware cream background here would only show as a brief flash
+// before the WebView paints.
 const styles = StyleSheet.create({
   container: {
     width: "100%",

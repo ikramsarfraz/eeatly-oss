@@ -1,13 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { detectPlatform } from "@eeatly/shared";
 import { UrlPreviewCard } from "./url-preview-card";
+import { useThemeColors } from "../../lib/design/use-theme-colors";
 
 /**
  * Mobile equivalent of the web `SourceUrlInputPreview`. Shows a small
  * platform badge for recognised hosts, or the OG preview card for
  * generic web URLs. Debounced 400ms so each keystroke doesn't fire
  * a fetch.
+ *
+ * R19.7: hint text color reads from `useThemeColors()` and the
+ * StyleSheet is memoised on the palette reference.
  */
 type Props = {
   url: string;
@@ -21,6 +25,26 @@ const PLATFORM_LABEL: Record<string, string> = {
 };
 
 export function SourceUrlInputPreview({ url }: Props) {
+  const colors = useThemeColors();
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        hint: {
+          fontSize: 12,
+          color: colors.ink2,
+          lineHeight: 18
+        },
+        hintStrong: {
+          color: colors.ink,
+          fontWeight: "500"
+        },
+        cardWrap: {
+          marginTop: 4
+        }
+      }),
+    [colors]
+  );
+
   const trimmed = url.trim();
   const [debouncedUrl, setDebouncedUrl] = useState(trimmed);
 
@@ -56,18 +80,3 @@ export function SourceUrlInputPreview({ url }: Props) {
     </Text>
   );
 }
-
-const styles = StyleSheet.create({
-  hint: {
-    fontSize: 12,
-    color: "#666",
-    lineHeight: 18
-  },
-  hintStrong: {
-    color: "#222",
-    fontWeight: "500"
-  },
-  cardWrap: {
-    marginTop: 4
-  }
-});

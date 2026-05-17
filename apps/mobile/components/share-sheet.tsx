@@ -14,6 +14,8 @@ import {
   View
 } from "react-native";
 import { trpc } from "../lib/trpc";
+import type { ThemeColors } from "../lib/design/tokens";
+import { useThemeColors } from "../lib/design/use-theme-colors";
 
 /**
  * Round 14 Task 1 — recipe share sheet.
@@ -33,7 +35,203 @@ import { trpc } from "../lib/trpc";
  *
  * No new dep. Uses RN's built-in `Share.share` (same pattern as R13
  * Task 5's recipe share button) and the R13 Task 6 expo-clipboard.
+ *
+ * R19.7: theme-aware. Styles built via `makeStyles(colors)` and
+ * memoised on the palette reference inside each sub-component that
+ * actually renders, so the StyleSheet only recomputes on appearance
+ * change.
  */
+
+type Styles = ReturnType<typeof makeStyles>;
+
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    backdrop: {
+      flex: 1,
+      // Scrim stays semi-transparent black in both modes — a transparent
+      // dark overlay reads correctly against any underlying surface.
+      backgroundColor: "rgba(0,0,0,0.45)",
+      justifyContent: "flex-end"
+    },
+    sheet: {
+      backgroundColor: colors.paper,
+      borderTopLeftRadius: 18,
+      borderTopRightRadius: 18,
+      paddingBottom: 28,
+      maxHeight: "85%"
+    },
+    handleWrap: {
+      alignItems: "center",
+      paddingVertical: 10
+    },
+    handle: {
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.ink4
+    },
+    bodyPad: {
+      paddingHorizontal: 20,
+      paddingBottom: 8,
+      gap: 12
+    },
+    sheetTitle: {
+      fontSize: 17,
+      fontWeight: "600",
+      color: colors.ink
+    },
+    sheetBody: {
+      fontSize: 13,
+      color: colors.ink2,
+      lineHeight: 19
+    },
+    optionRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 8,
+      borderRadius: 10,
+      minHeight: 60,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.borderSoft,
+      backgroundColor: colors.surface
+    },
+    optionRowPressed: { backgroundColor: colors.creamSoft },
+    optionIconWrap: {
+      width: 36,
+      height: 36,
+      alignItems: "center",
+      justifyContent: "center"
+    },
+    optionBody: { flex: 1, gap: 2 },
+    optionLabel: { fontSize: 15, fontWeight: "500", color: colors.ink },
+    optionSublabel: { fontSize: 12, color: colors.ink3 },
+    urlBox: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: colors.sageBg,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.sageDeep
+    },
+    urlText: {
+      flex: 1,
+      fontSize: 13,
+      color: colors.forest,
+      fontFamily: "Menlo"
+    },
+    actionRow: {
+      flexDirection: "row",
+      gap: 8
+    },
+    actionButton: {
+      minHeight: 46,
+      paddingHorizontal: 16,
+      borderRadius: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6
+    },
+    actionPrimary: {
+      flex: 1,
+      backgroundColor: colors.forest
+    },
+    actionPrimaryText: {
+      color: colors.forestText,
+      fontSize: 14,
+      fontWeight: "600"
+    },
+    actionSecondary: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface
+    },
+    actionSecondaryText: {
+      color: colors.forest,
+      fontSize: 14,
+      fontWeight: "500"
+    },
+    fullWidthSecondary: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      minHeight: 46,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface
+    },
+    pressed: { opacity: 0.85 },
+    disabled: { opacity: 0.55 },
+    doneRow: {
+      alignItems: "center",
+      paddingTop: 4
+    },
+    doneText: {
+      color: colors.ink2,
+      fontSize: 14
+    },
+    manageHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between"
+    },
+    manageTitle: { flex: 1, textAlign: "center" },
+    manageList: {
+      maxHeight: 280
+    },
+    manageRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      paddingVertical: 12,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.borderSoft
+    },
+    manageRowBody: { flex: 1, gap: 2 },
+    manageRowUrl: {
+      fontSize: 13,
+      color: colors.ink,
+      fontFamily: "Menlo"
+    },
+    manageRowMeta: { fontSize: 11, color: colors.ink3 },
+    revokeButton: {
+      minHeight: 36,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.danger,
+      backgroundColor: colors.dangerSoft
+    },
+    revokeText: {
+      color: colors.danger,
+      fontSize: 13,
+      fontWeight: "500"
+    },
+    emptyText: {
+      fontSize: 13,
+      color: colors.ink3,
+      fontStyle: "italic",
+      textAlign: "center",
+      paddingVertical: 24
+    },
+    upgradeIcon: { alignSelf: "center" },
+    upgradeButton: {
+      flex: undefined,
+      minWidth: 200,
+      alignSelf: "stretch",
+      marginTop: 4
+    }
+  });
+}
 
 export type ShareSheetProps = {
   visible: boolean;
@@ -73,6 +271,8 @@ export function ShareSheet({
   recipeText,
   recipeSourceUrl
 }: ShareSheetProps) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const utils = trpc.useUtils();
   const [phase, setPhase] = useState<Phase>({ kind: "options" });
 
@@ -191,6 +391,8 @@ export function ShareSheet({
 
           {phase.kind === "options" ? (
             <OptionsView
+              styles={styles}
+              colors={colors}
               onShareText={shareRecipeText}
               onCreateLink={createLink}
               onManage={() => setPhase({ kind: "manage" })}
@@ -199,6 +401,8 @@ export function ShareSheet({
             />
           ) : phase.kind === "created" ? (
             <CreatedView
+              styles={styles}
+              colors={colors}
               url={phase.url}
               onCopy={() => copyUrl(phase.url)}
               onWhatsApp={() => openWhatsApp(phase.url)}
@@ -207,6 +411,8 @@ export function ShareSheet({
             />
           ) : phase.kind === "manage" ? (
             <ManageView
+              styles={styles}
+              colors={colors}
               shares={shares}
               loading={listQuery.isPending}
               revokingId={revokeMutation.variables?.shareId ?? null}
@@ -214,7 +420,7 @@ export function ShareSheet({
               onBack={() => setPhase({ kind: "options" })}
             />
           ) : (
-            <UpgradeView onClose={onClose} />
+            <UpgradeView styles={styles} colors={colors} onClose={onClose} />
           )}
         </Pressable>
       </Pressable>
@@ -223,12 +429,16 @@ export function ShareSheet({
 }
 
 function OptionsView({
+  styles,
+  colors,
   onShareText,
   onCreateLink,
   onManage,
   hasShares,
   creating
 }: {
+  styles: Styles;
+  colors: ThemeColors;
   onShareText: () => void;
   onCreateLink: () => void;
   onManage: () => void;
@@ -239,12 +449,16 @@ function OptionsView({
     <View style={styles.bodyPad}>
       <Text style={styles.sheetTitle}>Share this recipe</Text>
       <SheetOption
+        styles={styles}
+        colors={colors}
         icon="share-outline"
         label="Share recipe text"
         sublabel="Send the recipe via WhatsApp, Messages, etc."
         onPress={onShareText}
       />
       <SheetOption
+        styles={styles}
+        colors={colors}
         icon="link-outline"
         label="Create a link anyone can view"
         sublabel="Public share link — revoke anytime."
@@ -253,6 +467,8 @@ function OptionsView({
       />
       {hasShares ? (
         <SheetOption
+          styles={styles}
+          colors={colors}
           icon="settings-outline"
           label="Manage existing links"
           sublabel="See or revoke share links for this recipe."
@@ -264,12 +480,16 @@ function OptionsView({
 }
 
 function CreatedView({
+  styles,
+  colors,
   url,
   onCopy,
   onWhatsApp,
   onShare,
   onDone
 }: {
+  styles: Styles;
+  colors: ThemeColors;
   url: string;
   onCopy: () => void;
   onWhatsApp: () => void;
@@ -281,10 +501,10 @@ function CreatedView({
       <Text style={styles.sheetTitle}>Share link ready</Text>
       <Text style={styles.sheetBody}>
         Anyone with this link can view the recipe. You can revoke it
-        anytime from "Manage links."
+        anytime from &ldquo;Manage links.&rdquo;
       </Text>
       <View style={styles.urlBox}>
-        <Ionicons name="link-outline" size={16} color="#2f6f58" />
+        <Ionicons name="link-outline" size={16} color={colors.forest} />
         <Text style={styles.urlText} numberOfLines={1} ellipsizeMode="middle">
           {url}
         </Text>
@@ -299,7 +519,7 @@ function CreatedView({
           ]}
           accessibilityRole="button"
         >
-          <Ionicons name="copy-outline" size={18} color="#fff" />
+          <Ionicons name="copy-outline" size={18} color={colors.forestText} />
           <Text style={styles.actionPrimaryText}>Copy</Text>
         </Pressable>
         <Pressable
@@ -311,7 +531,7 @@ function CreatedView({
           ]}
           accessibilityRole="button"
         >
-          <Ionicons name="logo-whatsapp" size={18} color="#2f6f58" />
+          <Ionicons name="logo-whatsapp" size={18} color={colors.forest} />
           <Text style={styles.actionSecondaryText}>WhatsApp</Text>
         </Pressable>
       </View>
@@ -323,7 +543,7 @@ function CreatedView({
         ]}
         accessibilityRole="button"
       >
-        <Ionicons name="share-outline" size={18} color="#2f6f58" />
+        <Ionicons name="share-outline" size={18} color={colors.forest} />
         <Text style={styles.actionSecondaryText}>More share options…</Text>
       </Pressable>
       <Pressable
@@ -339,12 +559,16 @@ function CreatedView({
 }
 
 function ManageView({
+  styles,
+  colors,
   shares,
   loading,
   revokingId,
   onRevoke,
   onBack
 }: {
+  styles: Styles;
+  colors: ThemeColors;
   shares: Array<{ id: string; url: string; createdAt: Date | string }>;
   loading: boolean;
   revokingId: string | null;
@@ -361,7 +585,7 @@ function ManageView({
           accessibilityRole="button"
           accessibilityLabel="Back to share options"
         >
-          <Ionicons name="chevron-back" size={22} color="#2f6f58" />
+          <Ionicons name="chevron-back" size={22} color={colors.forest} />
         </Pressable>
         <Text style={[styles.sheetTitle, styles.manageTitle]}>
           Share links
@@ -370,7 +594,7 @@ function ManageView({
       </View>
 
       {loading ? (
-        <ActivityIndicator color="#2f6f58" />
+        <ActivityIndicator color={colors.forest} />
       ) : shares.length === 0 ? (
         <Text style={styles.emptyText}>
           No share links for this recipe yet.
@@ -403,7 +627,7 @@ function ManageView({
                 accessibilityRole="button"
               >
                 {revokingId === s.id ? (
-                  <ActivityIndicator color="#b91c1c" size="small" />
+                  <ActivityIndicator color={colors.danger} size="small" />
                 ) : (
                   <Text style={styles.revokeText}>Revoke</Text>
                 )}
@@ -416,13 +640,21 @@ function ManageView({
   );
 }
 
-function UpgradeView({ onClose }: { onClose: () => void }) {
+function UpgradeView({
+  styles,
+  colors,
+  onClose
+}: {
+  styles: Styles;
+  colors: ThemeColors;
+  onClose: () => void;
+}) {
   return (
     <View style={styles.bodyPad}>
       <Ionicons
         name="sparkles-outline"
         size={28}
-        color="#2f6f58"
+        color={colors.forest}
         style={styles.upgradeIcon}
       />
       <Text style={styles.sheetTitle}>Share links are a Plus feature</Text>
@@ -453,12 +685,16 @@ function UpgradeView({ onClose }: { onClose: () => void }) {
 }
 
 function SheetOption({
+  styles,
+  colors,
   icon,
   label,
   sublabel,
   onPress,
   loading
 }: {
+  styles: Styles;
+  colors: ThemeColors;
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   sublabel?: string;
@@ -479,201 +715,16 @@ function SheetOption({
     >
       <View style={styles.optionIconWrap}>
         {loading ? (
-          <ActivityIndicator size="small" color="#2f6f58" />
+          <ActivityIndicator size="small" color={colors.forest} />
         ) : (
-          <Ionicons name={icon} size={22} color="#2f6f58" />
+          <Ionicons name={icon} size={22} color={colors.forest} />
         )}
       </View>
       <View style={styles.optionBody}>
         <Text style={styles.optionLabel}>{label}</Text>
         {sublabel ? <Text style={styles.optionSublabel}>{sublabel}</Text> : null}
       </View>
-      <Ionicons name="chevron-forward" size={18} color="#aaa" />
+      <Ionicons name="chevron-forward" size={18} color={colors.ink3} />
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "flex-end"
-  },
-  sheet: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    paddingBottom: 28,
-    maxHeight: "85%"
-  },
-  handleWrap: {
-    alignItems: "center",
-    paddingVertical: 10
-  },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#dcd9d2"
-  },
-  bodyPad: {
-    paddingHorizontal: 20,
-    paddingBottom: 8,
-    gap: 12
-  },
-  sheetTitle: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: "#111"
-  },
-  sheetBody: {
-    fontSize: 13,
-    color: "#555",
-    lineHeight: 19
-  },
-  optionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 10,
-    minHeight: 60,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#e5e3dc",
-    backgroundColor: "#fff"
-  },
-  optionRowPressed: { backgroundColor: "#f3f1ea" },
-  optionIconWrap: {
-    width: 36,
-    height: 36,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  optionBody: { flex: 1, gap: 2 },
-  optionLabel: { fontSize: 15, fontWeight: "500", color: "#111" },
-  optionSublabel: { fontSize: 12, color: "#777" },
-  urlBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#eef5f1",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#cfe1d7"
-  },
-  urlText: {
-    flex: 1,
-    fontSize: 13,
-    color: "#1f4a3b",
-    fontFamily: "Menlo"
-  },
-  actionRow: {
-    flexDirection: "row",
-    gap: 8
-  },
-  actionButton: {
-    minHeight: 46,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6
-  },
-  actionPrimary: {
-    flex: 1,
-    backgroundColor: "#2f6f58"
-  },
-  actionPrimaryText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "600"
-  },
-  actionSecondary: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#cfd6cf",
-    backgroundColor: "#fff"
-  },
-  actionSecondaryText: {
-    color: "#2f6f58",
-    fontSize: 14,
-    fontWeight: "500"
-  },
-  fullWidthSecondary: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    minHeight: 46,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#cfd6cf",
-    backgroundColor: "#fff"
-  },
-  pressed: { opacity: 0.85 },
-  disabled: { opacity: 0.55 },
-  doneRow: {
-    alignItems: "center",
-    paddingTop: 4
-  },
-  doneText: {
-    color: "#666",
-    fontSize: 14
-  },
-  manageHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between"
-  },
-  manageTitle: { flex: 1, textAlign: "center" },
-  manageList: {
-    maxHeight: 280
-  },
-  manageRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: "#e5e3dc"
-  },
-  manageRowBody: { flex: 1, gap: 2 },
-  manageRowUrl: {
-    fontSize: 13,
-    color: "#222",
-    fontFamily: "Menlo"
-  },
-  manageRowMeta: { fontSize: 11, color: "#888" },
-  revokeButton: {
-    minHeight: 36,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#f0c5c2",
-    backgroundColor: "#fdecea"
-  },
-  revokeText: {
-    color: "#b91c1c",
-    fontSize: 13,
-    fontWeight: "500"
-  },
-  emptyText: {
-    fontSize: 13,
-    color: "#888",
-    fontStyle: "italic",
-    textAlign: "center",
-    paddingVertical: 24
-  },
-  upgradeIcon: { alignSelf: "center" },
-  upgradeButton: {
-    flex: undefined,
-    minWidth: 200,
-    alignSelf: "stretch",
-    marginTop: 4
-  }
-});

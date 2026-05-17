@@ -19,6 +19,7 @@ import {
   ErrorScreen,
   LoadingScreen
 } from "../../components/ui";
+import { useThemeColors } from "../../lib/design/use-theme-colors";
 
 /**
  * Round 17 invite-accept — NativeWind rebuild.
@@ -27,6 +28,14 @@ import {
  * out. Three states (signed out / signed in as invited / signed
  * in as someone else) drive different CTAs. R15.5 merge preview
  * is preserved.
+ *
+ * R19.7: migrated off the R17 compat aliases (`bg-background`,
+ * `text-foreground`, `text-primary`, `bg-primary-muted`,
+ * `text-destructive`) onto the R19 redesign tokens with `dark:`
+ * variants. The compat aliases in `tailwind.config.js` deliberately
+ * do NOT have dark siblings — this screen was the last place still
+ * relying on them. Inline-hex icon / indicator colors now read from
+ * `useThemeColors()` so they invert with system appearance.
  */
 
 function getCauseReason(error: unknown): string | null {
@@ -37,6 +46,7 @@ function getCauseReason(error: unknown): string | null {
 }
 
 export default function InviteAcceptScreen() {
+  const colors = useThemeColors();
   const { token: tokenParam } = useLocalSearchParams<{ token?: string | string[] }>();
   const token = Array.isArray(tokenParam) ? tokenParam[0] : tokenParam;
 
@@ -254,7 +264,10 @@ export default function InviteAcceptScreen() {
   const invitedEmail = invite.email.toLowerCase();
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={["top", "bottom"]}>
+    <SafeAreaView
+      className="flex-1 bg-cream dark:bg-cream-dark"
+      edges={["top", "bottom"]}
+    >
       <Stack.Screen options={{ headerShown: false }} />
       <View className="flex-1 px-6 pt-10 gap-4">
         <Heading title="You're invited" body={inviterLine} />
@@ -267,26 +280,30 @@ export default function InviteAcceptScreen() {
               fullWidth
               loading={busy === "send-magic"}
               leadingIcon={
-                <Ionicons name="mail-outline" size={18} color="#FBF8F1" />
+                <Ionicons
+                  name="mail-outline"
+                  size={18}
+                  color={colors.forestText}
+                />
               }
               onPress={() => startMagicLink(invitedEmail)}
             >
               {`Sign in as ${invitedEmail}`}
             </Button>
-            <Text className="text-small text-foreground-muted text-center">
+            <Text className="text-small text-ink-2 dark:text-ink-2-dark text-center">
               We&apos;ll email a one-tap sign-in link to {invitedEmail}.
               After you tap it, you&apos;ll come back here to accept.
             </Text>
           </View>
         ) : currentEmail.toLowerCase() !== invitedEmail ? (
           <View className="gap-2">
-            <Text className="text-body text-foreground-muted text-center">
+            <Text className="text-body text-ink-2 dark:text-ink-2-dark text-center">
               This invitation is for{" "}
-              <Text className="font-semibold text-foreground">
+              <Text className="font-semibold text-ink dark:text-ink-dark">
                 {invitedEmail}
               </Text>
               . You&apos;re signed in as{" "}
-              <Text className="font-semibold text-foreground">
+              <Text className="font-semibold text-ink dark:text-ink-dark">
                 {currentEmail}
               </Text>
               .
@@ -297,7 +314,11 @@ export default function InviteAcceptScreen() {
               fullWidth
               loading={busy === "switch"}
               leadingIcon={
-                <Ionicons name="log-out-outline" size={18} color="#FBF8F1" />
+                <Ionicons
+                  name="log-out-outline"
+                  size={18}
+                  color={colors.forestText}
+                />
               }
               onPress={signOutAndContinue}
             >
@@ -311,8 +332,8 @@ export default function InviteAcceptScreen() {
           <View className="gap-3">
             {previewMutation.isPending && !preview ? (
               <View className="flex-row items-center justify-center gap-2 py-4">
-                <ActivityIndicator color="#2C5F3F" />
-                <Text className="text-small text-foreground-muted">
+                <ActivityIndicator color={colors.forest} />
+                <Text className="text-small text-ink-2 dark:text-ink-2-dark">
                   Checking what would merge…
                 </Text>
               </View>
@@ -326,13 +347,13 @@ export default function InviteAcceptScreen() {
                     <Ionicons
                       name="git-merge-outline"
                       size={18}
-                      color="#2C5F3F"
+                      color={colors.forest}
                     />
-                    <Text className="text-caption-strong font-semibold uppercase tracking-wider text-primary">
+                    <Text className="text-caption-strong font-semibold uppercase tracking-wider text-forest dark:text-forest-dark">
                       What happens when you accept
                     </Text>
                   </View>
-                  <Text className="text-body text-foreground leading-5">
+                  <Text className="text-body text-ink dark:text-ink-dark leading-5">
                     {preview.mealsToMerge > 0
                       ? `${preview.mealsToMerge} of your meals`
                       : "No meals"}
@@ -348,7 +369,7 @@ export default function InviteAcceptScreen() {
               </Card>
             ) : null}
             {previewError ? (
-              <Text className="text-caption text-destructive text-center">
+              <Text className="text-caption text-danger dark:text-danger-dark text-center">
                 {previewError}
               </Text>
             ) : null}
@@ -361,7 +382,7 @@ export default function InviteAcceptScreen() {
                 <Ionicons
                   name="checkmark-circle-outline"
                   size={18}
-                  color="#FBF8F1"
+                  color={colors.forestText}
                 />
               }
               onPress={() => {
@@ -387,15 +408,16 @@ export default function InviteAcceptScreen() {
 }
 
 function Heading({ title, body }: { title: string; body: string }) {
+  const colors = useThemeColors();
   return (
     <View className="items-center gap-3 pb-4">
-      <View className="h-20 w-20 items-center justify-center rounded-full bg-primary-muted">
-        <Ionicons name="people-outline" size={36} color="#2C5F3F" />
+      <View className="h-20 w-20 items-center justify-center rounded-full bg-sage-bg dark:bg-sage-bg-dark">
+        <Ionicons name="people-outline" size={36} color={colors.forest} />
       </View>
-      <Text className="text-heading-1 font-bold text-foreground text-center">
+      <Text className="text-heading-1 font-bold text-ink dark:text-ink-dark text-center">
         {title}
       </Text>
-      <Text className="text-body text-foreground-muted text-center leading-6">
+      <Text className="text-body text-ink-2 dark:text-ink-2-dark text-center leading-6">
         {body}
       </Text>
     </View>
