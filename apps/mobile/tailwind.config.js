@@ -93,36 +93,7 @@ module.exports = {
         danger: "#A8413A",
         "danger-dark": "#D88078",
         "danger-soft": "#F0DBD8",
-        "danger-soft-dark": "#3A211E",
-
-        // Compat aliases so R17 screens (Home, Library, Settings, Plans,
-        // Household, etc.) keep rendering. Do NOT use these in new code —
-        // they map onto the redesign tokens above. Dark variants for
-        // these inherited screens are picked up via the underlying token
-        // names, not these aliases.
-        background: {
-          DEFAULT: "#F5EFE2",
-          elevated: "#FFFFFF",
-          muted: "#EFE7D6"
-        },
-        foreground: {
-          DEFAULT: "#1A1F1A",
-          muted: "#5F665B",
-          subtle: "#9C9787"
-        },
-        primary: {
-          DEFAULT: "#2E5739",
-          foreground: "#F5EFE2",
-          muted: "#E3E8D5"
-        },
-        accent: {
-          DEFAULT: "#D9C68C",
-          foreground: "#1A1F1A"
-        },
-        destructive: {
-          DEFAULT: "#A8413A",
-          foreground: "#F5EFE2"
-        }
+        "danger-soft-dark": "#3A211E"
       },
       borderRadius: {
         // Tight tiles → tighter corners; generous cards → 14; hero cards

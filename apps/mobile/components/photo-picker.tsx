@@ -133,13 +133,13 @@ export function PhotoPicker({ value, onChange, disabled }: PhotoPickerProps) {
         <View className="relative">
           <Image
             source={{ uri: uploading ? sheet.previewUri : value! }}
-            className="w-full aspect-[4/3] rounded-md bg-background-muted"
+            className="w-full aspect-[4/3] rounded-md bg-cream-soft dark:bg-cream-soft-dark"
             resizeMode="cover"
           />
           {uploading ? (
-            <View className="absolute inset-0 items-center justify-center rounded-md bg-foreground/40 gap-2">
+            <View className="absolute inset-0 items-center justify-center rounded-md bg-ink/40 dark:bg-ink-dark/40 gap-2">
               <ActivityIndicator color="#FBF8F1" />
-              <Text className="text-caption text-primary-foreground font-semibold">
+              <Text className="text-caption text-forest-text dark:text-forest-text-dark font-semibold">
                 Uploading…
               </Text>
             </View>
@@ -150,7 +150,7 @@ export function PhotoPicker({ value, onChange, disabled }: PhotoPickerProps) {
                 onPress={openSheet}
                 className="px-3 py-2 rounded-sm active:opacity-70 min-h-[44px] justify-center"
               >
-                <Text className="text-caption-strong font-semibold text-primary">
+                <Text className="text-caption-strong font-semibold text-forest dark:text-forest-dark">
                   Change
                 </Text>
               </Pressable>
@@ -158,7 +158,7 @@ export function PhotoPicker({ value, onChange, disabled }: PhotoPickerProps) {
                 onPress={() => onChange(null)}
                 className="px-3 py-2 rounded-sm active:opacity-70 min-h-[44px] justify-center"
               >
-                <Text className="text-caption-strong font-semibold text-destructive">
+                <Text className="text-caption-strong font-semibold text-danger dark:text-danger-dark">
                   Remove
                 </Text>
               </Pressable>
@@ -189,7 +189,7 @@ export function PhotoPicker({ value, onChange, disabled }: PhotoPickerProps) {
       )}
 
       {error ? (
-        <Text className="text-caption text-destructive mt-2">{error}</Text>
+        <Text className="text-caption text-danger dark:text-danger-dark mt-2">{error}</Text>
       ) : null}
 
       <Modal
@@ -199,14 +199,14 @@ export function PhotoPicker({ value, onChange, disabled }: PhotoPickerProps) {
         onRequestClose={closeSheet}
       >
         <Pressable
-          className="flex-1 bg-foreground/40 justify-end"
+          className="flex-1 bg-ink/40 dark:bg-ink-dark/40 justify-end"
           onPress={closeSheet}
         >
           <Pressable
             onPress={() => null}
-            className="bg-background-elevated rounded-t-lg pt-3 pb-9 px-4 gap-1"
+            className="bg-surface dark:bg-surface-dark rounded-t-lg pt-3 pb-9 px-4 gap-1"
           >
-            <Text className="text-caption text-foreground-muted text-center py-2">
+            <Text className="text-caption text-ink-3 dark:text-ink-3-dark text-center py-2">
               Add a photo
             </Text>
             <SheetOption
@@ -258,8 +258,8 @@ function SheetOption({
       <Text
         className={`text-body ${
           variant === "cancel"
-            ? "text-foreground-muted"
-            : "text-foreground font-semibold"
+            ? "text-ink-3 dark:text-ink-3-dark"
+            : "text-ink dark:text-ink-dark font-semibold"
         }`}
       >
         {label}

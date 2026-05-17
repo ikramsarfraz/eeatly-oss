@@ -107,7 +107,6 @@ vi.mock("@/services/plans", () => plansServiceMock);
 
 const sharesServiceMock = vi.hoisted(() => ({
   listSharesForMeal: vi.fn(),
-  listSharesForHousehold: vi.fn(),
   getRecipeShareByToken: vi.fn(),
   createRecipeShare: vi.fn(),
   revokeRecipeShare: vi.fn()

@@ -11,7 +11,6 @@ import {
 import {
   createRecipeShare,
   getRecipeShareByToken,
-  listSharesForHousehold,
   listSharesForMeal,
   revokeRecipeShare
 } from "@/services/shares";
@@ -26,7 +25,7 @@ import {
 /**
  * Round 11 — share reads.
  *
- * `listForMeal` / `listForHousehold` power the "manage shares" UI.
+ * `listForMeal` powers the per-meal "manage shares" UI.
  * `getByToken` is public — bearer-token access to the share-page
  * payload; matches the existing public surface in /app/share/[token].
  */
@@ -36,10 +35,6 @@ export const sharesRouter = router({
     .query(({ ctx, input }) =>
       listSharesForMeal({ userId: ctx.user.id, mealId: input.mealId })
     ),
-
-  listForHousehold: householdMemberProcedure.query(({ ctx }) =>
-    listSharesForHousehold({ userId: ctx.user.id, householdId: ctx.household.id })
-  ),
 
   getByToken: publicProcedure
     .input(z.object({ token: z.string().min(8).max(256) }))
