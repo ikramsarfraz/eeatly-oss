@@ -3,14 +3,19 @@ import { fileURLToPath } from "node:url";
 
 export default defineConfig({
   test: {
-    environment: "node",
+    // Default env is happy-dom so component / RTL tests work without a
+    // per-file pragma. Pure-function tests stub the globals they need
+    // (see `lib/refine/device-id.test.ts`) so the env choice doesn't
+    // affect them. Vitest 4 dropped `environmentMatchGlobs`, so a
+    // single default is the cleanest.
+    environment: "happy-dom",
     include: ["**/*.test.ts", "**/*.test.tsx"],
     exclude: ["node_modules", ".next", "drizzle"],
     setupFiles: ["./vitest.setup.ts"],
     coverage: {
       reporter: ["text", "html"],
-      include: ["lib/**/*.ts", "services/**/*.ts"],
-      exclude: ["**/*.test.ts", "**/index.ts"]
+      include: ["lib/**/*.ts", "services/**/*.ts", "components/**/*.tsx"],
+      exclude: ["**/*.test.ts", "**/*.test.tsx", "**/index.ts"]
     }
   },
   resolve: {

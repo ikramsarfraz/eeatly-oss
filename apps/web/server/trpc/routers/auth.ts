@@ -16,9 +16,6 @@ const CONFIRMATION_PHRASE = "delete my account";
 /**
  * Round 11 — auth-adjacent procedures.
  *
- * `signOut` is the plain "sign me out" path. The cookie clear happens
- * inside Better Auth's `auth.api.signOut`; tRPC just delegates.
- *
  * `signOutAndRedirect` is the Round 8 invite-email-mismatch helper:
  * sign out + return a safe redirect URL the client uses with
  * `window.location.assign` (so the freshly-cleared cookie state takes
@@ -31,21 +28,6 @@ const CONFIRMATION_PHRASE = "delete my account";
  * procedures don't redirect.
  */
 export const authRouter = router({
-  signOut: publicProcedure.mutation(async ({ ctx }) => {
-    try {
-      await auth.api.signOut({ headers: ctx.headers });
-    } catch (error) {
-      logger.warn("trpc_sign_out_failed", {
-        error: error instanceof Error ? error.message : String(error)
-      });
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Couldn't sign you out. Please try again."
-      });
-    }
-    return { ok: true as const };
-  }),
-
   signOutAndRedirect: publicProcedure
     .input(z.object({ redirectTo: z.string().min(1).max(2048) }))
     .mutation(async ({ ctx, input }) => {
