@@ -24,14 +24,17 @@ type InteractiveCardProps = Omit<PressableProps, "style"> & {
   className?: string;
 };
 
+// R19 — dark-mode aware. NativeWind picks `dark:` variants via
+// `darkMode: 'media'` so consumers don't pass theme props.
 const baseByVariant: Record<CardVariant, string> = {
   default:
-    "bg-surface rounded-lg border border-border-soft shadow-sm",
+    "bg-surface dark:bg-surface-dark rounded-lg border border-border-soft dark:border-border-soft-dark shadow-sm",
   interactive:
-    "bg-surface rounded-lg border border-border-soft shadow-sm active:bg-sage-bg/40",
+    "bg-surface dark:bg-surface-dark rounded-lg border border-border-soft dark:border-border-soft-dark shadow-sm active:bg-sage-bg/40 dark:active:bg-sage-bg-dark/40",
   outlined:
-    "bg-surface rounded-lg border border-border-soft",
-  flush: "bg-surface rounded-lg border border-border-soft overflow-hidden"
+    "bg-surface dark:bg-surface-dark rounded-lg border border-border-soft dark:border-border-soft-dark",
+  flush:
+    "bg-surface dark:bg-surface-dark rounded-lg border border-border-soft dark:border-border-soft-dark overflow-hidden"
 };
 
 export function Card(props: CardProps | InteractiveCardProps) {

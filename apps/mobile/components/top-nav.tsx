@@ -1,10 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Link, router } from "expo-router";
 import { Pressable, Text, View } from "react-native";
-import { colors } from "../lib/design/tokens";
+import { useThemeColors } from "../lib/design/use-theme-colors";
 
 /**
- * Round 18 — in-body top nav, replacing the native Stack/Tabs header.
+ * Round 18/19 — in-body top nav, replacing the native Stack/Tabs header.
  *
  * Layout: optional left slot (back chevron or text button) → centered
  * 16pt Geist title → optional right slot (gear icon or text button).
@@ -44,6 +44,7 @@ export function TopNav({
   onRightPress,
   right
 }: TopNavProps) {
+  const colors = useThemeColors();
   return (
     <View
       style={{
