@@ -20,11 +20,25 @@ import { protectedProcedure, router } from "../trpc";
  *      original timestamp. Returns the redirect URL instead of doing
  *      the redirect itself (procedures don't redirect — clients do).
  *
+ * Round 24 — `status` exposes the onboarding-completion bit for the
+ * mobile navigation gate. Web reads it server-side via `db` in the
+ * route layer, but mobile needs a client-callable surface (Better
+ * Auth's session doesn't carry custom user columns).
+ *
  * `updatePreferences` mirrors `saveHabits` but is called from
  * `/settings` after onboarding completes. Same schema, different
  * revalidation path.
  */
 export const onboardingRouter = router({
+  status: protectedProcedure.query(async ({ ctx }) => {
+    const [row] = await db
+      .select({ onboardingCompletedAt: users.onboardingCompletedAt })
+      .from(users)
+      .where(eq(users.id, ctx.user.id))
+      .limit(1);
+    return { completed: !!row?.onboardingCompletedAt };
+  }),
+
   saveHabits: protectedProcedure
     .input(onboardingHabitsInputSchema)
     .mutation(async ({ ctx, input }) => {

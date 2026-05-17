@@ -1,5 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Link, router } from "expo-router";
+// R24 — home TopNav `right` slot now stacks the notification bell next
+// to the settings gear; both need to be reachable from the home tab.
 import { useEffect, useState } from "react";
 import {
   Pressable,
@@ -14,6 +16,7 @@ import { dateEyebrow, displayFirstName, greetingFor } from "../../../lib/design/
 import { formatCookedAt } from "../../../lib/dates";
 import { useThemeColors } from "../../../lib/design/use-theme-colors";
 import { trpc } from "../../../lib/trpc";
+import { NotificationBell } from "../../../components/notification-bell";
 import { TopNav } from "../../../components/top-nav";
 import {
   Button,
@@ -75,7 +78,29 @@ export default function HomeTab() {
   if (dashboard.isPending) {
     return (
       <Screen>
-        <TopNav title="Home" divider={false} />
+        <TopNav
+        title="Home"
+        divider={false}
+        right={
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+            <NotificationBell />
+            <Link href="/(authed)/settings" asChild>
+              <Pressable
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="Settings"
+                style={{ padding: 4 }}
+              >
+                <Ionicons
+                  name="settings-outline"
+                  size={22}
+                  color={colors.forest}
+                />
+              </Pressable>
+            </Link>
+          </View>
+        }
+      />
         <LoadingScreen />
       </Screen>
     );
@@ -84,7 +109,29 @@ export default function HomeTab() {
   if (dashboard.error) {
     return (
       <Screen>
-        <TopNav title="Home" divider={false} />
+        <TopNav
+        title="Home"
+        divider={false}
+        right={
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+            <NotificationBell />
+            <Link href="/(authed)/settings" asChild>
+              <Pressable
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="Settings"
+                style={{ padding: 4 }}
+              >
+                <Ionicons
+                  name="settings-outline"
+                  size={22}
+                  color={colors.forest}
+                />
+              </Pressable>
+            </Link>
+          </View>
+        }
+      />
         <ErrorScreen
           title="Couldn't load your kitchen"
           body="Check your connection and pull down to retry."
@@ -102,7 +149,29 @@ export default function HomeTab() {
 
   return (
     <Screen>
-      <TopNav title="Home" divider={false} />
+      <TopNav
+        title="Home"
+        divider={false}
+        right={
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+            <NotificationBell />
+            <Link href="/(authed)/settings" asChild>
+              <Pressable
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="Settings"
+                style={{ padding: 4 }}
+              >
+                <Ionicons
+                  name="settings-outline"
+                  size={22}
+                  color={colors.forest}
+                />
+              </Pressable>
+            </Link>
+          </View>
+        }
+      />
       <ScrollView
         contentContainerStyle={{ paddingTop: 8, paddingBottom: 32 }}
         showsVerticalScrollIndicator={false}

@@ -16,6 +16,7 @@ import { useThemeColors } from "../../../lib/design/use-theme-colors";
 import { trpc } from "../../../lib/trpc";
 import {
   Card,
+  Chip,
   ErrorScreen,
   IconBubble,
   LoadingScreen,
@@ -34,7 +35,14 @@ import {
  */
 export default function PlansListScreen() {
   const colors = useThemeColors();
-  const list = trpc.plans.list.useQuery(undefined, { staleTime: 30_000 });
+  // R24 — archived filter. `plans.list({ includeArchived })` already
+  // accepts the flag (audit confirmed), so server-side filtering keeps
+  // the list lightweight even with many archived plans.
+  const [showArchived, setShowArchived] = useState(false);
+  const list = trpc.plans.list.useQuery(
+    { includeArchived: showArchived },
+    { staleTime: 30_000 }
+  );
   const [cloneSource, setCloneSource] = useState<{
     id: string;
     name: string;
@@ -85,12 +93,26 @@ export default function PlansListScreen() {
         data={plans}
         keyExtractor={(p) => p.id}
         ListHeaderComponent={
-          <View style={{ paddingHorizontal: 22, paddingTop: 12, paddingBottom: 22 }}>
+          <View style={{ paddingHorizontal: 22, paddingTop: 12, paddingBottom: 22, gap: 14 }}>
             <PageTitle
               title="Plans"
               size="md"
               subtitle="Occasion menus, dinners, weeknight cooks."
             />
+            <Pressable
+              onPress={() => setShowArchived((v) => !v)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: showArchived }}
+              accessibilityLabel={
+                showArchived ? "Hide archived plans" : "Show archived plans"
+              }
+              hitSlop={8}
+              style={{ alignSelf: "flex-start" }}
+            >
+              <Chip tone={showArchived ? "sage" : "ghost"}>
+                {showArchived ? "Showing archived" : "Show archived"}
+              </Chip>
+            </Pressable>
           </View>
         }
         contentContainerStyle={{
@@ -145,6 +167,7 @@ export default function PlansListScreen() {
             name={item.name}
             scheduledDate={item.scheduledDate}
             dishCount={item.dishCount}
+            archivedAt={item.archivedAt ?? null}
             onLongPress={() => offerClone(item.id, item.name)}
           />
         )}
@@ -192,23 +215,31 @@ function PlanTile({
   name,
   scheduledDate,
   dishCount,
+  archivedAt,
   onLongPress
 }: {
   id: string;
   name: string;
   scheduledDate: string | null;
   dishCount: number;
+  archivedAt: Date | string | null;
   onLongPress?: () => void;
 }) {
   const colors = useThemeColors();
+  const archived = !!archivedAt;
   return (
     <Link href={`/(authed)/plans/${id}` as never} asChild>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${name}, ${dishCount} dishes. Long-press to clone.`}
+        accessibilityLabel={`${name}, ${dishCount} dishes${
+          archived ? ", archived" : ""
+        }. Long-press to clone.`}
         onLongPress={onLongPress}
         delayLongPress={420}
         className="active:opacity-90"
+        // R24 — archived plans render muted so the "showing archived"
+        // filter reads as such without restructuring the tile.
+        style={{ opacity: archived ? 0.6 : 1 }}
       >
         <Card>
           <View
@@ -223,13 +254,22 @@ function PlanTile({
               />
             </IconBubble>
             <View className="flex-1 gap-1">
-              <Text
-                className="font-body-semibold text-title-md text-ink dark:text-ink-dark"
-                style={{ letterSpacing: -0.1 }}
-                numberOfLines={1}
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8
+                }}
               >
-                {name}
-              </Text>
+                <Text
+                  className="font-body-semibold text-title-md text-ink dark:text-ink-dark"
+                  style={{ letterSpacing: -0.1, flex: 1 }}
+                  numberOfLines={1}
+                >
+                  {name}
+                </Text>
+                {archived ? <Chip tone="ghost">Archived</Chip> : null}
+              </View>
               <Text
                 className="font-mono text-eyebrow text-ink-3 dark:text-ink-3-dark uppercase"
                 style={{ letterSpacing: 0.6 }}

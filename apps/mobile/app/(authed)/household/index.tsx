@@ -116,6 +116,38 @@ export default function HouseholdScreen() {
       Alert.alert("Couldn't cancel", error.message || "Try again.")
   });
 
+  // R24 — owner-only member removal. The procedure is gated on
+  // `householdOwnerProcedure` server-side, so non-owners couldn't
+  // even invoke this if we showed the button. We still hide it via
+  // `isOwner` for clarity. On success: invalidate `households.current`
+  // so the member list repaints without the removed row.
+  const removeMemberMutation = trpc.households.removeMember.useMutation({
+    onSuccess: async (result) => {
+      await utils.households.current.invalidate();
+      Alert.alert(
+        "Removed",
+        `${result.removedUserName} no longer has access to this kitchen.`
+      );
+    },
+    onError: (error) =>
+      Alert.alert("Couldn't remove", error.message || "Try again.")
+  });
+
+  function confirmRemoveMember(memberName: string, memberUserId: string) {
+    Alert.alert(
+      `Remove ${memberName}?`,
+      `They'll lose access to this kitchen. Their recipes stay credited to them as "Former member."`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: () => removeMemberMutation.mutate({ targetUserId: memberUserId })
+        }
+      ]
+    );
+  }
+
   const leaveMutation = trpc.households.leaveHousehold.useMutation({
     onSuccess: async (result) => {
       await Promise.all([
@@ -252,6 +284,11 @@ export default function HouseholdScreen() {
           <View style={{ gap: 18 }}>
             {members.map((m) => {
               const isMe = currentUserId === m.userId;
+              // R24 — show "Remove" only for OTHER members when the
+              // viewer is the owner. Self-removal lives on the
+              // "Leave kitchen" button at the bottom and uses the
+              // `leaveHousehold` procedure (with the SOLE_OWNER guard).
+              const canRemove = isOwner && !isMe && m.role !== "owner";
               return (
                 <View
                   key={m.userId}
@@ -266,7 +303,7 @@ export default function HouseholdScreen() {
                     <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
                       <Text
                         className="font-body-semibold text-body-lg text-ink dark:text-ink-dark"
-                        style={{ letterSpacing: -0.1 }}
+                        style={{ letterSpacing: -0.1, flex: 1 }}
                         numberOfLines={1}
                       >
                         {m.name}
@@ -302,6 +339,27 @@ export default function HouseholdScreen() {
                       </Text>
                     </View>
                   </View>
+                  {canRemove ? (
+                    <Pressable
+                      onPress={() => confirmRemoveMember(m.name, m.userId)}
+                      disabled={removeMemberMutation.isPending}
+                      hitSlop={10}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove ${m.name}`}
+                      style={{ padding: 4 }}
+                    >
+                      <Text
+                        style={{
+                          fontFamily: "Geist_600SemiBold",
+                          fontSize: 13,
+                          color: colors.danger,
+                          opacity: removeMemberMutation.isPending ? 0.5 : 1
+                        }}
+                      >
+                        Remove
+                      </Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               );
             })}
