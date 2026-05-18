@@ -251,14 +251,6 @@ select {
   font-family: var(--font-mono-val);
 }
 
-/* R23 — marketing landing opt-out. `app/marketing-page.tsx` keeps its
-   light editorial palette regardless of OS preference. This class is
-   applied at the root of that page so emerald CTAs + cream sections
-   read as intended (the brand surface stays consistent). */
-.marketing-light-only {
-  color-scheme: light;
-}
-
 /* Suppress iOS auto-zoom on input focus.
    Safari zooms when a focused field is < 16px; force 16px on phone widths. */
 @media (max-width: 599px) {
