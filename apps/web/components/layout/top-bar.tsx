@@ -51,20 +51,33 @@ type TopBarProps = {
 
 export function TopBar({ onOpenSearch }: TopBarProps) {
   const pathname = usePathname() ?? "/dashboard";
-  // R28 — pages can set a runtime override that replaces the LAST
-  // static crumb's label (e.g. Plan Detail → plan name; Recipe Detail
-  // → meal name). Intermediate crumbs stay static — "Cook / Library"
-  // is structural and doesn't need per-page lookup.
+  // R30 — pages can register a runtime override for a placeholder
+  // crumb label (e.g. Recipe Detail → meal name; Plan Detail → plan
+  // name). When the override carries a `targetLabel`, the matching
+  // crumb anywhere in the trail is replaced — useful on deeper
+  // refine routes where the dynamic segment isn't the last crumb.
+  // Without `targetLabel`, only the last crumb is replaced (R28's
+  // simple contract).
   const breadcrumbOverride = useBreadcrumbOverride();
   const staticCrumbs = getCrumbs(pathname);
-  const crumbs =
-    breadcrumbOverride && staticCrumbs.length > 0
-      ? staticCrumbs.map((c, i) =>
-          i === staticCrumbs.length - 1
-            ? { ...c, label: breadcrumbOverride }
-            : c
-        )
-      : staticCrumbs;
+  const crumbs = (() => {
+    if (!breadcrumbOverride || staticCrumbs.length === 0) return staticCrumbs;
+    if (breadcrumbOverride.targetLabel) {
+      let replaced = false;
+      return staticCrumbs.map((c) => {
+        if (!replaced && c.label === breadcrumbOverride.targetLabel) {
+          replaced = true;
+          return { ...c, label: breadcrumbOverride.label };
+        }
+        return c;
+      });
+    }
+    return staticCrumbs.map((c, i) =>
+      i === staticCrumbs.length - 1
+        ? { ...c, label: breadcrumbOverride.label }
+        : c
+    );
+  })();
   const actions = useTopBarActions();
 
   return (

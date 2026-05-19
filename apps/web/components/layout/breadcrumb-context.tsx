@@ -3,33 +3,44 @@
 import * as React from "react";
 
 /**
- * Round 28 — dynamic breadcrumb override.
+ * Round 30 — dynamic breadcrumb override.
  *
- * R26's TopBar reads static breadcrumbs from `getCrumbs(pathname)` in
- * `lib/nav/breadcrumbs.ts`. The last segment for dynamic routes
- * (Recipe Detail, Plan Detail, etc.) is a generic placeholder
- * ("Recipe", "Plan"). This context lets the active page replace that
- * last-crumb label with a concrete value pulled from data —
- * `useSetBreadcrumb(meal.name)` in `RecipeDetailClient`, etc.
+ * R26 ships a static `getCrumbs(pathname)` map for the TopBar trail.
+ * Routes with dynamic segments (Recipe Detail, Refine, Review,
+ * Plan Detail, etc.) need a runtime hook to swap the placeholder
+ * label ("Recipe" / "Plan") for the actual data (meal name, plan
+ * name). This context is that hook.
  *
- * Scope is intentionally narrow:
- *   - Single string override (replaces only the last static crumb).
- *   - One active override per provider scope; the cleanup function
- *     resets to `null` on unmount so back-navigation falls through to
- *     the static label without a stale value.
- *   - Intermediate crumbs are never overridden — those are stable
- *     ("Cook", "Library") and the static map owns them.
+ * Override semantics — single string with optional target label:
+ *   - `useSetBreadcrumb(label)` replaces the LAST crumb's label
+ *     (works on leaf pages where the dynamic segment IS the last
+ *     crumb — e.g. /meal/[id] → "Recipe" → meal name).
+ *   - `useSetBreadcrumb(label, targetLabel)` replaces the FIRST
+ *     crumb whose static label matches `targetLabel` (works on
+ *     deeper pages where the dynamic segment is mid-trail — e.g.
+ *     /meal/[id]/refine has [Cook, Library, Recipe, Refine] and
+ *     wants "Recipe" replaced with the meal name while "Refine"
+ *     stays the suffix).
  *
- * Coexists with the legacy R23 `BreadcrumbLabelProvider`. That one is
- * keyed by `href` and currently unused (R26's TopBar replaced the old
- * `AppBreadcrumb` consumer); the new context here is the R26-shaped
- * equivalent. The legacy provider can be cleaned up in a follow-up
- * once no consumers remain.
+ * Cleanup runs on unmount so back-navigation falls through to the
+ * static trail without stale overrides.
+ *
+ * Coexists with the legacy R23 `BreadcrumbLabelProvider` (keyed by
+ * href, currently unused since R26 retired `AppBreadcrumb`). The R23
+ * provider can be cleaned up in a follow-up.
  */
 
+type BreadcrumbOverride = {
+  /** New label to render. */
+  label: string;
+  /** When set, replace the first crumb whose static label equals this.
+   *  Otherwise replace the LAST crumb. */
+  targetLabel?: string;
+};
+
 type BreadcrumbContextValue = {
-  override: string | null;
-  setOverride: (label: string | null) => void;
+  override: BreadcrumbOverride | null;
+  setOverride: (override: BreadcrumbOverride | null) => void;
 };
 
 const BreadcrumbContext = React.createContext<BreadcrumbContextValue>({
@@ -42,7 +53,9 @@ export function BreadcrumbProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const [override, setOverride] = React.useState<string | null>(null);
+  const [override, setOverride] = React.useState<BreadcrumbOverride | null>(
+    null
+  );
   const value = React.useMemo(
     () => ({ override, setOverride }),
     [override]
@@ -55,16 +68,28 @@ export function BreadcrumbProvider({
 }
 
 /**
- * Page-level hook. Sets the last-crumb override for the lifetime of
- * the calling component; clears on unmount. Pass a `null` label to
- * explicitly clear without unmounting.
+ * Page-level hook. Sets the breadcrumb override for the lifetime of
+ * the calling component; clears on unmount.
+ *
+ *   - `useSetBreadcrumb(meal.name)` — replaces last crumb. Works on
+ *     leaf routes.
+ *   - `useSetBreadcrumb(meal.name, "Recipe")` — replaces the first
+ *     "Recipe" crumb wherever it appears. Works on deeper trails
+ *     where the dynamic segment isn't the last crumb.
  */
-export function useSetBreadcrumb(label: string | null): void {
+export function useSetBreadcrumb(
+  label: string | null,
+  targetLabel?: string
+): void {
   const { setOverride } = React.useContext(BreadcrumbContext);
   React.useEffect(() => {
-    setOverride(label);
+    if (label === null) {
+      setOverride(null);
+      return;
+    }
+    setOverride({ label, targetLabel });
     return () => setOverride(null);
-  }, [label, setOverride]);
+  }, [label, targetLabel, setOverride]);
 }
 
 /**
@@ -72,6 +97,6 @@ export function useSetBreadcrumb(label: string | null): void {
  * `null` when no page has set one — the TopBar falls back to
  * `getCrumbs(pathname)` unchanged.
  */
-export function useBreadcrumbOverride(): string | null {
+export function useBreadcrumbOverride(): BreadcrumbOverride | null {
   return React.useContext(BreadcrumbContext).override;
 }
