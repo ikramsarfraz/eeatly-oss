@@ -61,6 +61,9 @@ export function isActiveRoute(pathname: string, href: string): boolean {
  *   `/meal/[id]`                                  → Cook / Library / Recipe
  *   `/meal/[id]/refine`                           → Cook / Library / Recipe / Refine
  *   `/meal/[id]/refine/review`                    → Cook / Library / Recipe / Refine / Review
+ *   `/add`                                        → Capture / Add a meal
+ *   `/add/log`                                    → Capture / Add a meal / Log a meal
+ *   `/add/ai`                                     → Capture / Capture with AI
  *   `/settings`                                   → Kitchen / Settings
  *   `/notifications`                              → Inbox (route doesn't exist yet but we leave the map entry so the bell's link target works when added)
  */
@@ -139,6 +142,33 @@ export function getCrumbs(pathname: string): Crumb[] {
       { label: "Recipe", href: `/meal/${mealId}` as Route },
       { label: "Refine", href: `/meal/${mealId}/refine` as Route },
       { label: "Review" }
+    ];
+  }
+
+  // R29 — Capture group routes. The Add hub (`/add`) is the parent;
+  // `/add/log` reads as a deeper-than-hub trail since it's an
+  // editorial form surface. AI capture sits parallel to the hub
+  // (Capture / Capture with AI), not nested under it, because the
+  // sidebar has it as its own destination.
+  if (pathname === "/add") {
+    return [
+      { label: "Capture", href: "/dashboard" as Route },
+      { label: "Add a meal" }
+    ];
+  }
+
+  if (pathname === "/add/log") {
+    return [
+      { label: "Capture", href: "/dashboard" as Route },
+      { label: "Add a meal", href: "/add" as Route },
+      { label: "Log a meal" }
+    ];
+  }
+
+  if (pathname === "/add/ai") {
+    return [
+      { label: "Capture", href: "/dashboard" as Route },
+      { label: "Capture with AI" }
     ];
   }
 

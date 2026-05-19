@@ -1,106 +1,91 @@
 import type { Metadata } from "next";
 import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
-import {
-  getHistoryRows,
-  getHistoryStats,
-  type HistoryTab,
-  type HistorySortDir,
-  type HistorySortField
-} from "@/services/meals";
-import { HistoryClient, type HistoryFilters } from "@/components/history/history-client";
-import type { EffortLevel } from "@/types";
+import { getDashboardMeals } from "@/services/meals";
+import { listMealLibrary } from "@/services/plans";
+import { LibraryClient, type LibraryStat } from "@/components/library/library-client";
 
 export const metadata: Metadata = {
-  title: "History"
+  title: "Library"
 };
 
-const EFFORT_VALUES: ReadonlyArray<EffortLevel> = ["quick", "easy", "medium", "high_effort"];
+export const dynamic = "force-dynamic";
 
-function parseTab(raw: string | undefined): HistoryTab {
-  if (raw === "most" || raw === "neglected") return raw;
-  return "recent";
-}
-
-function parseSort(raw: string | undefined): HistorySortField {
-  return raw === "name" ? "name" : "date";
-}
-
-function parseDir(raw: string | undefined): HistorySortDir {
-  return raw === "asc" ? "asc" : "desc";
-}
-
-function parseEffort(raw: string | undefined): EffortLevel[] {
-  if (!raw) return [];
-  return raw
-    .split(",")
-    .map((v) => v.trim())
-    .filter((v): v is EffortLevel => EFFORT_VALUES.includes(v as EffortLevel));
-}
-
-function parseRange(raw: string | undefined): number | null {
-  if (!raw) return null;
-  const n = Number(raw);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  return Math.min(3650, Math.floor(n));
-}
-
-function parsePage(raw: string | undefined): number {
-  const n = Number(raw);
-  return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1;
-}
-
-export default async function HistoryPage(props: {
-  searchParams: Promise<{
-    tab?: string;
-    sort?: string;
-    dir?: string;
-    q?: string;
-    effort?: string;
-    range?: string;
-    page?: string;
-  }>;
-}) {
+/**
+ * Round 28 — Library.
+ *
+ * Repurposes the `/history` route to surface the new editorial
+ * Library design. The previous History UI (per-log table with tabs +
+ * filters) is retired in favor of a 4-up MealTile grid keyed off the
+ * household's recipe catalog. The cook-log timeline still lives in
+ * the data layer (`getHistoryRows`, `getHistoryStats`) — it's just
+ * no longer the primary surface; a future per-meal "Cook history"
+ * tab can re-expose it from the Recipe Detail page.
+ *
+ * Two queries run in parallel:
+ *   - `listMealLibrary` returns the full household recipe list
+ *     (`{ id, name, photoUrl }[]`) — the source of truth for the
+ *     grid.
+ *   - `getDashboardMeals` provides cook-stat overlays (cookCount,
+ *     lastCookedAt, effort-of-most-recent-cook) for the meals the
+ *     dashboard tracks. Stats are joined client-side; meals without
+ *     stats render as "Not yet cooked".
+ */
+export default async function HistoryPage() {
   const { user, household } = await requireCurrentUserWithHousehold();
-  const sp = await props.searchParams;
 
-  const filters: HistoryFilters = {
-    tab: parseTab(sp.tab),
-    sort: parseSort(sp.sort),
-    dir: parseDir(sp.dir),
-    q: typeof sp.q === "string" ? sp.q : "",
-    effortLevels: parseEffort(sp.effort),
-    rangeDays: parseRange(sp.range)
-  };
-  const page = parsePage(sp.page);
-
-  const [rowsResult, stats] = await Promise.all([
-    getHistoryRows(user.id, household.id, {
-      tab: filters.tab,
-      sort: filters.sort,
-      dir: filters.dir,
-      effortLevels: filters.effortLevels,
-      rangeDays: filters.rangeDays,
-      q: filters.q,
-      page,
-      pageSize: 20
-    }),
-    getHistoryStats(user.id, household.id)
+  const [rows, dashboard] = await Promise.all([
+    listMealLibrary({ userId: user.id, householdId: household.id }),
+    getDashboardMeals(user.id, household.id, { recentMealsLimit: 25 })
   ]);
 
+  // Build the stat overlay from dashboard data. recentMeals carry
+  // per-cook effort (modal effort isn't surfaced here); mostCooked
+  // + neglected carry cook counts. Merge them keyed by mealId with
+  // mostCooked / neglected as the source of truth for cook counts
+  // and recentMeals as the source of truth for the most-recent
+  // effort tag.
+  const statsById = new Map<string, LibraryStat>();
+  for (const stat of dashboard.mostCookedMeals) {
+    statsById.set(stat.mealId, {
+      mealId: stat.mealId,
+      cookCount: stat.cookCount,
+      lastCookedAt: stat.lastCookedAt,
+      effortLevel: null
+    });
+  }
+  for (const stat of dashboard.neglectedMeals) {
+    if (statsById.has(stat.mealId)) continue;
+    statsById.set(stat.mealId, {
+      mealId: stat.mealId,
+      cookCount: stat.cookCount,
+      lastCookedAt: stat.lastCookedAt,
+      effortLevel: null
+    });
+  }
+  // Recents bring the most-recent effort tag; use that as a
+  // best-effort effort indicator for the grid badge.
+  for (const log of dashboard.recentMeals) {
+    const existing = statsById.get(log.mealId);
+    if (existing) {
+      if (!existing.effortLevel) existing.effortLevel = log.effortLevel;
+    } else {
+      statsById.set(log.mealId, {
+        mealId: log.mealId,
+        cookCount: 1,
+        lastCookedAt: log.cookedAt,
+        effortLevel: log.effortLevel
+      });
+    }
+  }
+
   return (
-    <HistoryClient
-      initialRows={rowsResult.rows}
-      total={rowsResult.total}
-      page={rowsResult.page}
-      pageSize={rowsResult.pageSize}
-      filters={filters}
-      currentUserId={user.id}
-      stats={{
-        thisYear: stats.thisYear,
-        thisMonth: stats.thisMonth,
-        neglectedCount: stats.neglectedCount
-      }}
-      counts={stats.counts}
+    <LibraryClient
+      rows={rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        photoUrl: r.photoUrl
+      }))}
+      stats={Array.from(statsById.values())}
     />
   );
 }
