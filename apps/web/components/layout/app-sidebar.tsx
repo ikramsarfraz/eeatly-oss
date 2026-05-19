@@ -10,6 +10,7 @@ import {
   Home,
   Plus,
   Settings,
+  Sparkles,
   type LucideIcon
 } from "lucide-react";
 
@@ -26,7 +27,6 @@ import {
   SidebarMenuItem,
   SidebarRail
 } from "@/components/ui/sidebar";
-import { useQuickLog } from "@/components/dashboard/quick-log-provider";
 import { UserMenu } from "@/components/layout/user-menu";
 import { isActiveRoute } from "@/lib/nav/breadcrumbs";
 import type { AppUser } from "@/lib/auth/session";
@@ -66,6 +66,16 @@ type NavItem = {
   href: Route;
   label: string;
   icon: LucideIcon;
+  /**
+   * R29 — optional explicit active-path list. When set, the item is
+   * active only when `pathname` exactly matches one of these. Used by
+   * the Capture group so "Add a meal" highlights on `/add` + `/add/log`
+   * but NOT on `/add/ai` (the latter has its own sibling nav item).
+   * Without this, the default `isActiveRoute` helper would match
+   * "Add a meal" on every `/add/*` route via its prefix rule and both
+   * Capture items would light up at the same time.
+   */
+  matchPaths?: ReadonlyArray<string>;
 };
 
 const cookNav: NavItem[] = [
@@ -77,9 +87,34 @@ const cookNav: NavItem[] = [
   { href: "/history" as Route, label: "Library", icon: BookOpen }
 ];
 
+/**
+ * R29 — Capture group reinstated. R26 omitted it because the routes
+ * didn't exist; R29 builds `/add` + `/add/log` + `/add/ai` and brings
+ * the group back. "Saved links" stays omitted (no `/saved` route).
+ */
+const captureNav: NavItem[] = [
+  {
+    href: "/add" as Route,
+    label: "Add a meal",
+    icon: Plus,
+    matchPaths: ["/add", "/add/log"]
+  },
+  {
+    href: "/add/ai" as Route,
+    label: "Capture with AI",
+    icon: Sparkles,
+    matchPaths: ["/add/ai"]
+  }
+];
+
 const kitchenNav: NavItem[] = [
   { href: "/settings" as Route, label: "Settings", icon: Settings }
 ];
+
+function itemActive(pathname: string, item: NavItem): boolean {
+  if (item.matchPaths) return item.matchPaths.includes(pathname);
+  return isActiveRoute(pathname, item.href);
+}
 
 type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   user: AppUser;
@@ -87,7 +122,6 @@ type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
 
 export function AppSidebar({ user, ...props }: AppSidebarProps) {
   const pathname = usePathname() ?? "";
-  const { open: openQuickLog } = useQuickLog();
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
@@ -124,25 +158,28 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
           </SidebarMenuItem>
         </SidebarMenu>
 
-        {/* Log-a-meal CTA — opens the existing QuickLogDialog (R23+).
-            The `/add/log` route from the spec doesn't exist yet; the
-            in-flight dialog is the actual logging surface. ⌘E mirrors
-            the existing keyboard shortcut wired in QuickLogProvider. */}
+        {/* R29 — Log-a-meal CTA now routes to the dedicated
+            `/add/log` page. R26 had this opening the existing
+            `<QuickLogDialog>` because no route existed; that dialog
+            is kept in place (still callable via ⌘E via
+            QuickLogProvider) for in-context use, but the sidebar
+            primary entry is now the editorial page. */}
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              onClick={openQuickLog}
-              aria-haspopup="dialog"
+              asChild
               className="bg-foreground text-background hover:bg-[#2a3431] hover:text-background active:bg-[#2a3431] active:text-background dark:hover:bg-[color:var(--ink-2,#a8a28f)] dark:active:bg-[color:var(--ink-2,#a8a28f)]"
             >
-              <Plus className="h-4 w-4 shrink-0" />
-              <span>Log a meal</span>
-              <span
-                className="ml-auto rounded bg-white/[0.06] px-[5px] py-px font-mono-brand text-[10.5px] text-[#b8c4be] dark:bg-black/10 dark:text-[#4a463a]"
-                aria-hidden
-              >
-                ⌘E
-              </span>
+              <Link href={"/add/log" as Route}>
+                <Plus className="h-4 w-4 shrink-0" />
+                <span>Log a meal</span>
+                <span
+                  className="ml-auto rounded bg-white/[0.06] px-[5px] py-px font-mono-brand text-[10.5px] text-[#b8c4be] dark:bg-black/10 dark:text-[#4a463a]"
+                  aria-hidden
+                >
+                  ⌘E
+                </span>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -164,7 +201,7 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
                       asChild
-                      isActive={isActiveRoute(pathname, item.href)}
+                      isActive={itemActive(pathname, item)}
                     >
                       <Link href={item.href}>
                         <Icon className="size-4" />
@@ -178,9 +215,37 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Capture group omitted — the /add/* routes don't exist
-            yet (see header doc comment). When they land, add a
-            `<SidebarGroup>` with the same shape as Cook. */}
+        {/* R29 — Capture group reinstated. Routes built in this
+            round; matchPaths in NavItem disambiguates which item
+            highlights for which `/add/*` route. */}
+        <SidebarGroup className="py-1">
+          <SidebarGroupLabel
+            className="font-mono uppercase"
+            style={{ letterSpacing: "0.14em" }}
+          >
+            Capture
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {captureNav.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={itemActive(pathname, item)}
+                    >
+                      <Link href={item.href}>
+                        <Icon className="size-4" />
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
         <SidebarGroup className="py-1">
           <SidebarGroupLabel
@@ -197,7 +262,7 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
                       asChild
-                      isActive={isActiveRoute(pathname, item.href)}
+                      isActive={itemActive(pathname, item)}
                     >
                       <Link href={item.href}>
                         <Icon className="size-4" />

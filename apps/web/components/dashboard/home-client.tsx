@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import {
   differenceInCalendarDays,
@@ -10,7 +11,6 @@ import {
   parseISO
 } from "date-fns";
 import { Calendar, Plus, Sparkles } from "lucide-react";
-import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { useCreateMealLogImperative } from "@/hooks/use-dashboard-meals";
 import { useDashboardMeals } from "@/hooks/use-dashboard-meals";
 import { useToast } from "@/components/providers/toast-provider";
@@ -183,50 +183,34 @@ export function HomeClient({
   useSetTopBarActions(topBarAction);
 
   // Quick log — minimal form that calls meals.createLog with
-  // sensible defaults (today, easy effort, no notes). The AI button
-  // is wired through to the same dialog the meal log form uses;
-  // for v1 it opens that dialog via the QuickLog modal (which itself
-  // embeds the AISuggestDialog inside its form).
+  // R29 — Quick log buttons now route to the dedicated capture pages
+  // instead of submitting inline. "Log meal" pushes to `/add/log`
+  // with the typed name pre-filled via `?name=…`; "AI" pushes to
+  // `/add/ai`. The input stays as a name-capture before nav so the
+  // jump-to-page is one click + one keystroke for the common case.
+  const router = useRouter();
   const [quickLogName, setQuickLogName] = React.useState("");
   const createLog = useCreateMealLogImperative({ source: "quick_log" });
 
-  async function handleQuickLog(e?: React.FormEvent) {
+  function handleQuickLog(e?: React.FormEvent) {
     e?.preventDefault();
     const name = quickLogName.trim();
-    if (!name || createLog.isPending) return;
-    try {
-      await createLog.mutateAsync({
-        mealName: name,
-        effortLevel: "easy",
-        cookedDate: format(new Date(), "yyyy-MM-dd")
-      });
-      setQuickLogName("");
-      showToast({
-        variant: "success",
-        title: "Logged",
-        description: `${name} added to your kitchen.`
-      });
-    } catch (err) {
-      const cause = getCause(err);
-      const reason = cause?.reason;
-      const msg =
-        err instanceof Error ? err.message : "Try again.";
-      if (reason === "MEAL_NAME_COLLISION") {
-        showToast({
-          variant: "info",
-          title: "Already in your kitchen",
-          description: "We logged a new cook of this meal."
-        });
-        setQuickLogName("");
-      } else {
-        showToast({
-          variant: "error",
-          title: "Couldn't log meal",
-          description: msg
-        });
-      }
+    if (name.length > 0) {
+      router.push(
+        `/add/log?name=${encodeURIComponent(name)}` as Route
+      );
+    } else {
+      router.push("/add/log" as Route);
     }
   }
+
+  // Retained import for any future inline submit consumer — the R29
+  // routing change moved the actual submit to /add/log, but the hook
+  // stays imported so a follow-up that wants the imperative path back
+  // doesn't need a fresh import rejig.
+  void createLog;
+  void showToast;
+  void getCause;
 
   const recentTiles = meals.recentMeals.slice(0, 5);
   const mostCookedTiles = meals.mostCookedMeals.slice(0, 3);
@@ -401,22 +385,20 @@ export function HomeClient({
                   type="submit"
                   variant="default"
                   className="min-h-[40px]"
-                  disabled={
-                    createLog.isPending || quickLogName.trim().length === 0
-                  }
                 >
-                  {createLog.isPending ? "Logging…" : "Log meal"}
+                  Log meal
                 </Button>
-                <LogAgainButton
-                  mealName={quickLogName.trim() || "today"}
+                <Button
+                  type="button"
                   variant="ghost"
-                  iconOnly={false}
-                  label="AI"
                   className="min-h-[40px]"
-                />
+                  onClick={() => router.push("/add/ai" as Route)}
+                >
+                  AI
+                </Button>
               </div>
               <p className="text-[11.5px] text-muted-foreground">
-                Defaults to today, easy effort. Edit later in the meal page.
+                Opens the full form. Pre-fills the name if you typed one.
               </p>
             </form>
           </div>

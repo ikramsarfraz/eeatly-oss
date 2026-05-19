@@ -23,6 +23,21 @@ type MealLogFormProps = {
   onSuccess?: () => void;
   initialMealName?: string;
   autoFocusRecipe?: boolean;
+  /**
+   * R29 — when set, the form element gets this id and the internal
+   * submit button is hidden. External triggers (typically the page's
+   * TopBar Save button via `<button type="submit" form={id}>`) become
+   * the submission entry point. Default behavior (internal submit
+   * button, no form id) is unchanged.
+   */
+  formId?: string;
+  /**
+   * R29 — hide the internal "Log meal" submit button. Used by pages
+   * that move the submit affordance to the TopBar; leaving the
+   * default `false` preserves the in-place submit button for dialog +
+   * legacy consumers.
+   */
+  hideSubmit?: boolean;
 };
 
 const effortOptions: Array<{ value: MealLogInput["effortLevel"]; label: string }> = [
@@ -72,7 +87,13 @@ async function uploadPhoto(file: File) {
   return publicUrl;
 }
 
-export function MealLogForm({ onSuccess, initialMealName, autoFocusRecipe }: MealLogFormProps) {
+export function MealLogForm({
+  onSuccess,
+  initialMealName,
+  autoFocusRecipe,
+  formId,
+  hideSubmit = false
+}: MealLogFormProps) {
   const datalistId = React.useId();
   const utils = trpc.useUtils();
   const [photoFile, setPhotoFile] = React.useState<File | null>(null);
@@ -241,6 +262,7 @@ export function MealLogForm({ onSuccess, initialMealName, autoFocusRecipe }: Mea
 
   return (
     <form
+      id={formId}
       className="grid gap-3"
       onSubmit={handlePersist}
       onKeyDown={(event) => {
@@ -507,14 +529,16 @@ export function MealLogForm({ onSuccess, initialMealName, autoFocusRecipe }: Mea
         </div>
       ) : null}
 
-      <Button type="submit" disabled={isSubmitting} className="mt-1">
-        {isSubmitting ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Plus className="h-4 w-4" />
-        )}
-        Log meal
-      </Button>
+      {hideSubmit ? null : (
+        <Button type="submit" disabled={isSubmitting} className="mt-1">
+          {isSubmitting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Plus className="h-4 w-4" />
+          )}
+          Log meal
+        </Button>
+      )}
     </form>
   );
 }
