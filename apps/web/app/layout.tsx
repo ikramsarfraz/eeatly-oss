@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Instrument_Serif, JetBrains_Mono } from "next/font/google";
+import { ThemeProvider } from "next-themes";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { ToastProvider } from "@/components/providers/toast-provider";
 import { getPublicEnv } from "@/lib/env/public";
@@ -83,6 +84,11 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      // R31 — `suppressHydrationWarning` is the standard `next-themes`
+      // requirement: the provider injects an inline script that sets
+      // the `class` attribute before React hydrates, which would
+      // otherwise trip React's hydration mismatch warning.
+      suppressHydrationWarning
       className={`${inter.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable}`}
     >
       <body>
@@ -95,9 +101,21 @@ export default function RootLayout({
         >
           Skip to content
         </a>
-        <QueryProvider>
-          <ToastProvider>{children}</ToastProvider>
-        </QueryProvider>
+        {/* R31 — theme provider. `attribute="class"` toggles
+            `.dark` on `<html>` based on `theme` value; `enableSystem`
+            picks up OS preference when `theme === "system"`.
+            `disableTransitionOnChange` avoids the brief flash of
+            transitioning colors when the user flips the toggle. */}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <QueryProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </QueryProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
