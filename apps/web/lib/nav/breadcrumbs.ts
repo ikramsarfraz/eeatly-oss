@@ -64,6 +64,7 @@ export function isActiveRoute(pathname: string, href: string): boolean {
  *   `/add`                                        → Capture / Add a meal
  *   `/add/log`                                    → Capture / Add a meal / Log a meal
  *   `/add/ai`                                     → Capture / Capture with AI
+ *   `/household`                                  → Kitchen / Members
  *   `/settings`                                   → Kitchen / Settings
  *   `/notifications`                              → Inbox (route doesn't exist yet but we leave the map entry so the bell's link target works when added)
  */
@@ -169,6 +170,13 @@ export function getCrumbs(pathname: string): Crumb[] {
     return [
       { label: "Capture", href: "/dashboard" as Route },
       { label: "Capture with AI" }
+    ];
+  }
+
+  if (pathname === "/household") {
+    return [
+      { label: "Kitchen", href: "/dashboard" as Route },
+      { label: "Members" }
     ];
   }
 

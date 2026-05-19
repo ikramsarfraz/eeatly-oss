@@ -1,175 +1,64 @@
-import Link from "next/link";
-import type { Route } from "next";
 import { eq } from "drizzle-orm";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle
-} from "@/components/ui/card";
-import { DeleteAccountCard } from "@/components/account/delete-account-card";
-import { ExportDataCard } from "@/components/account/export-data-card";
-import { HouseholdCard } from "@/components/account/household-card";
-import { SubscriptionCard } from "@/components/account/subscription-card";
-import { FeedbackDialog } from "@/components/feedback/feedback-dialog";
-import { PreferencesCard } from "@/components/account/preferences-card";
-import { SignOutButton } from "@/components/layout/sign-out-button";
-import { households, users } from "@/db/schema";
+import { households } from "@/db/schema";
 import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
 import { db } from "@/lib/db/client";
 import { hasStripeEnv } from "@/lib/env/server";
 import { getSubscriptionState } from "@/services/billing";
-import {
-  listHouseholdMembers,
-  listPendingInvitations
-} from "@/services/households";
+import { listPendingInvitations, listHouseholdMembers } from "@/services/households";
+import { SettingsClient } from "@/components/settings/settings-client";
 
+/**
+ * Round 31 — Settings server shell.
+ *
+ * Pulls the small bundle of data the redesigned `<SettingsClient>`
+ * needs (auth user, household summary, owner flag, member +
+ * pending-invitation counts, plan tier). The old card-list shell in
+ * R23/R24/R25 fetched a bigger payload (full member list, preferences,
+ * subscription dates, etc.) so each in-page card could render in
+ * isolation — R31 moves member management to `/household` and lets
+ * the new client renderer surface just the summary roll-ups, so we
+ * only need the lighter projection here.
+ */
 export default async function SettingsPage() {
   const { user, household } = await requireCurrentUserWithHousehold();
 
-  // Pull the captured onboarding habits + beta cohort so the
-  // preferences and subscription cards can render. Beta cohort
-  // surfaces a subtle indicator on the SubscriptionCard.
-  const [prefsRow] = await db
-    .select({
-      cooksPerWeek: users.cooksPerWeek,
-      weeknightEffort: users.weeknightEffort,
-      betaCohort: users.betaCohort
-    })
-    .from(users)
-    .where(eq(users.id, user.id))
-    .limit(1);
-
-  // Stripe-side state for the SubscriptionCard. Returns null for free-
-  // tier users; the component branches on the shape.
-  const billingConfigured = hasStripeEnv();
-  const subscription = billingConfigured
-    ? await getSubscriptionState({ userId: user.id })
-    : null;
-
-  // Household data: owner pointer, members, pending invitations.
   const [ownerRow] = await db
     .select({ ownerId: households.ownerId })
     .from(households)
     .where(eq(households.id, household.id))
     .limit(1);
   const isOwner = ownerRow?.ownerId === user.id;
-  const [members, invitations] = await Promise.all([
+
+  const billingConfigured = hasStripeEnv();
+  const [members, invitations, subscription] = await Promise.all([
     listHouseholdMembers(user.id, household.id),
-    isOwner ? listPendingInvitations(user.id, household.id) : Promise.resolve([])
+    isOwner
+      ? listPendingInvitations(user.id, household.id)
+      : Promise.resolve([]),
+    billingConfigured ? getSubscriptionState({ userId: user.id }) : Promise.resolve(null)
   ]);
 
+  const isPlus =
+    subscription?.status === "active" || subscription?.status === "trialing";
+
+  // Version label rendered as the small mono chip in the header. We
+  // surface the web app's package version so the page doubles as a
+  // diagnostic surface when teammates report a bug ("which build are
+  // you on?"). Falls back to "dev" when the build-time env var is
+  // missing.
+  const version = process.env.npm_package_version ?? "dev";
+
   return (
-    <div className="grid max-w-3xl gap-5 pb-20 md:pb-0">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-normal">Settings</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Manage your eeatly account and preferences.
-        </p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Account</CardTitle>
-          <CardDescription>Your eeatly account details.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          <div className="grid gap-1 rounded-lg border bg-background/60 p-4">
-            <span className="text-sm text-muted-foreground">Name</span>
-            <span className="font-medium">{user.name}</span>
-          </div>
-          <div className="grid gap-1 rounded-lg border bg-background/60 p-4">
-            <span className="text-sm text-muted-foreground">Email</span>
-            <span className="font-medium">{user.email}</span>
-          </div>
-        </CardContent>
-      </Card>
-
-      <SubscriptionCard
-        subscription={
-          subscription
-            ? {
-                status: subscription.status,
-                currentPeriodEnd: subscription.currentPeriodEnd,
-                cancelAtPeriodEnd: subscription.cancelAtPeriodEnd
-              }
-            : null
-        }
-        isBetaCohort={Boolean(prefsRow?.betaCohort)}
-        billingConfigured={billingConfigured}
-      />
-
-      <PreferencesCard
-        cooksPerWeek={prefsRow?.cooksPerWeek ?? null}
-        weeknightEffort={prefsRow?.weeknightEffort ?? null}
-      />
-
-      <HouseholdCard
-        householdName={household.name}
-        currentUserId={user.id}
+    <div className="pb-20 md:pb-0">
+      <SettingsClient
+        user={{ name: user.name, email: user.email }}
+        household={{ name: household.name }}
+        memberCount={members.length}
+        pendingInviteCount={invitations.length}
         isOwner={isOwner}
-        members={members.map((m) => ({
-          userId: m.userId,
-          name: m.name,
-          email: m.email,
-          role: m.role,
-          joinedAt: m.joinedAt.toISOString()
-        }))}
-        invitations={invitations.map((i) => ({
-          id: i.id,
-          email: i.email,
-          createdAt: i.createdAt.toISOString(),
-          expiresAt: i.expiresAt.toISOString()
-        }))}
+        isPlus={isPlus}
+        version={version}
       />
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Your cooking history</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          Your cooking history is shared with everyone in your kitchen. eeatly uses it
-          to help your household remember meals you all love and suggest what to cook again.
-        </CardContent>
-      </Card>
-
-      <ExportDataCard />
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Help improve eeatly</CardTitle>
-          <CardDescription>
-            Tell us what felt confusing, useful, or missing.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <FeedbackDialog />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Sign out</CardTitle>
-          <CardDescription>
-            Sign out of your eeatly account on this device.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <SignOutButton />
-        </CardContent>
-      </Card>
-
-      <DeleteAccountCard />
-
-      <div className="flex gap-4 text-sm text-muted-foreground">
-        <Link href={"/privacy" as Route} className="hover:text-foreground">
-          Privacy
-        </Link>
-        <Link href={"/help" as Route} className="hover:text-foreground">
-          Help
-        </Link>
-      </div>
     </div>
   );
 }

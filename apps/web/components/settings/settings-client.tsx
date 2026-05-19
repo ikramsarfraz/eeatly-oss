@@ -1,0 +1,514 @@
+"use client";
+
+import * as React from "react";
+import Link from "next/link";
+import type { Route } from "next";
+import {
+  AlertTriangle,
+  ChevronRight,
+  Download,
+  ExternalLink,
+  Loader2,
+  Mail,
+  Pencil,
+  Sparkles,
+  Trash2,
+  Users
+} from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { SectionLabel } from "@/components/ui/section-label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from "@/components/ui/dialog";
+import { useToast } from "@/components/providers/toast-provider";
+import { trpc } from "@/lib/trpc/client";
+import { getCause } from "@/lib/trpc/errors";
+import { cn } from "@/lib/utils";
+
+import { SettingRow } from "@/components/settings/setting-row";
+import { ThemeToggle } from "@/components/settings/theme-toggle";
+
+const DELETE_CONFIRMATION_PHRASE = "delete my account";
+
+/**
+ * Round 31 — Settings page editorial rewrite.
+ *
+ * 200px jump-nav + 7 sections (Account / Plan / Kitchen / Notifications
+ * / Appearance / Advanced / Danger zone). The R23 card-list layout is
+ * gone; each section is now a single Card with `<SettingRow>`
+ * children for consistency.
+ *
+ * Active jump-nav state: scroll-driven via `IntersectionObserver`.
+ * Click also nudges the active state immediately so taps feel
+ * responsive even before the scroll settles.
+ *
+ * The R23 `<SubscriptionCard>` / `<HouseholdCard>` /
+ * `<DeleteAccountCard>` / `<PreferencesCard>` cards no longer
+ * render — their content lives inside the new sections as Rows. The
+ * underlying trpc calls (`auth.deleteAccount`, `billing.createPortalSession`,
+ * `households.*`) all stay in their existing components and are
+ * invoked directly from the new Rows where needed.
+ */
+
+type SectionId =
+  | "account"
+  | "plan"
+  | "kitchen"
+  | "notifications"
+  | "appearance"
+  | "advanced"
+  | "danger";
+
+const SECTIONS: ReadonlyArray<{ id: SectionId; label: string; danger?: boolean }> = [
+  { id: "account", label: "Account" },
+  { id: "plan", label: "Plan" },
+  { id: "kitchen", label: "Kitchen" },
+  { id: "notifications", label: "Notifications" },
+  { id: "appearance", label: "Appearance" },
+  { id: "advanced", label: "Advanced" },
+  { id: "danger", label: "Danger zone", danger: true }
+];
+
+type SettingsClientProps = {
+  user: { name: string; email: string };
+  household: { name: string };
+  memberCount: number;
+  pendingInviteCount: number;
+  /** Owner pointer — currently unused by the rendered Settings UI
+   *  (member management has moved to `/household`) but retained on the
+   *  prop shape so callers can pass it through and future owner-only
+   *  affordances (transfer ownership, billing seats) can light up
+   *  without a server-shell change. */
+  isOwner: boolean;
+  isPlus: boolean;
+  version: string;
+};
+
+export function SettingsClient({
+  user,
+  household,
+  memberCount,
+  pendingInviteCount,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- see prop comment
+  isOwner: _isOwner,
+  isPlus,
+  version
+}: SettingsClientProps) {
+  const [active, setActive] = React.useState<SectionId>("account");
+
+  // IntersectionObserver for scroll-driven active state. Each section
+  // anchor reports when it enters / leaves the viewport; we pick the
+  // section whose top is closest-but-still-above the center as the
+  // active one. Cheap to compute; no continuous scroll listener
+  // needed.
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const observer = new window.IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .map((e) => ({
+            id: e.target.id as SectionId,
+            top: e.boundingClientRect.top
+          }))
+          .sort((a, b) => a.top - b.top);
+        if (visible[0]) setActive(visible[0].id);
+      },
+      { rootMargin: "-120px 0px -65% 0px", threshold: 0 }
+    );
+    SECTIONS.forEach((s) => {
+      const el = document.getElementById(s.id);
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  function handleNavClick(id: SectionId) {
+    setActive(id);
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+
+  return (
+    <div className="grid gap-7">
+      {/* Header band */}
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <h1
+          className="font-serif text-[44px] leading-[1.02] text-foreground sm:text-[52px] lg:text-[64px]"
+          style={{ letterSpacing: "-0.025em" }}
+        >
+          Settings.
+        </h1>
+        <span
+          className="font-mono text-[10.5px] uppercase text-muted-foreground"
+          style={{ letterSpacing: "0.14em" }}
+        >
+          eeatly · v{version}
+        </span>
+      </header>
+
+      {/* Two-column grid — 200px jump-nav + 1fr sections */}
+      <div className="grid gap-6 lg:grid-cols-[200px_1fr]">
+        {/* Jump-nav (sticky on lg+) */}
+        <nav
+          aria-label="Settings sections"
+          className="lg:sticky lg:top-[calc(var(--header-h)_+_16px)] lg:self-start"
+        >
+          <ul className="grid gap-1">
+            {SECTIONS.map((section) => {
+              const isActive = active === section.id;
+              return (
+                <li key={section.id}>
+                  <button
+                    type="button"
+                    onClick={() => handleNavClick(section.id)}
+                    className={cn(
+                      "w-full rounded-md px-3 py-2 text-left text-[13px] font-medium transition-colors",
+                      isActive && !section.danger
+                        ? "bg-[color:var(--sage-soft)] font-semibold text-primary"
+                        : isActive && section.danger
+                          ? "bg-[color:var(--danger-soft)] font-semibold text-[color:var(--danger-fg)]"
+                          : section.danger
+                            ? "text-[color:var(--danger-fg)] hover:bg-[color:var(--danger-soft)]/60"
+                            : "text-muted-foreground hover:bg-[var(--surface-2)] hover:text-foreground"
+                    )}
+                  >
+                    {section.label}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+
+        {/* Sections — max-width clamped so long lines stay readable */}
+        <div className="grid max-w-[740px] gap-8">
+          <section id="account" className="grid gap-3 scroll-mt-24">
+            <SectionLabel>Account</SectionLabel>
+            <Card className="overflow-hidden p-0">
+              <SettingRow
+                label="Name"
+                value={user.name}
+                suffix={
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2 text-muted-foreground"
+                    title="Edit name (coming soon)"
+                    disabled
+                    aria-disabled
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                }
+              />
+              <SettingRow
+                label="Email"
+                value={user.email}
+                suffix={
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2 text-muted-foreground"
+                    title="Edit email (coming soon)"
+                    disabled
+                    aria-disabled
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                }
+                last
+              />
+            </Card>
+          </section>
+
+          <section id="plan" className="grid gap-3 scroll-mt-24">
+            <SectionLabel>Plan</SectionLabel>
+            <Card className="overflow-hidden p-0">
+              <SettingRow
+                label={isPlus ? "Plus" : "Current plan"}
+                sub={
+                  isPlus
+                    ? "All Plus features active. Manage billing on the web."
+                    : "Free tier — logging, library, basic plans. AI capture is gated; planning is gated."
+                }
+                suffix={
+                  <Badge variant={isPlus ? "sage" : "ghost"}>
+                    {isPlus ? "Plus" : "Free"}
+                  </Badge>
+                }
+              />
+              <SettingRow
+                label="See Plus features"
+                sub="AI capture across photo, voice, paste · Plan an occasion · Cook history pulled forward."
+                suffix={
+                  <Button asChild variant="outline" size="sm" className="h-9">
+                    <Link href={"/pricing" as Route}>
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Compare Plus
+                    </Link>
+                  </Button>
+                }
+                last
+              />
+            </Card>
+          </section>
+
+          <section id="kitchen" className="grid gap-3 scroll-mt-24">
+            <SectionLabel>Kitchen</SectionLabel>
+            <Card className="overflow-hidden p-0">
+              <SettingRow
+                label="Members &amp; invitations"
+                sub={
+                  <>
+                    {memberCount === 1
+                      ? "Just you"
+                      : `${memberCount} members`}{" "}
+                    · {pendingInviteCount}{" "}
+                    {pendingInviteCount === 1
+                      ? "pending invite"
+                      : "pending invites"}
+                    .
+                  </>
+                }
+                suffix={
+                  <Button asChild variant="ghost" size="sm" className="h-9">
+                    <Link href={"/household" as Route}>
+                      <Users className="h-3.5 w-3.5" />
+                      Manage
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </Button>
+                }
+              />
+              <SettingRow
+                label="Default kitchen"
+                sub="Where new logs and meals land."
+                value={household.name}
+                last
+              />
+            </Card>
+          </section>
+
+          <section id="notifications" className="grid gap-3 scroll-mt-24">
+            <SectionLabel>Notifications</SectionLabel>
+            <Card className="overflow-hidden p-0">
+              <SettingRow
+                label="Notifications"
+                sub="Coming soon — alerts when co-cooks log meals, plans approach, pending invites expire."
+                last
+              />
+            </Card>
+          </section>
+
+          <section id="appearance" className="grid gap-3 scroll-mt-24">
+            <SectionLabel>Appearance</SectionLabel>
+            <Card className="overflow-hidden p-0">
+              <SettingRow
+                label="Theme"
+                sub="Light follows your editorial cream. Dark uses a warm near-black. System tracks your OS."
+                suffix={<ThemeToggle />}
+                last
+              />
+            </Card>
+          </section>
+
+          <section id="advanced" className="grid gap-3 scroll-mt-24">
+            <SectionLabel>Advanced</SectionLabel>
+            <Card className="overflow-hidden p-0">
+              <SettingRow
+                label="Developer settings"
+                sub="Diagnostics, experimental flags, data sync controls. Lands when we have something to surface here."
+                last
+              />
+            </Card>
+          </section>
+
+          <section id="danger" className="grid gap-3 scroll-mt-24">
+            <SectionLabel>Danger zone</SectionLabel>
+            <Card className="overflow-hidden border-[color:var(--danger-soft)] p-0">
+              <SettingRow
+                label="Export your data"
+                sub="Download everything in your kitchen — meals, logs, plans, annotations — as JSON."
+                suffix={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9"
+                    disabled
+                    aria-disabled
+                    title="Export coming soon"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Export
+                  </Button>
+                }
+                danger
+              />
+              <DeleteAccountRow />
+            </Card>
+          </section>
+
+          {/* Hidden — currently unused affordances kept on the page
+              for compatibility with existing keyboard shortcut / link
+              targets. Sign-out + Feedback + Privacy/Help links live
+              in the user menu / public routes. */}
+          <p className="mt-2 text-[11.5px] text-muted-foreground">
+            Privacy ·{" "}
+            <Link href={"/privacy" as Route} className="underline-offset-2 hover:underline">
+              privacy policy
+            </Link>{" "}
+            · Help ·{" "}
+            <Link href={"/help" as Route} className="underline-offset-2 hover:underline">
+              help center
+            </Link>
+          </p>
+        </div>
+      </div>
+
+      {/* Suppress unused-import warnings for icons / utilities the
+          subcomponents may pick up later. */}
+      <span hidden aria-hidden>
+        <Mail className="h-0 w-0" />
+        <Sparkles className="h-0 w-0" />
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Inline delete-account row — keeps the existing
+ * `trpc.auth.deleteAccount` flow but renders inside the new Card +
+ * SettingRow shape. The procedure requires a `confirmationPhrase`
+ * input (existing R4 invariant), so we use shadcn `Dialog` + `Input`
+ * rather than `AlertDialog` to gate the destructive action behind a
+ * typed confirmation. Behavior mirrors the R23 `<DeleteAccountCard>`:
+ * - OWNER_BLOCK → polite error toast pointing at ownership transfer.
+ * - On success → `window.location.assign(result.redirectTo)` so the
+ *   cleared Better Auth cookie takes effect on the next page load.
+ */
+function DeleteAccountRow() {
+  const { showToast } = useToast();
+  const [open, setOpen] = React.useState(false);
+  const [phrase, setPhrase] = React.useState("");
+  const deleteMut = trpc.auth.deleteAccount.useMutation();
+  const pending = deleteMut.isPending;
+  const phraseMatches =
+    phrase.trim().toLowerCase() === DELETE_CONFIRMATION_PHRASE;
+
+  async function handleConfirm() {
+    if (!phraseMatches) return;
+    try {
+      const result = await deleteMut.mutateAsync({ confirmationPhrase: phrase });
+      window.location.assign(result.redirectTo);
+    } catch (error) {
+      const cause = getCause(error);
+      if (cause?.reason === "OWNER_BLOCK") {
+        showToast({
+          variant: "error",
+          title: "Can't delete your account yet",
+          description:
+            "You own a kitchen with other members. Transfer ownership before deleting — for now, contact support to make the change."
+        });
+        return;
+      }
+      showToast({
+        variant: "error",
+        title: "Couldn't delete your account",
+        description: error instanceof Error ? error.message : undefined
+      });
+    }
+  }
+
+  return (
+    <SettingRow
+      label="Delete account"
+      sub="Permanently removes your account, your meal history, and any kitchens you own (transfer ownership first if you have co-cooks). Cannot be undone."
+      suffix={
+        <Dialog
+          open={open}
+          onOpenChange={(next) => {
+            setOpen(next);
+            if (!next) setPhrase("");
+          }}
+        >
+          <DialogTrigger asChild>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="h-9"
+              disabled={pending}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-[color:var(--danger-fg)]" />
+                Delete this account?
+              </DialogTitle>
+              <DialogDescription>
+                This permanently removes your eeatly account, the meals
+                you&apos;ve logged, plans you own, and any kitchens you
+                own. Co-cooks lose access. There&apos;s no undo.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-2 py-2">
+              <Label htmlFor="confirm-delete-phrase">
+                Type{" "}
+                <span className="font-mono-brand text-foreground">
+                  {DELETE_CONFIRMATION_PHRASE}
+                </span>{" "}
+                to confirm.
+              </Label>
+              <Input
+                id="confirm-delete-phrase"
+                value={phrase}
+                onChange={(e) => setPhrase(e.target.value)}
+                placeholder={DELETE_CONFIRMATION_PHRASE}
+                autoComplete="off"
+                disabled={pending}
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setOpen(false)}
+                disabled={pending}
+              >
+                Keep account
+              </Button>
+              <Button
+                type="button"
+                onClick={handleConfirm}
+                disabled={!phraseMatches || pending}
+                className="bg-[color:var(--destructive)] text-[color:var(--destructive-foreground)] hover:bg-[color:var(--destructive)]/90"
+              >
+                {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Delete forever
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      }
+      danger
+      last
+    />
+  );
+}

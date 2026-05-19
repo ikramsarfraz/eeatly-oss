@@ -141,14 +141,19 @@
   --font-mono-val: var(--font-mono-loaded), ui-monospace, monospace;
 }
 
-/* R23 — dark mode. Media-based per the R20 audit decision; no toggle.
+/* R23 — dark-mode palette. Same hex values as before; R31 migrated
+   the selector from `@media (prefers-color-scheme: dark)` to
+   `.dark` so `next-themes` can toggle Light / Dark / System on a
+   class attribute. System mode delegates back to the OS preference
+   via `next-themes`' own resolver, which then applies the matching
+   class — so the OS-based default still works without a second
+   media-query rule here.
    Hex values pulled from `apps/mobile/lib/design/tokens.ts` (the
    `colorsDark` block) where the semantic role matches. Web-only
    palettes (accent / warn / shadcn sidebar) get derivations in the
    same hue family, darker / lower-saturation so they read against the
    warm near-black `--background`. */
-@media (prefers-color-scheme: dark) {
-  :root {
+.dark {
     --background: #15140f;
     --foreground: #f0e9d9;
     --card: #1f1d17;
@@ -219,7 +224,6 @@
 
     --shadow-sm: 0 1px 0 rgba(0,0,0,0.45), 0 1px 2px rgba(0,0,0,0.55);
     --shadow-md: 0 1px 0 rgba(0,0,0,0.5), 0 8px 24px -12px rgba(0,0,0,0.7);
-  }
 }
 
 * {
@@ -245,10 +249,8 @@ select {
   background: rgba(47, 111, 88, 0.22);
 }
 
-@media (prefers-color-scheme: dark) {
-  ::selection {
-    background: rgba(136, 184, 148, 0.28);
-  }
+.dark ::selection {
+  background: rgba(136, 184, 148, 0.28);
 }
 
 /* Serif utility */

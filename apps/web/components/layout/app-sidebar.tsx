@@ -11,6 +11,7 @@ import {
   Plus,
   Settings,
   Sparkles,
+  Users,
   type LucideIcon
 } from "lucide-react";
 
@@ -107,7 +108,12 @@ const captureNav: NavItem[] = [
   }
 ];
 
+/**
+ * R31 — Kitchen group reinstated. "Members" lands at `/household`
+ * (the new dedicated kitchen page). Existing "Settings" stays below.
+ */
 const kitchenNav: NavItem[] = [
+  { href: "/household" as Route, label: "Members", icon: Users },
   { href: "/settings" as Route, label: "Settings", icon: Settings }
 ];
 
