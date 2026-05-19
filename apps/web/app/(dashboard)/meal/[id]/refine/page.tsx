@@ -13,12 +13,14 @@ import {
   Type
 } from "lucide-react";
 import type {
+  HeadsUp,
   PendingChange,
   RefineSource
 } from "@eeatly/api/validators/refine";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PageTitle } from "@/components/ui/page-title";
+import { Card } from "@/components/ui/card";
+import { MealTile } from "@/components/ui/meal-tile";
 import { SectionLabel } from "@/components/ui/section-label";
 import {
   AlertDialog,
@@ -32,6 +34,10 @@ import {
   AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
 import { useToastShortcuts } from "@/components/ui/toast";
+import { useSetBreadcrumb } from "@/components/layout/breadcrumb-context";
+import { useSetTopBarActions } from "@/components/layout/top-bar-actions";
+import { HeadsUpCard } from "@/components/refine/heads-up-card";
+import { RefineDiff } from "@/components/refine/refine-diff";
 import { getDeviceId } from "@/lib/refine/device-id";
 import {
   describePendingChange,
@@ -386,142 +392,429 @@ export default function RefineComposerPage() {
     submitPhotoMut.isPending;
 
   return (
-    <article className="mx-auto grid w-full max-w-[720px] gap-6 px-4 pb-12 pt-3 sm:px-6 sm:pt-4">
-      <PageTitle
-        kicker="Refine"
-        title={meal.name}
-        size="l"
-        subtitle="Send a prompt, voice note, or photo. I'll suggest changes you can accept before saving."
-      />
+    <RefineBody
+      meal={meal}
+      sessionId={sessionId}
+      turns={turns}
+      pending={pending}
+      counts={counts}
+      headsUp={session?.headsUp ?? []}
+      resolverCtx={resolverCtx}
+      mode={mode}
+      setMode={setMode}
+      draft={draft}
+      setDraft={setDraft}
+      recorder={recorder}
+      photoFile={photoFile}
+      photoInputRef={photoInputRef}
+      photoPreview={photoPreview}
+      handlePhotoChange={handlePhotoChange}
+      handleSubmitText={handleSubmitText}
+      handleSubmitVoice={handleSubmitVoice}
+      handleSubmitPhoto={handleSubmitPhoto}
+      handleToggleTurn={handleToggleTurn}
+      handleDiscard={handleDiscard}
+      submitting={submitting}
+      submitTextPending={submitTextMut.isPending}
+      submitVoicePending={submitVoiceMut.isPending}
+      submitPhotoPending={submitPhotoMut.isPending}
+      discardPending={discardMut.isPending}
+      onReviewSave={() =>
+        sessionId &&
+        router.push(
+          `/meal/${mealId}/refine/review?sessionId=${encodeURIComponent(sessionId)}` as Route
+        )
+      }
+    />
+  );
+}
 
-      {/* Composer card */}
-      <section className="grid gap-4 rounded-2xl border border-[var(--primary-soft)] bg-[var(--primary-soft)]/40 p-5">
-        <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.14em] text-[color:var(--secondary-foreground)]">
-          <Sparkles className="h-3.5 w-3.5" />
-          <span className="font-mono">Tell me what to change</span>
-        </div>
+/**
+ * Round 30 — editorial Refine body.
+ *
+ * Lifted into its own component so the React hook ordering stays
+ * stable across the loading / error / loaded branches (the top-level
+ * page hits four early-returns before reaching the success body;
+ * `useSetBreadcrumb` + `useSetTopBarActions` need to run on every
+ * render with the meal name + counts in scope, so they live here).
+ *
+ * Layout:
+ *   - Identity strip: full-width cream-soft band, border-bottom.
+ *     44×44 MealTile + serif meal name + mono meta + "Editing"
+ *     wheat Chip.
+ *   - Two-column body, no gap, full-bleed:
+ *     LEFT (1fr): paper surface, composer hero + chat history.
+ *     RIGHT (380px): cream-soft sidebar with pending summary,
+ *       "Will affect" rows, and the heads-up card.
+ *
+ * Reuses R22's mode-tab + per-mode surface subcomponents (TextSurface
+ * / VoiceSurface / PhotoSurface / Waveform) and the TurnBlock /
+ * TurnSummary pair below in this file. Only the wrapper layout and
+ * the composer-hero card chrome change.
+ */
+// Local type alias for the meal subset the body component reads.
+// tRPC react-query's nested ReturnType lookup widens to `{}` in some
+// TS contexts, so the inline pull from `getById.useQuery` doesn't
+// give us the field names. Listing the fields explicitly is the
+// narrowest path that keeps the body strongly typed.
+type RefineBodyMeal = {
+  id: string;
+  name: string;
+  photoUrl: string | null;
+  ingredients: string[] | null;
+  effortLevel: "quick" | "easy" | "medium" | "high_effort" | null;
+  structuredIngredients: Array<{
+    id: string;
+    position: number;
+    name: string;
+    quantityString: string;
+    prepNote: string | null;
+  }>;
+  structuredSteps: Array<{
+    id: string;
+    position: number;
+    title: string;
+    time: string | null;
+    body: string;
+    ingredientIds: string[];
+  }>;
+};
 
-        <ModeTabs mode={mode} onChange={setMode} />
+function RefineBody({
+  meal,
+  sessionId,
+  turns,
+  pending,
+  counts,
+  headsUp,
+  resolverCtx,
+  mode,
+  setMode,
+  draft,
+  setDraft,
+  recorder,
+  photoFile,
+  photoInputRef,
+  photoPreview,
+  handlePhotoChange,
+  handleSubmitText,
+  handleSubmitVoice,
+  handleSubmitPhoto,
+  handleToggleTurn,
+  handleDiscard,
+  submitting,
+  submitTextPending,
+  submitVoicePending,
+  submitPhotoPending,
+  discardPending,
+  onReviewSave
+}: {
+  meal: RefineBodyMeal;
+  sessionId: string | null;
+  turns: SessionTurn[];
+  pending: PendingChange[];
+  counts: { add: number; change: number; remove: number; total: number };
+  headsUp: HeadsUp[];
+  resolverCtx: Parameters<typeof describePendingChange>[1];
+  mode: Mode;
+  setMode: (m: Mode) => void;
+  draft: string;
+  setDraft: (s: string) => void;
+  recorder: ReturnType<typeof useVoiceRecorder>;
+  photoFile: File | null;
+  photoInputRef: React.RefObject<HTMLInputElement | null>;
+  photoPreview: string | null;
+  handlePhotoChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleSubmitText: () => void;
+  handleSubmitVoice: () => void;
+  handleSubmitPhoto: () => void;
+  handleToggleTurn: (turnId: string, currentAccepted: boolean) => void;
+  handleDiscard: () => void;
+  submitting: boolean;
+  submitTextPending: boolean;
+  submitVoicePending: boolean;
+  submitPhotoPending: boolean;
+  discardPending: boolean;
+  onReviewSave: () => void;
+}) {
+  // R30 — dynamic breadcrumb. Overrides the "Recipe" placeholder in
+  // the static trail (Cook / Library / Recipe / Refine) with the
+  // actual meal name. The targetLabel-based API is what R30 added
+  // so deeper routes work without a separate per-route helper.
+  useSetBreadcrumb(meal.name, "Recipe");
 
-        {mode === "text" ? (
-          <TextSurface
-            draft={draft}
-            onChange={setDraft}
-            onSubmit={handleSubmitText}
-            disabled={!sessionId || submitting}
-            sending={submitTextMut.isPending}
-          />
-        ) : null}
-
-        {mode === "voice" ? (
-          <VoiceSurface
-            recorder={recorder}
-            onSubmit={handleSubmitVoice}
-            sending={submitVoiceMut.isPending}
-          />
-        ) : null}
-
-        {mode === "photo" ? (
-          <PhotoSurface
-            inputRef={photoInputRef}
-            file={photoFile}
-            preview={photoPreview}
-            onChange={handlePhotoChange}
-            onSubmit={handleSubmitPhoto}
-            sending={submitPhotoMut.isPending}
-          />
-        ) : null}
-
-        <div className="flex flex-wrap gap-1.5">
-          {EXAMPLE_PROMPTS.map((label) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => {
-                setMode("text");
-                setDraft(label);
-              }}
-              className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1 text-[12px] text-foreground/80 transition hover:bg-[var(--surface-2)]"
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {/* Session history */}
-      <section className="grid gap-3">
-        <SectionLabel>
-          {turns.length > 0
-            ? `This session · ${turns.length} turn${turns.length === 1 ? "" : "s"}`
-            : "This session"}
-        </SectionLabel>
-        {turns.length === 0 ? (
-          <p className="font-serif italic text-muted-foreground">
-            Send a refinement above to get started.
-          </p>
-        ) : (
-          <ul className="grid list-none gap-4">
-            {turns.map((turn) => (
-              <li key={turn.id}>
-                <TurnBlock
-                  turn={turn}
-                  resolverCtx={resolverCtx}
-                  onTogglePress={handleToggleTurn}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {/* Pending summary + actions */}
-      {counts.total > 0 ? (
-        <section className="grid gap-3">
-          <div className="flex items-center justify-between">
-            <SectionLabel>Pending changes</SectionLabel>
-            <span
-              className="text-[12px] text-muted-foreground/80"
-              aria-hidden
-              title="Manual editing not implemented in this round"
-            >
-              Or edit by hand →
-            </span>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-            <span className="text-[13px] font-semibold">
-              {counts.total} change{counts.total === 1 ? "" : "s"} ready
-            </span>
-            <span className="ml-auto flex flex-wrap items-center gap-1.5">
-              {counts.add > 0 ? <Badge variant="sage">{`+${counts.add}`}</Badge> : null}
-              {counts.change > 0 ? <Badge variant="wheat">{`~${counts.change}`}</Badge> : null}
-              {counts.remove > 0 ? <Badge variant="danger">{`−${counts.remove}`}</Badge> : null}
-            </span>
-          </div>
-        </section>
-      ) : null}
-
-      <div className="grid gap-2 sm:flex sm:items-center sm:justify-between">
+  // TopBar actions: Discard (decorative ghost when nothing's pending,
+  // confirming AlertDialog when dirty) + Review & save (disabled
+  // until at least one pending change is ready).
+  const dirty = counts.total > 0 || turns.length > 0;
+  const topBarActions = React.useMemo(
+    () => (
+      <>
         <DiscardButton
           onConfirm={handleDiscard}
-          pending={discardMut.isPending}
-          dirty={counts.total > 0 || turns.length > 0}
+          pending={discardPending}
+          dirty={dirty}
         />
         <Button
           type="button"
+          variant="default"
           disabled={counts.total === 0 || !sessionId}
-          onClick={() =>
-            sessionId &&
-            router.push(
-              `/meal/${mealId}/refine/review?sessionId=${encodeURIComponent(sessionId)}` as Route
-            )
-          }
-          className="min-h-[44px]"
+          onClick={onReviewSave}
+          className="min-h-[40px]"
         >
-          Review changes{counts.total > 0 ? ` · ${counts.total}` : ""}
+          Review & save
+          {counts.total > 0 ? (
+            <span
+              className="ml-2 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-white/[0.18] px-1.5 font-mono-brand text-[11.5px] font-bold text-primary-foreground"
+              aria-hidden
+            >
+              {counts.total}
+            </span>
+          ) : null}
         </Button>
-      </div>
-    </article>
+      </>
+    ),
+    [
+      counts.total,
+      sessionId,
+      handleDiscard,
+      discardPending,
+      dirty,
+      onReviewSave
+    ]
+  );
+  useSetTopBarActions(topBarActions);
+
+  // Build a thin "Will affect" preview from the pending list.
+  const willAffect = React.useMemo(
+    () =>
+      pending.map((c) => {
+        const d = describePendingChange(c, resolverCtx);
+        return { id: c.id, kind: c.kind, title: d.title, note: d.typeLabel };
+      }),
+    [pending, resolverCtx]
+  );
+
+  return (
+    // Full-bleed wrapper: negative margins neutralize the dashboard
+    // layout's `<main>` padding (R26 sets `px-4 py-5 max-md` /
+    // `px-8 py-7` at md+). Bottom-tab clearance preserved via the
+    // layout's own padding.
+    <div className="-mx-4 -my-5 sm:-mx-8 sm:-my-7">
+      {/* Identity strip */}
+      <section className="grid grid-cols-[44px_1fr_auto] items-center gap-4 border-b border-[var(--border)] bg-[var(--surface-2)] px-6 py-4 sm:px-8">
+        <MealTile
+          name={meal.name}
+          size="s"
+          className="aspect-square h-11 w-11 rounded-[8px] border-0"
+        />
+        <div className="min-w-0">
+          <p
+            className="truncate font-serif text-[22px] leading-tight text-foreground"
+            style={{ letterSpacing: "-0.015em" }}
+          >
+            {meal.name}
+          </p>
+          <p
+            className="mt-0.5 truncate font-mono text-[10.5px] uppercase text-muted-foreground"
+            style={{ letterSpacing: "0.14em" }}
+          >
+            {(meal.ingredients?.length ?? 0)} ingredients
+            {meal.structuredSteps?.length
+              ? ` · ${meal.structuredSteps.length} steps`
+              : ""}
+            {meal.effortLevel ? ` · ${meal.effortLevel}` : ""}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="wheat" className="font-mono">
+            Editing
+          </Badge>
+          {turns.length > 0 ? (
+            <span
+              className="font-mono text-[10.5px] uppercase text-muted-foreground"
+              style={{ letterSpacing: "0.14em" }}
+            >
+              {turns.length} turn{turns.length === 1 ? "" : "s"}
+            </span>
+          ) : null}
+        </div>
+      </section>
+
+      {/* Two-column body */}
+      <section className="grid grid-cols-1 lg:grid-cols-[1fr_380px]">
+        {/* LEFT: composer + chat history */}
+        <div className="flex flex-col gap-6 border-b border-[var(--border)] bg-background px-6 py-7 sm:px-8 lg:border-b-0 lg:border-r">
+          {/* Composer hero — sage-tinted with radial-dot overlay */}
+          <div
+            className="relative isolate grid gap-4 overflow-hidden rounded-[20px] border border-[color:var(--sage)] bg-[color:var(--sage-soft)] p-6"
+          >
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 opacity-50"
+              style={{
+                backgroundImage:
+                  "radial-gradient(var(--sage) 1px, transparent 1.4px)",
+                backgroundSize: "16px 16px",
+                backgroundPosition: "center"
+              }}
+            />
+            <div className="relative grid gap-3">
+              <div className="flex items-center gap-2 text-primary">
+                <Sparkles className="h-3.5 w-3.5" />
+                <span
+                  className="font-mono text-[10.5px] uppercase"
+                  style={{ letterSpacing: "0.14em" }}
+                >
+                  Tell me what to change
+                </span>
+              </div>
+              <h2
+                className="font-serif text-[28px] leading-[1.05] text-foreground sm:text-[32px]"
+                style={{ letterSpacing: "-0.02em" }}
+              >
+                Send a prompt, voice note, or photo.
+              </h2>
+              <ModeTabs mode={mode} onChange={setMode} />
+              {mode === "text" ? (
+                <TextSurface
+                  draft={draft}
+                  onChange={setDraft}
+                  onSubmit={handleSubmitText}
+                  disabled={!sessionId || submitting}
+                  sending={submitTextPending}
+                />
+              ) : null}
+              {mode === "voice" ? (
+                <VoiceSurface
+                  recorder={recorder}
+                  onSubmit={handleSubmitVoice}
+                  sending={submitVoicePending}
+                />
+              ) : null}
+              {mode === "photo" ? (
+                <PhotoSurface
+                  inputRef={photoInputRef}
+                  file={photoFile}
+                  preview={photoPreview}
+                  onChange={handlePhotoChange}
+                  onSubmit={handleSubmitPhoto}
+                  sending={submitPhotoPending}
+                />
+              ) : null}
+              {/* Example prompts — decorative for v1, but clicking
+                  the chip still seeds the text input (zero-cost
+                  affordance, no procedure call). */}
+              <div className="flex flex-wrap gap-1.5">
+                {EXAMPLE_PROMPTS.map((label) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => {
+                      setMode("text");
+                      setDraft(label);
+                    }}
+                    className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1 text-[12px] text-foreground/80 transition hover:bg-[var(--surface-2)]"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Session history */}
+          <div className="grid gap-3">
+            <SectionLabel
+              action={
+                turns.length > 0 ? (
+                  <span
+                    className="font-mono text-[10.5px] uppercase text-muted-foreground"
+                    style={{ letterSpacing: "0.14em" }}
+                  >
+                    {turns.length} turn{turns.length === 1 ? "" : "s"} ·{" "}
+                    {counts.total} change{counts.total === 1 ? "" : "s"}
+                  </span>
+                ) : null
+              }
+            >
+              This session
+            </SectionLabel>
+            {turns.length === 0 ? (
+              <p className="font-serif italic text-muted-foreground">
+                Send a refinement above to get started.
+              </p>
+            ) : (
+              <ul className="grid list-none gap-4">
+                {turns.map((turn) => (
+                  <li key={turn.id}>
+                    <TurnBlock
+                      turn={turn}
+                      resolverCtx={resolverCtx}
+                      onTogglePress={handleToggleTurn}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        {/* RIGHT: pending sidebar (cream-soft) */}
+        <aside className="flex flex-col gap-5 bg-[var(--surface-2)] px-6 py-7 sm:px-7">
+          <div className="grid gap-3">
+            <SectionLabel>Pending changes</SectionLabel>
+            <Card className="grid gap-2 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[13.5px] font-semibold text-foreground">
+                  {counts.total} change{counts.total === 1 ? "" : "s"} ready
+                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {counts.add > 0 ? (
+                    <Badge variant="sage">+{counts.add}</Badge>
+                  ) : null}
+                  {counts.change > 0 ? (
+                    <Badge variant="wheat">~{counts.change}</Badge>
+                  ) : null}
+                  {counts.remove > 0 ? (
+                    <Badge variant="danger">−{counts.remove}</Badge>
+                  ) : null}
+                </div>
+              </div>
+              <p className="text-[12.5px] leading-[1.5] text-muted-foreground">
+                We&apos;ll roll all your refinements into one save. Review
+                them in the next step before they overwrite the recipe.
+              </p>
+            </Card>
+          </div>
+
+          {willAffect.length > 0 ? (
+            <div className="grid gap-3">
+              <SectionLabel>Will affect</SectionLabel>
+              <Card className="grid gap-1 p-4">
+                {willAffect.map((row) => (
+                  <RefineDiff
+                    key={row.id}
+                    kind={row.kind}
+                    label={row.title}
+                    note={row.note}
+                  />
+                ))}
+              </Card>
+            </div>
+          ) : null}
+
+          {/* Heads-up — stack each rule callout */}
+          {headsUp.length > 0 ? (
+            <div className="grid gap-2">
+              {headsUp.map((rule) => (
+                <HeadsUpCard key={rule.id} headsUp={rule} />
+              ))}
+            </div>
+          ) : null}
+        </aside>
+      </section>
+    </div>
   );
 }
 
