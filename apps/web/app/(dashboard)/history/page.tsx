@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
+import { countHouseholdMembers } from "@/services/households";
 import { getDashboardMeals } from "@/services/meals";
 import { listMealLibrary } from "@/services/plans";
 import { LibraryClient, type LibraryStat } from "@/components/library/library-client";
@@ -33,9 +34,13 @@ export const dynamic = "force-dynamic";
 export default async function HistoryPage() {
   const { user, household } = await requireCurrentUserWithHousehold();
 
-  const [rows, dashboard] = await Promise.all([
+  // R32 — also fetch household member count for the visibility chip +
+  // tile indicator render gate. Cheap query (count(*) on household
+  // members), runs in the same parallel batch.
+  const [rows, dashboard, memberCount] = await Promise.all([
     listMealLibrary({ userId: user.id, householdId: household.id }),
-    getDashboardMeals(user.id, household.id, { recentMealsLimit: 25 })
+    getDashboardMeals(user.id, household.id, { recentMealsLimit: 25 }),
+    countHouseholdMembers(user.id, household.id)
   ]);
 
   // Build the stat overlay from dashboard data. recentMeals carry
@@ -83,9 +88,13 @@ export default async function HistoryPage() {
       rows={rows.map((r) => ({
         id: r.id,
         name: r.name,
-        photoUrl: r.photoUrl
+        photoUrl: r.photoUrl,
+        sharedAt: r.sharedAt ? r.sharedAt.toISOString() : null,
+        createdByUserId: r.createdByUserId
       }))}
       stats={Array.from(statsById.values())}
+      currentUserId={user.id}
+      householdMemberCount={memberCount}
     />
   );
 }

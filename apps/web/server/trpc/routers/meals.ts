@@ -11,7 +11,9 @@ import {
   deleteMealLog,
   getHistoryRows,
   getHistoryStats,
-  getMealDetail
+  getMealDetail,
+  shareMeal,
+  unshareMeal
 } from "@/services/meals";
 import { createNotification } from "@/services/notifications";
 import { householdMemberProcedure, rateLimit, router } from "../trpc";
@@ -28,6 +30,39 @@ import { householdMemberProcedure, rateLimit, router } from "../trpc";
  * page is still server-rendered today; these procedures back the
  * future client-side filter/sort transitions.
  */
+/**
+ * R32 — service-throws-Error → typed TRPCError mapper for the share /
+ * unshare mutations. The structured `cause.reason` is what the client
+ * matches on (mirrors the plans router's `mapPlanServiceError`).
+ */
+function mapMealVisibilityError(error: unknown): TRPCError {
+  if (error instanceof TRPCError) return error;
+  const message = error instanceof Error ? error.message : "Unknown error.";
+  const lower = message.toLowerCase();
+  if (lower.includes("only the creator")) {
+    return new TRPCError({
+      code: "FORBIDDEN",
+      message,
+      cause: { reason: "NOT_CREATOR" }
+    });
+  }
+  if (lower.includes("not found") || lower.includes("not in this household")) {
+    return new TRPCError({
+      code: "NOT_FOUND",
+      message: "Meal not found.",
+      cause: { reason: "MEAL_NOT_FOUND" }
+    });
+  }
+  if (lower.includes("archived")) {
+    return new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message,
+      cause: { reason: "MEAL_ARCHIVED" }
+    });
+  }
+  return new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
+}
+
 const historyOptionsSchema = z.object({
   tab: z.enum(["recent", "most", "neglected"]).optional(),
   sort: z.enum(["date", "name"]).optional(),
@@ -122,6 +157,71 @@ export const mealsRouter = router({
       }
 
       return { mealLog: { id: mealLog?.id } };
+    }),
+
+  /**
+   * Round 32 — flip a meal between personal and shared. Creator-only
+   * at both the service and procedure layers. The service throws
+   * plain `Error` objects for "not found / wrong household / not
+   * creator"; we map those to the right TRPCError codes here so the
+   * client can branch on `cause.reason`.
+   *
+   * Idempotent on both sides:
+   *   - share() on an already-shared meal updates the timestamp.
+   *   - unshare() on an already-personal meal is a no-op.
+   *
+   * After mutation we revalidate `/dashboard`, `/history`, `/ideas`
+   * (anywhere a meal tile renders) so other members' next navigation
+   * picks up the new visibility. The home / library / plans procedures
+   * use TanStack Query invalidation client-side too — see
+   * `recipe-detail-client.tsx`.
+   */
+  share: householdMemberProcedure
+    .use(rateLimit("mutation"))
+    .input(z.object({ mealId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const result = await shareMeal({
+          userId: ctx.user.id,
+          householdId: ctx.household.id,
+          mealId: input.mealId
+        });
+        revalidatePath("/dashboard");
+        revalidatePath("/history");
+        revalidatePath("/ideas");
+        revalidatePath(`/meal/${input.mealId}`);
+        logger.info("meal_shared", {
+          userId: ctx.user.id,
+          mealId: input.mealId
+        });
+        return { sharedAt: result.sharedAt.toISOString() };
+      } catch (error) {
+        throw mapMealVisibilityError(error);
+      }
+    }),
+
+  unshare: householdMemberProcedure
+    .use(rateLimit("mutation"))
+    .input(z.object({ mealId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        await unshareMeal({
+          userId: ctx.user.id,
+          householdId: ctx.household.id,
+          mealId: input.mealId
+        });
+        revalidatePath("/dashboard");
+        revalidatePath("/history");
+        revalidatePath("/ideas");
+        revalidatePath(`/meal/${input.mealId}`);
+        logger.info("meal_unshared", {
+          userId: ctx.user.id,
+          mealId: input.mealId
+        });
+        return { sharedAt: null };
+      } catch (error) {
+        throw mapMealVisibilityError(error);
+      }
     }),
 
   /**

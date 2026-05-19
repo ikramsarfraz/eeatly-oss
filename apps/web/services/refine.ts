@@ -249,6 +249,19 @@ export async function startSession(args: {
   });
   if (!mealRow) throw new Error("Meal not found.");
   await requireHouseholdMember(args.userId, mealRow.householdId);
+  // R32 edit-path lockdown — Refine is a write surface (the save path
+  // persists structured ingredients + steps onto the meal). Only the
+  // creator can start a refine session. Other household members can
+  // read the meal (if shared) but can't propose changes to it.
+  //
+  // Behavior change from R31: pre-R32, household-wide members could
+  // start a refine session on any meal in their household. Refine
+  // sessions were per-device per-user, so concurrent drafts were
+  // already possible, but the underlying meal could be edited by any
+  // member. R32 narrows write access to the creator.
+  if (mealRow.createdByUserId !== args.userId) {
+    throw new Error("Only the creator can refine this meal.");
+  }
 
   // Resume the active session if there is one, else insert.
   const existing = await db.query.refineSessions.findFirst({

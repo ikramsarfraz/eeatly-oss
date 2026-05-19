@@ -81,8 +81,18 @@ afterEach(() => {
 });
 
 describe("createRecipeShare", () => {
+  // R32 — meal lookups now project `createdByUserId` so the
+  // creator-only check can run. Tests where the operation should
+  // succeed pin the creator to match the caller.
   it("rejects when the meal isn't in the caller's household", async () => {
-    queue([{ id: "m-1", householdId: "h-other", archivedAt: null }]);
+    queue([
+      {
+        id: "m-1",
+        householdId: "h-other",
+        archivedAt: null,
+        createdByUserId: "u-other"
+      }
+    ]);
     sessionMock.requireHouseholdMember.mockRejectedValueOnce(
       new Error("Not authorized for this household.")
     );
@@ -95,7 +105,15 @@ describe("createRecipeShare", () => {
   });
 
   it("rejects when the feature gate denies (non-beta non-paid)", async () => {
-    queue([{ id: "m-1", householdId: "h-a", archivedAt: null }]);
+    queue([
+      {
+        id: "m-1",
+        householdId: "h-a",
+        archivedAt: null,
+        // Pin creator to caller so the test reaches the gate check.
+        createdByUserId: "u-free"
+      }
+    ]);
     gateMock.requireFeatureAccess.mockRejectedValueOnce(
       new FeatureGateDeniedError("recipe_share_create")
     );
@@ -106,15 +124,44 @@ describe("createRecipeShare", () => {
   });
 
   it("rejects archived meals", async () => {
-    queue([{ id: "m-1", householdId: "h-a", archivedAt: new Date("2025-01-01") }]);
+    queue([
+      {
+        id: "m-1",
+        householdId: "h-a",
+        archivedAt: new Date("2025-01-01"),
+        createdByUserId: "u-a"
+      }
+    ]);
 
     await expect(
       createRecipeShare({ userId: "u-a", mealId: "m-1" })
     ).rejects.toThrow(/archived/);
   });
 
+  it("R32 — rejects when the caller isn't the meal's creator", async () => {
+    queue([
+      {
+        id: "m-1",
+        householdId: "h-a",
+        archivedAt: null,
+        createdByUserId: "u-creator"
+      }
+    ]);
+
+    await expect(
+      createRecipeShare({ userId: "u-other-member", mealId: "m-1" })
+    ).rejects.toThrow(/creator/);
+  });
+
   it("returns the existing share when one is already active for this meal (idempotent)", async () => {
-    queue([{ id: "m-1", householdId: "h-a", archivedAt: null }]); // meal lookup
+    queue([
+      {
+        id: "m-1",
+        householdId: "h-a",
+        archivedAt: null,
+        createdByUserId: "u-a"
+      }
+    ]); // meal lookup
     queue([
       { id: "s-existing", token: "existing-token-1234567890123456789012345678901" }
     ]); // existing-share lookup
@@ -130,7 +177,14 @@ describe("createRecipeShare", () => {
   });
 
   it("inserts a new share when no active share exists", async () => {
-    queue([{ id: "m-1", householdId: "h-a", archivedAt: null }]); // meal lookup
+    queue([
+      {
+        id: "m-1",
+        householdId: "h-a",
+        archivedAt: null,
+        createdByUserId: "u-a"
+      }
+    ]); // meal lookup
     queue([]); // existing-share lookup returns nothing
     queue([{ id: "s-new" }]); // insert .returning()
 
@@ -210,8 +264,18 @@ describe("getRecipeShareByToken", () => {
 });
 
 describe("revokeRecipeShare", () => {
+  // R32 — revoke lookup now joins meals, so the projected row carries
+  // `createdByUserId`. Tests pin it to the caller for paths that
+  // should succeed.
   it("rejects when the caller isn't in the share's household", async () => {
-    queue([{ id: "s-1", householdId: "h-other", revokedAt: null }]);
+    queue([
+      {
+        id: "s-1",
+        householdId: "h-other",
+        revokedAt: null,
+        createdByUserId: "u-other-creator"
+      }
+    ]);
     sessionMock.requireHouseholdMember.mockRejectedValueOnce(
       new Error("Not authorized for this household.")
     );
@@ -221,16 +285,43 @@ describe("revokeRecipeShare", () => {
     ).rejects.toThrow(/Not authorized/);
   });
 
+  it("R32 — rejects when the caller isn't the share's creator", async () => {
+    queue([
+      {
+        id: "s-1",
+        householdId: "h-a",
+        revokedAt: null,
+        createdByUserId: "u-creator"
+      }
+    ]);
+
+    await expect(
+      revokeRecipeShare({ userId: "u-other-member", shareId: "s-1" })
+    ).rejects.toThrow(/creator/);
+  });
+
   it("soft no-ops when the share is already revoked (double-click safe)", async () => {
     queue([
-      { id: "s-1", householdId: "h-a", revokedAt: new Date("2026-05-01") }
+      {
+        id: "s-1",
+        householdId: "h-a",
+        revokedAt: new Date("2026-05-01"),
+        createdByUserId: "u-a"
+      }
     ]);
     await revokeRecipeShare({ userId: "u-a", shareId: "s-1" });
     // No update queued — the function returned early.
   });
 
   it("issues the revoke update when the share is currently active", async () => {
-    queue([{ id: "s-1", householdId: "h-a", revokedAt: null }]);
+    queue([
+      {
+        id: "s-1",
+        householdId: "h-a",
+        revokedAt: null,
+        createdByUserId: "u-a"
+      }
+    ]);
     queue([]); // update returning
 
     await revokeRecipeShare({ userId: "u-a", shareId: "s-1" });
@@ -238,8 +329,18 @@ describe("revokeRecipeShare", () => {
 });
 
 describe("listSharesForMeal", () => {
+  // R32 — listing now bails to `[]` for non-creators so the dialog
+  // stays simple. Tests that exercise the populated branch pin the
+  // creator to the caller.
   it("requires household membership before listing", async () => {
-    queue([{ id: "m-1", householdId: "h-a" }]);
+    queue([
+      {
+        id: "m-1",
+        householdId: "h-a",
+        createdByUserId: "u-creator",
+        sharedAt: null
+      }
+    ]);
     sessionMock.requireHouseholdMember.mockRejectedValueOnce(
       new Error("Not authorized for this household.")
     );
@@ -249,8 +350,32 @@ describe("listSharesForMeal", () => {
     ).rejects.toThrow(/Not authorized/);
   });
 
+  it("R32 — returns empty list for non-creators (no leak)", async () => {
+    queue([
+      {
+        id: "m-1",
+        householdId: "h-a",
+        createdByUserId: "u-creator",
+        sharedAt: new Date("2026-04-01")
+      }
+    ]);
+
+    const rows = await listSharesForMeal({
+      userId: "u-other-member",
+      mealId: "m-1"
+    });
+    expect(rows).toEqual([]);
+  });
+
   it("returns active shares with full URL", async () => {
-    queue([{ id: "m-1", householdId: "h-a" }]);
+    queue([
+      {
+        id: "m-1",
+        householdId: "h-a",
+        createdByUserId: "u-a",
+        sharedAt: null
+      }
+    ]);
     queue([
       {
         id: "s-1",

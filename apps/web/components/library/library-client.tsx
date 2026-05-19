@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import type { Route } from "next";
-import { Plus } from "lucide-react";
+import { Lock, Plus } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,14 @@ export type LibraryRow = {
   id: string;
   name: string;
   photoUrl: string | null;
+  /**
+   * Round 32 — meal sharing state. ISO string when shared, null when
+   * personal. Filtered down to "creator-own + shared" by the service;
+   * the client uses these to power the Personal / Shared filter chips
+   * and the per-tile lock indicator.
+   */
+  sharedAt: string | null;
+  createdByUserId: string | null;
 };
 
 export type LibraryStat = {
@@ -70,12 +78,22 @@ type LibraryClientProps = {
   rows: LibraryRow[];
   /** Stat overlays keyed by mealId. Joined client-side. */
   stats: LibraryStat[];
+  /**
+   * Round 32 — viewing user id (for "is this MY personal meal?") and
+   * household member count (controls whether Personal/Shared chips +
+   * tile indicators render at all). Single-member households hide
+   * both — no signal to surface when there's nobody to share with.
+   */
+  currentUserId: string;
+  householdMemberCount: number;
 };
 
 type FilterKey =
   | "all"
   | "recent"
   | "most"
+  | "personal"
+  | "shared"
   | "quick"
   | "high"
   | "never";
@@ -84,11 +102,16 @@ const FILTER_LABELS: Record<FilterKey, string> = {
   all: "All",
   recent: "Recently cooked",
   most: "Most cooked",
+  personal: "Personal",
+  shared: "Shared",
   quick: "Quick",
   high: "High effort",
   never: "Never cooked"
 };
 
+// R32 — Personal + Shared sit between "Most cooked" and the decorative
+// effort chips so the visibility filters are visually grouped with the
+// other derived filters. Hidden entirely for single-member households.
 const DERIVED_FILTERS: ReadonlyArray<FilterKey> = [
   "all",
   "recent",
@@ -96,9 +119,16 @@ const DERIVED_FILTERS: ReadonlyArray<FilterKey> = [
   "never"
 ];
 
+const VISIBILITY_FILTERS: ReadonlyArray<FilterKey> = ["personal", "shared"];
+
 const DECORATIVE_FILTERS: ReadonlyArray<FilterKey> = ["quick", "high"];
 
-export function LibraryClient({ rows, stats }: LibraryClientProps) {
+export function LibraryClient({
+  rows,
+  stats,
+  currentUserId,
+  householdMemberCount
+}: LibraryClientProps) {
   const { open: openQuickLog } = useQuickLog();
   const [filter, setFilter] = React.useState<FilterKey>("all");
 
@@ -134,12 +164,25 @@ export function LibraryClient({ rows, stats }: LibraryClientProps) {
   const [now] = React.useState(() => Date.now());
   const thirtyDays = 30 * 24 * 60 * 60 * 1000;
 
+  const isMultiMember = householdMemberCount > 1;
+
   // Derived counts for chip subtitles. Computed once per stats change.
   const counts = React.useMemo(() => {
     let recent = 0;
     let most = 0;
     let never = 0;
+    let personal = 0;
+    let shared = 0;
     for (const row of rows) {
+      // R32 — Personal = the viewer's own personal meal. Shared = the
+      // meal has a non-null sharedAt regardless of creator. Other
+      // members' personal meals were filtered out server-side, so the
+      // only personal rows we ever see here are the viewer's own.
+      if (row.sharedAt === null && row.createdByUserId === currentUserId) {
+        personal += 1;
+      } else if (row.sharedAt !== null) {
+        shared += 1;
+      }
       const stat = statsByMealId.get(row.id);
       if (!stat) {
         never += 1;
@@ -157,11 +200,13 @@ export function LibraryClient({ rows, stats }: LibraryClientProps) {
       all: rows.length,
       recent,
       most,
+      personal,
+      shared,
       quick: 0,
       high: 0,
       never
     } as Record<FilterKey, number>;
-  }, [rows, statsByMealId, now, thirtyDays]);
+  }, [rows, statsByMealId, now, thirtyDays, currentUserId]);
 
   // Apply filter to rows.
   const filteredRows = React.useMemo(() => {
@@ -181,9 +226,15 @@ export function LibraryClient({ rows, stats }: LibraryClientProps) {
         );
       }
       if (filter === "most") return (stat?.cookCount ?? 0) >= 2;
+      if (filter === "personal") {
+        return row.sharedAt === null && row.createdByUserId === currentUserId;
+      }
+      if (filter === "shared") {
+        return row.sharedAt !== null;
+      }
       return true;
     });
-  }, [rows, statsByMealId, filter, now, thirtyDays]);
+  }, [rows, statsByMealId, filter, now, thirtyDays, currentUserId]);
 
   return (
     <div className="grid gap-7">
@@ -215,7 +266,8 @@ export function LibraryClient({ rows, stats }: LibraryClientProps) {
         </span>
       </header>
 
-      {/* Filter chip row */}
+      {/* Filter chip row. R32 — Personal + Shared chips only render
+          for multi-member households (no signal in solo kitchens). */}
       <nav
         aria-label="Library filters"
         className="flex flex-wrap items-center gap-2"
@@ -229,6 +281,17 @@ export function LibraryClient({ rows, stats }: LibraryClientProps) {
             onClick={() => setFilter(key)}
           />
         ))}
+        {isMultiMember
+          ? (VISIBILITY_FILTERS as ReadonlyArray<FilterKey>).map((key) => (
+              <FilterChip
+                key={key}
+                active={filter === key}
+                count={counts[key]}
+                label={FILTER_LABELS[key]}
+                onClick={() => setFilter(key)}
+              />
+            ))
+          : null}
         {(DECORATIVE_FILTERS as ReadonlyArray<FilterKey>).map((key) => (
           <FilterChip
             key={key}
@@ -246,7 +309,13 @@ export function LibraryClient({ rows, stats }: LibraryClientProps) {
         <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {filteredRows.map((row) => (
             <li key={row.id}>
-              <LibraryCard row={row} stat={statsByMealId.get(row.id)} />
+              <LibraryCard
+                row={row}
+                stat={statsByMealId.get(row.id)}
+                showPersonalIndicator={
+                  isMultiMember && row.sharedAt === null
+                }
+              />
             </li>
           ))}
         </ul>
@@ -303,10 +372,17 @@ function FilterChip({
 
 function LibraryCard({
   row,
-  stat
+  stat,
+  showPersonalIndicator
 }: {
   row: LibraryRow;
   stat: LibraryStat | undefined;
+  /**
+   * R32 — gate the MealTile lock indicator. Threaded in as a single
+   * boolean so the card stays unopinionated about how the parent
+   * derives the "multi-member && personal" condition.
+   */
+  showPersonalIndicator: boolean;
 }) {
   // Build a compact meta line: cook count + last-cooked relative
   // ("3× cooked · last Mar 4"). When no stats, just "Not yet cooked".
@@ -336,17 +412,29 @@ function LibraryCard({
       aria-label={`Open recipe for ${row.name}`}
     >
       {row.photoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={row.photoUrl}
-          alt=""
-          className="aspect-square w-full rounded-md border bg-muted object-cover transition-opacity group-hover:opacity-90"
-        />
+        <span className="relative block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={row.photoUrl}
+            alt=""
+            className="aspect-square w-full rounded-md border bg-muted object-cover transition-opacity group-hover:opacity-90"
+          />
+          {showPersonalIndicator ? (
+            <span
+              aria-label="Personal meal"
+              title="Personal — only you see this"
+              className="absolute right-2 top-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-background/85 text-foreground"
+            >
+              <Lock className="h-3 w-3" strokeWidth={2.2} />
+            </span>
+          ) : null}
+        </span>
       ) : (
         <MealTile
           name={row.name}
           size="m"
           className="aspect-square w-full rounded-md border transition-opacity group-hover:opacity-90"
+          isPersonal={showPersonalIndicator}
         />
       )}
       <div className="grid gap-0.5">

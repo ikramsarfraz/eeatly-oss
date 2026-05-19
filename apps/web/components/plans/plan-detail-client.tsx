@@ -104,11 +104,21 @@ const EFFORT_LABEL: Record<
 export function PlanDetailClient({
   plan,
   dishes,
+  hiddenDishCount,
   members,
   library
 }: {
   plan: PlanDetailPlan;
   dishes: PlanDetailDish[];
+  /**
+   * R32 — count of dishes on this plan that were filtered out because
+   * the underlying meal is another member's personal recipe. Rendered
+   * as a mono-caps placeholder row so non-creators see "N dishes
+   * hidden by other members" rather than a mysteriously-shorter list.
+   * Always zero when the viewer is the plan's creator and any
+   * personal dishes on the plan are theirs.
+   */
+  hiddenDishCount: number;
   members: PlanDetailMember[];
   library: PlanDetailLibraryRow[];
 }) {
@@ -323,6 +333,23 @@ export function PlanDetailClient({
               </p>
             </div>
           )}
+          {/* R32 — hidden-dishes placeholder. When the viewer is not
+              the creator of a personal dish on the plan, the service
+              filtered it out + bumped this count. We surface a single
+              mono-caps row so the missing rows don't look like a
+              data bug. */}
+          {hiddenDishCount > 0 ? (
+            <div className="border-t border-[var(--border-soft,var(--border))] px-[18px] py-3">
+              <p
+                className="font-mono text-[10.5px] uppercase text-muted-foreground"
+                style={{ letterSpacing: "0.14em" }}
+              >
+                {hiddenDishCount === 1
+                  ? "1 dish hidden by another member"
+                  : `${hiddenDishCount} dishes hidden by other members`}
+              </p>
+            </div>
+          ) : null}
           <div className="flex items-center justify-center border-t border-dashed border-[var(--border-strong,var(--border))] px-[18px] py-3">
             {/* AddDishPicker exports its own trigger button (Dialog
                 from shadcn). Rendering it inline gives us the picker

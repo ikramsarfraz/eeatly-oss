@@ -1,3 +1,4 @@
+import { Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -93,11 +94,23 @@ const TILE_RADIUS: Record<MealTileSize, string> = {
 export function MealTile({
   name,
   size = "m",
-  className
+  className,
+  isPersonal
 }: {
   name: string;
   size?: MealTileSize;
   className?: string;
+  /**
+   * Round 32 — when true, a small lock icon renders in the top-right
+   * corner to signal "personal — only the creator sees this meal."
+   * The prop is intentionally undefined-able rather than defaulting
+   * to false so caller pages can pass `isPersonal={isMultiMember &&
+   * meal.sharedAt === null}` without further branching: undefined
+   * skips the icon entirely. Single-member households never set it,
+   * so the indicator stays out of the way when there's no one else
+   * to hide from.
+   */
+  isPersonal?: boolean;
 }) {
   const palette = mealPalette(name);
   const letter = (name || "?").trim().charAt(0).toUpperCase();
@@ -175,6 +188,20 @@ export function MealTile({
       >
         {letter}
       </span>
+      {/* R32 — personal-meal lock indicator. Top-right corner, 12px
+          icon, muted color so it doesn't compete with the monogram.
+          The lucide `Lock` glyph matches the chip + button on Recipe
+          Detail. Only renders when `isPersonal === true`; caller
+          composes the prop so this stays a single-prop signal. */}
+      {isPersonal ? (
+        <span
+          aria-label="Personal meal"
+          title="Personal — only you see this"
+          className="absolute right-2 top-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[color:var(--mt-bg)]/85 text-[color:var(--mt-fg)] dark:bg-[color:var(--mt-bg-dark)]/85 dark:text-[color:var(--mt-fg-dark)]"
+        >
+          <Lock className="h-3 w-3" strokeWidth={2.2} />
+        </span>
+      ) : null}
       {/* Hidden semantic label for assistive tech — the monogram is
           decorative; the meal name lives in the parent context. */}
       <span className="sr-only">{name}</span>
