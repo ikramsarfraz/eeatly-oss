@@ -1,14 +1,28 @@
 import { Suspense } from "react";
-import { DashboardClient } from "@/components/dashboard/dashboard-client";
+import { HomeClient } from "@/components/dashboard/home-client";
 import { WelcomeToast } from "@/components/dashboard/welcome-toast";
 import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
 import { getDashboardMeals } from "@/services/meals";
 
+/**
+ * Round 26 — Home (dashboard) page.
+ *
+ * Server reads `dashboardMeals` directly via the service (R11
+ * convention — tRPC is client-driven; SSR fetches don't need to
+ * round-trip through it) and hands the result + current user
+ * identity off to the client. All interactive surfaces (recents
+ * grid links, upcoming-plan card, quick-log form, top-bar action)
+ * live inside `<HomeClient>`.
+ *
+ * The R25 `<DashboardClient>` was the previous renderer; replaced
+ * here by `<HomeClient>`. The old file stays on disk in case any
+ * follow-up wants its hero copy; it can be removed once R26 settles.
+ */
 export default async function DashboardPage() {
-  // Round 11: server components read services directly. tRPC is the
-  // client-driven interaction layer; routing every SSR fetch through
-  // it would add network latency for no benefit.
   const { user, household } = await requireCurrentUserWithHousehold();
+  // Run the household-scoped meals query — the household lookup
+  // doubles as the auth gate (`requireHouseholdMember` runs inside
+  // `getDashboardMeals`).
   const meals = await getDashboardMeals(user.id, household.id);
 
   return (
@@ -18,7 +32,11 @@ export default async function DashboardPage() {
       <Suspense fallback={null}>
         <WelcomeToast />
       </Suspense>
-      <DashboardClient initialData={meals} currentUserId={user.id} />
+      <HomeClient
+        initialData={meals}
+        currentUserId={user.id}
+        currentUserName={user.name ?? null}
+      />
     </>
   );
 }

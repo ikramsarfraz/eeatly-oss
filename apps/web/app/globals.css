@@ -84,11 +84,16 @@
   --ring: rgba(47, 111, 88, 0.35);
   --radius: 0.75rem;
 
-  /* Sidebar tokens (shadcn sidebar palette) */
-  --sidebar: #fdfcf7;
+  /* R26 — sidebar tokens retuned to the design's warmer cream palette.
+     `--sidebar` is the panel background (a few shades warmer than the
+     main `--background` so the rail reads as a distinct surface);
+     `--sidebar-accent` is the active-item pill background. The other
+     tokens inherit the existing forest/foreground/border roles so the
+     shadcn `Sidebar` primitive continues to compose without surprises. */
+  --sidebar: #ebe2cc;
   --sidebar-foreground: #1b2220;
-  --sidebar-border: #e2dfd3;
-  --sidebar-accent: #f1efe6;
+  --sidebar-border: #d9cfb7;
+  --sidebar-accent: #dfd3b7;
   --sidebar-accent-foreground: #1c4738;
   --sidebar-primary: #2f6f58;
   --sidebar-primary-foreground: #f9fffb;
@@ -169,11 +174,16 @@
     --input: #2d2b22;
     --ring: rgba(136, 184, 148, 0.45);
 
-    /* Sidebar palette mirrors the main tokens. */
-    --sidebar: #1f1d17;
+    /* R26 — dark sidebar siblings of the R26 light cream palette. The
+       light values are `#ebe2cc` / `#dfd3b7`; the dark mirrors pick up
+       the mobile palette's `creamSoft` (`#1c1a14`) for the panel
+       background and a slightly warmer near-black for the active-item
+       pill so it reads against the panel without competing with the
+       primary CTA. */
+    --sidebar: #1c1a14;
     --sidebar-foreground: #f0e9d9;
     --sidebar-border: #2d2b22;
-    --sidebar-accent: #2a3022;
+    --sidebar-accent: #2a2419;
     --sidebar-accent-foreground: #a1cba9;
     --sidebar-primary: #88b894;
     --sidebar-primary-foreground: #10180f;

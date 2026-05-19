@@ -5,14 +5,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Route } from "next";
 import {
+  BookOpen,
   CalendarDays,
-  Clock3,
-  MessageSquare,
-  Moon,
+  Home,
   Plus,
   Settings,
-  Sparkles,
-  type LucideIcon,
+  type LucideIcon
 } from "lucide-react";
 
 import {
@@ -26,12 +24,43 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
+  SidebarRail
 } from "@/components/ui/sidebar";
 import { useQuickLog } from "@/components/dashboard/quick-log-provider";
-import { FeedbackDialog } from "@/components/feedback/feedback-dialog";
 import { UserMenu } from "@/components/layout/user-menu";
+import { isActiveRoute } from "@/lib/nav/breadcrumbs";
 import type { AppUser } from "@/lib/auth/session";
+
+/**
+ * Round 26 — App sidebar composed from shadcn primitives.
+ *
+ * The design's visual is a fixed 248px cream rail with three named
+ * groups (Cook / Capture / Kitchen) and a brand block + Log-a-meal
+ * CTA in the header. shadcn's `Sidebar` already handles every
+ * structural concern (keyboard nav, focus management, mobile Sheet
+ * wrapping, the collapsible state machine), so this file just maps
+ * the design content onto the primitive's slots and tunes the chrome
+ * via CSS variables in `globals.css`.
+ *
+ * Sidebar collapse mode:
+ *   The spec calls for `collapsible="none"` but shadcn's `none` mode
+ *   skips the mobile Sheet behavior entirely (always-rendered static
+ *   div). `collapsible="offcanvas"` keeps the Sheet on mobile, and
+ *   we pair it with `defaultOpen` on the provider so desktop reads
+ *   the panel as "permanent" (which is what the design intends).
+ *   The off-canvas toggle button is rendered in `TopBar` only on
+ *   narrow viewports — desktop never sees it.
+ *
+ * Nav items currently omitted (spec-listed but no route exists):
+ *   - Add a meal `/add` → no route. The sidebar header's "Log a meal"
+ *     CTA opens the existing `QuickLogDialog` instead.
+ *   - Capture with AI `/add/ai` → no route. Inline AI is in
+ *     `AISuggestDialog`, opened from the meal log form.
+ *   - Saved links `/saved` → no route.
+ *   - History `/history` is the Library route; no separate page.
+ *   - Members `/household` → no route. Household lives inside
+ *     `/settings`.
+ */
 
 type NavItem = {
   href: Route;
@@ -39,17 +68,17 @@ type NavItem = {
   icon: LucideIcon;
 };
 
-const cookingNav: NavItem[] = [
-  { href: "/dashboard", label: "Tonight", icon: Moon },
-  { href: "/ideas", label: "Ideas", icon: Sparkles },
-  // Next typed-routes hasn't regenerated for /plans yet; cast follows
-  // the convention used elsewhere (e.g., bottom-tab-bar's `as Route`).
+const cookNav: NavItem[] = [
+  { href: "/dashboard" as Route, label: "Home", icon: Home },
   { href: "/plans" as Route, label: "Plans", icon: CalendarDays },
-  { href: "/history", label: "History", icon: Clock3 },
+  // The existing `/history` route is the Library — same page, named
+  // for the dashboard nav. Don't add a second History item; one route,
+  // one nav entry.
+  { href: "/history" as Route, label: "Library", icon: BookOpen }
 ];
 
-const youNav: NavItem[] = [
-  { href: "/settings", label: "Settings", icon: Settings },
+const kitchenNav: NavItem[] = [
+  { href: "/settings" as Route, label: "Settings", icon: Settings }
 ];
 
 type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
@@ -60,24 +89,33 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
   const pathname = usePathname() ?? "";
   const { open: openQuickLog } = useQuickLog();
 
-  const isActive = (href: string) =>
-    href === "/dashboard"
-      ? pathname === "/dashboard"
-      : pathname.startsWith(href);
-
   return (
-    <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader>
+    <Sidebar collapsible="offcanvas" {...props}>
+      <SidebarHeader className="gap-3 pt-4">
+        {/* Brand block — squircle monogram + serif wordmark + mono
+            caption. The Link routes to /dashboard so tapping the
+            brand returns Home from any deep route. */}
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild tooltip="eeatly">
-              <Link href="/dashboard">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-primary font-serif italic text-[22px] leading-none text-primary-foreground">
+            <SidebarMenuButton size="lg" asChild>
+              <Link href={"/dashboard" as Route}>
+                <span
+                  aria-hidden
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-primary font-serif italic text-[22px] leading-none text-primary-foreground"
+                >
                   e
-                </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">eeatly</span>
-                  <span className="truncate text-xs text-muted-foreground">
+                </span>
+                <div className="grid flex-1 text-left leading-tight">
+                  <span
+                    className="truncate font-serif text-[22px] leading-none text-sidebar-foreground"
+                    style={{ letterSpacing: "-0.01em" }}
+                  >
+                    eeatly
+                  </span>
+                  <span
+                    className="mt-1 truncate font-mono text-[10px] uppercase text-muted-foreground"
+                    style={{ letterSpacing: "0.14em" }}
+                  >
                     private beta
                   </span>
                 </div>
@@ -86,22 +124,23 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
           </SidebarMenuItem>
         </SidebarMenu>
 
+        {/* Log-a-meal CTA — opens the existing QuickLogDialog (R23+).
+            The `/add/log` route from the spec doesn't exist yet; the
+            in-flight dialog is the actual logging surface. ⌘E mirrors
+            the existing keyboard shortcut wired in QuickLogProvider. */}
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={openQuickLog}
               aria-haspopup="dialog"
-              // R23 — the button inverts ground↔text. In light mode it's
-              // a dark-green pill; in dark mode it's a cream pill on the
-              // dark sidebar. The hover hex (`#2a3431`) is the
-              // pre-dark-mode foreground shade and stays on light only;
-              // dark mode uses a lighter cream-soft for hover.
               className="bg-foreground text-background hover:bg-[#2a3431] hover:text-background active:bg-[#2a3431] active:text-background dark:hover:bg-[color:var(--ink-2,#a8a28f)] dark:active:bg-[color:var(--ink-2,#a8a28f)]"
-              tooltip="Log a meal"
             >
               <Plus className="h-4 w-4 shrink-0" />
               <span>Log a meal</span>
-              <span className="ml-auto rounded bg-white/[0.06] px-[5px] py-px font-mono-brand text-[10.5px] text-[#b8c4be] group-data-[collapsible=icon]:hidden dark:bg-black/10 dark:text-[#4a463a]">
+              <span
+                className="ml-auto rounded bg-white/[0.06] px-[5px] py-px font-mono-brand text-[10.5px] text-[#b8c4be] dark:bg-black/10 dark:text-[#4a463a]"
+                aria-hidden
+              >
                 ⌘E
               </span>
             </SidebarMenuButton>
@@ -111,17 +150,21 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
 
       <SidebarContent>
         <SidebarGroup className="py-1">
-          <SidebarGroupLabel>Cooking</SidebarGroupLabel>
+          <SidebarGroupLabel
+            className="font-mono uppercase"
+            style={{ letterSpacing: "0.14em" }}
+          >
+            Cook
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {cookingNav.map(item => {
+              {cookNav.map((item) => {
                 const Icon = item.icon;
                 return (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
-                      isActive={isActive(item.href)}
                       asChild
-                      tooltip={item.label}
+                      isActive={isActiveRoute(pathname, item.href)}
                     >
                       <Link href={item.href}>
                         <Icon className="size-4" />
@@ -135,18 +178,26 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {/* Capture group omitted — the /add/* routes don't exist
+            yet (see header doc comment). When they land, add a
+            `<SidebarGroup>` with the same shape as Cook. */}
+
         <SidebarGroup className="py-1">
-          <SidebarGroupLabel>You</SidebarGroupLabel>
+          <SidebarGroupLabel
+            className="font-mono uppercase"
+            style={{ letterSpacing: "0.14em" }}
+          >
+            Kitchen
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {youNav.map(item => {
+              {kitchenNav.map((item) => {
                 const Icon = item.icon;
                 return (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
-                      isActive={isActive(item.href)}
                       asChild
-                      tooltip={item.label}
+                      isActive={isActiveRoute(pathname, item.href)}
                     >
                       <Link href={item.href}>
                         <Icon className="size-4" />
@@ -156,16 +207,6 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
                   </SidebarMenuItem>
                 );
               })}
-              <SidebarMenuItem>
-                <FeedbackDialog
-                  trigger={
-                    <SidebarMenuButton tooltip="Feedback">
-                      <MessageSquare className="size-4" />
-                      <span>Feedback</span>
-                    </SidebarMenuButton>
-                  }
-                />
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
