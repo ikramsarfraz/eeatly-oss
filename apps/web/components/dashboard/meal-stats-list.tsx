@@ -46,9 +46,16 @@ export function MealStatsList({
           const isStale = daysAgo !== null && daysAgo >= 14;
 
           return (
-            <div
+            // R25 — whole row navigates to /meal/[id]. Same pattern as
+            // RecentHistoryList: <Link> wrapper + stopPropagation on
+            // any interactive children so the action button stays
+            // independently tappable. The cook-count badge is purely
+            // decorative (no onClick) so it doesn't need a boundary.
+            <Link
               key={meal.mealId}
-              className="grid grid-cols-[44px_1fr_auto] items-center gap-3 border-b px-[18px] py-[11px] last:border-0 hover:bg-[var(--surface-2)]"
+              href={`/meal/${meal.mealId}` as Route}
+              className="grid cursor-pointer grid-cols-[44px_1fr_auto] items-center gap-3 border-b px-[18px] py-[11px] last:border-0 hover:bg-[var(--surface-2)] focus-visible:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+              aria-label={`Open recipe for ${meal.mealName}`}
             >
               {/* Thumbnail — photo if uploaded, gradient fallback otherwise */}
               <MealThumb
@@ -57,17 +64,11 @@ export function MealStatsList({
                 fallbackIndex={i}
               />
 
-              {/* Info — name links to the recipe view (Round 10). The
-                  row's other controls (cook count badge / log-again)
-                  stay outside the link so phone taps on either target
-                  remain unambiguous. */}
+              {/* Info — name in the same visual weight as before. */}
               <div className="min-w-0">
-                <Link
-                  href={`/meal/${meal.mealId}` as Route}
-                  className="block truncate text-[13.5px] font-medium underline-offset-2 hover:underline"
-                >
+                <span className="block truncate text-[13.5px] font-medium text-foreground">
                   {meal.mealName}
-                </Link>
+                </span>
                 <div className="mt-0.5 flex items-center gap-2 text-[11.5px] text-muted-foreground">
                   <span>
                     {meal.lastCookedAt
@@ -83,20 +84,32 @@ export function MealStatsList({
                 </div>
               </div>
 
-              {/* Cook count or log-again */}
+              {/* Cook count badge (display-only) OR log-again button
+                  (interactive). Wrap the interactive case in a
+                  stopPropagation boundary so the tap doesn't navigate
+                  to /meal/[id]. */}
               {"cookCount" in meal && typeof meal.cookCount === "number" ? (
                 <span className="rounded-[6px] bg-[var(--surface-2)] px-[7px] py-[3px] font-mono-brand text-[11.5px] font-medium text-foreground">
                   {meal.cookCount}×
                 </span>
               ) : (
-                <LogAgainButton
-                  mealName={meal.mealName}
-                  variant="default"
-                  compact
-                  iconOnly
-                />
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.stopPropagation();
+                    }
+                  }}
+                >
+                  <LogAgainButton
+                    mealName={meal.mealName}
+                    variant="default"
+                    compact
+                    iconOnly
+                  />
+                </div>
               )}
-            </div>
+            </Link>
           );
         })}
       </div>
