@@ -17,6 +17,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { NotificationBell } from "@/components/layout/notification-bell";
+import { useBreadcrumbOverride } from "@/components/layout/breadcrumb-context";
 import { useTopBarActions } from "@/components/layout/top-bar-actions";
 import { getCrumbs } from "@/lib/nav/breadcrumbs";
 
@@ -50,7 +51,20 @@ type TopBarProps = {
 
 export function TopBar({ onOpenSearch }: TopBarProps) {
   const pathname = usePathname() ?? "/dashboard";
-  const crumbs = getCrumbs(pathname);
+  // R28 — pages can set a runtime override that replaces the LAST
+  // static crumb's label (e.g. Plan Detail → plan name; Recipe Detail
+  // → meal name). Intermediate crumbs stay static — "Cook / Library"
+  // is structural and doesn't need per-page lookup.
+  const breadcrumbOverride = useBreadcrumbOverride();
+  const staticCrumbs = getCrumbs(pathname);
+  const crumbs =
+    breadcrumbOverride && staticCrumbs.length > 0
+      ? staticCrumbs.map((c, i) =>
+          i === staticCrumbs.length - 1
+            ? { ...c, label: breadcrumbOverride }
+            : c
+        )
+      : staticCrumbs;
   const actions = useTopBarActions();
 
   return (

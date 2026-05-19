@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
 import { listPlansForHousehold } from "@/services/plans";
-import { PlansList } from "@/components/plans/plans-list";
+import { PlansClient } from "@/components/plans/plans-client";
 
 export const metadata: Metadata = {
   title: "Plans"
@@ -9,21 +9,25 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function PlansPage(props: {
-  searchParams: Promise<{ archived?: string }>;
-}) {
+/**
+ * Round 28 — Plans list. Server shell.
+ *
+ * Includes archived plans in the response so the Drafts section in
+ * the client can split them out client-side. The R23 `?archived=1`
+ * toggle is gone — the new layout surfaces archived plans inline as
+ * "Drafts & ideas" rather than behind a toggle.
+ */
+export default async function PlansPage() {
   const { user, household } = await requireCurrentUserWithHousehold();
-  const sp = await props.searchParams;
-  const showingArchived = sp.archived === "1";
 
   const plans = await listPlansForHousehold({
     householdId: household.id,
     userId: user.id,
-    includeArchived: showingArchived
+    includeArchived: true
   });
 
   return (
-    <PlansList
+    <PlansClient
       plans={plans.map((p) => ({
         id: p.id,
         name: p.name,
@@ -31,7 +35,6 @@ export default async function PlansPage(props: {
         archivedAt: p.archivedAt,
         dishCount: p.dishCount
       }))}
-      showingArchived={showingArchived}
     />
   );
 }
