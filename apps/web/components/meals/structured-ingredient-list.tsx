@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { Check, Clipboard, MessageCircle } from "lucide-react";
+import { Clipboard, MessageCircle } from "lucide-react";
 import { useToast } from "@/components/providers/toast-provider";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 /**
@@ -14,22 +15,25 @@ import { cn } from "@/lib/utils";
  * `meal.structuredIngredients.length > 0`. The legacy component still
  * carries every meal that predates the R18 Refine save path.
  *
- * Visual contract (mirrors the mobile structured row layout from
- * `apps/mobile/app/(authed)/meal/[id]/index.tsx` lines 437–483):
+ * Round 27 — visual retune for the editorial Recipe Detail. Same
+ * data shape, same session-local checkbox semantics, same export
+ * helpers — only the visual treatment changes:
  *
- *   [checkbox]  Cumin seeds, finely ground          2 tsp
- *               ^^^^^^^^^^^^^^                      ^^^^^^^
- *               name (sans, ink)                    qty (mono, muted, right)
- *               + italic prep note inline below
+ *   - Rows live inside a shadcn `<Card>` (padding 0, overflow hidden)
+ *     so the whole list reads as a single object on the cream-soft
+ *     ingredients sidebar.
+ *   - Checkbox is a 17×17 forest-filled square (rounded-[5px]),
+ *     replacing R25's rounded-full circle. Off state: 1.5px ink-4
+ *     border, transparent fill. On state: forest border + fill, white
+ *     checkmark.
+ *   - Checked rows: ink-3 + line-through; the qty + prep note inherit
+ *     the same treatment.
+ *   - Each row separated by `border-top` (no border on first) instead
+ *     of relying on hover-only bg.
  *
- * Checkbox state is session-local — matches `IngredientChecklist`'s
- * deliberate non-persistence (R10 comment: "open the recipe → tap what's
- * already in the kitchen → see what to buy"; surviving a refresh would
- * be surprising). The Has/Need summary block at the bottom of the
- * legacy component is preserved here too, including the same
- * Copy / WhatsApp export buttons. Exports flatten structured rows into
- * single-line strings via `formatStructuredIngredientForExport` so the
- * downstream copy/share text stays identical to what the page renders.
+ * Export shape (`formatStructuredIngredientForExport`) and the Has /
+ * Need summary block stay byte-identical so the WhatsApp + Copy text
+ * users see is unchanged from R25.
  */
 
 export type StructuredIngredient = {
@@ -105,87 +109,114 @@ export function StructuredIngredientList({
   const noneChecked = checked.size === 0;
 
   return (
-    <div className="grid gap-3">
-      <ul className="grid gap-0.5">
-        {sorted.map((row) => {
-          const isChecked = checked.has(row.id);
-          const note = row.prepNote?.trim();
-          const qty = row.quantityString.trim();
-          return (
-            <li key={row.id}>
-              <button
-                type="button"
-                onClick={() => toggle(row.id)}
-                aria-pressed={isChecked}
-                aria-label={
-                  isChecked
-                    ? `Mark "${row.name}" as needed`
-                    : `Mark "${row.name}" as on hand`
-                }
-                // 44px min-height for touch targets — same Apple HIG
-                // rationale as the legacy checklist. The grid layout
-                // keeps the qty column right-aligned regardless of
-                // name length.
-                className="-mx-1 grid w-full min-h-[44px] cursor-pointer grid-cols-[22px_1fr_auto] items-start gap-3 rounded-md px-1 py-1.5 text-left transition-colors hover:bg-[var(--surface-2)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <span
-                  aria-hidden
-                  className={cn(
-                    "mt-[3px] flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+    <div className="grid gap-4">
+      <Card className="overflow-hidden p-0">
+        <ul className="grid">
+          {sorted.map((row, idx) => {
+            const isChecked = checked.has(row.id);
+            const note = row.prepNote?.trim();
+            const qty = row.quantityString.trim();
+            return (
+              <li key={row.id}>
+                <button
+                  type="button"
+                  onClick={() => toggle(row.id)}
+                  aria-pressed={isChecked}
+                  aria-label={
                     isChecked
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-[var(--border-strong,#cfccc0)] bg-transparent"
+                      ? `Mark "${row.name}" as needed`
+                      : `Mark "${row.name}" as on hand`
+                  }
+                  // 44px min-height for touch targets — same Apple HIG
+                  // rationale as the legacy checklist. First row drops
+                  // the top border so the Card's edge is clean.
+                  className={cn(
+                    "grid w-full min-h-[44px] cursor-pointer grid-cols-[24px_1fr_auto] items-start gap-3 px-[14px] py-[10px] text-left transition-colors hover:bg-[var(--surface-2)]/60 focus:outline-none focus-visible:bg-[var(--surface-2)] focus-visible:ring-0",
+                    idx > 0
+                      ? "border-t border-[var(--border-soft,var(--border))]"
+                      : ""
                   )}
                 >
-                  {isChecked ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : null}
-                </span>
-                <span className="min-w-0">
                   <span
+                    aria-hidden
                     className={cn(
-                      "block text-[15px] leading-[1.4] transition-colors",
+                      "mt-[2px] flex h-[17px] w-[17px] shrink-0 items-center justify-center rounded-[5px] border-[1.5px] transition-colors",
                       isChecked
-                        ? "text-muted-foreground line-through"
-                        : "text-foreground"
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-[var(--border-strong,#cfccc0)] bg-transparent"
                     )}
                   >
-                    {row.name}
+                    {isChecked ? (
+                      // Compact 10×10 check glyph — matches the
+                      // design's "10×10 SVG path" callout. Stroke kept
+                      // thick so it reads at 17px box size.
+                      <svg
+                        width="10"
+                        height="10"
+                        viewBox="0 0 10 10"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                        aria-hidden
+                      >
+                        <path
+                          d="M1.5 5.25L4 7.75L8.5 2.5"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    ) : null}
                   </span>
-                  {note ? (
-                    // Prep notes ("finely chopped", "at room temp") use
-                    // the same serif-italic muted treatment as the
-                    // mobile pattern — sets them apart from the name
-                    // without weighing them down.
+                  <span className="min-w-0">
                     <span
                       className={cn(
-                        "block font-serif text-[13px] italic leading-[1.35] text-muted-foreground transition-colors",
-                        isChecked ? "line-through" : ""
+                        "block text-[13.5px] font-medium leading-[1.4] transition-colors",
+                        isChecked
+                          ? "text-muted-foreground line-through decoration-[var(--ink-4,var(--border-strong))]"
+                          : "text-foreground"
                       )}
+                      style={{ letterSpacing: "-0.05px" }}
                     >
-                      {note}
+                      {row.name}
                     </span>
-                  ) : null}
-                </span>
-                {qty ? (
-                  <span
-                    className={cn(
-                      "mt-[3px] whitespace-nowrap text-right font-mono text-[12.5px] uppercase text-muted-foreground transition-colors",
-                      isChecked ? "line-through opacity-60" : ""
-                    )}
-                    style={{ letterSpacing: "0.04em" }}
-                  >
-                    {qty}
+                    {note ? (
+                      // Prep notes ("finely chopped", "at room temp") use
+                      // the same serif-italic muted treatment as the
+                      // mobile pattern — sets them apart from the name
+                      // without weighing them down.
+                      <span
+                        className={cn(
+                          "block font-serif text-[12.5px] italic leading-[1.35] text-muted-foreground transition-colors",
+                          isChecked ? "line-through" : ""
+                        )}
+                      >
+                        {note}
+                      </span>
+                    ) : null}
                   </span>
-                ) : (
-                  // Reserve grid column so the row's name + note still
-                  // align with rows that have qty. Empty span keeps
-                  // the grid track intact.
-                  <span aria-hidden />
-                )}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+                  {qty ? (
+                    <span
+                      className={cn(
+                        "mt-[2px] whitespace-nowrap text-right font-mono text-[11.5px] uppercase text-muted-foreground transition-colors",
+                        isChecked ? "line-through opacity-60" : ""
+                      )}
+                      style={{ letterSpacing: "0.04em" }}
+                    >
+                      {qty}
+                    </span>
+                  ) : (
+                    // Reserve grid column so the row's name + note still
+                    // align with rows that have qty. Empty span keeps
+                    // the grid track intact.
+                    <span aria-hidden />
+                  )}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </Card>
 
       <ChecklistSummary
         needed={needed}
@@ -264,6 +295,10 @@ function ChecklistSummary({
  * `wa.me/?text=...` opens the WhatsApp deep link; clipboard fallback
  * matches the legacy toast copy. Re-implemented per the "parallel
  * component" approach so neither file imports the other.
+ *
+ * R27 — visual swap: the WhatsApp button gains a sage tone so it
+ * reads as the "primary export" against the cream-soft sidebar, with
+ * Copy as the outline secondary. The export text shape is unchanged.
  */
 function ShoppingListExport({
   mealName,
@@ -306,21 +341,25 @@ function ShoppingListExport({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid gap-2">
+      <Button
+        type="button"
+        asChild
+        className="min-h-[44px] w-full bg-[var(--sage)] text-[color:var(--sage-fg)] hover:bg-[var(--sage)]/85"
+      >
+        <a href={whatsappHref} target="_blank" rel="noopener noreferrer">
+          <MessageCircle className="h-4 w-4" />
+          Share shopping list
+        </a>
+      </Button>
       <Button
         type="button"
         variant="outline"
         onClick={handleCopy}
-        className="min-h-[44px]"
+        className="min-h-[44px] w-full"
       >
         <Clipboard className="h-4 w-4" />
-        {justCopied ? "Copied!" : "Copy list"}
-      </Button>
-      <Button type="button" variant="outline" asChild className="min-h-[44px]">
-        <a href={whatsappHref} target="_blank" rel="noopener noreferrer">
-          <MessageCircle className="h-4 w-4" />
-          WhatsApp
-        </a>
+        {justCopied ? "Copied!" : "Copy as text"}
       </Button>
     </div>
   );
