@@ -46,11 +46,19 @@ export async function createRecipeShare(args: {
   // Look up the meal first so we know which household to authorize
   // against. archivedAt filter rejects soft-deleted meals up front;
   // sharing a meal you can't view yourself would be confusing.
+  //
+  // R32 — public share links are an independent visibility mechanism
+  // (external viewers see the recipe through the token regardless of
+  // household sharing state). But CREATING a share is a write that
+  // implicitly publishes recipe content, so it's creator-only. Other
+  // household members can view a meal that's shared with them but
+  // can't publish it externally.
   const [meal] = await db
     .select({
       id: meals.id,
       householdId: meals.householdId,
-      archivedAt: meals.archivedAt
+      archivedAt: meals.archivedAt,
+      createdByUserId: meals.createdByUserId
     })
     .from(meals)
     .where(eq(meals.id, args.mealId))
@@ -59,6 +67,9 @@ export async function createRecipeShare(args: {
   if (meal.archivedAt) throw new Error("Meal is archived.");
 
   await requireHouseholdMember(args.userId, meal.householdId);
+  if (meal.createdByUserId !== args.userId) {
+    throw new Error("Only the creator can share this recipe.");
+  }
   await requireFeatureAccess(args.userId, "recipe_share_create");
 
   // Reuse the existing active share if one exists. Avoids cluttering
@@ -181,12 +192,25 @@ export async function listSharesForMeal(args: {
   mealId: string;
 }): Promise<ShareListRow[]> {
   const [meal] = await db
-    .select({ id: meals.id, householdId: meals.householdId })
+    .select({
+      id: meals.id,
+      householdId: meals.householdId,
+      createdByUserId: meals.createdByUserId,
+      sharedAt: meals.sharedAt
+    })
     .from(meals)
     .where(eq(meals.id, args.mealId))
     .limit(1);
   if (!meal) throw new Error("Meal not found.");
   await requireHouseholdMember(args.userId, meal.householdId);
+  // R32 — listing share links for a meal is only relevant to the
+  // creator (only they can create / revoke). Returning an empty list
+  // for non-creators rather than throwing keeps the dialog simple —
+  // the create button is the only path that exposes the creator-only
+  // error, and that's gated client-side too.
+  if (meal.createdByUserId !== args.userId) {
+    return [];
+  }
 
   const rows = await db
     .select({
@@ -273,17 +297,26 @@ export async function revokeRecipeShare(args: {
   // Look up the share to find its household, then verify membership.
   // Already-revoked shares are a soft no-op (don't error if the user
   // double-clicked).
+  //
+  // R32 — revoking is the symmetric write of creating, so it's also
+  // creator-only. We join meals to get the creator pointer in one
+  // round-trip.
   const [share] = await db
     .select({
       id: recipeShares.id,
       householdId: recipeShares.householdId,
-      revokedAt: recipeShares.revokedAt
+      revokedAt: recipeShares.revokedAt,
+      createdByUserId: meals.createdByUserId
     })
     .from(recipeShares)
+    .innerJoin(meals, eq(meals.id, recipeShares.mealId))
     .where(eq(recipeShares.id, args.shareId))
     .limit(1);
   if (!share) throw new Error("Share not found.");
   await requireHouseholdMember(args.userId, share.householdId);
+  if (share.createdByUserId !== args.userId) {
+    throw new Error("Only the creator can revoke this share.");
+  }
   if (share.revokedAt) return;
 
   await db

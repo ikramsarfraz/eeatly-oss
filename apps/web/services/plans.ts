@@ -5,6 +5,7 @@ import { db } from "@/lib/db/client";
 import { requireHouseholdMember } from "@/lib/auth/session";
 import { requireFeatureAccess } from "@/lib/gates/resolver";
 import { logger } from "@/lib/observability/logger";
+import { canViewMeal, mealVisibilityFilter } from "@/lib/meals/visibility";
 import { mealLogs, meals, planDishes, plans, users, type Verdict } from "@/db/schema";
 
 /**
@@ -39,6 +40,14 @@ export type PlanDishWithMeal = {
 
 export type PlanWithDishes = PlanRow & {
   dishes: PlanDishWithMeal[];
+  /**
+   * Round 32 — count of dishes filtered out because the underlying
+   * meal is another member's personal recipe. The Plan Detail UI
+   * renders a "N dishes hidden by other members" placeholder when
+   * this is greater than zero so non-creators don't see a
+   * mysteriously-shorter dish list.
+   */
+  hiddenDishCount: number;
 };
 
 async function loadPlanOrThrow(planId: string): Promise<PlanRow> {
@@ -92,6 +101,14 @@ export async function getPlan(args: { planId: string; userId: string }): Promise
 
   // LEFT JOIN users via addedByUserId so a deleted member doesn't drop
   // the dish from the plan (matches the Round 4.7 attribution contract).
+  //
+  // R32 — visibility for dishes: we fetch ALL dishes on the plan first,
+  // then partition into visible vs hidden so the response can carry a
+  // separate `hiddenDishCount`. Doing it in two phases (rather than
+  // pushing the predicate into the WHERE clause) lets us return the
+  // count alongside the list — the UI needs both. A single query with
+  // the filter would silently drop hidden dishes and leave the
+  // non-creator wondering why the plan looks short.
   const rows = await db
     .select({
       id: planDishes.id,
@@ -107,6 +124,9 @@ export async function getPlan(args: { planId: string; userId: string }): Promise
       updatedAt: planDishes.updatedAt,
       mealName: meals.name,
       mealPhotoUrl: meals.photoUrl,
+      mealCreatorUserId: meals.createdByUserId,
+      mealHouseholdId: meals.householdId,
+      mealSharedAt: meals.sharedAt,
       addedByName: users.name
     })
     .from(planDishes)
@@ -115,7 +135,40 @@ export async function getPlan(args: { planId: string; userId: string }): Promise
     .where(eq(planDishes.planId, args.planId))
     .orderBy(asc(planDishes.sortOrder), asc(planDishes.createdAt));
 
-  return { ...plan, dishes: rows };
+  const visible: PlanDishWithMeal[] = [];
+  let hiddenDishCount = 0;
+  for (const r of rows) {
+    const ok = canViewMeal(
+      {
+        createdByUserId: r.mealCreatorUserId,
+        householdId: r.mealHouseholdId,
+        sharedAt: r.mealSharedAt
+      },
+      { id: args.userId, householdId: plan.householdId }
+    );
+    if (!ok) {
+      hiddenDishCount += 1;
+      continue;
+    }
+    visible.push({
+      id: r.id,
+      planId: r.planId,
+      mealId: r.mealId,
+      addedByUserId: r.addedByUserId,
+      sortOrder: r.sortOrder,
+      actualEffort: r.actualEffort,
+      timeTakenMinutes: r.timeTakenMinutes,
+      verdict: r.verdict,
+      annotationNotes: r.annotationNotes,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+      mealName: r.mealName,
+      mealPhotoUrl: r.mealPhotoUrl,
+      addedByName: r.addedByName
+    });
+  }
+
+  return { ...plan, dishes: visible, hiddenDishCount };
 }
 
 export type ListPlansArgs = {
@@ -221,7 +274,17 @@ export async function addDishToPlan(args: {
   await requireHouseholdMember(args.userId, plan.householdId);
 
   const [meal] = await db
-    .select({ id: meals.id, householdId: meals.householdId, archivedAt: meals.archivedAt })
+    .select({
+      id: meals.id,
+      householdId: meals.householdId,
+      archivedAt: meals.archivedAt,
+      // R32 — visibility fields so we can reject the add if the meal
+      // isn't visible to the caller. Treating it as "not found"
+      // matches the rest of the read path: never leak the existence
+      // of another member's personal meal through error messages.
+      createdByUserId: meals.createdByUserId,
+      sharedAt: meals.sharedAt
+    })
     .from(meals)
     .where(eq(meals.id, args.mealId))
     .limit(1);
@@ -237,6 +300,25 @@ export async function addDishToPlan(args: {
     throw new Error("Meal not in this household.");
   }
   if (meal.archivedAt) throw new Error("Meal is archived.");
+  // R32 — reject adding a meal the caller can't view. Identical
+  // surfacing to a cross-household add ("not found") so the personal
+  // meal's existence doesn't leak.
+  const isVisible = canViewMeal(
+    {
+      createdByUserId: meal.createdByUserId,
+      householdId: meal.householdId,
+      sharedAt: meal.sharedAt
+    },
+    { id: args.userId, householdId: plan.householdId }
+  );
+  if (!isVisible) {
+    logger.warn("plan_dish_hidden_meal_attempt", {
+      userId: args.userId,
+      planId: args.planId,
+      mealId: args.mealId
+    });
+    throw new Error("Meal not found.");
+  }
 
   // Append at the end of sortOrder. One round-trip for the max, one for
   // the insert. Could be done in a single statement via a subquery, but
@@ -516,6 +598,11 @@ export async function getPlanEffortAggregate(args: {
   // Pull every dish on the plan + its current annotation effort, in
   // one query. The most-recent-log lookup is a correlated subquery so
   // we get a single row per dish.
+  //
+  // R32 — join meals + filter by visibility so hidden dishes (other
+  // members' personal meals) drop out of the aggregate. Without this,
+  // a non-creator viewing a shared plan would see the aggregate
+  // include dishes they can't see — the header chip would over-count.
   const rows = await db
     .select({
       actualEffort: planDishes.actualEffort,
@@ -531,7 +618,13 @@ export async function getPlanEffortAggregate(args: {
       )`
     })
     .from(planDishes)
-    .where(eq(planDishes.planId, args.planId));
+    .innerJoin(meals, eq(meals.id, planDishes.mealId))
+    .where(
+      and(
+        eq(planDishes.planId, args.planId),
+        mealVisibilityFilter(args.userId, plan.householdId)
+      )
+    );
 
   const out: PlanEffortAggregate = {
     quick: 0,
@@ -621,6 +714,16 @@ export type MealLibraryRow = {
   id: string;
   name: string;
   photoUrl: string | null;
+  /**
+   * Round 32 — exposes the meal's sharing state so the Library +
+   * search UIs can render the personal/shared indicators inline (the
+   * "Personal" lock icon on tiles, and the chip filter on Library).
+   * Server-side filtering still strips other members' personal meals
+   * via `mealVisibilityFilter`; this field lets the client tell a
+   * member's OWN personal meal apart from a shared one.
+   */
+  sharedAt: Date | null;
+  createdByUserId: string | null;
 };
 
 export async function listMealLibrary(args: {
@@ -638,13 +741,20 @@ export async function listMealLibrary(args: {
     .select({
       id: meals.id,
       name: meals.name,
-      photoUrl: meals.photoUrl
+      photoUrl: meals.photoUrl,
+      sharedAt: meals.sharedAt,
+      createdByUserId: meals.createdByUserId
     })
     .from(meals)
     .where(
       and(
         eq(meals.householdId, args.householdId),
         isNull(meals.archivedAt),
+        // R32 — strip other members' personal meals from the Library
+        // listing + the add-dish picker. The client UI is responsible
+        // for then partitioning the remaining (creator-own + shared)
+        // rows into Personal vs Shared chips for the viewer.
+        mealVisibilityFilter(args.userId, args.householdId),
         q.length > 0 ? sql`lower(${meals.name}) like ${`%${q}%`}` : undefined
       )
     )
@@ -666,9 +776,19 @@ export async function filterMealIdsInHousehold(args: {
   await requireHouseholdMember(args.userId, args.householdId);
   if (args.mealIds.length === 0) return [];
 
+  // R32 — visibility filter applies here because the caller (clone-UX)
+  // uses the returned ids to render hint badges. Other members'
+  // personal meals would otherwise leak through as visible badge
+  // labels in the new plan.
   const rows = await db
     .select({ id: meals.id })
     .from(meals)
-    .where(and(eq(meals.householdId, args.householdId), inArray(meals.id, args.mealIds)));
+    .where(
+      and(
+        eq(meals.householdId, args.householdId),
+        inArray(meals.id, args.mealIds),
+        mealVisibilityFilter(args.userId, args.householdId)
+      )
+    );
   return rows.map((r) => r.id);
 }

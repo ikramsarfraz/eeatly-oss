@@ -4,6 +4,7 @@ import { and, asc, count, desc, eq, inArray, isNull, max, sql } from "drizzle-or
 import { db } from "@/lib/db/client";
 import { requireHouseholdMember } from "@/lib/auth/session";
 import { withSuggestions } from "@/lib/meals/rediscovery";
+import { mealVisibilityFilter } from "@/lib/meals/visibility";
 import { normalizeMealName } from "@/lib/utils";
 import { mealLogInputSchema, type MealLogInput } from "@eeatly/api/validators/meals";
 import {
@@ -19,10 +20,24 @@ import type { DashboardMeals, MealStat, RecentMeal } from "@/types";
 // fn is the calling user's id (for the membership check); the second is the
 // household id the request targets. requireHouseholdMember runs at the top
 // of each so cross-household access fails fast with a logged error.
+//
+// Round 32 — this helper deliberately STAYS visibility-free. It scopes
+// to a household + drops soft-archived rows; the visibility predicate
+// (`mealVisibilityFilter`) is applied separately at every READ site
+// where it's intentional. The WRITE-path upsert in `createMealLog`
+// must NOT filter by visibility — otherwise B trying to log a meal
+// whose normalized name collides with A's personal meal would fail
+// the unique index. The whole point of the household-wide name index
+// is to deduplicate across visibility states.
 function scopeMealsToHousehold(householdId: string) {
   return and(eq(meals.householdId, householdId), isNull(meals.archivedAt));
 }
 
+// Round 32 — logs are filtered by household + soft-delete; the joined
+// meal's visibility is applied separately at every read site (history,
+// dashboard recent, ideas) so a member can't see a log against another
+// member's personal meal. Logs themselves don't carry a visibility
+// flag — they inherit it from the meal they reference.
 function activeMealLogsForHousehold(householdId: string) {
   return and(eq(mealLogs.householdId, householdId), isNull(mealLogs.deletedAt));
 }
@@ -60,7 +75,16 @@ export async function getDashboardMeals(
       .from(mealLogs)
       .innerJoin(meals, eq(mealLogs.mealId, meals.id))
       .leftJoin(users, eq(users.id, mealLogs.cookedByUserId))
-      .where(activeMealLogsForHousehold(householdId))
+      // R32 — recent-cooks join hits meals, so the visibility predicate
+      // applies to the joined row. Another member's personal meal that
+      // somehow has a log against it (e.g. legacy data, or future
+      // cross-user logging) is excluded here.
+      .where(
+        and(
+          activeMealLogsForHousehold(householdId),
+          mealVisibilityFilter(userId, householdId)
+        )
+      )
       .orderBy(desc(mealLogs.cookedAt))
       .limit(recentLimit),
 
@@ -76,7 +100,12 @@ export async function getDashboardMeals(
       })
       .from(meals)
       .innerJoin(mealLogs, and(eq(mealLogs.mealId, meals.id), isNull(mealLogs.deletedAt)))
-      .where(scopeMealsToHousehold(householdId))
+      .where(
+        and(
+          scopeMealsToHousehold(householdId),
+          mealVisibilityFilter(userId, householdId)
+        )
+      )
       .groupBy(meals.id)
       .orderBy(desc(count(mealLogs.id)))
       .limit(6),
@@ -93,7 +122,12 @@ export async function getDashboardMeals(
       })
       .from(meals)
       .leftJoin(mealLogs, and(eq(mealLogs.mealId, meals.id), isNull(mealLogs.deletedAt)))
-      .where(scopeMealsToHousehold(householdId))
+      .where(
+        and(
+          scopeMealsToHousehold(householdId),
+          mealVisibilityFilter(userId, householdId)
+        )
+      )
       .groupBy(meals.id)
       .orderBy(sql`max(${mealLogs.cookedAt}) asc nulls first`)
       .limit(18)
@@ -125,10 +159,20 @@ export async function getDashboardMeals(
   );
 }
 
+/**
+ * Round 32 — new meals default to `shared`. `createMealLog` always sets
+ * `sharedAt = new Date()` on insert. There's no client-visible toggle
+ * for the default; the reverse action ("Move to personal") lives on
+ * Recipe Detail after creation. An optional `shared` field on the
+ * payload exists as a future-proofing knob — today the schema doesn't
+ * surface it, but the service-layer parameter would slot in here if it
+ * does, and the default would remain `true`.
+ */
 export async function createMealLog(
   userId: string,
   householdId: string,
-  input: MealLogInput
+  input: MealLogInput,
+  options?: { shared?: boolean }
 ): Promise<{
   mealLog: (typeof mealLogs.$inferSelect) | undefined;
   mealLogCount: number;
@@ -178,6 +222,12 @@ export async function createMealLog(
             recipeText: recipeText ?? null,
             recipeSourceUrl: recipeSourceUrl ?? null,
             ingredients: ingredients ?? null,
+            // R32 — new meals default to shared. The `shared` option is
+            // an explicit future-proofing knob (no client surface today).
+            // Setting `sharedAt = now()` preserves the "shared by default"
+            // behavior the round established; callers that explicitly
+            // pass `shared: false` get a personal meal on creation.
+            sharedAt: options?.shared === false ? null : new Date(),
             updatedAt: new Date()
           })
           .returning()
@@ -298,6 +348,13 @@ export async function getHistoryRows(
 
   const baseFilters = [
     activeMealLogsForHousehold(householdId),
+    // R32 — history rows always join meals, so the visibility filter
+    // applies to the joined meal row. Without this, a member could see
+    // log entries pointing at another member's personal meal in their
+    // history. The unique household-name index makes that situation
+    // narrow but real (e.g. a user removed from the household leaving
+    // logs behind), so we filter defensively.
+    mealVisibilityFilter(userId, householdId),
     options.effortLevels && options.effortLevels.length > 0
       ? inArray(mealLogs.effortLevel, [...options.effortLevels])
       : undefined,
@@ -465,6 +522,11 @@ export async function getHistoryStats(
   await requireHouseholdMember(userId, householdId);
 
   const [statsRow, mealAggRows] = await Promise.all([
+    // R32 — totals are joined to meals via mealId so we can apply the
+    // visibility filter; without it, a member would see counts that
+    // include other members' personal-meal logs in their household
+    // aggregates. Visibility is folded in via the inner join's WHERE
+    // clause.
     db
       .select({
         thisYear: sql<number>`count(*) filter (where date_trunc('year', ${mealLogs.cookedAt}::timestamp) = date_trunc('year', current_date))::int`,
@@ -472,7 +534,13 @@ export async function getHistoryStats(
         totalLogs: count(mealLogs.id)
       })
       .from(mealLogs)
-      .where(activeMealLogsForHousehold(householdId)),
+      .innerJoin(meals, eq(mealLogs.mealId, meals.id))
+      .where(
+        and(
+          activeMealLogsForHousehold(householdId),
+          mealVisibilityFilter(userId, householdId)
+        )
+      ),
     db
       .select({
         mealId: meals.id,
@@ -484,7 +552,12 @@ export async function getHistoryStats(
         mealLogs,
         and(eq(mealLogs.mealId, meals.id), isNull(mealLogs.deletedAt))
       )
-      .where(scopeMealsToHousehold(householdId))
+      .where(
+        and(
+          scopeMealsToHousehold(householdId),
+          mealVisibilityFilter(userId, householdId)
+        )
+      )
       .groupBy(meals.id)
   ]);
 
@@ -540,6 +613,14 @@ export type MealDetailView = {
   lastCookedAt: string | null;
   createdAt: string;
   /**
+   * Round 32 — meal sharing flag. `null` = personal (only the creator
+   * sees the meal); ISO timestamp = when it became shared with the
+   * household. The Recipe Detail view renders a "Personal" / "Shared"
+   * chip off this field, and the TopBar's share affordance branches on
+   * whether the viewer is the creator and the current sharing state.
+   */
+  sharedAt: string | null;
+  /**
    * Modal effort across all logs of this meal — `null` when there are
    * no logs yet (a meal can be added without being cooked, e.g. via
    * AI re-extract flows that save a recipe before the first cook).
@@ -594,14 +675,25 @@ export async function getMealDetail(
       recipeSourceUrl: meals.recipeSourceUrl,
       ingredients: meals.ingredients,
       notes: meals.notes,
+      sharedAt: meals.sharedAt,
       createdAt: meals.createdAt,
       createdByUserId: meals.createdByUserId,
       createdByName: users.name
     })
     .from(meals)
     .leftJoin(users, eq(users.id, meals.createdByUserId))
+    // R32 — visibility filter folded in. A direct navigation to a
+    // mealId that's another member's personal meal returns null here
+    // — the calling page renders `notFound()` exactly like it does
+    // for cross-household IDs, so we don't leak the meal's existence
+    // through error messages.
     .where(
-      and(eq(meals.id, mealId), eq(meals.householdId, householdId), isNull(meals.archivedAt))
+      and(
+        eq(meals.id, mealId),
+        eq(meals.householdId, householdId),
+        isNull(meals.archivedAt),
+        mealVisibilityFilter(userId, householdId)
+      )
     )
     .limit(1);
 
@@ -686,6 +778,7 @@ export async function getMealDetail(
     cookCount: Number(stats?.cookCount ?? 0),
     lastCookedAt: stats?.lastCookedAt ?? null,
     createdAt: row.createdAt.toISOString(),
+    sharedAt: row.sharedAt ? row.sharedAt.toISOString() : null,
     effortLevel: pickModalEffort(effortRows),
     structuredIngredients: structuredIngredientRows,
     structuredSteps: structuredStepRows
@@ -720,6 +813,84 @@ function pickModalEffort(
     }
   }
   return best.effortLevel;
+}
+
+/**
+ * Round 32 — flip a meal's `sharedAt` timestamp. Idempotent: re-sharing
+ * an already-shared meal moves the timestamp forward; that's fine
+ * (the spec accepts this). Creator-only auth enforced at the procedure
+ * layer; this service-level check is defense-in-depth so any future
+ * caller can't bypass authz.
+ */
+export async function shareMeal(args: {
+  userId: string;
+  householdId: string;
+  mealId: string;
+}): Promise<{ sharedAt: Date }> {
+  await requireHouseholdMember(args.userId, args.householdId);
+
+  const [row] = await db
+    .select({
+      id: meals.id,
+      householdId: meals.householdId,
+      createdByUserId: meals.createdByUserId,
+      archivedAt: meals.archivedAt
+    })
+    .from(meals)
+    .where(eq(meals.id, args.mealId))
+    .limit(1);
+  if (!row) throw new Error("Meal not found.");
+  if (row.archivedAt) throw new Error("Meal is archived.");
+  if (row.householdId !== args.householdId) {
+    throw new Error("Meal not in this household.");
+  }
+  if (row.createdByUserId !== args.userId) {
+    throw new Error("Only the creator can share this meal.");
+  }
+
+  const sharedAt = new Date();
+  await db
+    .update(meals)
+    .set({ sharedAt, updatedAt: new Date() })
+    .where(eq(meals.id, args.mealId));
+  return { sharedAt };
+}
+
+/**
+ * Round 32 — flip a shared meal back to personal. Idempotent: unsharing
+ * an already-personal meal is a no-op (the predicate is symmetric).
+ */
+export async function unshareMeal(args: {
+  userId: string;
+  householdId: string;
+  mealId: string;
+}): Promise<{ sharedAt: null }> {
+  await requireHouseholdMember(args.userId, args.householdId);
+
+  const [row] = await db
+    .select({
+      id: meals.id,
+      householdId: meals.householdId,
+      createdByUserId: meals.createdByUserId,
+      archivedAt: meals.archivedAt
+    })
+    .from(meals)
+    .where(eq(meals.id, args.mealId))
+    .limit(1);
+  if (!row) throw new Error("Meal not found.");
+  if (row.archivedAt) throw new Error("Meal is archived.");
+  if (row.householdId !== args.householdId) {
+    throw new Error("Meal not in this household.");
+  }
+  if (row.createdByUserId !== args.userId) {
+    throw new Error("Only the creator can change sharing on this meal.");
+  }
+
+  await db
+    .update(meals)
+    .set({ sharedAt: null, updatedAt: new Date() })
+    .where(eq(meals.id, args.mealId));
+  return { sharedAt: null };
 }
 
 export async function deleteMealLog(

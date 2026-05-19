@@ -362,7 +362,16 @@ describe("extractIngredientsForMeal (Round 10)", () => {
   });
 
   it("throws NoRecipeTextError when the meal exists but has no recipeText", async () => {
-    queue([{ id: "m-1", recipeText: null }]);
+    queue([
+      {
+        id: "m-1",
+        recipeText: null,
+        // R32 — creator pinned to caller so the test reaches the
+        // "no recipe text" branch rather than the new creator check.
+        createdByUserId: "u-member",
+        sharedAt: null
+      }
+    ]);
 
     await expect(
       extractIngredientsForMeal({
@@ -375,8 +384,36 @@ describe("extractIngredientsForMeal (Round 10)", () => {
     expect(openaiMock.extractIngredientsFromText).not.toHaveBeenCalled();
   });
 
+  it("R32 — rejects when the caller isn't the meal's creator", async () => {
+    queue([
+      {
+        id: "m-1",
+        recipeText: "1 cup rice. Cook.",
+        createdByUserId: "u-creator",
+        sharedAt: new Date("2026-04-01")
+      }
+    ]);
+
+    await expect(
+      extractIngredientsForMeal({
+        userId: "u-other-member",
+        householdId: "h-a",
+        mealId: "m-1"
+      })
+    ).rejects.toBeInstanceOf(NoRecipeTextError);
+
+    expect(openaiMock.extractIngredientsFromText).not.toHaveBeenCalled();
+  });
+
   it("extracts, persists the cleaned list, and returns it on the happy path", async () => {
-    queue([{ id: "m-1", recipeText: "1 cup rice. 2 tbsp ghee. Cook." }]);
+    queue([
+      {
+        id: "m-1",
+        recipeText: "1 cup rice. 2 tbsp ghee. Cook.",
+        createdByUserId: "u-member",
+        sharedAt: null
+      }
+    ]);
     queue([{ id: "m-1" }]); // the update returning row
 
     const result = await extractIngredientsForMeal({
@@ -392,7 +429,14 @@ describe("extractIngredientsForMeal (Round 10)", () => {
   });
 
   it("filters empty entries and trims whitespace before persisting", async () => {
-    queue([{ id: "m-1", recipeText: "method here" }]);
+    queue([
+      {
+        id: "m-1",
+        recipeText: "method here",
+        createdByUserId: "u-member",
+        sharedAt: null
+      }
+    ]);
     queue([{ id: "m-1" }]);
     openaiMock.extractIngredientsFromText.mockResolvedValueOnce([
       "  ",

@@ -107,6 +107,9 @@ describe("getMealDetail (Round 10)", () => {
         recipeSourceUrl: null,
         ingredients: ["1 cup basmati rice", "2 tbsp ghee"],
         notes: null,
+        // R32 — sharedAt projected onto MealDetailView. Pin a fixed
+        // timestamp so the toISOString() output is deterministic.
+        sharedAt: new Date("2026-04-02T00:00:00Z"),
         createdAt: new Date("2026-04-01T12:00:00Z"),
         createdByUserId: "u-author",
         createdByName: "Ali"
@@ -162,6 +165,7 @@ describe("getMealDetail (Round 10)", () => {
       cookCount: 3,
       lastCookedAt: "2026-05-10",
       createdAt: "2026-04-01T12:00:00.000Z",
+      sharedAt: "2026-04-02T00:00:00.000Z",
       effortLevel: "medium",
       structuredIngredients: [
         {
@@ -195,6 +199,10 @@ describe("getMealDetail (Round 10)", () => {
         recipeSourceUrl: null,
         ingredients: null,
         notes: null,
+        // R32 — a legacy meal predates sharing; the 0028 backfill sets
+        // every pre-R32 row to NOW(), so the projected value here is
+        // a non-null Date.
+        sharedAt: new Date("2025-01-02T00:00:00Z"),
         createdAt: new Date("2025-01-01T00:00:00Z"),
         createdByUserId: null,
         createdByName: null

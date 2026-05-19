@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
 import {
   RecipeDetailClient,
-  type RecipeDetailMeal
+  type RecipeDetailMeal,
+  type RecipeDetailViewer
 } from "@/components/meals/recipe-detail-client";
 import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
+import { countHouseholdMembers } from "@/services/households";
 import { getMealDetail } from "@/services/meals";
 
 export const dynamic = "force-dynamic";
@@ -32,7 +34,14 @@ export default async function MealDetailPage({ params }: PageProps) {
   const { id } = await params;
   const { user, household } = await requireCurrentUserWithHousehold();
 
-  const meal = await getMealDetail(user.id, household.id, id);
+  // R32 — fetch meal + member count in parallel. Member count drives
+  // the TopBar share affordance + visibility chip; the recipe view
+  // hides both on single-member households (no signal to surface
+  // when there's no one else to share with).
+  const [meal, memberCount] = await Promise.all([
+    getMealDetail(user.id, household.id, id),
+    countHouseholdMembers(user.id, household.id)
+  ]);
   if (!meal) {
     notFound();
   }
@@ -51,10 +60,16 @@ export default async function MealDetailPage({ params }: PageProps) {
     createdByName: meal.createdByName,
     cookCount: meal.cookCount,
     lastCookedAt: meal.lastCookedAt,
+    sharedAt: meal.sharedAt,
     effortLevel: meal.effortLevel,
     structuredIngredients: meal.structuredIngredients ?? [],
     structuredSteps: meal.structuredSteps ?? []
   };
 
-  return <RecipeDetailClient meal={payload} />;
+  const viewer: RecipeDetailViewer = {
+    currentUserId: user.id,
+    householdMemberCount: memberCount
+  };
+
+  return <RecipeDetailClient meal={payload} viewer={viewer} />;
 }

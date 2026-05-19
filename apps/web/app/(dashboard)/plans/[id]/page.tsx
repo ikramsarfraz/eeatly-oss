@@ -65,13 +65,18 @@ export default async function PlanDetailPage(props: {
         verdict: d.verdict,
         annotationNotes: d.annotationNotes
       }))}
+      hiddenDishCount={plan.hiddenDishCount}
       members={members.map((m) => ({
         userId: m.userId,
         name: m.name,
         email: m.email,
         role: m.role
       }))}
-      library={library}
+      library={library.map((r) => ({
+        id: r.id,
+        name: r.name,
+        photoUrl: r.photoUrl
+      }))}
     />
   );
 }

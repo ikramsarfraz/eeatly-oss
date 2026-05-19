@@ -151,8 +151,19 @@ export async function extractIngredientsForMeal(args: {
   await requireHouseholdMember(args.userId, args.householdId);
   await requireFeatureAccess(args.userId, "ai_suggest_text");
 
+  // R32 — this is a write path (overwrites meal.ingredients) so it
+  // gates on creator-only via the visibility predicate's stricter
+  // check below. The lookup pulls createdByUserId so we can verify the
+  // caller is the creator after the read. Other surfacings (recipe
+  // detail with no recipe text → "extract ingredients" CTA) only
+  // render for the creator anyway, so this is defense-in-depth.
   const [mealRow] = await db
-    .select({ id: meals.id, recipeText: meals.recipeText })
+    .select({
+      id: meals.id,
+      recipeText: meals.recipeText,
+      createdByUserId: meals.createdByUserId,
+      sharedAt: meals.sharedAt
+    })
     .from(meals)
     .where(
       and(eq(meals.id, args.mealId), eq(meals.householdId, args.householdId), isNull(meals.archivedAt))
@@ -162,6 +173,12 @@ export async function extractIngredientsForMeal(args: {
   if (!mealRow) {
     // Treat missing/archived/cross-household the same way as the page
     // does — 404 surface, no leakage about WHY.
+    throw new NoRecipeTextError();
+  }
+  if (mealRow.createdByUserId !== args.userId) {
+    // R32 edit-path lockdown — only the creator can extract /
+    // overwrite ingredients on their meal. Other members can read it
+    // (if shared) but the write surface is creator-only.
     throw new NoRecipeTextError();
   }
 
