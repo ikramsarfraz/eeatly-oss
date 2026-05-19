@@ -8,6 +8,7 @@ import {
   SidebarProvider
 } from "@/components/ui/sidebar";
 import { BreadcrumbLabelProvider } from "@/components/breadcrumb-label-provider";
+import { BreadcrumbProvider } from "@/components/layout/breadcrumb-context";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { BottomTabBar } from "@/components/layout/bottom-tab-bar";
 import { CommandPalette } from "@/components/layout/command-palette";
@@ -100,6 +101,7 @@ export function AppShell({
       <BreadcrumbLabelProvider>
         <SidebarProvider defaultOpen>
           <TopBarActionsProvider>
+            <BreadcrumbProvider>
             <QuickLogProvider>
               <TabletRailEnforcer />
               <AppSidebar user={user} />
@@ -119,6 +121,7 @@ export function AppShell({
                 onOpenChange={setPaletteOpen}
               />
             </QuickLogProvider>
+            </BreadcrumbProvider>
           </TopBarActionsProvider>
         </SidebarProvider>
       </BreadcrumbLabelProvider>

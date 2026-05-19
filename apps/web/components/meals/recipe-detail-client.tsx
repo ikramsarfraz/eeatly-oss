@@ -17,6 +17,7 @@ import { StructuredIngredientList } from "@/components/meals/structured-ingredie
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { SourceUrlEmbed } from "@/components/embeds/source-url-embed";
 
+import { useSetBreadcrumb } from "@/components/layout/breadcrumb-context";
 import { useSetTopBarActions } from "@/components/layout/top-bar-actions";
 import { splitMealName } from "@/lib/meal/split-name";
 import { cn } from "@/lib/utils";
@@ -213,6 +214,12 @@ export function RecipeDetailClient({ meal }: { meal: RecipeDetailMeal }) {
     ? sortedStructuredIngredients.length
     : meal.ingredients?.length ?? 0;
   const stepCount = stepCards.length;
+
+  // R28 — retroactive dynamic breadcrumb. The TopBar's static map
+  // resolves `/meal/[id]` to "Recipe"; this hook replaces that last
+  // crumb with the actual meal name. Cleanup runs on unmount so
+  // back-navigation falls through to the static label.
+  useSetBreadcrumb(meal.name);
 
   // Editorial title pair. Single-word names render headline-only;
   // multi-word names get the italic kicker + roman headline split
