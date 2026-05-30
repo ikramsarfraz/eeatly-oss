@@ -9,6 +9,8 @@ import { pickMagicLinkUrl } from "@/lib/auth/deep-links";
 import { getServerEnv, hasGoogleAuthEnv } from "@/lib/env/server";
 import { sendMagicLinkEmail } from "@/lib/email/resend";
 import { logger } from "@/lib/observability/logger";
+import { trackEvent } from "@/lib/observability/analytics";
+import { capturePostHogServerEvent } from "@/lib/observability/posthog-server";
 import { ensureHouseholdForUser } from "@/services/households";
 
 /**
@@ -163,6 +165,17 @@ function buildAuth() {
               error: error instanceof Error ? error.message : String(error)
             });
           }
+          // True signup signal — fires once, when the account row is
+          // actually created (magic-link verified), not when the link is
+          // requested. Both the in-house event log and PostHog get it
+          // here so the two stay consistent. Each is failure-isolated so
+          // analytics can never block account creation.
+          trackEvent({ name: "signed_up", userId: user.id });
+          await capturePostHogServerEvent({
+            distinctId: user.id,
+            event: "signed_up",
+            properties: { email: user.email }
+          });
         }
       }
     }

@@ -60,6 +60,7 @@
     "open-graph-scraper": "^6.11.0",
     "openai": "^6.37.0",
     "posthog-js": "^1.376.4",
+    "posthog-node": "^5.35.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-email": "^6.1.1",

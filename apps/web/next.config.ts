@@ -123,7 +123,9 @@ export default withSentryConfig(withBundleAnalyzer(nextConfig), {
     // Only upload when a token is present; otherwise the build would warn
     // / fail trying to authenticate. Org + project come from env when set.
     disable: !process.env.SENTRY_AUTH_TOKEN
-  },
-  // Strip the Sentry SDK's own logger statements from the client bundle.
-  disableLogger: true
+  }
+  // Note: `disableLogger` was removed — it's deprecated, and its
+  // replacement (`webpack.treeshake.removeDebugLogging`) isn't supported
+  // under Turbopack, which Next 16 uses. The Sentry debug-log overhead is
+  // negligible; not worth the deprecation warning.
 });

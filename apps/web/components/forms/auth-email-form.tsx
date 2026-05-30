@@ -57,11 +57,15 @@ export function AuthEmailForm({ mode, initialEmail, callbackURL }: AuthEmailForm
       }
 
       setSubmittedEmail(email);
-      const eventName = isSignUp ? "signed_up" : "signed_in";
-      // In-house server event (analytics_events) + PostHog funnel event,
-      // fired at the same moment so the two stay consistent.
-      trackAuthFunnel.mutate({ name: eventName });
-      capturePostHogEvent(eventName);
+      // New-user signups are tracked server-side at true account creation
+      // (Better Auth `user.create` hook) — not here at link-request time,
+      // which fired before the account even existed. We only record a
+      // returning sign-in here; no user-create hook runs for an existing
+      // account.
+      if (!isSignUp) {
+        trackAuthFunnel.mutate({ name: "signed_in" });
+        capturePostHogEvent("signed_in");
+      }
     } catch {
       setError("Sign-in is temporarily unavailable. Please try again later.");
     } finally {

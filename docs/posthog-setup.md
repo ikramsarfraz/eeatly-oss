@@ -18,6 +18,13 @@ doesn't have. Both can run together.
   pages, referrers automatically.
 - **New users** — on login, `posthog.identify(userId, { email })` ties
   the session to a PostHog person. New persons = new users in PostHog.
+- **Signups** — a `signed_up` event fires server-side at true account
+  creation (the Better Auth `user.create` hook in
+  [lib/auth/index.ts](../apps/web/lib/auth/index.ts)), captured via
+  `posthog-node`, *not* when the magic link is requested. The same event
+  lands in the in-house `analytics_events` log at the same moment, so the
+  two systems agree. Returning sign-ins fire `signed_in` from the client
+  auth form.
 - `person_profiles: "identified_only"` — anonymous visits are still
   counted for traffic, but person records are only created for signed-in
   users (cost control).
@@ -47,7 +54,7 @@ doesn't have. Both can run together.
 - Session replay is **off** for v1 (not initialized). Enable later via
   `posthog.init({ ..., session_recording })` + the replay add-on if you
   want it.
-- To capture custom funnels (e.g. an explicit `signed_up` event for a
-  signup funnel), call `posthog.capture("signed_up")` from the auth flow —
-  the in-house `analytics.trackAuthFunnel` already records this
-  server-side if you'd rather keep funnels there.
+- The signup funnel works out of the box: `$pageview` → `signed_up`
+  (server-side, account creation). For other custom client events use the
+  `capturePostHogEvent(name, props)` helper exported from the PostHog
+  provider — it no-ops when PostHog isn't configured.
