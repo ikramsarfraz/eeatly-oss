@@ -507,13 +507,13 @@ export default function MarketingPage() {
       {/* Cross-device band */}
       <section className="devices">
         <div className="wrap">
-          <span className="section-eyebrow">Mobile · Web</span>
+          <span className="section-eyebrow">Works on every device</span>
           <h2 className="section-title">Wherever your family cooks from</h2>
-          <p className="section-sub">Cook from your phone at the stove. Plan from your laptop on Sunday. Same kitchen, same recipes — your family&apos;s library follows you everywhere.</p>
+          <p className="section-sub">Open it on your laptop on Sunday, or on your phone&apos;s browser at the stove. Same kitchen, same recipes — your family&apos;s library follows you everywhere, no install needed.</p>
           <div className="device-stage"><DevicePair /></div>
           <div className="device-callouts">
-            <div className="device-callout"><div className="dc-icon">{phoneI}</div><div><div className="dc-title">In your pocket</div><div className="dc-body">iOS app for capturing recipes the moment they arrive and cooking with phone in hand.</div></div></div>
-            <div className="device-callout"><div className="dc-icon">{laptopI}</div><div><div className="dc-title">On the web</div><div className="dc-body">Open the same kitchen at <span className="dc-mono">app.eeatly.com</span> on any browser — no install needed.</div></div></div>
+            <div className="device-callout"><div className="dc-icon">{laptopI}</div><div><div className="dc-title">On the web</div><div className="dc-body">Open your kitchen at <span className="dc-mono">app.eeatly.com</span> in any browser — nothing to download.</div></div></div>
+            <div className="device-callout"><div className="dc-icon">{phoneI}</div><div><div className="dc-title">On your phone</div><div className="dc-body">Works beautifully in your phone&apos;s browser for capturing and cooking. Native apps are on the way.</div></div></div>
             <div className="device-callout"><div className="dc-icon">{globe}</div><div><div className="dc-title">One library</div><div className="dc-body">Sign in once, see the same recipes everywhere — every change syncs in real time.</div></div></div>
           </div>
         </div>

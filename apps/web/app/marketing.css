@@ -274,16 +274,6 @@
   align-items: center;
   position: relative;
 }
-.mkt .hero-grid::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 6%;
-  bottom: 6%;
-  width: 1px;
-  background: linear-gradient(180deg, transparent 0%, var(--border) 18%, var(--border) 82%, transparent 100%);
-  pointer-events: none;
-}
 .mkt .hero-inner {
   position: relative;
 }
