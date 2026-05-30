@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Instrument_Serif, JetBrains_Mono } from "next/font/google";
+import { Inter, Instrument_Serif, JetBrains_Mono, Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { ToastProvider } from "@/components/providers/toast-provider";
@@ -29,6 +29,15 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   weight: ["400", "500"],
   variable: "--font-mono-loaded",
+  display: "swap"
+});
+
+// Geist — body/UI font for the brand + marketing surfaces (design handoff).
+// Scoped to the marketing page via the `.mkt` root; the authed app keeps Inter.
+const geist = Geist({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-geist",
   display: "swap"
 });
 
@@ -90,7 +99,7 @@ export default function RootLayout({
       // the `class` attribute before React hydrates, which would
       // otherwise trip React's hydration mismatch warning.
       suppressHydrationWarning
-      className={`${inter.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable}`}
+      className={`${inter.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable} ${geist.variable}`}
     >
       <body>
         {/* Keyboard accessibility: jump straight to content without
