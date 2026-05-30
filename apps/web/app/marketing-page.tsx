@@ -209,27 +209,50 @@ function RefineScreen() {
 }
 
 /* ─── Web app shell + screens (the available product) ──────────── */
+// Small sidebar icons (match the real app's lucide set).
+const navIcon = {
+  home: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 01-1 1h-5v-7h-6v7H4a1 1 0 01-1-1v-9.5z" /></svg>,
+  cal: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></svg>,
+  book: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5a2 2 0 012-2h13v17H6a2 2 0 00-2 2V5z" /><path d="M6 18h13" /></svg>,
+  plus: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>,
+  spark: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.8 5.4L19 10l-5.2 1.6L12 17l-1.8-5.4L5 10l5.2-1.6L12 3z" /></svg>,
+  users: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2" /><circle cx="10" cy="7" r="4" /><path d="M21 21v-2a4 4 0 00-3-3.87M17 3.13a4 4 0 010 7.75" /></svg>,
+  gear: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-2.7 1.1V21a2 2 0 11-4 0v-.1a1.6 1.6 0 00-2.7-1.1l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.6 1.6 0 00.3-1.8 1.6 1.6 0 00-1.5-1H3a2 2 0 110-4h.1A1.6 1.6 0 004.6 9a1.6 1.6 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.6 1.6 0 001.8.3H9a1.6 1.6 0 001-1.5V3a2 2 0 114 0v.1a1.6 1.6 0 001 1.5 1.6 1.6 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.6 1.6 0 00-.3 1.8V9a1.6 1.6 0 001.5 1H21a2 2 0 110 4h-.1a1.6 1.6 0 00-1.5 1z" /></svg>
+};
+
 function WebSidebar({ active }: { active: string }) {
-  const nav = [
-    { ic: home(), label: "Home" },
-    { ic: book(), label: "Library" },
-    { ic: planIcon, label: "Plans" },
-    { ic: shareIcon, label: "Shared" }
+  const groups: Array<{ label: string; items: Array<[string, React.ReactNode]> }> = [
+    { label: "Cook", items: [["Home", navIcon.home], ["Plans", navIcon.cal], ["Library", navIcon.book]] },
+    { label: "Capture", items: [["Add a meal", navIcon.plus], ["Capture with AI", navIcon.spark]] },
+    { label: "Kitchen", items: [["Members", navIcon.users], ["Settings", navIcon.gear]] }
   ];
   return (
-    <div style={{ width: 134, flexShrink: 0, borderRight: "1px solid var(--border-soft)", background: "color-mix(in srgb, var(--paper) 60%, var(--cream))", padding: "16px 11px", display: "flex", flexDirection: "column", gap: 14 }}>
-      <div style={{ paddingLeft: 4 }}><BrandWordmark size={21} /></div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        {nav.map((n) => {
-          const on = n.label === active;
-          return (
-            <div key={n.label} style={{ display: "flex", alignItems: "center", gap: 9, padding: "7px 9px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: on ? "var(--forest)" : "var(--ink2)", background: on ? "var(--sage-bg)" : "transparent" }}>
-              <span style={{ display: "inline-flex", width: 16, height: 16 }}>{n.ic}</span>{n.label}
-            </div>
-          );
-        })}
+    <div style={{ width: 176, flexShrink: 0, borderRight: "1px solid var(--border-soft)", background: "color-mix(in srgb, var(--paper) 55%, var(--cream))", padding: "16px 12px", display: "flex", flexDirection: "column", gap: 13, overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 9, paddingLeft: 2 }}>
+        <span style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 9, background: "var(--forest)", color: "var(--forest-text)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-serif-loaded), 'Instrument Serif', serif", fontStyle: "italic", fontSize: 21, lineHeight: 0.78 }}>e</span>
+        <div style={{ lineHeight: 1 }}>
+          <div style={{ fontFamily: "var(--font-serif-loaded), 'Instrument Serif', serif", fontSize: 20, letterSpacing: "-0.01em" }}>eeatly</div>
+          <div style={{ fontFamily: "var(--font-mono-loaded), monospace", fontSize: 8, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--ink3)", marginTop: 3 }}>Private beta</div>
+        </div>
       </div>
-      <div style={{ marginTop: "auto", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 0", borderRadius: 99, background: "var(--forest)", color: "var(--forest-text)", fontSize: 12, fontWeight: 600 }}>+ New recipe</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderRadius: 9, background: "var(--ink)", color: "var(--cream)", fontSize: 12.5, fontWeight: 600 }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+        Log a meal
+        <span style={{ marginLeft: "auto", fontFamily: "var(--font-mono-loaded), monospace", fontSize: 9.5, opacity: 0.55 }}>⌘E</span>
+      </div>
+      {groups.map((g) => (
+        <div key={g.label} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <div style={{ fontFamily: "var(--font-mono-loaded), monospace", fontSize: 8.5, letterSpacing: 1.6, textTransform: "uppercase", color: "var(--ink3)", padding: "2px 9px 4px" }}>{g.label}</div>
+          {g.items.map(([label, ic]) => {
+            const on = label === active;
+            return (
+              <div key={label} style={{ display: "flex", alignItems: "center", gap: 9, padding: "6px 9px", borderRadius: 8, fontSize: 12.5, fontWeight: on ? 600 : 500, color: on ? "var(--forest)" : "var(--ink2)", background: on ? "var(--sage-bg)" : "transparent" }}>
+                <span style={{ display: "inline-flex", width: 15, height: 15 }}>{ic}</span>{label}
+              </div>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }
@@ -288,9 +311,9 @@ function BrowserWindow({ width, height, path, children }: { width: number | stri
 }
 
 const WEB_SCREENS = [
-  { key: "kitchen", label: "Kitchen", path: "/kitchen", node: <WebKitchen />, enter: "hp-enter-fade" },
-  { key: "recipe", label: "Recipe", path: "/recipe/biryani", node: <WebRecipe />, enter: "hp-enter-lift" },
-  { key: "refine", label: "Refine", path: "/refine", node: <WebRefine />, enter: "hp-enter-morph" }
+  { key: "kitchen", label: "Home", path: "/dashboard", node: <WebKitchen />, enter: "hp-enter-fade" },
+  { key: "recipe", label: "Recipe", path: "/meal/biryani", node: <WebRecipe />, enter: "hp-enter-lift" },
+  { key: "refine", label: "Refine", path: "/meal/biryani/refine", node: <WebRefine />, enter: "hp-enter-morph" }
 ];
 
 function HeroWebDemo() {
@@ -314,11 +337,11 @@ function HeroWebDemo() {
             </div>
           </BrowserWindow>
         </div>
-        <div className="callout" style={{ top: -22, left: -26, right: "auto", bottom: "auto", transform: "none", width: 208 }}>
+        <div className="callout" style={{ top: 54, right: "calc(100% - 34px)", left: "auto", bottom: "auto", transform: "none", width: 200 }}>
           <div className="callout-head"><span className="callout-icon terra">{mic}</span><span className="callout-kicker">Voice capture</span></div>
           <div className="callout-body">A voice note becomes a recipe — <em>structured</em>, searchable.</div>
         </div>
-        <div className="callout" style={{ bottom: -22, right: -26, left: "auto", top: "auto", transform: "none", width: 208 }}>
+        <div className="callout" style={{ bottom: 54, left: "calc(100% - 34px)", right: "auto", top: "auto", transform: "none", width: 200 }}>
           <div className="callout-head"><span className="callout-icon forest">{sparkle}</span><span className="callout-kicker">Refine with AI</span></div>
           <div className="callout-body">Change a recipe by <em>asking</em> — “add more heat”.</div>
         </div>
