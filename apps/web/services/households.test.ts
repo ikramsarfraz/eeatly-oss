@@ -111,7 +111,11 @@ afterEach(() => {
   expect(dbState.queue, "unused queued db results").toHaveLength(0);
 });
 
-const FUTURE = new Date("2026-05-20T20:00:00Z");
+// 30 days out, computed relative to now so the fixture never goes stale
+// as the calendar advances — `acceptHouseholdInvitation` rejects any
+// invitation whose `expiresAt` is in the past (households.ts), so a
+// hardcoded literal would silently expire and break these tests over time.
+const FUTURE = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
 function makeInvitation(overrides: Partial<{
   id: string;
