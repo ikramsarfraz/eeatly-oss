@@ -8,7 +8,6 @@ import { Lock, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MealTile } from "@/components/ui/meal-tile";
-import { useSetTopBarActions } from "@/components/layout/top-bar-actions";
 import { useQuickLog } from "@/components/dashboard/quick-log-provider";
 import { cn } from "@/lib/utils";
 
@@ -132,24 +131,6 @@ export function LibraryClient({
   const { open: openQuickLog } = useQuickLog();
   const [filter, setFilter] = React.useState<FilterKey>("all");
 
-  // TopBar action: New recipe. Opens the existing QuickLogDialog
-  // since `/add` doesn't exist. Memoised to keep the actions
-  // provider's effect stable.
-  const topBarAction = React.useMemo(
-    () => (
-      <Button
-        variant="default"
-        className="min-h-[40px]"
-        onClick={openQuickLog}
-      >
-        <Plus className="h-3.5 w-3.5" />
-        New recipe
-      </Button>
-    ),
-    [openQuickLog]
-  );
-  useSetTopBarActions(topBarAction);
-
   // Stats map keyed by mealId.
   const statsByMealId = React.useMemo(() => {
     const map = new Map<string, LibraryStat>();
@@ -254,16 +235,20 @@ export function LibraryClient({
             {rows.length === 1 ? "recipe" : "recipes"}.
           </p>
         </div>
-        {/* Sort decoration — design draws a sort dropdown but the
-            underlying query order is alphabetical; wiring a real sort
-            requires a server option or a client reshuffle. Flagged. */}
-        <span
-          className="cursor-default rounded-full border bg-[var(--surface-2)] px-3 py-1.5 font-mono text-[10.5px] uppercase text-muted-foreground opacity-70"
-          style={{ letterSpacing: "0.13em" }}
-          aria-disabled
-        >
-          A–Z
-        </span>
+        {/* Primary action lives in the page header (not the top bar). */}
+        <div className="flex items-center gap-2">
+          <span
+            className="cursor-default rounded-full border bg-[var(--surface-2)] px-3 py-1.5 font-mono text-[10.5px] uppercase text-muted-foreground opacity-70"
+            style={{ letterSpacing: "0.13em" }}
+            aria-disabled
+          >
+            A–Z
+          </span>
+          <Button variant="default" className="min-h-[40px]" onClick={openQuickLog}>
+            <Plus className="h-3.5 w-3.5" />
+            New recipe
+          </Button>
+        </div>
       </header>
 
       {/* Filter chip row. R32 — Personal + Shared chips only render

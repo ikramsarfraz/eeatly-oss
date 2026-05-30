@@ -15,7 +15,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MealTile } from "@/components/ui/meal-tile";
 import { SectionLabel } from "@/components/ui/section-label";
-import { useSetTopBarActions } from "@/components/layout/top-bar-actions";
 
 /**
  * Round 28 — editorial Plans list.
@@ -66,21 +65,6 @@ export function PlansClient({ plans }: PlansClientProps) {
   const scheduled = plans.filter((p) => !p.archivedAt);
   const drafts = plans.filter((p) => Boolean(p.archivedAt));
 
-  // TopBar: forest "New plan" CTA. Memoised so the actions provider's
-  // effect doesn't re-fire on parent rerenders.
-  const topBarAction = React.useMemo(
-    () => (
-      <Button asChild variant="default" className="min-h-[40px]">
-        <Link href={"/plans/new" as Route}>
-          <Plus className="h-3.5 w-3.5" />
-          New plan
-        </Link>
-      </Button>
-    ),
-    []
-  );
-  useSetTopBarActions(topBarAction);
-
   return (
     <div className="grid gap-7">
       {/* Header band — display title + description. Filter + Recent
@@ -98,28 +82,13 @@ export function PlansClient({ plans }: PlansClientProps) {
             night rotations — whatever rhythm the kitchen runs on.
           </p>
         </div>
-        {/* Filter + Recent — visible per design, no handlers yet
-            (deferred). */}
-        <div className="flex items-center gap-2 text-[12px]">
-          <button
-            type="button"
-            disabled
-            aria-disabled
-            className="cursor-default rounded-full border bg-[var(--surface-2)] px-3 py-1.5 font-mono text-[10.5px] uppercase text-muted-foreground opacity-70"
-            style={{ letterSpacing: "0.13em" }}
-          >
-            All
-          </button>
-          <button
-            type="button"
-            disabled
-            aria-disabled
-            className="cursor-default rounded-full border bg-[var(--surface-2)] px-3 py-1.5 font-mono text-[10.5px] uppercase text-muted-foreground opacity-70"
-            style={{ letterSpacing: "0.13em" }}
-          >
-            Recent
-          </button>
-        </div>
+        {/* Primary action lives in the page header (not the top bar). */}
+        <Button asChild variant="default" className="min-h-[40px]">
+          <Link href={"/plans/new" as Route}>
+            <Plus className="h-3.5 w-3.5" />
+            New plan
+          </Link>
+        </Button>
       </header>
 
       {/* Scheduled grid — 3-up with empty-state always last */}
