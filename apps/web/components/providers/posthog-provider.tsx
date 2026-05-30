@@ -38,6 +38,19 @@ function ensureInit() {
   initialized = true;
 }
 
+/**
+ * Capture a custom PostHog event from anywhere on the client. No-op when
+ * PostHog isn't configured (or on the server), so callers don't need to
+ * guard the key themselves. Use for funnel events like `signed_up`.
+ */
+export function capturePostHogEvent(
+  name: string,
+  properties?: Record<string, unknown>
+) {
+  if (!POSTHOG_KEY || typeof window === "undefined") return;
+  posthog.capture(name, properties);
+}
+
 /** Fires a `$pageview` on every App Router navigation. */
 function PostHogPageView() {
   const pathname = usePathname();

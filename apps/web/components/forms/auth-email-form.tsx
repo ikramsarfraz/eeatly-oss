@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth/client";
+import { capturePostHogEvent } from "@/components/providers/posthog-provider";
 
 type AuthEmailFormProps = {
   mode: "sign-in" | "sign-up";
@@ -56,7 +57,11 @@ export function AuthEmailForm({ mode, initialEmail, callbackURL }: AuthEmailForm
       }
 
       setSubmittedEmail(email);
-      trackAuthFunnel.mutate({ name: isSignUp ? "signed_up" : "signed_in" });
+      const eventName = isSignUp ? "signed_up" : "signed_in";
+      // In-house server event (analytics_events) + PostHog funnel event,
+      // fired at the same moment so the two stay consistent.
+      trackAuthFunnel.mutate({ name: eventName });
+      capturePostHogEvent(eventName);
     } catch {
       setError("Sign-in is temporarily unavailable. Please try again later.");
     } finally {
