@@ -240,7 +240,7 @@ function PhoneDemo() {
   const screen = SCREENS[i];
   return (
     <>
-      <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+      <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} style={{ position: "relative", zIndex: 1, width: "100%", display: "flex", justifyContent: "center" }}>
         <IOSDevice>
           <div className="hp-stage">
             <div key={screen.key} className={`hp-screen ${screen.enter} hp-morph-ready`}>{screen.node}</div>
@@ -259,7 +259,72 @@ function PhoneDemo() {
   );
 }
 
-/* ─── Cross-device pair (laptop + phone + sync badge) ──────────── */
+/* ─── Web app screen (rendered inside the laptop) ──────────────── */
+function WebApp() {
+  const nav = [
+    { ic: home(), label: "Home", active: true },
+    { ic: book(), label: "Library", active: false },
+    { ic: planIcon, label: "Plans", active: false },
+    { ic: shareIcon, label: "Shared", active: false }
+  ];
+  const meals = [
+    { name: "Nani's Biryani", meta: "Nani · 8×" },
+    { name: "Lasagna", meta: "Mara · 5×" },
+    { name: "Tacos al pastor", meta: "Diego · 3×" },
+    { name: "Shakshuka", meta: "You · 6×" },
+    { name: "Dal tadka", meta: "Mom · 12×" },
+    { name: "Khichdi", meta: "Nani · 4×" },
+    { name: "Ramen", meta: "You · 2×" },
+    { name: "Tiramisu", meta: "Mara · 1×" },
+    { name: "Pad thai", meta: "Diego · 3×" }
+  ];
+  return (
+    <div className="browser-app" style={{ display: "flex", fontFamily: "var(--font-geist), system-ui, sans-serif", color: "var(--ink)" }}>
+      {/* sidebar */}
+      <div style={{ width: 150, flexShrink: 0, borderRight: "1px solid var(--border-soft)", background: "color-mix(in srgb, var(--paper) 60%, var(--cream))", padding: "16px 12px", display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ paddingLeft: 4 }}><BrandWordmark size={22} /></div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          {nav.map((n) => (
+            <div key={n.label} style={{ display: "flex", alignItems: "center", gap: 9, padding: "7px 9px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: n.active ? "var(--forest)" : "var(--ink2)", background: n.active ? "var(--sage-bg)" : "transparent" }}>
+              <span style={{ display: "inline-flex", width: 16, height: 16 }}>{n.ic}</span>{n.label}
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: "auto", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 0", borderRadius: 99, background: "var(--forest)", color: "var(--forest-text)", fontSize: 12, fontWeight: 600 }}>+ New recipe</div>
+      </div>
+      {/* main */}
+      <div style={{ flex: 1, padding: "20px 24px", overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 16 }}>
+          <div>
+            <div style={{ fontFamily: "var(--font-serif-loaded), 'Instrument Serif', serif", fontSize: 28, letterSpacing: "-0.02em", lineHeight: 1 }}>Our kitchen</div>
+            <div style={{ fontSize: 12, color: "var(--ink2)", marginTop: 5 }}>142 recipes · 4 cooks</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, height: 30, padding: "0 12px", borderRadius: 99, border: "1px solid var(--border-soft)", background: "var(--surface)", color: "var(--ink3)", fontSize: 12 }}>{searchI()} Search dishes</div>
+            <div style={{ display: "flex" }}>
+              {["F", "M", "D"].map((a, idx) => (
+                <span key={a} style={{ width: 26, height: 26, borderRadius: 99, background: MEAL_PALETTES[idx + 1].bg, color: MEAL_PALETTES[idx + 1].fg, fontSize: 12, fontWeight: 600, display: "inline-flex", alignItems: "center", justifyContent: "center", border: "2px solid var(--cream)", marginLeft: idx ? -8 : 0 }}>{a}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+          {meals.map((m) => (
+            <div key={m.name} style={{ border: "1px solid var(--border-soft)", borderRadius: 12, overflow: "hidden", background: "var(--surface)" }}>
+              <div style={{ aspectRatio: "16 / 10" }}><MealTile name={m.name} fontSize={40} radius={0} /></div>
+              <div style={{ padding: "8px 10px" }}>
+                <div style={{ fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</div>
+                <div style={{ fontSize: 10.5, color: "var(--ink3)", fontFamily: "var(--font-mono-loaded), monospace", letterSpacing: 0.3, marginTop: 2 }}>{m.meta}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Cross-device pair (laptop + phone) ───────────────────────── */
 function DevicePair() {
   return (
     <>
@@ -271,27 +336,12 @@ function DevicePair() {
               <div className="browser-dots"><span className="browser-dot red" /><span className="browser-dot yellow" /><span className="browser-dot green" /></div>
               <div className="browser-url"><span className="url-host">app.eeatly.com</span><span className="url-path">/kitchen</span></div>
             </div>
-            <div className="browser-content">
-              <div className="browser-app" style={{ padding: 22 }}>
-                <div style={{ fontFamily: "var(--font-serif-loaded), 'Instrument Serif', serif", fontSize: 26, letterSpacing: "-0.02em", marginBottom: 16 }}>Our kitchen</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-                  {["Biryani", "Lasagna", "Tacos al pastor", "Shakshuka", "Dal tadka", "Khichdi", "Ramen", "Tiramisu"].map((m) => (
-                    <div key={m}>
-                      <div style={{ aspectRatio: "1 / 1" }}><MealTile name={m} fontSize={40} /></div>
-                      <div style={{ fontSize: 10.5, fontWeight: 600, marginTop: 5, color: "var(--ink)" }}>{m}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <div className="browser-content"><WebApp /></div>
           </div>
         </div>
         <div className="laptop-base" />
       </div>
-      <div className="device-phone"><IOSDevice width={150} height={320}><HomeScreen /></IOSDevice></div>
-      <div className="sync-pulse">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 01-9 9c-2.5 0-4.7-1-6.3-2.6M3 12a9 9 0 019-9c2.5 0 4.7 1 6.3 2.6" /><path d="M21 3v6h-6M3 21v-6h6" /></svg>
-      </div>
+      <div className="device-phone"><IOSDevice width={158} height={336}><RecipeScreen /></IOSDevice></div>
     </>
   );
 }
@@ -354,6 +404,16 @@ function ThemeToggle() {
 }
 
 export default function MarketingPage() {
+  const { theme, setTheme } = useTheme();
+  React.useEffect(() => {
+    // Handoff: light is the default for the marketing page. Convert the
+    // implicit "system" default to explicit light on first visit; an
+    // explicit dark choice (via the toggle) is preserved.
+    if (theme === "system") {
+      setTheme("light");
+    }
+  }, [theme, setTheme]);
+
   return (
     <div className="mkt" id="top">
       {/* Header */}
@@ -389,7 +449,7 @@ export default function MarketingPage() {
               <span className="mobile-eyebrow">A walk through the app</span>
               <div className="phone-slot">
                 <div className="phone-slot-glow" />
-                <div style={{ position: "relative", zIndex: 1 }}><PhoneDemo /></div>
+                <PhoneDemo />
                 <div className="callout callout-tl">
                   <div className="callout-head"><span className="callout-icon terra">{mic}</span><span className="callout-kicker">Voice capture</span></div>
                   <div className="callout-body">A voice note from your aunt becomes a recipe — <em>structured</em>, searchable, hers.</div>
