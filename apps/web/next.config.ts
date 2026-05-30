@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import nextBundleAnalyzer from "@next/bundle-analyzer";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const withBundleAnalyzer = nextBundleAnalyzer({
   enabled: process.env.ANALYZE === "true"
@@ -92,4 +93,20 @@ const nextConfig: NextConfig = {
   }
 };
 
-export default withBundleAnalyzer(nextConfig);
+// Sentry wraps the config to inject the build-time plugin (source-map
+// upload, tunneling, tree-shaking of debug code). It's safe to apply
+// unconditionally: with no `SENTRY_AUTH_TOKEN` the source-map upload is
+// skipped, and with no DSN the runtime SDK stays inert. `tunnelRoute`
+// proxies client events through the app origin so ad-blockers / strict
+// CSP can't drop them.
+export default withSentryConfig(withBundleAnalyzer(nextConfig), {
+  silent: !process.env.CI,
+  tunnelRoute: "/monitoring",
+  sourcemaps: {
+    // Only upload when a token is present; otherwise the build would warn
+    // / fail trying to authenticate. Org + project come from env when set.
+    disable: !process.env.SENTRY_AUTH_TOKEN
+  },
+  // Strip the Sentry SDK's own logger statements from the client bundle.
+  disableLogger: true
+});

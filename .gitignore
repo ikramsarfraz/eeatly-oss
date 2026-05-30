@@ -12,3 +12,7 @@ coverage/
 *.tsbuildinfo
 .vercel
 .claude/
+
+# Sentry build plugin
+.env.sentry-build-plugin
+.sentryclirc

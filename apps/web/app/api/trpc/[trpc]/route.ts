@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "@/server/trpc/app-router";
 import { createTRPCContext } from "@/server/trpc/context";
@@ -101,6 +102,13 @@ async function handler(req: Request) {
           message: error.message,
           causeChain: JSON.stringify(chain),
           stack: error.stack
+        });
+        // Mirror to Sentry (inert without a DSN). Tag by procedure path so
+        // 500s group per-procedure; attach the resolved pg/Drizzle cause
+        // chain that the log line already computed.
+        Sentry.captureException(error, {
+          tags: { trpc_path: path ?? "<none>", trpc_type: type },
+          extra: { causeChain: chain }
         });
       }
     }

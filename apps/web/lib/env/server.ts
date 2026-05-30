@@ -51,7 +51,15 @@ const serverEnvSchema = z.object({
   // / payments), Plus is unlocked for everyone, no card. Tri-state:
   // "true"/"false" force the behavior; unset defaults to ON until Stripe
   // is configured. See `isLaunchFreeAccess` below.
-  LAUNCH_FREE_ACCESS: optionalString
+  LAUNCH_FREE_ACCESS: optionalString,
+  // Sentry error tracking — all optional; the SDK is inert when the DSN
+  // is absent (no network, no overhead), so local/dev/preview need none
+  // of these. `SENTRY_AUTH_TOKEN` only enables source-map upload at build
+  // time. The DSN is intentionally public (safe to expose to the client).
+  SENTRY_DSN: optionalString,
+  NEXT_PUBLIC_SENTRY_DSN: optionalString,
+  SENTRY_AUTH_TOKEN: optionalString,
+  SENTRY_ENVIRONMENT: optionalString
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
@@ -128,4 +136,14 @@ export function isLaunchFreeAccess(env = getServerEnv()) {
   if (env.LAUNCH_FREE_ACCESS === "true") return true;
   if (env.LAUNCH_FREE_ACCESS === "false") return false;
   return !hasStripeEnv(env);
+}
+
+/**
+ * True when a Sentry DSN is configured (server-side check). The SDK
+ * itself no-ops when the DSN is empty, so this is mainly for deploy
+ * reporting + skipping setup work; the Sentry config files read
+ * `process.env` directly since they run before/around the app boundary.
+ */
+export function hasSentryEnv(env = getServerEnv()) {
+  return Boolean(env.SENTRY_DSN || env.NEXT_PUBLIC_SENTRY_DSN);
 }

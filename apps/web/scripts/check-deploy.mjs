@@ -115,6 +115,18 @@ if (launchOverride === "true" || launchOverride === "false") {
   lines.push(`LAUNCH_FREE_ACCESS: ${launchOverride} (explicit override of the default)`);
 }
 
+// Sentry — optional; the SDK is inert without a DSN. Source-map upload
+// additionally needs SENTRY_AUTH_TOKEN at build time.
+const sentryDsn = setAndNonEmpty("SENTRY_DSN") || setAndNonEmpty("NEXT_PUBLIC_SENTRY_DSN");
+if (!sentryDsn) {
+  lines.push("Sentry: not configured — error tracking disabled (set SENTRY_DSN + NEXT_PUBLIC_SENTRY_DSN to enable).");
+} else {
+  const sourcemaps = setAndNonEmpty("SENTRY_AUTH_TOKEN")
+    ? "source-map upload on"
+    : "source-map upload off (set SENTRY_AUTH_TOKEN)";
+  lines.push(`Sentry: enabled — error tracking on; ${sourcemaps}.`);
+}
+
 lines.push(
   `PLATFORM_ADMIN_HOST: ${setAndNonEmpty("PLATFORM_ADMIN_HOST") ? "set (admin routes additionally gated by host)" : "not set (admin uses session + role only)"}`
 );
