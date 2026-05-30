@@ -37,9 +37,11 @@ export default function PrivacyPage() {
             <li>Recipes you save and any shareable links you create</li>
           </ul>
           <p className="mt-3 text-sm text-muted-foreground">
-            We don&apos;t track what you search, how long you spend on each
-            page, or anything beyond what you choose to log. There are no
-            third-party analytics on the site.
+            Beyond what you log, we keep lightweight product analytics — which
+            pages get visited and when people sign up — to understand how
+            eeatly is used (see &ldquo;Analytics &amp; error tracking&rdquo;
+            below). We don&apos;t sell your data or track you across other
+            sites.
           </p>
         </section>
 
@@ -52,6 +54,29 @@ export default function PrivacyPage() {
             to a paid plan — is handled entirely by Stripe; we never see your
             card details.
           </p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold">Analytics &amp; error tracking</h2>
+          <p className="mt-3 text-sm text-muted-foreground">
+            We use two third-party services to understand usage and keep the
+            app healthy:
+          </p>
+          <ul className="mt-2 list-inside list-disc grid gap-1 text-sm text-muted-foreground">
+            <li>
+              <span className="text-foreground">PostHog</span> — product
+              analytics for page visits and sign-ups, so we can see what&apos;s
+              working. Anonymous visits are counted without a profile; a
+              profile is only created once you sign in. We don&apos;t sell this
+              data or use it to track you on other sites.
+            </li>
+            <li>
+              <span className="text-foreground">Sentry</span> — error
+              monitoring. When something breaks, a diagnostic report (the error
+              and a stack trace) is sent so we can fix it. We don&apos;t attach
+              your personal data to these reports.
+            </li>
+          </ul>
         </section>
 
         <section>
@@ -147,9 +172,10 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-xl font-semibold">Cookies</h2>
           <p className="mt-3 text-sm text-muted-foreground">
-            We use one cookie: the session cookie that keeps you signed in
-            after you click a magic link. No ad cookies, no tracking
-            pixels, no third-party analytics.
+            The session cookie that keeps you signed in after you click a
+            magic link, plus a PostHog analytics cookie that counts visits.
+            No ad cookies and no tracking pixels — we don&apos;t follow you
+            around the web.
           </p>
         </section>
 
