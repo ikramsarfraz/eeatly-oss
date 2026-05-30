@@ -322,6 +322,59 @@
   color: var(--ink);
 }
 
+/* Centered single-column hero copy (product demo lives in its own band
+   below so it gets full width). */
+.mkt .hero-lead {
+  text-align: center;
+  max-width: 740px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.mkt .hero-lead .hero-sub {
+  max-width: 580px;
+}
+.mkt .hero-lead .hero-ctas {
+  justify-content: center;
+}
+
+/* Full-width walkthrough band under the hero. */
+.mkt .hero-demo {
+  padding: 8px 0 96px;
+}
+.mkt .hero-demo-wrap {
+  position: relative;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 26px;
+}
+.mkt .hero-demo-frame {
+  position: relative;
+  width: 100%;
+}
+.mkt .hero-demo-glow {
+  position: absolute;
+  inset: -12% -6%;
+  background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--sage) 45%, transparent) 0%, transparent 65%);
+  filter: blur(54px);
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 0;
+}
+.dark .mkt .hero-demo-glow {
+  background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--forest) 30%, transparent) 0%, transparent 65%);
+}
+@media (max-width: 900px) {
+  .mkt .hero-demo {
+    padding: 4px 0 64px;
+  }
+}
+
 /* ─── Mobile (app demo) — right hero column ──────────────────── */
 .mkt .mobile-stage {
   position: relative;

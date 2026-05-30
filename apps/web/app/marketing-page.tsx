@@ -270,7 +270,7 @@ function WebRefine() {
   );
 }
 
-function BrowserWindow({ width, height, path, children }: { width: number; height: number; path: string; children: React.ReactNode }) {
+function BrowserWindow({ width, height, path, children }: { width: number | string; height: number; path: string; children: React.ReactNode }) {
   return (
     <div style={{ width, height, borderRadius: 14, overflow: "hidden", background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "0 34px 70px -30px rgba(20,20,15,0.4), inset 0 0 0 1px rgba(255,255,255,0.04)", display: "flex", flexDirection: "column" }}>
       <div style={{ height: 38, flexShrink: 0, display: "flex", alignItems: "center", gap: 12, padding: "0 12px", background: "color-mix(in srgb, var(--paper) 80%, var(--cream))", borderBottom: "1px solid var(--border-soft)" }}>
@@ -303,18 +303,22 @@ function HeroWebDemo() {
   }, [i, paused]);
   const s = WEB_SCREENS[i];
   return (
-    <div style={{ position: "relative", width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 22 }}>
-      <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} style={{ position: "relative", zIndex: 1 }}>
-        <BrowserWindow width={540} height={368} path={s.path}>
-          <div className="hp-stage">
-            <div key={s.key} className={`hp-screen ${s.enter} hp-morph-ready`}>{s.node}</div>
-          </div>
-        </BrowserWindow>
-        <div className="callout" style={{ top: -20, left: -28, right: "auto", bottom: "auto", transform: "none", width: 196 }}>
+    <div className="hero-demo-wrap">
+      <span className="mobile-eyebrow">A walk through the web app</span>
+      <div className="hero-demo-frame" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+        <div className="hero-demo-glow" />
+        <div style={{ position: "relative", zIndex: 1 }}>
+          <BrowserWindow width="100%" height={540} path={s.path}>
+            <div className="hp-stage">
+              <div key={s.key} className={`hp-screen ${s.enter} hp-morph-ready`}>{s.node}</div>
+            </div>
+          </BrowserWindow>
+        </div>
+        <div className="callout" style={{ top: -22, left: -26, right: "auto", bottom: "auto", transform: "none", width: 208 }}>
           <div className="callout-head"><span className="callout-icon terra">{mic}</span><span className="callout-kicker">Voice capture</span></div>
           <div className="callout-body">A voice note becomes a recipe — <em>structured</em>, searchable.</div>
         </div>
-        <div className="callout" style={{ bottom: -20, right: -28, left: "auto", top: "auto", transform: "none", width: 196 }}>
+        <div className="callout" style={{ bottom: -22, right: -26, left: "auto", top: "auto", transform: "none", width: 208 }}>
           <div className="callout-head"><span className="callout-icon forest">{sparkle}</span><span className="callout-kicker">Refine with AI</span></div>
           <div className="callout-body">Change a recipe by <em>asking</em> — “add more heat”.</div>
         </div>
@@ -490,25 +494,21 @@ export default function MarketingPage() {
       {/* Hero */}
       <section className="hero">
         <div className="wrap">
-          <div className="hero-grid">
-            <div className="hero-inner">
-              <span className="eyebrow">For families who cook from far apart</span>
-              <h1>One kitchen.<br />Your whole family.<br />Any distance.</h1>
-              <p className="hero-sub">Save the recipes your family actually cooks — from voice notes, WhatsApp photos, recipe links, however they reach you. Everyone in your kitchen can see them, even when you&apos;re not in the same one.</p>
-              <div className="hero-ctas">
-                <Link className="btn btn-primary" href={"/sign-up" as Route}>Start your kitchen {arrow}</Link>
-                <a className="link" href="#pricing">See pricing</a>
-              </div>
-            </div>
-            <div className="mobile-stage">
-              <span className="mobile-eyebrow">A walk through the web app</span>
-              <div className="phone-slot">
-                <div className="phone-slot-glow" />
-                <HeroWebDemo />
-              </div>
+          <div className="hero-lead">
+            <span className="eyebrow">For families who cook from far apart</span>
+            <h1>One kitchen.<br />Your whole family.<br />Any distance.</h1>
+            <p className="hero-sub">Save the recipes your family actually cooks — from voice notes, WhatsApp photos, recipe links, however they reach you. Everyone in your kitchen can see them, even when you&apos;re not in the same one.</p>
+            <div className="hero-ctas">
+              <Link className="btn btn-primary" href={"/sign-up" as Route}>Start your kitchen {arrow}</Link>
+              <a className="link" href="#pricing">See pricing</a>
             </div>
           </div>
         </div>
+      </section>
+
+      {/* Web app walkthrough — full-width band under the hero */}
+      <section className="hero-demo">
+        <HeroWebDemo />
       </section>
 
       {/* Trust strip */}
