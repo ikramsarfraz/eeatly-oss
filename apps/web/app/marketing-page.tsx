@@ -24,9 +24,6 @@ const check = (
 const mic = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0014 0M12 18v3" /></svg>
 );
-const calendar = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></svg>
-);
 const sparkle = (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l1.8 5.4L19 10l-5.2 1.6L12 17l-1.8-5.4L5 10l5.2-1.6L12 3z" /></svg>
 );
@@ -138,15 +135,6 @@ function searchI() {
 
 const screenWrap: React.CSSProperties = { position: "absolute", inset: 0, padding: "44px 16px 60px", fontFamily: "var(--font-geist), system-ui, sans-serif", color: "var(--ink)" };
 
-function SplashScreen() {
-  return (
-    <div style={{ ...screenWrap, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
-      <span style={{ width: 64, height: 64, borderRadius: "22.37%", background: "var(--forest)", color: "var(--cream)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-serif-loaded), 'Instrument Serif', serif", fontStyle: "italic", fontSize: 44, lineHeight: 0.78 }}>e</span>
-      <BrandWordmark size={30} />
-      <span style={{ fontFamily: "var(--font-mono-loaded), monospace", fontSize: 9.5, letterSpacing: 1.6, textTransform: "uppercase", color: "var(--ink3)" }}>Your family kitchen</span>
-    </div>
-  );
-}
 function HomeScreen() {
   const meals = ["Biryani", "Lasagna", "Khichdi", "Tacos al pastor", "Shakshuka", "Dal tadka"];
   return (
@@ -220,53 +208,131 @@ function RefineScreen() {
   );
 }
 
-type Screen = { key: string; label: string; node: React.ReactNode; enter: string };
-const SCREENS: Screen[] = [
-  { key: "splash", label: "Splash", node: <SplashScreen />, enter: "hp-enter-fade" },
-  { key: "home", label: "Home", node: <HomeScreen />, enter: "hp-enter-lift" },
-  { key: "add", label: "Add", node: <AddScreen />, enter: "hp-enter-push" },
-  { key: "recipe", label: "Recipe", node: <RecipeScreen />, enter: "hp-enter-lift" },
-  { key: "refine", label: "Refine", node: <RefineScreen />, enter: "hp-enter-morph" }
+/* ─── Web app shell + screens (the available product) ──────────── */
+function WebSidebar({ active }: { active: string }) {
+  const nav = [
+    { ic: home(), label: "Home" },
+    { ic: book(), label: "Library" },
+    { ic: planIcon, label: "Plans" },
+    { ic: shareIcon, label: "Shared" }
+  ];
+  return (
+    <div style={{ width: 134, flexShrink: 0, borderRight: "1px solid var(--border-soft)", background: "color-mix(in srgb, var(--paper) 60%, var(--cream))", padding: "16px 11px", display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ paddingLeft: 4 }}><BrandWordmark size={21} /></div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        {nav.map((n) => {
+          const on = n.label === active;
+          return (
+            <div key={n.label} style={{ display: "flex", alignItems: "center", gap: 9, padding: "7px 9px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: on ? "var(--forest)" : "var(--ink2)", background: on ? "var(--sage-bg)" : "transparent" }}>
+              <span style={{ display: "inline-flex", width: 16, height: 16 }}>{n.ic}</span>{n.label}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ marginTop: "auto", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 0", borderRadius: 99, background: "var(--forest)", color: "var(--forest-text)", fontSize: 12, fontWeight: 600 }}>+ New recipe</div>
+    </div>
+  );
+}
+
+function WebRecipe() {
+  return (
+    <div className="browser-app" style={{ display: "flex", fontFamily: "var(--font-geist), system-ui, sans-serif", color: "var(--ink)" }}>
+      <WebSidebar active="Library" />
+      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+        <div style={{ width: "40%", flexShrink: 0 }}><MealTile name="Nani's Biryani" fontSize={110} radius={0} /></div>
+        <div style={{ flex: 1, padding: "20px 22px", overflow: "hidden" }}>
+          <div style={{ fontFamily: "var(--font-serif-loaded), 'Instrument Serif', serif", fontSize: 25, letterSpacing: "-0.02em", lineHeight: 1.05 }}>Nani&apos;s Chicken Biryani</div>
+          <div style={{ fontSize: 10, color: "var(--ink3)", fontFamily: "var(--font-mono-loaded), monospace", letterSpacing: 0.6, margin: "6px 0 14px" }}>ADDED BY NANI · COOKED 8×</div>
+          {["Basmati rice", "Chicken thighs", "Yogurt + spices", "Fried onions", "Saffron milk"].map((ing) => (
+            <div key={ing} style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 12, padding: "5px 0", borderBottom: "1px solid var(--border-soft)" }}>
+              <span style={{ width: 5, height: 5, borderRadius: 99, background: "var(--forest)" }} />{ing}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WebRefine() {
+  return (
+    <div className="browser-app" style={{ display: "flex", fontFamily: "var(--font-geist), system-ui, sans-serif", color: "var(--ink)" }}>
+      <WebSidebar active="Library" />
+      <div style={{ flex: 1, padding: "20px 24px", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <div style={{ fontFamily: "var(--font-serif-loaded), 'Instrument Serif', serif", fontSize: 24, letterSpacing: "-0.02em", marginBottom: 14 }}>Refine with AI</div>
+        <div style={{ alignSelf: "flex-end", maxWidth: "62%", background: "var(--forest)", color: "var(--forest-text)", padding: "9px 13px", borderRadius: "14px 14px 4px 14px", fontSize: 12.5, marginBottom: 12 }}>Add more heat and halve the recipe</div>
+        <div style={{ maxWidth: "72%", background: "var(--surface)", border: "1px solid var(--border-soft)", padding: "12px 13px", borderRadius: "14px 14px 14px 4px" }}>
+          <div style={{ fontSize: 9, fontFamily: "var(--font-mono-loaded), monospace", letterSpacing: 1.4, color: "var(--ink3)", marginBottom: 6 }}>SUGGESTED CHANGES</div>
+          <div style={{ fontSize: 12.5, color: "var(--ink2)", lineHeight: 1.5 }}>+2 green chilies · ½ all quantities · 4 servings → 2</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BrowserWindow({ width, height, path, children }: { width: number; height: number; path: string; children: React.ReactNode }) {
+  return (
+    <div style={{ width, height, borderRadius: 14, overflow: "hidden", background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "0 34px 70px -30px rgba(20,20,15,0.4), inset 0 0 0 1px rgba(255,255,255,0.04)", display: "flex", flexDirection: "column" }}>
+      <div style={{ height: 38, flexShrink: 0, display: "flex", alignItems: "center", gap: 12, padding: "0 12px", background: "color-mix(in srgb, var(--paper) 80%, var(--cream))", borderBottom: "1px solid var(--border-soft)" }}>
+        <div style={{ display: "flex", gap: 6 }}>
+          {["#FF5F57", "#FEBC2E", "#28C840"].map((c) => (<span key={c} style={{ width: 10, height: 10, borderRadius: 99, background: c }} />))}
+        </div>
+        <div style={{ flex: 1, maxWidth: 280, margin: "0 auto", height: 22, borderRadius: 7, background: "var(--surface)", border: "1px solid var(--border-soft)", display: "flex", alignItems: "center", justifyContent: "center", gap: 5, fontFamily: "var(--font-mono-loaded), monospace", fontSize: 10.5, color: "var(--ink2)" }}>
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--forest)" }}><rect x="4" y="11" width="16" height="9" rx="2" /><path d="M8 11V8a4 4 0 018 0v3" /></svg>
+          <span style={{ color: "var(--ink)", fontWeight: 500 }}>app.eeatly.com</span><span style={{ color: "var(--ink3)" }}>{path}</span>
+        </div>
+      </div>
+      <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>{children}</div>
+    </div>
+  );
+}
+
+const WEB_SCREENS = [
+  { key: "kitchen", label: "Kitchen", path: "/kitchen", node: <WebKitchen />, enter: "hp-enter-fade" },
+  { key: "recipe", label: "Recipe", path: "/recipe/biryani", node: <WebRecipe />, enter: "hp-enter-lift" },
+  { key: "refine", label: "Refine", path: "/refine", node: <WebRefine />, enter: "hp-enter-morph" }
 ];
 
-function PhoneDemo() {
+function HeroWebDemo() {
   const [i, setI] = React.useState(0);
   const [paused, setPaused] = React.useState(false);
   React.useEffect(() => {
     if (paused) return;
-    const t = setTimeout(() => setI((n) => (n + 1) % SCREENS.length), 3400);
+    const t = setTimeout(() => setI((n) => (n + 1) % WEB_SCREENS.length), 3600);
     return () => clearTimeout(t);
   }, [i, paused]);
-  const screen = SCREENS[i];
+  const s = WEB_SCREENS[i];
   return (
-    <>
-      <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} style={{ position: "relative", zIndex: 1, width: "100%", display: "flex", justifyContent: "center" }}>
-        <IOSDevice>
+    <div style={{ position: "relative", width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 22 }}>
+      <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} style={{ position: "relative", zIndex: 1 }}>
+        <BrowserWindow width={540} height={368} path={s.path}>
           <div className="hp-stage">
-            <div key={screen.key} className={`hp-screen ${screen.enter} hp-morph-ready`}>{screen.node}</div>
+            <div key={s.key} className={`hp-screen ${s.enter} hp-morph-ready`}>{s.node}</div>
           </div>
-        </IOSDevice>
+        </BrowserWindow>
+        <div className="callout" style={{ top: -20, left: -28, right: "auto", bottom: "auto", transform: "none", width: 196 }}>
+          <div className="callout-head"><span className="callout-icon terra">{mic}</span><span className="callout-kicker">Voice capture</span></div>
+          <div className="callout-body">A voice note becomes a recipe — <em>structured</em>, searchable.</div>
+        </div>
+        <div className="callout" style={{ bottom: -20, right: -28, left: "auto", top: "auto", transform: "none", width: 196 }}>
+          <div className="callout-head"><span className="callout-icon forest">{sparkle}</span><span className="callout-kicker">Refine with AI</span></div>
+          <div className="callout-body">Change a recipe by <em>asking</em> — “add more heat”.</div>
+        </div>
       </div>
-      <div className="hero-progress" role="tablist" aria-label="App walkthrough">
-        {SCREENS.map((s, idx) => (
-          <button key={s.key} type="button" className={`hp-dot${idx === i ? " active" : ""}`} onClick={() => setI(idx)} aria-selected={idx === i} role="tab">
+      <div className="hero-progress" role="tablist" aria-label="Web app walkthrough">
+        {WEB_SCREENS.map((sc, idx) => (
+          <button key={sc.key} type="button" className={`hp-dot${idx === i ? " active" : ""}`} onClick={() => setI(idx)} aria-selected={idx === i} role="tab">
             <span className="hp-dot-pip" />
-            {s.label}
+            {sc.label}
           </button>
         ))}
       </div>
-    </>
+    </div>
   );
 }
 
-/* ─── Web app screen (rendered inside the laptop) ──────────────── */
-function WebApp() {
-  const nav = [
-    { ic: home(), label: "Home", active: true },
-    { ic: book(), label: "Library", active: false },
-    { ic: planIcon, label: "Plans", active: false },
-    { ic: shareIcon, label: "Shared", active: false }
-  ];
+/* ─── Web kitchen dashboard (rendered in the laptop + hero) ────── */
+function WebKitchen() {
   const meals = [
     { name: "Nani's Biryani", meta: "Nani · 8×" },
     { name: "Lasagna", meta: "Mara · 5×" },
@@ -280,18 +346,7 @@ function WebApp() {
   ];
   return (
     <div className="browser-app" style={{ display: "flex", fontFamily: "var(--font-geist), system-ui, sans-serif", color: "var(--ink)" }}>
-      {/* sidebar */}
-      <div style={{ width: 150, flexShrink: 0, borderRight: "1px solid var(--border-soft)", background: "color-mix(in srgb, var(--paper) 60%, var(--cream))", padding: "16px 12px", display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ paddingLeft: 4 }}><BrandWordmark size={22} /></div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          {nav.map((n) => (
-            <div key={n.label} style={{ display: "flex", alignItems: "center", gap: 9, padding: "7px 9px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: n.active ? "var(--forest)" : "var(--ink2)", background: n.active ? "var(--sage-bg)" : "transparent" }}>
-              <span style={{ display: "inline-flex", width: 16, height: 16 }}>{n.ic}</span>{n.label}
-            </div>
-          ))}
-        </div>
-        <div style={{ marginTop: "auto", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 0", borderRadius: 99, background: "var(--forest)", color: "var(--forest-text)", fontSize: 12, fontWeight: 600 }}>+ New recipe</div>
-      </div>
+      <WebSidebar active="Home" />
       {/* main */}
       <div style={{ flex: 1, padding: "20px 24px", overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 16 }}>
@@ -336,7 +391,7 @@ function DevicePair() {
               <div className="browser-dots"><span className="browser-dot red" /><span className="browser-dot yellow" /><span className="browser-dot green" /></div>
               <div className="browser-url"><span className="url-host">app.eeatly.com</span><span className="url-path">/kitchen</span></div>
             </div>
-            <div className="browser-content"><WebApp /></div>
+            <div className="browser-content"><WebKitchen /></div>
           </div>
         </div>
         <div className="laptop-base" />
@@ -446,26 +501,10 @@ export default function MarketingPage() {
               </div>
             </div>
             <div className="mobile-stage">
-              <span className="mobile-eyebrow">A walk through the app</span>
+              <span className="mobile-eyebrow">A walk through the web app</span>
               <div className="phone-slot">
                 <div className="phone-slot-glow" />
-                <PhoneDemo />
-                <div className="callout callout-tl">
-                  <div className="callout-head"><span className="callout-icon terra">{mic}</span><span className="callout-kicker">Voice capture</span></div>
-                  <div className="callout-body">A voice note from your aunt becomes a recipe — <em>structured</em>, searchable, hers.</div>
-                </div>
-                <div className="callout callout-bl">
-                  <div className="callout-head"><span className="callout-icon wheat">{calendar}</span><span className="callout-kicker">Plan ahead</span></div>
-                  <div className="callout-body">Holidays, dinners, Sundays — plans <em>roll forward</em>, year after year.</div>
-                </div>
-                <div className="callout callout-tr">
-                  <div className="callout-head"><span className="callout-icon forest">{sparkle}</span><span className="callout-kicker">Refine with AI</span></div>
-                  <div className="callout-body">Change a recipe by <em>asking</em> — “add more heat”, “half the recipe”.</div>
-                </div>
-                <div className="callout callout-br">
-                  <div className="callout-head"><span className="callout-icon sage">{users}</span><span className="callout-kicker">One kitchen</span></div>
-                  <div className="callout-body">Everyone in your family sees it — <em>even from afar</em>.</div>
-                </div>
+                <HeroWebDemo />
               </div>
             </div>
           </div>
@@ -570,9 +609,9 @@ export default function MarketingPage() {
       {/* Showcase */}
       <section className="showcase">
         <div className="wrap">
-          <span className="section-eyebrow">See it in action</span>
-          <h2 className="section-title">A kitchen, in your pocket</h2>
-          <p className="section-sub">From the moment you open the app, to capturing a recipe, to looking it up months later — every screen built for how families actually cook.</p>
+          <span className="section-eyebrow">Coming soon</span>
+          <h2 className="section-title">A mobile app, in your pocket</h2>
+          <p className="section-sub">The eeatly mobile app is on its way. Here&apos;s a preview of the experience — the same kitchen, built for cooking with your phone in hand. Until then, everything works in your phone&apos;s browser.</p>
           <ShowcaseGallery />
         </div>
       </section>
