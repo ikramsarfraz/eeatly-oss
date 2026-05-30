@@ -152,12 +152,6 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
                   >
                     eeatly
                   </span>
-                  <span
-                    className="mt-1 truncate font-mono text-[10px] uppercase text-muted-foreground"
-                    style={{ letterSpacing: "0.14em" }}
-                  >
-                    private beta
-                  </span>
                 </div>
               </Link>
             </SidebarMenuButton>

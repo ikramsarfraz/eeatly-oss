@@ -230,10 +230,7 @@ function WebSidebar({ active }: { active: string }) {
     <div style={{ width: 176, flexShrink: 0, borderRight: "1px solid var(--border-soft)", background: "color-mix(in srgb, var(--paper) 55%, var(--cream))", padding: "16px 12px", display: "flex", flexDirection: "column", gap: 13, overflow: "hidden" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 9, paddingLeft: 2 }}>
         <span style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 9, background: "var(--forest)", color: "var(--forest-text)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-serif-loaded), 'Instrument Serif', serif", fontStyle: "italic", fontSize: 21, lineHeight: 0.78 }}>e</span>
-        <div style={{ lineHeight: 1 }}>
-          <div style={{ fontFamily: "var(--font-serif-loaded), 'Instrument Serif', serif", fontSize: 20, letterSpacing: "-0.01em" }}>eeatly</div>
-          <div style={{ fontFamily: "var(--font-mono-loaded), monospace", fontSize: 8, letterSpacing: 1.3, textTransform: "uppercase", color: "var(--ink3)", marginTop: 3 }}>Private beta</div>
-        </div>
+        <div style={{ fontFamily: "var(--font-serif-loaded), 'Instrument Serif', serif", fontSize: 20, letterSpacing: "-0.01em", lineHeight: 1 }}>eeatly</div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderRadius: 9, background: "var(--ink)", color: "var(--cream)", fontSize: 12.5, fontWeight: 600 }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>

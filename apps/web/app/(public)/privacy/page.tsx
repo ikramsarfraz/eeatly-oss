@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6 lg:px-8">
-      <h1 className="text-3xl font-semibold tracking-tight">Privacy</h1>
+      <h1 className="font-serif text-[40px] font-normal" style={{ letterSpacing: "-0.02em" }}>Privacy</h1>
       <p className="mt-3 text-muted-foreground">
         eeatly is your family&apos;s food memory, and you should know exactly
         how it&apos;s kept. This page is in plain English, not legal

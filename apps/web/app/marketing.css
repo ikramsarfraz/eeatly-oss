@@ -34,6 +34,27 @@
   --band-dark-ink2: #c7d5b8;
   --band-dark-ink3: #8aa28e;
 
+  /* Remap the app's semantic tokens to the brand palette so shadcn /
+     Tailwind utilities used on the public pages (pricing, privacy, help)
+     render on-brand without rewriting every className. Dark mode follows
+     automatically because the brand vars above flip in `.dark .mkt`. */
+  --background: var(--cream);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--forest);
+  --primary-foreground: var(--forest-text);
+  --secondary: var(--sage-bg);
+  --secondary-foreground: var(--forest);
+  --muted: var(--paper);
+  --muted-foreground: var(--ink2);
+  --accent: var(--terra);
+  --accent-foreground: var(--cream);
+  --input: var(--border);
+  --ring: color-mix(in srgb, var(--forest) 35%, transparent);
+
   background: var(--cream);
   color: var(--ink);
   font-family: var(--font-geist), system-ui, sans-serif;

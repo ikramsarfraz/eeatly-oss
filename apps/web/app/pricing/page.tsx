@@ -6,6 +6,7 @@ import { getServerEnv, hasStripeEnv, isLaunchFreeAccess } from "@/lib/env/server
 import { FEATURE_REGISTRY, type FeatureKey } from "@eeatly/api/gates/registry";
 import { getSubscriptionState } from "@/services/billing";
 import { PricingCard } from "@/components/pricing/pricing-card";
+import "../marketing.css";
 
 export const metadata: Metadata = {
   title: "Pricing — eeatly Plus",
@@ -42,6 +43,7 @@ export default async function PricingPage() {
   );
 
   return (
+    <div className="mkt min-h-screen">
     <main
       id="main"
       tabIndex={-1}
@@ -118,5 +120,6 @@ export default async function PricingPage() {
         </Link>
       </footer>
     </main>
+    </div>
   );
 }
