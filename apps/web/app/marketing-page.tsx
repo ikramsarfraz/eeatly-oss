@@ -257,36 +257,101 @@ function WebSidebar({ active }: { active: string }) {
   );
 }
 
+const monoLabel: React.CSSProperties = { fontFamily: "var(--font-mono-loaded), monospace", fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--ink3)" };
+const chipSage: React.CSSProperties = { padding: "3px 9px", borderRadius: 99, fontSize: 11, fontWeight: 600, background: "var(--sage-bg)", color: "var(--forest)" };
+const chipWheat: React.CSSProperties = { padding: "3px 9px", borderRadius: 99, fontSize: 11, fontWeight: 600, background: "color-mix(in srgb, var(--wheat) 38%, transparent)", color: "color-mix(in srgb, var(--wheat) 30%, var(--ink))" };
+const chipGhost: React.CSSProperties = { padding: "3px 9px", borderRadius: 99, fontSize: 11, fontWeight: 600, border: "1px solid var(--border)", color: "var(--ink2)" };
+
+// Recipe Detail — mirrors the real editorial recipe page: square monogram
+// tile + split title + chip row + meta + Refine/Log actions, over an
+// ingredient sidebar + method column.
 function WebRecipe() {
   return (
     <div className="browser-app" style={{ display: "flex", fontFamily: "var(--font-geist), system-ui, sans-serif", color: "var(--ink)" }}>
       <WebSidebar active="Library" />
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-        <div style={{ width: "40%", flexShrink: 0 }}><MealTile name="Nani's Biryani" fontSize={110} radius={0} /></div>
-        <div style={{ flex: 1, padding: "20px 22px", overflow: "hidden" }}>
-          <div style={{ fontFamily: "var(--font-serif-loaded), 'Instrument Serif', serif", fontSize: 25, letterSpacing: "-0.02em", lineHeight: 1.05 }}>Nani&apos;s Chicken Biryani</div>
-          <div style={{ fontSize: 10, color: "var(--ink3)", fontFamily: "var(--font-mono-loaded), monospace", letterSpacing: 0.6, margin: "6px 0 14px" }}>ADDED BY NANI · COOKED 8×</div>
-          {["Basmati rice", "Chicken thighs", "Yogurt + spices", "Fried onions", "Saffron milk"].map((ing) => (
-            <div key={ing} style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 12, padding: "5px 0", borderBottom: "1px solid var(--border-soft)" }}>
-              <span style={{ width: 5, height: 5, borderRadius: 99, background: "var(--forest)" }} />{ing}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ display: "flex", borderBottom: "1px solid var(--border)" }}>
+          <div style={{ width: 192, height: 192, flexShrink: 0 }}><MealTile name="Nani's Chicken Biryani" fontSize={100} radius={0} /></div>
+          <div style={{ flex: 1, padding: "18px 22px", minWidth: 0 }}>
+            <div style={monoLabel}>Recipe · in library</div>
+            <div style={{ fontFamily: "var(--font-serif-loaded), 'Instrument Serif', serif", fontStyle: "italic", fontSize: 18, color: "var(--ink2)", lineHeight: 1, marginTop: 9 }}>Nani&apos;s Chicken,</div>
+            <div style={{ fontFamily: "var(--font-serif-loaded), 'Instrument Serif', serif", fontSize: 44, letterSpacing: "-0.025em", lineHeight: 0.92, color: "var(--ink)" }}>Biryani.</div>
+            <div style={{ display: "flex", gap: 6, marginTop: 12, flexWrap: "wrap" }}>
+              <span style={chipSage}>Easy</span>
+              <span style={chipGhost}>9 ingredients</span>
+              <span style={chipWheat}>4 steps</span>
             </div>
-          ))}
+            <div style={{ fontSize: 11.5, color: "var(--ink2)", marginTop: 11 }}>Added by Nani · 8 cooks · 2 days ago</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 13 }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 99, border: "1px solid var(--border)", fontSize: 12, fontWeight: 600, color: "var(--ink)" }}>{sparkle} Refine with AI</span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 99, background: "var(--forest)", color: "var(--forest-text)", fontSize: 12, fontWeight: 600 }}>Log a cook</span>
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+          <div style={{ width: 234, flexShrink: 0, background: "var(--cream-soft)", borderRight: "1px solid var(--border-soft)", padding: "16px 18px", overflow: "hidden" }}>
+            <div style={{ ...monoLabel, marginBottom: 10 }}>Ingredients</div>
+            {[["Basmati rice", "2 cups"], ["Chicken thighs", "700 g"], ["Yogurt", "¾ cup"], ["Fried onions", "1 cup"], ["Saffron milk", "3 tbsp"]].map(([n, q]) => (
+              <div key={n} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12, padding: "6px 0", borderBottom: "1px solid var(--border-soft)" }}>
+                <span>{n}</span><span style={{ fontFamily: "var(--font-mono-loaded), monospace", fontSize: 10.5, color: "var(--ink3)" }}>{q}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ flex: 1, padding: "16px 20px", overflow: "hidden" }}>
+            <div style={{ ...monoLabel, marginBottom: 12 }}>Method</div>
+            <div style={{ display: "flex", gap: 13 }}>
+              <div style={{ fontFamily: "var(--font-serif-loaded), 'Instrument Serif', serif", fontStyle: "italic", fontSize: 26, color: "var(--forest)", lineHeight: 1 }}>1</div>
+              <div>
+                <div style={{ fontFamily: "var(--font-serif-loaded), 'Instrument Serif', serif", fontSize: 17, color: "var(--ink)" }}>Marinate the chicken</div>
+                <div style={{ fontFamily: "var(--font-mono-loaded), monospace", fontSize: 10, color: "var(--ink3)", letterSpacing: 0.5, margin: "3px 0 7px" }}>30 MIN · OVERNIGHT BEST</div>
+                <div style={{ fontSize: 12, color: "var(--ink2)", lineHeight: 1.5 }}>Whisk the yogurt with the spice mix, coat the thighs, and rest covered.</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
+// Refine with AI — chat composer + pending-changes diff + heads-up,
+// matching the real Refine flow's shape.
 function WebRefine() {
+  const diffs: Array<[string, string, "add" | "edit"]> = [
+    ["+", "Add 2 green chillies", "add"],
+    ["~", "Halve all quantities", "edit"],
+    ["~", "Servings 4 → 2", "edit"]
+  ];
   return (
     <div className="browser-app" style={{ display: "flex", fontFamily: "var(--font-geist), system-ui, sans-serif", color: "var(--ink)" }}>
       <WebSidebar active="Library" />
-      <div style={{ flex: 1, padding: "20px 24px", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-        <div style={{ fontFamily: "var(--font-serif-loaded), 'Instrument Serif', serif", fontSize: 24, letterSpacing: "-0.02em", marginBottom: 14 }}>Refine with AI</div>
-        <div style={{ alignSelf: "flex-end", maxWidth: "62%", background: "var(--forest)", color: "var(--forest-text)", padding: "9px 13px", borderRadius: "14px 14px 4px 14px", fontSize: 12.5, marginBottom: 12 }}>Add more heat and halve the recipe</div>
-        <div style={{ maxWidth: "72%", background: "var(--surface)", border: "1px solid var(--border-soft)", padding: "12px 13px", borderRadius: "14px 14px 14px 4px" }}>
-          <div style={{ fontSize: 9, fontFamily: "var(--font-mono-loaded), monospace", letterSpacing: 1.4, color: "var(--ink3)", marginBottom: 6 }}>SUGGESTED CHANGES</div>
-          <div style={{ fontSize: 12.5, color: "var(--ink2)", lineHeight: 1.5 }}>+2 green chilies · ½ all quantities · 4 servings → 2</div>
+      <div style={{ flex: 1, padding: "18px 22px", overflow: "hidden", display: "flex", flexDirection: "column", gap: 11 }}>
+        <div>
+          <div style={{ fontFamily: "var(--font-serif-loaded), 'Instrument Serif', serif", fontSize: 23, letterSpacing: "-0.02em" }}>Refine with AI</div>
+          <div style={{ ...monoLabel, marginTop: 4 }}>Refining · Nani&apos;s Chicken Biryani</div>
+        </div>
+        <div style={{ alignSelf: "flex-end", maxWidth: "60%", background: "var(--forest)", color: "var(--forest-text)", padding: "9px 13px", borderRadius: "14px 14px 4px 14px", fontSize: 12.5 }}>Add more heat and halve the recipe</div>
+        <div style={{ maxWidth: "82%", background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "14px 14px 14px 4px", overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 13px", borderBottom: "1px solid var(--border-soft)" }}>
+            <span style={monoLabel}>Pending changes</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--forest)" }}>Accept all</span>
+          </div>
+          {diffs.map(([sign, text, kind]) => (
+            <div key={text} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 13px", borderBottom: "1px solid var(--border-soft)" }}>
+              <span style={{ width: 18, height: 18, flexShrink: 0, borderRadius: 6, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, background: kind === "add" ? "var(--sage-bg)" : "color-mix(in srgb, var(--wheat) 38%, transparent)", color: kind === "add" ? "var(--forest)" : "color-mix(in srgb, var(--wheat) 30%, var(--ink))" }}>{sign}</span>
+              <span style={{ fontSize: 12.5, color: "var(--ink)" }}>{text}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-start", background: "color-mix(in srgb, var(--wheat) 22%, transparent)", border: "1px solid color-mix(in srgb, var(--wheat) 45%, transparent)", borderRadius: 10, padding: "9px 12px", fontSize: 11.5, color: "var(--ink2)", lineHeight: 1.45 }}>
+          <span style={{ color: "var(--terra)" }}>⚠</span> Heads up — halving leaves an odd egg count. Round up to 2?
+        </div>
+        <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 8, border: "1px solid var(--border)", borderRadius: 99, padding: "6px 6px 6px 14px", background: "var(--surface)" }}>
+          <span style={{ flex: 1, fontSize: 12, color: "var(--ink3)" }}>Ask for another change…</span>
+          <span style={{ color: "var(--ink3)", display: "inline-flex" }}>{mic}</span>
+          <span style={{ width: 28, height: 28, borderRadius: 99, background: "var(--forest)", color: "var(--forest-text)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 5l7 7-7 7" /></svg>
+          </span>
         </div>
       </div>
     </div>
@@ -359,45 +424,48 @@ function HeroWebDemo() {
 }
 
 /* ─── Web kitchen dashboard (rendered in the laptop + hero) ────── */
+// Home — mirrors the real dashboard: editorial hero (kicker + first name
+// + date + week summary), 4-up stat cards, and a "Recently cooked" row.
 function WebKitchen() {
-  const meals = [
-    { name: "Nani's Biryani", meta: "Nani · 8×" },
-    { name: "Lasagna", meta: "Mara · 5×" },
-    { name: "Tacos al pastor", meta: "Diego · 3×" },
-    { name: "Shakshuka", meta: "You · 6×" },
-    { name: "Dal tadka", meta: "Mom · 12×" },
-    { name: "Khichdi", meta: "Nani · 4×" },
-    { name: "Ramen", meta: "You · 2×" },
-    { name: "Tiramisu", meta: "Mara · 1×" },
-    { name: "Pad thai", meta: "Diego · 3×" }
+  const recents = [
+    { name: "Shakshuka", date: "MAY 28" },
+    { name: "Dal tadka", date: "MAY 27" },
+    { name: "Tacos al pastor", date: "MAY 25" },
+    { name: "Khichdi", date: "MAY 24" },
+    { name: "Ramen", date: "MAY 22" }
+  ];
+  const stats: Array<[string, string, "sage" | "wheat"]> = [
+    ["Logged this week", "3", "sage"],
+    ["In library", "142", "wheat"],
+    ["Reliable repeats", "18", "sage"],
+    ["Pending invites", "2", "wheat"]
   ];
   return (
     <div className="browser-app" style={{ display: "flex", fontFamily: "var(--font-geist), system-ui, sans-serif", color: "var(--ink)" }}>
       <WebSidebar active="Home" />
-      {/* main */}
-      <div style={{ flex: 1, padding: "20px 24px", overflow: "hidden" }}>
-        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 16 }}>
-          <div>
-            <div style={{ fontFamily: "var(--font-serif-loaded), 'Instrument Serif', serif", fontSize: 28, letterSpacing: "-0.02em", lineHeight: 1 }}>Our kitchen</div>
-            <div style={{ fontSize: 12, color: "var(--ink2)", marginTop: 5 }}>142 recipes · 4 cooks</div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, height: 30, padding: "0 12px", borderRadius: 99, border: "1px solid var(--border-soft)", background: "var(--surface)", color: "var(--ink3)", fontSize: 12 }}>{searchI()} Search dishes</div>
-            <div style={{ display: "flex" }}>
-              {["F", "M", "D"].map((a, idx) => (
-                <span key={a} style={{ width: 26, height: 26, borderRadius: 99, background: MEAL_PALETTES[idx + 1].bg, color: MEAL_PALETTES[idx + 1].fg, fontSize: 12, fontWeight: 600, display: "inline-flex", alignItems: "center", justifyContent: "center", border: "2px solid var(--cream)", marginLeft: idx ? -8 : 0 }}>{a}</span>
-              ))}
+      <div style={{ flex: 1, padding: "22px 26px", overflow: "hidden" }}>
+        <div style={{ fontFamily: "var(--font-serif-loaded), 'Instrument Serif', serif", fontStyle: "italic", fontSize: 18, color: "var(--ink2)", lineHeight: 1 }}>Good evening,</div>
+        <div style={{ fontFamily: "var(--font-serif-loaded), 'Instrument Serif', serif", fontSize: 52, letterSpacing: "-0.02em", lineHeight: 0.95, color: "var(--ink)", marginTop: 4 }}>Sara.</div>
+        <div style={{ ...monoLabel, marginTop: 8 }}>Fri, May 30</div>
+        <div style={{ fontSize: 13, color: "var(--ink2)", marginTop: 8, maxWidth: 520 }}>You&apos;ve cooked <strong style={{ color: "var(--ink)" }}>3</strong> meals this week. Next up: <em style={{ fontFamily: "var(--font-serif-loaded), 'Instrument Serif', serif", color: "var(--ink)" }}>Eid dinner</em>.</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 11, marginTop: 18 }}>
+          {stats.map(([label, val, tone]) => (
+            <div key={label} style={{ borderRadius: 12, padding: "12px 13px", background: tone === "sage" ? "var(--sage-bg)" : "color-mix(in srgb, var(--wheat) 32%, transparent)", border: `1px solid ${tone === "sage" ? "color-mix(in srgb, var(--sage) 70%, transparent)" : "color-mix(in srgb, var(--wheat) 55%, transparent)"}` }}>
+              <div style={monoLabel}>{label}</div>
+              <div style={{ fontFamily: "var(--font-serif-loaded), 'Instrument Serif', serif", fontSize: 34, lineHeight: 1, color: "var(--ink)", marginTop: 6, letterSpacing: "-0.02em" }}>{val}</div>
             </div>
-          </div>
+          ))}
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
-          {meals.map((m) => (
-            <div key={m.name} style={{ border: "1px solid var(--border-soft)", borderRadius: 12, overflow: "hidden", background: "var(--surface)" }}>
-              <div style={{ aspectRatio: "16 / 10" }}><MealTile name={m.name} fontSize={40} radius={0} /></div>
-              <div style={{ padding: "8px 10px" }}>
-                <div style={{ fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</div>
-                <div style={{ fontSize: 10.5, color: "var(--ink3)", fontFamily: "var(--font-mono-loaded), monospace", letterSpacing: 0.3, marginTop: 2 }}>{m.meta}</div>
-              </div>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", margin: "20px 0 10px" }}>
+          <div style={monoLabel}>Recently cooked</div>
+          <span style={{ fontSize: 11, color: "var(--ink2)" }}>See all →</span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 11 }}>
+          {recents.map((r) => (
+            <div key={r.name}>
+              <div style={{ aspectRatio: "1 / 1", borderRadius: 10, overflow: "hidden", border: "1px solid var(--border-soft)" }}><MealTile name={r.name} fontSize={38} radius={0} /></div>
+              <div style={{ fontSize: 11.5, fontWeight: 500, marginTop: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</div>
+              <div style={{ ...monoLabel, fontSize: 8.5, marginTop: 2 }}>{r.date}</div>
             </div>
           ))}
         </div>
