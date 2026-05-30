@@ -513,7 +513,7 @@ export default function MarketingPage() {
           <div className="device-stage"><DevicePair /></div>
           <div className="device-callouts">
             <div className="device-callout"><div className="dc-icon">{laptopI}</div><div><div className="dc-title">On the web</div><div className="dc-body">Open your kitchen at <span className="dc-mono">app.eeatly.com</span> in any browser — nothing to download.</div></div></div>
-            <div className="device-callout"><div className="dc-icon">{phoneI}</div><div><div className="dc-title">On your phone</div><div className="dc-body">Works beautifully in your phone&apos;s browser for capturing and cooking. Native apps are on the way.</div></div></div>
+            <div className="device-callout"><div className="dc-icon">{phoneI}</div><div><div className="dc-title">On your phone <span className="dc-soon">Coming soon</span></div><div className="dc-body">Works beautifully in your phone&apos;s browser today. Dedicated iOS &amp; Android apps are coming soon.</div></div></div>
             <div className="device-callout"><div className="dc-icon">{globe}</div><div><div className="dc-title">One library</div><div className="dc-body">Sign in once, see the same recipes everywhere — every change syncs in real time.</div></div></div>
           </div>
         </div>
