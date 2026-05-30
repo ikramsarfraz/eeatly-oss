@@ -6,7 +6,6 @@ import { Fragment, useEffect, useState } from "react";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import {
   ArrowRight,
-  ChefHat,
   Mic,
   Camera,
   Users,
@@ -19,6 +18,7 @@ import {
   Lock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Wordmark } from "@/components/brand/logo";
 import { PRICING } from "@/lib/pricing";
 
 const HEADLINE = "One kitchen. Your whole family. Any distance.";
@@ -86,11 +86,8 @@ function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-transparent bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-2.5">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-            <ChefHat className="h-5 w-5" />
-          </span>
-          <span className="text-lg font-semibold tracking-tight">eeatly</span>
+        <Link href="/" className="flex items-center">
+          <Wordmark size={28} />
         </Link>
         <nav className="flex items-center gap-2 sm:gap-3">
           <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
@@ -856,11 +853,8 @@ function Footer() {
     <footer className="border-t bg-muted/20">
       <div className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-[1fr_auto] md:items-start md:py-16">
         <div className="max-w-xs">
-          <Link href="/" className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <ChefHat className="h-4 w-4" />
-            </span>
-            <span className="text-lg font-semibold tracking-tight">eeatly</span>
+          <Link href="/" className="flex items-center">
+            <Wordmark size={24} />
           </Link>
           <p className="mt-4 text-sm text-muted-foreground">
             Where your family&apos;s recipes live. Across phones, across chats,

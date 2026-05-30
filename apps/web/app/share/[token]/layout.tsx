@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { ChefHat } from "lucide-react";
+import { Wordmark } from "@/components/brand/logo";
 
 /**
  * Round 7 — minimal public chrome for share pages. Distinct from the
@@ -16,11 +16,8 @@ export default function ShareLayout({ children }: { children: React.ReactNode })
     <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="mx-auto flex w-full max-w-3xl items-center justify-between px-4 py-4 sm:px-6">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <ChefHat className="h-4 w-4" />
-            </span>
-            <span className="text-base font-semibold">eeatly</span>
+          <Link href="/" className="flex items-center">
+            <Wordmark size={28} />
           </Link>
         </div>
       </header>

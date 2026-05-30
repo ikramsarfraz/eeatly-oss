@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { ChefHat } from "lucide-react";
+import { Wordmark } from "@/components/brand/logo";
 import {
   Card,
   CardContent,
@@ -36,11 +36,8 @@ export default async function InviteAcceptPage({
       className="grid min-h-screen place-items-center px-4 py-8"
     >
       <div className="w-full max-w-md">
-        <Link href="/" className="mb-6 flex items-center justify-center gap-2">
-          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <ChefHat className="h-5 w-5" />
-          </span>
-          <span className="text-xl font-semibold">eeatly</span>
+        <Link href="/" className="mb-6 flex items-center justify-center">
+          <Wordmark size={32} />
         </Link>
 
         <InvitationView invitation={invitation} user={user} token={token} />

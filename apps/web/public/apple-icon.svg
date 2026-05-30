@@ -1,6 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-label="eeatly">
-  <rect width="180" height="180" rx="40" fill="#2f6f58"/>
-  <path d="M56 88c0-24 14-42 34-42s34 18 34 42v30c0 10-8 18-18 18H74c-10 0-18-8-18-18V88Z" fill="#f7f7f2"/>
-  <path d="M71 89c0-15 8-26 19-26s19 11 19 26" fill="none" stroke="#2f6f58" stroke-width="12" stroke-linecap="round"/>
-  <path d="M72 112h36" stroke="#2f6f58" stroke-width="12" stroke-linecap="round"/>
+  <rect width="180" height="180" rx="40.3" fill="#2E5739"/>
+  <text x="90" y="95" text-anchor="middle" dominant-baseline="central"
+        font-family="'Instrument Serif', Georgia, 'Times New Roman', serif"
+        font-style="italic" font-size="148" fill="#F5EFE2">e</text>
+  <circle cx="140" cy="128" r="8" fill="#D9C68C"/>
 </svg>

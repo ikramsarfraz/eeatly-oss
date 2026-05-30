@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata, Route } from "next";
-import { ChefHat } from "lucide-react";
+import { Wordmark } from "@/components/brand/logo";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getServerEnv, hasStripeEnv, isLaunchFreeAccess } from "@/lib/env/server";
 import { FEATURE_REGISTRY, type FeatureKey } from "@eeatly/api/gates/registry";
@@ -48,11 +48,8 @@ export default async function PricingPage() {
       className="mx-auto max-w-3xl px-4 py-10 pb-20 sm:px-6 sm:py-12"
     >
       <header className="mb-8 grid gap-3">
-        <Link href="/" className="flex w-fit items-center gap-2 text-foreground">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <ChefHat className="h-4.5 w-4.5" />
-          </span>
-          <span className="text-lg font-semibold">eeatly</span>
+        <Link href="/" className="flex w-fit items-center text-foreground">
+          <Wordmark size={30} />
         </Link>
         <h1 className="font-serif text-[36px] font-normal leading-tight tracking-[-0.005em] sm:text-[42px]">
           A kitchen that remembers what worked
