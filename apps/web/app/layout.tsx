@@ -3,6 +3,7 @@ import { Inter, Instrument_Serif, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { ToastProvider } from "@/components/providers/toast-provider";
+import { PostHogProvider } from "@/components/providers/posthog-provider";
 import { getPublicEnv } from "@/lib/env/public";
 import "./globals.css";
 
@@ -113,7 +114,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <QueryProvider>
-            <ToastProvider>{children}</ToastProvider>
+            <PostHogProvider>
+              <ToastProvider>{children}</ToastProvider>
+            </PostHogProvider>
           </QueryProvider>
         </ThemeProvider>
       </body>

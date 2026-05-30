@@ -29,11 +29,28 @@ const contentSecurityPolicy = [
   "frame-src 'self' https://www.youtube-nocookie.com https://www.tiktok.com https://www.pinterest.com https://assets.pinterest.com"
 ].join("; ");
 
+// PostHog reverse proxy — front the ingestion + asset hosts under our own
+// origin (`/ingest/*`) so ad-blockers (which blocklist *.posthog.com)
+// can't silently drop pageview/visit events. Region derived from the
+// public host env var; defaults to US cloud.
+const posthogHost = (process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "https://us.i.posthog.com").replace(/\/$/, "");
+const posthogAssetHost = posthogHost.includes("eu.i.posthog.com")
+  ? "https://eu-assets.i.posthog.com"
+  : "https://us-assets.i.posthog.com";
+
 const nextConfig: NextConfig = {
   typedRoutes: true,
   // Round 12: workspace packages live as .ts source (not pre-built .d.ts +
   // .js). Next needs to compile them through SWC alongside app code.
   transpilePackages: ["@eeatly/api", "@eeatly/shared"],
+  // PostHog needs trailing slashes preserved on its ingestion paths.
+  skipTrailingSlashRedirect: true,
+  async rewrites() {
+    return [
+      { source: "/ingest/static/:path*", destination: `${posthogAssetHost}/static/:path*` },
+      { source: "/ingest/:path*", destination: `${posthogHost}/:path*` }
+    ];
+  },
   async headers() {
     return [
       {

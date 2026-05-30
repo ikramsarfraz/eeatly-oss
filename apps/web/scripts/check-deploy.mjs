@@ -127,6 +127,14 @@ if (!sentryDsn) {
   lines.push(`Sentry: enabled — error tracking on; ${sourcemaps}.`);
 }
 
+// PostHog — optional client analytics; inert without the key.
+if (!setAndNonEmpty("NEXT_PUBLIC_POSTHOG_KEY")) {
+  lines.push("PostHog: not configured — pageview/visit + user analytics disabled (set NEXT_PUBLIC_POSTHOG_KEY).");
+} else {
+  const host = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com (default)";
+  lines.push(`PostHog: enabled — analytics on; host ${host}.`);
+}
+
 lines.push(
   `PLATFORM_ADMIN_HOST: ${setAndNonEmpty("PLATFORM_ADMIN_HOST") ? "set (admin routes additionally gated by host)" : "not set (admin uses session + role only)"}`
 );

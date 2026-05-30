@@ -59,7 +59,11 @@ const serverEnvSchema = z.object({
   SENTRY_DSN: optionalString,
   NEXT_PUBLIC_SENTRY_DSN: optionalString,
   SENTRY_AUTH_TOKEN: optionalString,
-  SENTRY_ENVIRONMENT: optionalString
+  SENTRY_ENVIRONMENT: optionalString,
+  // PostHog product analytics — public, client-side. Inert without the
+  // key. See also `lib/env/public.ts` (where the client reads them).
+  NEXT_PUBLIC_POSTHOG_KEY: optionalString,
+  NEXT_PUBLIC_POSTHOG_HOST: optionalString
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
