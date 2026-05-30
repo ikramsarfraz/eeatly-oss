@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { households } from "@/db/schema";
 import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
 import { db } from "@/lib/db/client";
-import { hasStripeEnv } from "@/lib/env/server";
+import { hasStripeEnv, isLaunchFreeAccess } from "@/lib/env/server";
 import { getSubscriptionState } from "@/services/billing";
 import { listPendingInvitations, listHouseholdMembers } from "@/services/households";
 import { SettingsClient } from "@/components/settings/settings-client";
@@ -38,6 +38,11 @@ export default async function SettingsPage() {
     billingConfigured ? getSubscriptionState({ userId: user.id }) : Promise.resolve(null)
   ]);
 
+  // During the launch promo, Plus is unlocked for everyone via the gate
+  // resolver even without a Stripe subscription — so the Plan section
+  // should read as Plus, not Free. We pass the flag separately so the
+  // client can label it as a launch perk rather than a paid plan.
+  const launchMode = isLaunchFreeAccess();
   const isPlus =
     subscription?.status === "active" || subscription?.status === "trialing";
 
@@ -57,6 +62,7 @@ export default async function SettingsPage() {
         pendingInviteCount={invitations.length}
         isOwner={isOwner}
         isPlus={isPlus}
+        launchMode={launchMode}
         version={version}
       />
     </div>

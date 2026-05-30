@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/providers/toast-provider";
 import { trpc } from "@/lib/trpc/client";
+import { LAUNCH_BADGE, PRICING } from "@/lib/pricing";
 
 type AuthState =
   | { kind: "anonymous" }
@@ -15,23 +16,26 @@ type AuthState =
   | { kind: "signed_in_free" };
 
 type PricingCardProps = {
-  monthlyPriceDisplay: string | null;
-  annualPriceDisplay: string | null;
   /**
-   * "configured" → Upgrade CTA fires the checkout action.
-   * "not_configured" → render "Coming soon" placeholder; no clickable
-   *   button. Lets the marketing page exist even in environments without
-   *   STRIPE_* env vars (dev, preview).
+   * Stripe wired (all STRIPE_* env vars present) → the "Upgrade" CTA can
+   * fire real checkout. When false, there's no checkout to fire; the card
+   * either shows the launch promo (see `launchMode`) or a "Coming soon"
+   * placeholder.
    */
   billingConfigured: boolean;
+  /**
+   * Release-v1 launch promo. When true, prices render struck-through with
+   * the launch badge and the CTA points everyone into the app (Plus is
+   * already unlocked) instead of checkout.
+   */
+  launchMode: boolean;
   authState: AuthState;
   features: string[];
 };
 
 export function PricingCard({
-  monthlyPriceDisplay,
-  annualPriceDisplay,
   billingConfigured,
+  launchMode,
   authState,
   features
 }: PricingCardProps) {
@@ -42,8 +46,7 @@ export function PricingCard({
   const checkoutMutation = trpc.billing.createCheckoutSession.useMutation();
   const pending = checkoutMutation.isPending;
 
-  const activePriceDisplay =
-    priceType === "monthly" ? monthlyPriceDisplay : annualPriceDisplay;
+  const activePrice = priceType === "monthly" ? PRICING.monthly : PRICING.annual;
 
   async function handleUpgrade() {
     if (pending) return;
@@ -119,20 +122,56 @@ export function PricingCard({
       </div>
 
       <div className="grid gap-1">
-        <div className="text-3xl font-semibold tracking-normal">
-          {activePriceDisplay ?? "—"}
-          <span className="ml-1 text-sm font-normal text-muted-foreground">
-            / {priceType === "monthly" ? "month" : "year"}
-          </span>
+        <div className="flex items-baseline gap-2">
+          {launchMode ? (
+            <>
+              <span className="text-3xl font-semibold tracking-normal text-muted-foreground line-through decoration-2">
+                {activePrice.display}
+              </span>
+              <span className="text-3xl font-semibold tracking-normal text-primary">
+                $0
+              </span>
+              <span className="text-sm font-normal text-muted-foreground">
+                today
+              </span>
+            </>
+          ) : (
+            <div className="text-3xl font-semibold tracking-normal">
+              {activePrice.display}
+              <span className="ml-1 text-sm font-normal text-muted-foreground">
+                {activePrice.suffix}
+              </span>
+            </div>
+          )}
         </div>
+        {priceType === "annual" ? (
+          <p className="text-xs font-medium text-primary">{PRICING.annual.note}</p>
+        ) : null}
         <p className="text-xs text-muted-foreground">
-          Billed {priceType === "monthly" ? "monthly" : "yearly"} via Stripe. Cancel
-          anytime.
+          {launchMode
+            ? LAUNCH_BADGE
+            : `Billed ${priceType === "monthly" ? "monthly" : "yearly"} via Stripe. Cancel anytime.`}
         </p>
       </div>
 
-      {/* CTA varies by auth + billing-configured state. */}
-      {!billingConfigured ? (
+      {/* CTA varies by launch mode, then auth + billing-configured state. */}
+      {launchMode ? (
+        authState.kind === "anonymous" ? (
+          <Button asChild className="w-full">
+            <Link href={"/sign-up" as Route}>Start free during launch</Link>
+          </Button>
+        ) : authState.kind === "active_subscriber" ? (
+          <Button asChild variant="outline" className="w-full">
+            <Link href={"/settings" as Route}>You&apos;re on Plus — manage billing</Link>
+          </Button>
+        ) : (
+          <Button asChild className="w-full">
+            <Link href={"/dashboard" as Route}>
+              You&apos;re all set — Plus is unlocked
+            </Link>
+          </Button>
+        )
+      ) : !billingConfigured ? (
         <Button type="button" disabled className="w-full">
           Coming soon
         </Button>

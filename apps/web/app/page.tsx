@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
-import { getServerEnv } from "@/lib/env/server";
+import { getServerEnv, isLaunchFreeAccess } from "@/lib/env/server";
 import MarketingPage from "./marketing-page";
 
 const META_DESCRIPTION =
@@ -33,7 +33,7 @@ export default async function HomePage() {
   }
 
   const env = getServerEnv();
-  const monthlyPriceDisplay = env.STRIPE_PRICE_MONTHLY_DISPLAY ?? null;
+  const launchMode = isLaunchFreeAccess(env);
 
   const structuredData = {
     "@context": "https://schema.org",
@@ -49,7 +49,7 @@ export default async function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
-      <MarketingPage monthlyPriceDisplay={monthlyPriceDisplay} />
+      <MarketingPage launchMode={launchMode} />
     </>
   );
 }

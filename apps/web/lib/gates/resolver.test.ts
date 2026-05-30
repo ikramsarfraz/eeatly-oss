@@ -43,6 +43,14 @@ vi.mock("@/lib/observability/logger", () => ({
   logger: { debug: () => undefined, info: () => undefined, warn: () => undefined, error: () => undefined }
 }));
 
+// The resolver reads the launch-promo flag from env. Mock it so the
+// precedence tests below run with the promo OFF (the normal gated
+// behavior); the launch-mode block flips it on per-test.
+const launchFreeAccess = vi.hoisted(() => ({ value: false }));
+vi.mock("@/lib/env/server", () => ({
+  isLaunchFreeAccess: () => launchFreeAccess.value
+}));
+
 import { can } from "./resolver";
 
 function queue<T>(value: T) {
@@ -51,6 +59,7 @@ function queue<T>(value: T) {
 
 beforeEach(() => {
   dbState.queue.length = 0;
+  launchFreeAccess.value = false;
 });
 
 afterEach(() => {
@@ -147,6 +156,36 @@ describe("can() — precedence walk", () => {
     queue([]); // user lookup → no rows
     queue([]); // override lookup → no rows
     const allowed = await can("u-ghost", "plans_create");
+    expect(allowed).toBe(false);
+  });
+});
+
+describe("can() — launch promo (release v1)", () => {
+  it("grants a beta_or_paid feature to a free, non-beta user when launch mode is on", async () => {
+    launchFreeAccess.value = true;
+    queue([{ id: "u-l1", role: "root_app_user", betaCohort: null }]);
+    queue([]); // override lookup → no rows
+    const allowed = await can("u-l1", "ai_share_recipe");
+    expect(allowed).toBe(true);
+  });
+
+  it("denies the same user when launch mode is off (sanity that the flag is what flips it)", async () => {
+    launchFreeAccess.value = false;
+    queue([{ id: "u-l2", role: "root_app_user", betaCohort: null }]);
+    queue([]);
+    const allowed = await can("u-l2", "ai_share_recipe");
+    expect(allowed).toBe(false);
+  });
+
+  it("an explicit per-user paid_only override still wins over launch mode", async () => {
+    // Launch mode would otherwise grant access; the user-targeted
+    // override pins them to paid_only and they have no subscription, so
+    // they're denied. Confirms the promo only affects the default-rule
+    // step, never override rows.
+    launchFreeAccess.value = true;
+    queue([{ id: "u-l3", role: "root_app_user", betaCohort: null }]);
+    queue([{ userId: "u-l3", cohort: null, ruleOverride: "paid_only" }]);
+    const allowed = await can("u-l3", "ai_share_recipe");
     expect(allowed).toBe(false);
   });
 });

@@ -19,6 +19,7 @@ import {
   Lock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PRICING } from "@/lib/pricing";
 
 const HEADLINE = "One kitchen. Your whole family. Any distance.";
 const SUBHEAD =
@@ -46,10 +47,12 @@ const staggerContainer: Variants = {
 /* ────────────────────────────────────────────────────────────────────────── */
 
 interface MarketingPageProps {
-  monthlyPriceDisplay: string | null;
+  /** Release-v1 launch promo — when true the pricing teaser frames Plus
+   *  as free during launch rather than a paid upsell. */
+  launchMode: boolean;
 }
 
-export default function MarketingPage({ monthlyPriceDisplay }: MarketingPageProps) {
+export default function MarketingPage({ launchMode }: MarketingPageProps) {
   const prefersReducedMotion = useReducedMotion();
 
   return (
@@ -67,7 +70,7 @@ export default function MarketingPage({ monthlyPriceDisplay }: MarketingPageProp
       <HowItWorksSection prefersReducedMotion={prefersReducedMotion} />
       <TestimonialsSection prefersReducedMotion={prefersReducedMotion} />
       <SecondaryCTA prefersReducedMotion={prefersReducedMotion} />
-      <PricingTeaser monthlyPriceDisplay={monthlyPriceDisplay} prefersReducedMotion={prefersReducedMotion} />
+      <PricingTeaser launchMode={launchMode} prefersReducedMotion={prefersReducedMotion} />
       <FaqSection prefersReducedMotion={prefersReducedMotion} />
       <Footer />
       <MobileStickyCTA />
@@ -653,8 +656,10 @@ const PLAN_COMPARISON = [
   { feature: "Public share links", free: false, plus: true }
 ] as const;
 
-function PricingTeaser({ monthlyPriceDisplay, prefersReducedMotion }: { monthlyPriceDisplay: string | null; prefersReducedMotion: boolean | null }) {
-  const priceLine = monthlyPriceDisplay ? `Plus starts at ${monthlyPriceDisplay}/month` : null;
+function PricingTeaser({ launchMode, prefersReducedMotion }: { launchMode: boolean; prefersReducedMotion: boolean | null }) {
+  const priceLine = launchMode
+    ? `${PRICING.monthly.display}/month or ${PRICING.annual.display}/year — free for everyone during launch`
+    : `Plus starts at ${PRICING.monthly.display}/month · ${PRICING.annual.display}/year (2 months free)`;
 
   return (
     <section className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6">

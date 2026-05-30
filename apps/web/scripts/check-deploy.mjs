@@ -81,6 +81,40 @@ if (r2Count === 0) {
   lines.push(`R2: partially configured (${r2Count}/${r2Keys.length}) — missing: ${missing.join(", ")}`);
 }
 
+// Stripe paid tier — all-or-none, same as R2. When none are set the app
+// runs in launch mode (Plus free for everyone); when all are set, paid
+// checkout goes live and launch free-access auto-disables. A PARTIAL
+// config is a hard failure: a half-wired Stripe is the one state that
+// silently breaks checkout, so we block the deploy on it.
+const stripeKeys = [
+  "STRIPE_SECRET_KEY",
+  "STRIPE_PUBLISHABLE_KEY",
+  "STRIPE_WEBHOOK_SECRET",
+  "STRIPE_PRICE_MONTHLY",
+  "STRIPE_PRICE_ANNUAL"
+];
+const stripeCount = stripeKeys.filter((k) => setAndNonEmpty(k)).length;
+if (stripeCount === 0) {
+  lines.push(
+    "Stripe: not configured — launch mode active (Plus free for everyone). Set all STRIPE_* vars to turn on paid checkout."
+  );
+} else if (stripeCount === stripeKeys.length) {
+  lines.push(
+    "Stripe: fully configured — paid checkout active; launch free-access auto-disabled (unless LAUNCH_FREE_ACCESS=true)."
+  );
+} else {
+  failed = true;
+  const missing = stripeKeys.filter((k) => !setAndNonEmpty(k));
+  lines.push(
+    `Stripe: partially configured (${stripeCount}/${stripeKeys.length}) — missing: ${missing.join(", ")}`
+  );
+}
+
+const launchOverride = process.env.LAUNCH_FREE_ACCESS;
+if (launchOverride === "true" || launchOverride === "false") {
+  lines.push(`LAUNCH_FREE_ACCESS: ${launchOverride} (explicit override of the default)`);
+}
+
 lines.push(
   `PLATFORM_ADMIN_HOST: ${setAndNonEmpty("PLATFORM_ADMIN_HOST") ? "set (admin routes additionally gated by host)" : "not set (admin uses session + role only)"}`
 );

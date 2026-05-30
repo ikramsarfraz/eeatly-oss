@@ -7,7 +7,8 @@ const baseCtx: GateContext = {
   betaCohort: null,
   subscriptionStatus: null,
   allowlistedUserIds: [],
-  envFlags: {}
+  envFlags: {},
+  launchFreeAccess: false
 };
 
 describe("ruleEvaluators", () => {

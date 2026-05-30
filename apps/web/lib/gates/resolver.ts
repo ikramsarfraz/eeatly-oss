@@ -4,6 +4,7 @@ import { cache } from "react";
 import { and, eq, or } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { featureOverrides, users } from "@/db/schema";
+import { isLaunchFreeAccess } from "@/lib/env/server";
 import { FeatureGateDeniedError } from "@/lib/errors/gates";
 import { logger } from "@/lib/observability/logger";
 import {
@@ -53,7 +54,8 @@ const loadGateContext = cache(async (userId: string): Promise<GateContext> => {
       betaCohort: null,
       subscriptionStatus: null,
       allowlistedUserIds: [],
-      envFlags: {}
+      envFlags: {},
+      launchFreeAccess: isLaunchFreeAccess()
     };
   }
 
@@ -70,7 +72,9 @@ const loadGateContext = cache(async (userId: string): Promise<GateContext> => {
     // loading them all up-front would be wasteful for the common case
     // (rules other than `allowlist` / `env_flag`).
     allowlistedUserIds: [],
-    envFlags: {}
+    envFlags: {},
+    // Launch promo flag — read once per request alongside the user row.
+    launchFreeAccess: isLaunchFreeAccess()
   };
 });
 
@@ -139,6 +143,24 @@ export async function can(userId: string, feature: FeatureKey): Promise<boolean>
 
   // Step 4: feature's default rule.
   const defaultRule = FEATURE_REGISTRY[feature].defaultRule;
+
+  // Launch promo (release v1): unlock the paid-tier default rules for
+  // everyone. Runs only after the override lookup, so an explicit
+  // per-user / per-cohort deny still wins. Leaves admin_only, allowlist,
+  // env_flag, and open untouched.
+  if (
+    ctx.launchFreeAccess &&
+    (defaultRule === "beta_or_paid" || defaultRule === "paid_only")
+  ) {
+    logger.debug("gate_check", {
+      userId,
+      feature,
+      allowed: true,
+      via: "launch"
+    });
+    return true;
+  }
+
   const allowed = ruleEvaluators[defaultRule](ctx, feature);
   logger.debug("gate_check", {
     userId,

@@ -42,6 +42,14 @@ export type GateContext = {
   allowlistedUserIds: string[];
   /** Env-flag rule consults this — feature key → boolean. */
   envFlags: Record<string, boolean>;
+  /**
+   * Release-v1 launch promo. When true, the resolver grants any feature
+   * whose default rule is `paid_only` / `beta_or_paid` to every user —
+   * Plus is free for all during launch. Handled in the resolver's
+   * default-rule step (NOT a rule evaluator), so explicit per-user /
+   * per-cohort override rows still win. See `lib/gates/resolver.ts`.
+   */
+  launchFreeAccess: boolean;
 };
 
 /**

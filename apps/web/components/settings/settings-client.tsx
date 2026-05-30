@@ -92,6 +92,13 @@ type SettingsClientProps = {
    *  without a server-shell change. */
   isOwner: boolean;
   isPlus: boolean;
+  /**
+   * Release-v1 launch promo. When true (and the user has no paid
+   * subscription), Plus is unlocked for free during launch — the Plan
+   * section reads as Plus with a "free during launch" note rather than
+   * the gated Free copy.
+   */
+  launchMode: boolean;
   version: string;
 };
 
@@ -103,8 +110,13 @@ export function SettingsClient({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- see prop comment
   isOwner: _isOwner,
   isPlus,
+  launchMode,
   version
 }: SettingsClientProps) {
+  // Plus features are active either through a real subscription or the
+  // launch promo. `isPaidPlus` distinguishes the two for the copy below.
+  const isPaidPlus = isPlus;
+  const hasPlus = isPlus || launchMode;
   const [active, setActive] = React.useState<SectionId>("account");
 
   // IntersectionObserver for scroll-driven active state. Each section
@@ -239,15 +251,17 @@ export function SettingsClient({
             <SectionLabel>Plan</SectionLabel>
             <Card className="overflow-hidden p-0">
               <SettingRow
-                label={isPlus ? "Plus" : "Current plan"}
+                label={hasPlus ? "Plus" : "Current plan"}
                 sub={
-                  isPlus
+                  isPaidPlus
                     ? "All Plus features active. Manage billing on the web."
-                    : "Free tier — logging, library, basic plans. AI capture is gated; planning is gated."
+                    : launchMode
+                      ? "All Plus features unlocked free during launch — no card required."
+                      : "Free tier — logging, library, basic plans. AI capture is gated; planning is gated."
                 }
                 suffix={
-                  <Badge variant={isPlus ? "sage" : "ghost"}>
-                    {isPlus ? "Plus" : "Free"}
+                  <Badge variant={hasPlus ? "sage" : "ghost"}>
+                    {hasPlus ? "Plus" : "Free"}
                   </Badge>
                 }
               />

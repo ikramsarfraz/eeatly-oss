@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata, Route } from "next";
 import { ChefHat } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
-import { getServerEnv, hasStripeEnv } from "@/lib/env/server";
+import { getServerEnv, hasStripeEnv, isLaunchFreeAccess } from "@/lib/env/server";
 import { FEATURE_REGISTRY, type FeatureKey } from "@eeatly/api/gates/registry";
 import { getSubscriptionState } from "@/services/billing";
 import { PricingCard } from "@/components/pricing/pricing-card";
@@ -18,6 +18,7 @@ export const dynamic = "force-dynamic";
 export default async function PricingPage() {
   const env = getServerEnv();
   const billingConfigured = hasStripeEnv(env);
+  const launchMode = isLaunchFreeAccess(env);
   const user = await getCurrentUser();
 
   // Subscription lookup only matters when a user is signed in AND
@@ -65,9 +66,8 @@ export default async function PricingPage() {
       </header>
 
       <PricingCard
-        monthlyPriceDisplay={env.STRIPE_PRICE_MONTHLY_DISPLAY ?? null}
-        annualPriceDisplay={env.STRIPE_PRICE_ANNUAL_DISPLAY ?? null}
         billingConfigured={billingConfigured}
+        launchMode={launchMode}
         authState={authState}
         features={plusFeatures}
       />
@@ -86,25 +86,27 @@ export default async function PricingPage() {
         <h2 className="text-lg font-semibold tracking-normal">Common questions</h2>
         <dl className="grid gap-4 text-sm">
           <div className="grid gap-1">
-            <dt className="font-medium text-foreground">Can I cancel anytime?</dt>
+            <dt className="font-medium text-foreground">What does &ldquo;free during launch&rdquo; mean?</dt>
             <dd className="text-muted-foreground">
-              Yes. Cancel from the Settings page; access stays through the end of the
-              period you paid for.
+              Every Plus feature is unlocked for everyone right now — no card
+              needed. We&apos;ll give plenty of notice before paid plans begin, and
+              early users will get a launch discount as a thank-you. The prices
+              above are what they&apos;ll be.
             </dd>
           </div>
           <div className="grid gap-1">
             <dt className="font-medium text-foreground">Does Plus apply to the whole household?</dt>
             <dd className="text-muted-foreground">
-              Yes — anyone you invite to your household uses Plus features on your
-              subscription. One payer, the whole kitchen benefits.
+              Yes — anyone you invite to your household uses Plus features too. One
+              account, the whole kitchen benefits.
             </dd>
           </div>
           <div className="grid gap-1">
-            <dt className="font-medium text-foreground">What if I&apos;m already in the beta?</dt>
+            <dt className="font-medium text-foreground">Can I cancel anytime?</dt>
             <dd className="text-muted-foreground">
-              Beta users keep full access free for now — there&apos;s a small indicator
-              in your Settings if you&apos;re on the beta cohort. No card on file
-              required.
+              When paid plans begin you&apos;ll be able to cancel from the Settings
+              page, and access stays through the end of the period you paid for.
+              Annual is billed yearly and works out to two months free.
             </dd>
           </div>
         </dl>

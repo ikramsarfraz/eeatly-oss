@@ -43,10 +43,15 @@ const serverEnvSchema = z.object({
   STRIPE_WEBHOOK_SECRET: optionalString,
   STRIPE_PRICE_MONTHLY: optionalString,
   STRIPE_PRICE_ANNUAL: optionalString,
-  // Separate human-readable display strings — kept out of the price IDs
-  // so the marketing copy doesn't depend on a Stripe API call at render.
-  STRIPE_PRICE_MONTHLY_DISPLAY: optionalString,
-  STRIPE_PRICE_ANNUAL_DISPLAY: optionalString
+  // Note: display prices are NOT env-driven — they live in `lib/pricing.ts`
+  // (the single source of truth) so the marketing + pricing pages render
+  // real numbers even before Stripe is configured. When you create the
+  // Stripe Prices, their amounts MUST match `PRICING` in that file.
+  // Release-v1 launch promo. While we don't yet have Stripe wired (no LLC
+  // / payments), Plus is unlocked for everyone, no card. Tri-state:
+  // "true"/"false" force the behavior; unset defaults to ON until Stripe
+  // is configured. See `isLaunchFreeAccess` below.
+  LAUNCH_FREE_ACCESS: optionalString
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
@@ -107,4 +112,20 @@ export function hasStripeEnv(env = getServerEnv()) {
       env.STRIPE_PRICE_MONTHLY &&
       env.STRIPE_PRICE_ANNUAL
   );
+}
+
+/**
+ * Release-v1 launch promo: eeatly Plus is unlocked for everyone, no card
+ * required, no expiry — framed on the pricing page as a launch discount.
+ *
+ * ON by default until Stripe is wired (`!hasStripeEnv`), so v1 needs no
+ * new env var. Once `STRIPE_*` is configured the promo turns itself off
+ * and real checkout takes over — no code change. `LAUNCH_FREE_ACCESS`
+ * can force either side: "true" keeps the promo on even with Stripe set,
+ * "false" is the kill-switch that restores gating immediately.
+ */
+export function isLaunchFreeAccess(env = getServerEnv()) {
+  if (env.LAUNCH_FREE_ACCESS === "true") return true;
+  if (env.LAUNCH_FREE_ACCESS === "false") return false;
+  return !hasStripeEnv(env);
 }
