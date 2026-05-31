@@ -120,6 +120,11 @@ const heavyQuantityRule: Rule = (recipe, changes) => {
  * If pending changes net-add ≥5 ingredients to a recipe with <10
  * ingredients, the recipe is probably crossing complexity tiers. Warn.
  */
+/** Human-readable effort label — "high_effort" → "high effort". */
+function effortLabel(e: "quick" | "easy" | "medium" | "high_effort"): string {
+  return e === "high_effort" ? "high effort" : e;
+}
+
 const ingredientCountRule: Rule = (recipe, changes) => {
   if (recipe.effortLevel === "high_effort") return null;
   const currentCount = recipe.ingredients.length;
@@ -136,10 +141,10 @@ const ingredientCountRule: Rule = (recipe, changes) => {
     id: "ingredient-count-spike",
     severity: "warn",
     title: "Heads up",
-    body: `You're adding ${netAdd} ingredients to a recipe with ${currentCount}. That tends to bump effort up to ${nextEffort}.`,
+    body: `You're adding ${netAdd} ingredients to a recipe with ${currentCount}. That tends to bump effort up to ${effortLabel(nextEffort)}.`,
     suggestedAction: recipe.effortLevel
       ? {
-          label: `Keep effort ${recipe.effortLevel}`,
+          label: `Keep effort ${effortLabel(recipe.effortLevel)}`,
           payload: { kind: "lock-effort", effortLevel: recipe.effortLevel }
         }
       : undefined
