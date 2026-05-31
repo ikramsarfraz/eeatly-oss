@@ -20,6 +20,7 @@ import { SectionLabel } from "@/components/ui/section-label";
 
 import { AddDishPicker } from "@/components/plans/add-dish-picker";
 import { AnnotationEditor } from "@/components/plans/annotation-editor";
+import { WhoCanSeeStrip } from "@/components/sharing/who-can-see-strip";
 import { useSetBreadcrumb } from "@/components/layout/breadcrumb-context";
 import { trpc } from "@/lib/trpc/client";
 import { useToast } from "@/components/providers/toast-provider";
@@ -102,12 +103,15 @@ const EFFORT_LABEL: Record<
 
 export function PlanDetailClient({
   plan,
+  isOwner,
   dishes,
   hiddenDishCount,
   members,
   library
 }: {
   plan: PlanDetailPlan;
+  /** Viewer owns this plan (controls the "Who can see this" strip variant). */
+  isOwner: boolean;
   dishes: PlanDetailDish[];
   /**
    * R32 — count of dishes on this plan that were filtered out because
@@ -293,6 +297,16 @@ export function PlanDetailClient({
           }}
         />
       ) : null}
+
+      {/* "Who can see this" strip — sharing a plan shares its live
+          structure, not the underlying recipes (the Share sheet copy
+          spells this out). */}
+      <WhoCanSeeStrip
+        itemType="plan"
+        itemId={plan.id}
+        itemName={plan.name}
+        isOwner={isOwner}
+      />
 
       {/* Dishes section */}
       <section className="grid gap-3">

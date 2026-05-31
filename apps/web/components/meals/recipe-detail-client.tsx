@@ -3,24 +3,14 @@
 import * as React from "react";
 import Link from "next/link";
 import type { Route } from "next";
-import { differenceInCalendarDays, format, formatDistanceToNow, parseISO } from "date-fns";
-import { Camera, Loader2, Lock, Share2, Sparkles } from "lucide-react";
+import { differenceInCalendarDays, format, parseISO } from "date-fns";
+import { Camera, Loader2, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MealTile } from "@/components/ui/meal-tile";
+import { WhoCanSeeStrip } from "@/components/sharing/who-can-see-strip";
 import { SectionLabel } from "@/components/ui/section-label";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger
-} from "@/components/ui/alert-dialog";
 
 import { IngredientChecklist } from "@/components/meals/ingredient-checklist";
 import { StepCard, type StepCardData } from "@/components/meals/step-card";
@@ -100,20 +90,6 @@ const EFFORT_LABEL: Record<
   medium: "Medium",
   high_effort: "High effort"
 };
-
-/**
- * R32 — render the "Shared {timeAgo}" label for the chip. Falls back
- * to a plain "Shared" when the timestamp is null or unparseable
- * (defense — caller already gates on `isShared`).
- */
-function sharedAgoLabel(sharedAt: string | null): string {
-  if (!sharedAt) return "Shared";
-  try {
-    return `Shared ${formatDistanceToNow(parseISO(sharedAt), { addSuffix: true })}`;
-  } catch {
-    return "Shared";
-  }
-}
 
 function lastCookedLabel(lastCookedAt: string | null): string | null {
   if (!lastCookedAt) return null;
@@ -361,9 +337,6 @@ export function RecipeDetailClient({
   const isCreator =
     meal.createdByUserId !== null &&
     meal.createdByUserId === viewer.currentUserId;
-  const isMultiMember = viewer.householdMemberCount > 1;
-  const isShared = meal.sharedAt !== null;
-  const showShareAffordance = isCreator && isMultiMember;
 
   // Dish image. `meal.photoUrl` arrives already coalesced server-side
   // (the meal's own photo → the app-wide AI image), so a non-null value
@@ -495,26 +468,8 @@ export function RecipeDetailClient({
                 {totalTime}
               </Badge>
             ) : null}
-            {/* R32 — visibility chip. Hidden on single-member
-                households (no signal to surface). "Personal" wheat
-                tone for null sharedAt; "Shared {timeAgo}" sage tone
-                for shared. The tone choice mirrors the design pack:
-                personal is the rarer, opt-in state and reads as
-                "yours alone"; shared is the default and reads as
-                household-warm. */}
-            {isMultiMember ? (
-              isShared ? (
-                <Badge variant="sage" className="gap-1">
-                  <Share2 className="h-3 w-3" />
-                  {sharedAgoLabel(meal.sharedAt)}
-                </Badge>
-              ) : (
-                <Badge variant="wheat" className="gap-1">
-                  <Lock className="h-3 w-3" />
-                  Personal
-                </Badge>
-              )
-            ) : null}
+            {/* Sharing state now lives in the "Who can see this" strip
+                below the hero (per-item sharing model). */}
           </div>
           <p
             className="mt-1 font-mono text-[11px] uppercase text-[var(--subtle-fg,var(--muted-foreground))]"
@@ -542,13 +497,6 @@ export function RecipeDetailClient({
                 Refine with AI
               </Link>
             </Button>
-            {showShareAffordance ? (
-              <ShareToggleButton
-                mealId={meal.id}
-                mealName={meal.name}
-                isShared={isShared}
-              />
-            ) : null}
             {/* Creator-only device upload. Reuses the presign → R2 flow;
                 the resulting photo becomes the meal's own image and wins
                 over the app-wide AI fallback. */}
@@ -580,6 +528,15 @@ export function RecipeDetailClient({
           </div>
         </div>
       </section>
+
+      {/* "Who can see this" strip — per-item sharing entry point. */}
+      <WhoCanSeeStrip
+        itemType="recipe"
+        itemId={meal.id}
+        itemName={meal.name}
+        isOwner={isCreator}
+        ownerName={meal.createdByName}
+      />
 
       {/* Body band — cream-soft ingredients sidebar + recipe column. */}
       <section className="grid grid-cols-1 md:grid-cols-[360px_1fr]">
@@ -680,131 +637,5 @@ export function RecipeDetailClient({
         </div>
       </section>
     </div>
-  );
-}
-
-/**
- * R32 — TopBar share/personal toggle. Two visual states:
- *
- *   - Personal meal → forest "Share with kitchen" button. One-tap
- *     action, no confirmation; sharing is the recoverable direction.
- *   - Shared meal → outline "Move to personal" button. Confirmation
- *     via shadcn AlertDialog because moving back hides the meal from
- *     household members and the spec calls it out as worth
- *     confirming.
- *
- * After the mutation succeeds we invalidate `trpc.meals.getById` so
- * the parent's `meal.sharedAt` re-fetches and the chip + button swap.
- * `dashboard.meals` + `plans.list` + `search.meals` are also
- * invalidated because they read meal lists that should update for
- * other members on their next navigation; same-user same-tab updates
- * happen via the getById refetch.
- */
-function ShareToggleButton({
-  mealId,
-  mealName,
-  isShared
-}: {
-  mealId: string;
-  mealName: string;
-  isShared: boolean;
-}) {
-  const { showToast } = useToast();
-  const utils = trpc.useUtils();
-  const shareMut = trpc.meals.share.useMutation({
-    onSuccess: () => {
-      void utils.meals.getById.invalidate({ mealId });
-      void utils.dashboard.meals.invalidate();
-      void utils.plans.list.invalidate();
-      void utils.search.meals.invalidate();
-      showToast({
-        variant: "success",
-        title: "Shared with your kitchen",
-        description: `${mealName} is now visible to other members.`
-      });
-    },
-    onError: (err) => {
-      showToast({
-        variant: "error",
-        title: "Couldn't share",
-        description: err.message ?? "Try again."
-      });
-    }
-  });
-  const unshareMut = trpc.meals.unshare.useMutation({
-    onSuccess: () => {
-      void utils.meals.getById.invalidate({ mealId });
-      void utils.dashboard.meals.invalidate();
-      void utils.plans.list.invalidate();
-      void utils.search.meals.invalidate();
-      showToast({
-        variant: "success",
-        title: "Moved to personal",
-        description: `${mealName} is only visible to you.`
-      });
-    },
-    onError: (err) => {
-      showToast({
-        variant: "error",
-        title: "Couldn't update",
-        description: err.message ?? "Try again."
-      });
-    }
-  });
-
-  const pending = shareMut.isPending || unshareMut.isPending;
-
-  if (!isShared) {
-    return (
-      <Button
-        type="button"
-        onClick={() => shareMut.mutate({ mealId })}
-        disabled={pending}
-        className="min-h-[40px]"
-      >
-        {pending ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        ) : (
-          <Share2 className="h-3.5 w-3.5" />
-        )}
-        Share with kitchen
-      </Button>
-    );
-  }
-
-  return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={pending}
-          className="min-h-[40px]"
-        >
-          {pending ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Lock className="h-3.5 w-3.5" />
-          )}
-          Move to personal
-        </Button>
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Move this meal to personal?</AlertDialogTitle>
-          <AlertDialogDescription>
-            Other household members will no longer see {mealName} in the
-            shared kitchen. Their cooking history stays intact; you can
-            share it again any time.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Keep shared</AlertDialogCancel>
-          <AlertDialogAction onClick={() => unshareMut.mutate({ mealId })}>
-            Move to personal
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
   );
 }
