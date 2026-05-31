@@ -19,6 +19,11 @@ import { users } from "./auth";
  *   - who_can_add_you: 'anyone' | 'connections' | 'no_one' — gates inbound
  *     connection invites for existing users.
  *   - find_by_email: whether others can discover/auto-match you by email.
+ *   - measurement_system: 'metric' | 'imperial' — the cook's preferred
+ *     units. Inferred once at signup from the request's geo/locale (see
+ *     lib/units/detect.ts) and flippable in Settings → Kitchen. Biases the
+ *     AI on capture + Refine so new recipe quantities come out in the
+ *     user's system; existing free-form quantity strings are left verbatim.
  */
 export const userSettings = pgTable("user_settings", {
   userId: text("user_id")
@@ -28,6 +33,7 @@ export const userSettings = pgTable("user_settings", {
   cooksCanReshare: boolean("cooks_can_reshare").notNull().default(false),
   whoCanAddYou: text("who_can_add_you").notNull().default("connections"),
   findByEmail: boolean("find_by_email").notNull().default(true),
+  measurementSystem: text("measurement_system").notNull().default("metric"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
 });
 

@@ -342,8 +342,8 @@ export function SettingsClient({
                 label="Default kitchen"
                 sub="Where new logs and meals land."
                 value={household.name}
-                last
               />
+              <KitchenUnits />
             </Card>
           </section>
 
@@ -706,6 +706,47 @@ function PrivacyToggles() {
         last
       />
     </Card>
+  );
+}
+
+/**
+ * Units preference (Settings → Kitchen). Shares the `privacySettings`
+ * query/mutation with PrivacyToggles since both live on the user_settings
+ * row. The default is inferred once at signup from the request's geo/locale
+ * (see lib/units/detect.ts); this is the flip. It biases the AI on capture
+ * + Refine — existing recipes are not retroactively converted.
+ */
+function KitchenUnits() {
+  const { showToast } = useToast();
+  const utils = trpc.useUtils();
+  const query = trpc.sharing.privacySettings.useQuery();
+  const update = trpc.sharing.updatePrivacySettings.useMutation({
+    onSuccess: () => void utils.sharing.privacySettings.invalidate(),
+    onError: (e) =>
+      showToast({ variant: "error", title: "Couldn't save", description: e.message })
+  });
+  const system = query.data?.measurementSystem;
+  if (!system) return null;
+
+  return (
+    <SettingRow
+      label="Units"
+      sub="Which measurements new AI-filled recipes use. Existing recipes keep their original units."
+      suffix={
+        <SegmentedRadio
+          value={system}
+          options={[
+            { value: "metric", label: "Metric" },
+            { value: "imperial", label: "Imperial" }
+          ]}
+          busy={update.isPending}
+          onChange={(v) =>
+            update.mutate({ measurementSystem: v as "metric" | "imperial" })
+          }
+        />
+      }
+      last
+    />
   );
 }
 

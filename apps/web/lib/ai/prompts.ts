@@ -8,6 +8,26 @@ export function buildDishImagePrompt(dishName: string): string {
   return `A high-quality, appetizing food photograph of "${dishName}". A single serving plated on a simple ceramic dish, shot from a slight overhead angle on a clean neutral surface with soft natural daylight and shallow depth of field. Realistic, editorial food-photography style. No text, no labels, no watermarks, no hands, no people.`;
 }
 
+/**
+ * Units bias for the AI extraction + Refine prompts. The product stores
+ * quantities as free-form strings and never converts them, so this is the
+ * only lever that makes new recipes land in the cook's preferred system.
+ *
+ * Crucially, we only ask the model to PREFER the system when it's free to
+ * choose (estimating quantities, building a recipe from scratch, normalizing
+ * a vague spoken amount) — never to convert a quantity the SOURCE states
+ * explicitly. A recipe card that says "250 g flour" should stay "250 g" even
+ * for an imperial cook; silently rewriting source numbers invites rounding
+ * errors. Returns "" for metric callers that didn't opt in, so the default
+ * prompt is unchanged.
+ */
+export function unitsDirective(system: "metric" | "imperial"): string {
+  if (system === "imperial") {
+    return `\n\nUNITS: This cook prefers US/imperial units (pounds, ounces, cups, teaspoons/tablespoons, °F). When YOU choose or estimate a quantity — building a recipe from scratch, filling a missing amount, or normalizing a vague spoken measure — express it in imperial. Do NOT convert or rewrite quantities the source states explicitly; keep those verbatim.`;
+  }
+  return `\n\nUNITS: This cook prefers metric units (grams, kilograms, millilitres, litres, °C). When YOU choose or estimate a quantity — building a recipe from scratch, filling a missing amount, or normalizing a vague spoken measure — express it in metric. Do NOT convert or rewrite quantities the source states explicitly; keep those verbatim.`;
+}
+
 export const SUGGEST_FROM_IMAGE_PROMPT = `Look at this image and determine whether it shows:
 (a) A finished dish or prepared meal
 (b) A recipe card, cookbook page, or written/printed recipe

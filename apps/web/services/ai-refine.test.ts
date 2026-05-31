@@ -19,6 +19,17 @@ const gateMock = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/gates/resolver", () => gateMock);
 
+const userSettingsMock = vi.hoisted(() => ({
+  getUserSettings: vi.fn(async () => ({
+    allowLinkShares: true,
+    cooksCanReshare: false,
+    whoCanAddYou: "connections" as const,
+    findByEmail: true,
+    measurementSystem: "metric" as const
+  }))
+}));
+vi.mock("@/services/user-settings", () => userSettingsMock);
+
 const withFallbackMock = vi.hoisted(() => ({
   withFallback: vi.fn(async (primary: () => Promise<unknown>) => primary())
 }));

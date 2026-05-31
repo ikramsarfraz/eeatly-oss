@@ -7,8 +7,10 @@ import {
   REFINE_RECIPE_PROMPT,
   SUGGEST_FROM_IMAGE_PROMPT,
   SUGGEST_FROM_TEXT_PROMPT,
-  SUGGEST_FROM_VOICE_NOTE_PROMPT
+  SUGGEST_FROM_VOICE_NOTE_PROMPT,
+  unitsDirective
 } from "@/lib/ai/prompts";
+import type { MeasurementSystem } from "@/lib/units/detect";
 import { logger } from "@/lib/observability/logger";
 import type { MealSuggestion } from "@/types";
 import {
@@ -97,7 +99,11 @@ function coerceIngredients(value: unknown): string[] {
   return out;
 }
 
-export async function suggestMealFromImage(imageBase64: string, mediaType: string): Promise<MealSuggestion> {
+export async function suggestMealFromImage(
+  imageBase64: string,
+  mediaType: string,
+  system: MeasurementSystem = "metric"
+): Promise<MealSuggestion> {
   const client = getAnthropicClient();
   const response = await client.messages.create(
     {
@@ -110,7 +116,7 @@ export async function suggestMealFromImage(imageBase64: string, mediaType: strin
           role: "user",
           content: [
             { type: "image", source: { type: "base64", media_type: mediaType as SupportedMediaType, data: imageBase64 } },
-            { type: "text", text: SUGGEST_FROM_IMAGE_PROMPT }
+            { type: "text", text: `${SUGGEST_FROM_IMAGE_PROMPT}${unitsDirective(system)}` }
           ]
         }
       ]
@@ -130,7 +136,10 @@ export async function suggestMealFromImage(imageBase64: string, mediaType: strin
   return parseSuggestion(toolBlock.input);
 }
 
-export async function suggestMealFromText(text: string): Promise<MealSuggestion> {
+export async function suggestMealFromText(
+  text: string,
+  system: MeasurementSystem = "metric"
+): Promise<MealSuggestion> {
   const client = getAnthropicClient();
   const response = await client.messages.create(
     {
@@ -138,7 +147,7 @@ export async function suggestMealFromText(text: string): Promise<MealSuggestion>
       max_tokens: 1024,
       tools: [suggestMealTool],
       tool_choice: { type: "tool", name: "suggest_meal" },
-      messages: [{ role: "user", content: `${SUGGEST_FROM_TEXT_PROMPT}\n\n${text}` }]
+      messages: [{ role: "user", content: `${SUGGEST_FROM_TEXT_PROMPT}${unitsDirective(system)}\n\n${text}` }]
     },
     { signal: AbortSignal.timeout(FALLBACK_TIMEOUT_MS) }
   );
@@ -156,7 +165,8 @@ export async function suggestMealFromText(text: string): Promise<MealSuggestion>
 }
 
 export async function suggestMealFromVoiceTranscript(
-  transcript: string
+  transcript: string,
+  system: MeasurementSystem = "metric"
 ): Promise<MealSuggestion> {
   const client = getAnthropicClient();
   const response = await client.messages.create(
@@ -166,7 +176,7 @@ export async function suggestMealFromVoiceTranscript(
       tools: [suggestMealTool],
       tool_choice: { type: "tool", name: "suggest_meal" },
       messages: [
-        { role: "user", content: `${SUGGEST_FROM_VOICE_NOTE_PROMPT}\n\n${transcript}` }
+        { role: "user", content: `${SUGGEST_FROM_VOICE_NOTE_PROMPT}${unitsDirective(system)}\n\n${transcript}` }
       ]
     },
     { signal: AbortSignal.timeout(FALLBACK_TIMEOUT_MS) }
@@ -283,6 +293,7 @@ export async function proposeRefineChanges(args: {
   recipeJson: string;
   instruction: string;
   image?: { base64: string; mediaType: string };
+  system?: MeasurementSystem;
 }): Promise<ProposeChangesResponse> {
   const client = getAnthropicClient();
   const userBlocks: Array<
@@ -308,7 +319,7 @@ export async function proposeRefineChanges(args: {
     {
       model: "claude-sonnet-4-6",
       max_tokens: 2048,
-      system: REFINE_RECIPE_PROMPT,
+      system: `${REFINE_RECIPE_PROMPT}${unitsDirective(args.system ?? "metric")}`,
       messages: [{ role: "user", content: userBlocks }]
     },
     { signal: AbortSignal.timeout(REFINE_FALLBACK_TIMEOUT_MS) }

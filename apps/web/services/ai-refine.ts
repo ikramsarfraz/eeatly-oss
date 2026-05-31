@@ -10,6 +10,7 @@ import {
   AudioTranscriptionFailedError
 } from "@/lib/errors/audio";
 import { requireFeatureAccess } from "@/lib/gates/resolver";
+import { getUserSettings } from "@/services/user-settings";
 import {
   isSupportedAudioMediaType,
   MAX_AUDIO_UPLOAD_BYTES
@@ -95,17 +96,20 @@ export async function proposeChangesFromText(args: {
   prompt: string;
 }): Promise<ProposeChangesResponse> {
   await requireFeatureAccess(args.userId, "ai_suggest_text");
+  const { measurementSystem: system } = await getUserSettings(args.userId);
   const recipeJson = serialiseRecipe(args.recipe);
   return withFallback(
     () =>
       openai.proposeRefineChanges({
         recipeJson,
-        instruction: args.prompt
+        instruction: args.prompt,
+        system
       }),
     () =>
       anthropic.proposeRefineChanges({
         recipeJson,
-        instruction: args.prompt
+        instruction: args.prompt,
+        system
       }),
     { operation: "refine_propose_changes_text" }
   );
@@ -160,17 +164,20 @@ export async function proposeChangesFromVoice(
     throw new AudioTooShortOrEmptyError();
   }
 
+  const { measurementSystem: system } = await getUserSettings(args.userId);
   const recipeJson = serialiseRecipe(args.recipe);
   const proposed = await withFallback(
     () =>
       openai.proposeRefineChanges({
         recipeJson,
-        instruction: trimmed
+        instruction: trimmed,
+        system
       }),
     () =>
       anthropic.proposeRefineChanges({
         recipeJson,
-        instruction: trimmed
+        instruction: trimmed,
+        system
       }),
     { operation: "refine_propose_changes_voice" }
   );
@@ -186,6 +193,7 @@ export async function proposeChangesFromPhoto(args: {
 }): Promise<ProposeChangesResponse> {
   await requireFeatureAccess(args.userId, "ai_suggest_image");
 
+  const { measurementSystem: system } = await getUserSettings(args.userId);
   const recipeJson = serialiseRecipe(args.recipe);
   // Photo mode's "prompt" is the photo itself + a fixed instruction so
   // the model knows to interpret the image as a diff rather than as a
@@ -197,13 +205,15 @@ export async function proposeChangesFromPhoto(args: {
       openai.proposeRefineChanges({
         recipeJson,
         instruction,
-        image: { base64: args.imageBase64, mediaType: args.mediaType }
+        image: { base64: args.imageBase64, mediaType: args.mediaType },
+        system
       }),
     () =>
       anthropic.proposeRefineChanges({
         recipeJson,
         instruction,
-        image: { base64: args.imageBase64, mediaType: args.mediaType }
+        image: { base64: args.imageBase64, mediaType: args.mediaType },
+        system
       }),
     { operation: "refine_propose_changes_photo" }
   );

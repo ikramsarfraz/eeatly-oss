@@ -1,15 +1,19 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { userSettings } from "@/db/schema";
+import {
+  asMeasurementSystem,
+  type MeasurementSystem
+} from "@/lib/units/detect";
 
 /**
- * Per-user sharing & privacy settings. An absent row means all defaults;
- * `getUserSettings` always returns a fully-populated object so callers never
- * branch on null. Every field is enforced server-side by its consumers
- * (link-share gating, reshare permission, inbound-invite gating, email
- * discovery) — none are cosmetic.
+ * Per-user settings (sharing & privacy + kitchen preferences). An absent
+ * row means all defaults; `getUserSettings` always returns a fully-populated
+ * object so callers never branch on null. Every field is enforced
+ * server-side by its consumers (link-share gating, reshare permission,
+ * inbound-invite gating, email discovery, AI units bias) — none are cosmetic.
  */
 
 export type WhoCanAddYou = "anyone" | "connections" | "no_one";
@@ -19,13 +23,15 @@ export type UserSettings = {
   cooksCanReshare: boolean;
   whoCanAddYou: WhoCanAddYou;
   findByEmail: boolean;
+  measurementSystem: MeasurementSystem;
 };
 
 const DEFAULTS: UserSettings = {
   allowLinkShares: true,
   cooksCanReshare: false,
   whoCanAddYou: "connections",
-  findByEmail: true
+  findByEmail: true,
+  measurementSystem: "metric"
 };
 
 function normalizeWhoCanAddYou(value: string): WhoCanAddYou {
@@ -43,7 +49,9 @@ export async function getUserSettings(userId: string): Promise<UserSettings> {
     allowLinkShares: row.allowLinkShares,
     cooksCanReshare: row.cooksCanReshare,
     whoCanAddYou: normalizeWhoCanAddYou(row.whoCanAddYou),
-    findByEmail: row.findByEmail
+    findByEmail: row.findByEmail,
+    measurementSystem:
+      asMeasurementSystem(row.measurementSystem) ?? DEFAULTS.measurementSystem
   };
 }
 
@@ -61,4 +69,35 @@ export async function updateUserSettings(
       set: { ...next, updatedAt: new Date() }
     });
   return next;
+}
+
+/**
+ * Persist the signup-time inferred measurement default WITHOUT clobbering a
+ * row the user has already touched. Used by the Better Auth `user.create`
+ * hook: inserts a fresh row carrying the inferred system, or — if a row
+ * somehow already exists — updates only `measurement_system`, leaving the
+ * privacy fields at whatever they were. Idempotent and failure-isolated by
+ * the caller. We never overwrite a non-default the user may have set,
+ * because at signup time no row exists yet (this is the first write).
+ */
+export async function seedMeasurementSystem(
+  userId: string,
+  system: MeasurementSystem
+): Promise<void> {
+  await db
+    .insert(userSettings)
+    .values({
+      userId,
+      allowLinkShares: DEFAULTS.allowLinkShares,
+      cooksCanReshare: DEFAULTS.cooksCanReshare,
+      whoCanAddYou: DEFAULTS.whoCanAddYou,
+      findByEmail: DEFAULTS.findByEmail,
+      measurementSystem: system,
+      updatedAt: new Date()
+    })
+    .onConflictDoUpdate({
+      target: userSettings.userId,
+      // Only touch the units column on conflict; never reset privacy fields.
+      set: { measurementSystem: system, updatedAt: sql`now()` }
+    });
 }

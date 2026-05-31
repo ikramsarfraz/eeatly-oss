@@ -12,6 +12,8 @@ import { logger } from "@/lib/observability/logger";
 import { trackEvent } from "@/lib/observability/analytics";
 import { capturePostHogServerEvent } from "@/lib/observability/posthog-server";
 import { ensureHouseholdForUser } from "@/services/households";
+import { seedMeasurementSystem } from "@/services/user-settings";
+import { inferMeasurementSystem } from "@/lib/units/detect";
 
 /**
  * Round 15.5 Task 1 — env access deferred. Previously this module
@@ -156,11 +158,37 @@ function buildAuth() {
         // household_members can resolve. Failure here would leave the user
         // without a household — getCurrentHousehold also self-heals as a
         // backstop, but logging here makes the gap visible in metrics.
-        after: async (user) => {
+        after: async (user, ctx) => {
           try {
             await ensureHouseholdForUser(user.id, user.name ?? null);
           } catch (error) {
             logger.error("user_create_household_setup_failed", {
+              userId: user.id,
+              error: error instanceof Error ? error.message : String(error)
+            });
+          }
+          // Infer the cook's measurement system ONCE, from the signup
+          // request's geo (Vercel `x-vercel-ip-country`) + Accept-Language.
+          // This is the only point we have request headers tied to the new
+          // user. Flippable later in Settings → Kitchen. Failure-isolated:
+          // a missing header or a write hiccup falls back to the column
+          // default ('metric') and never blocks account creation.
+          try {
+            const headers = (
+              ctx as { request?: Request; headers?: Headers } | undefined
+            )?.request?.headers ??
+              (ctx as { headers?: Headers } | undefined)?.headers ??
+              null;
+            const system = inferMeasurementSystem({
+              country:
+                headers?.get("x-vercel-ip-country") ??
+                headers?.get("cf-ipcountry") ??
+                null,
+              acceptLanguage: headers?.get("accept-language") ?? null
+            });
+            await seedMeasurementSystem(user.id, system);
+          } catch (error) {
+            logger.warn("user_create_units_seed_failed", {
               userId: user.id,
               error: error instanceof Error ? error.message : String(error)
             });

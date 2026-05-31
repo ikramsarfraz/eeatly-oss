@@ -79,7 +79,8 @@ export const sharingRouter = router({
         allowLinkShares: z.boolean().optional(),
         cooksCanReshare: z.boolean().optional(),
         whoCanAddYou: z.enum(["anyone", "connections", "no_one"]).optional(),
-        findByEmail: z.boolean().optional()
+        findByEmail: z.boolean().optional(),
+        measurementSystem: z.enum(["metric", "imperial"]).optional()
       })
     )
     .mutation(({ ctx, input }) => updateUserSettings(ctx.user.id, input)),

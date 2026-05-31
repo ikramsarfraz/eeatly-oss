@@ -17,6 +17,7 @@ import {
 } from "@/lib/errors/audio";
 import { NoRecipeTextError } from "@/lib/errors/ingredients";
 import { requireFeatureAccess } from "@/lib/gates/resolver";
+import type { MeasurementSystem } from "@/lib/units/detect";
 import {
   isSupportedAudioMediaType,
   MAX_AUDIO_UPLOAD_BYTES
@@ -28,7 +29,8 @@ const SUPPORTED_MEDIA_TYPES = ["image/jpeg", "image/png", "image/gif", "image/we
 
 export async function suggestMealFromImage(
   imageBase64: string,
-  mediaType: string
+  mediaType: string,
+  system: MeasurementSystem = "metric"
 ): Promise<MealSuggestion> {
   if (!(SUPPORTED_MEDIA_TYPES as readonly string[]).includes(mediaType)) {
     throw new Error(
@@ -37,20 +39,23 @@ export async function suggestMealFromImage(
   }
 
   return withFallback(
-    () => openai.suggestMealFromImage(imageBase64, mediaType),
-    () => anthropic.suggestMealFromImage(imageBase64, mediaType),
+    () => openai.suggestMealFromImage(imageBase64, mediaType, system),
+    () => anthropic.suggestMealFromImage(imageBase64, mediaType, system),
     { operation: "suggest_meal_from_image" }
   );
 }
 
-export async function suggestMealFromText(text: string): Promise<MealSuggestion> {
+export async function suggestMealFromText(
+  text: string,
+  system: MeasurementSystem = "metric"
+): Promise<MealSuggestion> {
   if (!text.trim()) {
     throw new Error("Please paste some text before requesting a suggestion.");
   }
 
   return withFallback(
-    () => openai.suggestMealFromText(text),
-    () => anthropic.suggestMealFromText(text),
+    () => openai.suggestMealFromText(text, system),
+    () => anthropic.suggestMealFromText(text, system),
     { operation: "suggest_meal_from_text" }
   );
 }
@@ -304,6 +309,7 @@ export async function suggestMealFromAudio(
     mediaType: string;
     fileName?: string;
     userId: string;
+    system?: MeasurementSystem;
   },
   deps: { transcriber?: AudioTranscriber } = {}
 ): Promise<MealSuggestion> {
@@ -343,9 +349,10 @@ export async function suggestMealFromAudio(
     throw new AudioTooShortOrEmptyError();
   }
 
+  const system = args.system ?? "metric";
   return withFallback(
-    () => openai.suggestMealFromVoiceTranscript(trimmed),
-    () => anthropic.suggestMealFromVoiceTranscript(trimmed),
+    () => openai.suggestMealFromVoiceTranscript(trimmed, system),
+    () => anthropic.suggestMealFromVoiceTranscript(trimmed, system),
     { operation: "suggest_meal_from_voice" }
   );
 }

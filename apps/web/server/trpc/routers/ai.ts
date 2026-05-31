@@ -23,6 +23,7 @@ import {
   suggestMealFromImage,
   suggestMealFromText
 } from "@/services/ai";
+import { getUserSettings } from "@/services/user-settings";
 import {
   gatedProcedure,
   householdMemberProcedure,
@@ -130,9 +131,14 @@ export const aiRouter = router({
   suggestFromPhoto: gatedProcedure("ai_suggest_image")
     .use(rateLimit("ai"))
     .input(photoInputSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       try {
-        return await suggestMealFromImage(input.imageBase64, input.mediaType);
+        const { measurementSystem } = await getUserSettings(ctx.user.id);
+        return await suggestMealFromImage(
+          input.imageBase64,
+          input.mediaType,
+          measurementSystem
+        );
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error.";
         if (message.toLowerCase().includes("unsupported image type")) {
@@ -153,9 +159,10 @@ export const aiRouter = router({
   suggestFromText: gatedProcedure("ai_suggest_text")
     .use(rateLimit("ai"))
     .input(textInputSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       try {
-        return await suggestMealFromText(input.text);
+        const { measurementSystem } = await getUserSettings(ctx.user.id);
+        return await suggestMealFromText(input.text, measurementSystem);
       } catch {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
@@ -196,11 +203,13 @@ export const aiRouter = router({
         });
       }
       try {
+        const { measurementSystem } = await getUserSettings(ctx.user.id);
         return await suggestMealFromAudio({
           audioBuffer,
           mediaType: input.mediaType,
           fileName: input.fileName,
-          userId: ctx.user.id
+          userId: ctx.user.id,
+          system: measurementSystem
         });
       } catch (error) {
         const mapped = mapGateError(error) ?? mapAudioError(error);

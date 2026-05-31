@@ -8,8 +8,10 @@ import {
   REFINE_RECIPE_PROMPT,
   SUGGEST_FROM_IMAGE_PROMPT,
   SUGGEST_FROM_TEXT_PROMPT,
-  SUGGEST_FROM_VOICE_NOTE_PROMPT
+  SUGGEST_FROM_VOICE_NOTE_PROMPT,
+  unitsDirective
 } from "@/lib/ai/prompts";
+import type { MeasurementSystem } from "@/lib/units/detect";
 import { logger } from "@/lib/observability/logger";
 import { getServerEnv } from "@/lib/env/server";
 import type { MealSuggestion } from "@/types";
@@ -98,7 +100,11 @@ function coerceIngredients(value: unknown): string[] {
   return out;
 }
 
-export async function suggestMealFromImage(imageBase64: string, mediaType: string): Promise<MealSuggestion> {
+export async function suggestMealFromImage(
+  imageBase64: string,
+  mediaType: string,
+  system: MeasurementSystem = "metric"
+): Promise<MealSuggestion> {
   const client = getClient();
   const response = await client.chat.completions.create(
     {
@@ -113,7 +119,7 @@ export async function suggestMealFromImage(imageBase64: string, mediaType: strin
           role: "user",
           content: [
             { type: "image_url", image_url: { url: `data:${mediaType};base64,${imageBase64}`, detail: "high" } },
-            { type: "text", text: SUGGEST_FROM_IMAGE_PROMPT }
+            { type: "text", text: `${SUGGEST_FROM_IMAGE_PROMPT}${unitsDirective(system)}` }
           ]
         }
       ]
@@ -134,7 +140,10 @@ export async function suggestMealFromImage(imageBase64: string, mediaType: strin
   return parseSuggestion(JSON.parse(content) as Record<string, unknown>);
 }
 
-export async function suggestMealFromText(text: string): Promise<MealSuggestion> {
+export async function suggestMealFromText(
+  text: string,
+  system: MeasurementSystem = "metric"
+): Promise<MealSuggestion> {
   const client = getClient();
   const response = await client.chat.completions.create(
     {
@@ -145,7 +154,7 @@ export async function suggestMealFromText(text: string): Promise<MealSuggestion>
         json_schema: { name: "meal_suggestion", strict: true, schema: SUGGESTION_SCHEMA }
       },
       messages: [
-        { role: "user", content: `${SUGGEST_FROM_TEXT_PROMPT}\n\n${text}` }
+        { role: "user", content: `${SUGGEST_FROM_TEXT_PROMPT}${unitsDirective(system)}\n\n${text}` }
       ]
     },
     { signal: AbortSignal.timeout(PRIMARY_TIMEOUT_MS) }
@@ -165,7 +174,8 @@ export async function suggestMealFromText(text: string): Promise<MealSuggestion>
 }
 
 export async function suggestMealFromVoiceTranscript(
-  transcript: string
+  transcript: string,
+  system: MeasurementSystem = "metric"
 ): Promise<MealSuggestion> {
   const client = getClient();
   // Voice-note transcripts are wordier than pasted text — ramble,
@@ -180,7 +190,7 @@ export async function suggestMealFromVoiceTranscript(
         json_schema: { name: "meal_suggestion", strict: true, schema: SUGGESTION_SCHEMA }
       },
       messages: [
-        { role: "user", content: `${SUGGEST_FROM_VOICE_NOTE_PROMPT}\n\n${transcript}` }
+        { role: "user", content: `${SUGGEST_FROM_VOICE_NOTE_PROMPT}${unitsDirective(system)}\n\n${transcript}` }
       ]
     },
     { signal: AbortSignal.timeout(PRIMARY_TIMEOUT_MS) }
@@ -385,6 +395,7 @@ export async function proposeRefineChanges(args: {
   recipeJson: string;
   instruction: string;
   image?: { base64: string; mediaType: string };
+  system?: MeasurementSystem;
 }): Promise<ProposeChangesResponse> {
   const client = getClient();
   const userContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [];
@@ -408,7 +419,10 @@ export async function proposeRefineChanges(args: {
       max_tokens: 2048,
       response_format: { type: "json_object" },
       messages: [
-        { role: "system", content: REFINE_RECIPE_PROMPT },
+        {
+          role: "system",
+          content: `${REFINE_RECIPE_PROMPT}${unitsDirective(args.system ?? "metric")}`
+        },
         { role: "user", content: userContent }
       ]
     },
