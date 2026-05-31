@@ -127,6 +127,8 @@ DIFF SCHEMA — return ONLY this shape:
 Rules:
 - BUILDING FROM SCRATCH: If the recipe has NO structured ingredients and NO structured steps, treat the instruction as a request to CREATE a complete, sensible recipe for the dish named in the input. Propose "add" ingredients and "add" steps that make a realistic recipe for that dish, shaped by the instruction (e.g. "make it spicier" → build a spicier version; "add prep notes" → include prep notes on the ingredients you add). If a free-form "recipeText" blob is present, convert it into structured "add" ingredients and steps. Aim for a usable recipe (roughly 4–10 ingredients and 2–6 steps) unless the instruction asks for something smaller.
 - NEVER return an empty "proposed" array when the instruction is actionable. An empty recipe plus any cooking instruction is always actionable — build it.
+- EVERY "add" step payload MUST have a non-empty "title" (a short step name like "Sear the patties") AND a non-empty "body" (the full instruction sentence, e.g. "Heat a skillet over medium-high and sear the patties 2–3 min per side until browned."). Never emit a step with an empty or placeholder title/body.
+- "whereHint" is ONLY a brief placement note ("at the end", "after the marinade step") — NEVER put the step's name or instructions in whereHint. For a from-scratch build, you can omit whereHint and rely on the order of your "add" steps in the array.
 - Use ONLY refIds that appear in the input recipe — never invent ids.
 - For "add", omit refId entirely. Use whereHint to describe placement in plain language.
 - For "change", the "field" must be a column name like "name", "quantityString", "prepNote", "title", "time", "body".

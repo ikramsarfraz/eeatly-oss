@@ -408,6 +408,27 @@ async function nextTurnPosition(sessionId: string): Promise<number> {
   return (row?.p ?? -1) + 1;
 }
 
+/**
+ * Drop degenerate "add" changes the model sometimes emits when building a
+ * recipe from scratch — steps with no title AND no body (which would persist
+ * as useless "New step" rows), or ingredients with no name. The prompt asks
+ * for full content; this is the safety net when the model ignores it.
+ */
+function sanitizeProposed(changes: PendingChange[]): PendingChange[] {
+  return changes.filter((c) => {
+    if (c.kind !== "add") return true;
+    if (c.target === "step") {
+      const p = (c.payload ?? {}) as { title?: string; body?: string };
+      return Boolean(p.title?.trim()) || Boolean(p.body?.trim());
+    }
+    if (c.target === "ingredient") {
+      const p = (c.payload ?? {}) as { name?: string };
+      return Boolean(p.name?.trim());
+    }
+    return true;
+  });
+}
+
 async function persistTurnAndRecompute(args: {
   sessionId: string;
   source: "text" | "voice" | "photo";
@@ -417,6 +438,7 @@ async function persistTurnAndRecompute(args: {
 }): Promise<{ turnId: string }> {
   const position = await nextTurnPosition(args.sessionId);
   const turnId = randomUUID();
+  const proposed = sanitizeProposed(args.proposed);
 
   await db.transaction(async (tx) => {
     await tx.insert(refineTurns).values({
@@ -426,14 +448,14 @@ async function persistTurnAndRecompute(args: {
       source: args.source,
       prompt: args.prompt,
       attachmentUrl: args.attachmentUrl,
-      proposed: args.proposed,
+      proposed,
       accepted: true
     });
     // Append to pending. The recompute happens via toggleTurnAccepted;
     // initial state is accepted=true so we go ahead and write rows.
-    if (args.proposed.length > 0) {
+    if (proposed.length > 0) {
       await tx.insert(refinePendingChanges).values(
-        args.proposed.map((p) => changeToPendingRow(p, args.sessionId, turnId))
+        proposed.map((p) => changeToPendingRow(p, args.sessionId, turnId))
       );
     }
     await tx
