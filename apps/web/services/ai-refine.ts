@@ -55,6 +55,13 @@ export type RecipeContext = {
   id: string;
   name: string;
   effortLevel: "quick" | "easy" | "medium" | "high_effort" | null;
+  /**
+   * Legacy free-form recipe text, when the meal has no structured rows.
+   * Lets the model convert a prose recipe (or an empty meal) into
+   * structured ingredients/steps via "add" changes. Optional so existing
+   * fixtures/callers don't have to thread it; the loader always sets it.
+   */
+  recipeText?: string | null;
   ingredients: Array<{
     id: string;
     position: number;

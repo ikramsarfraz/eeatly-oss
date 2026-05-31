@@ -108,7 +108,7 @@ Recipe:`;
  * verbatim — Zod parses on the way out so any drift here surfaces as
  * a 400 at the procedure layer rather than corrupt rows downstream.
  */
-export const REFINE_RECIPE_PROMPT = `You are editing an existing recipe. The user will describe a change in plain language; you will emit a structured diff against the recipe.
+export const REFINE_RECIPE_PROMPT = `You are helping a home cook refine a recipe. They may be EDITING a recipe that already has ingredients and steps, OR fleshing out one that is still just a dish name (empty, or only a free-form "recipeText" blob with no structured rows). In all cases you emit a structured diff against the recipe.
 
 DIFF SCHEMA — return ONLY this shape:
 
@@ -125,6 +125,8 @@ DIFF SCHEMA — return ONLY this shape:
 }
 
 Rules:
+- BUILDING FROM SCRATCH: If the recipe has NO structured ingredients and NO structured steps, treat the instruction as a request to CREATE a complete, sensible recipe for the dish named in the input. Propose "add" ingredients and "add" steps that make a realistic recipe for that dish, shaped by the instruction (e.g. "make it spicier" → build a spicier version; "add prep notes" → include prep notes on the ingredients you add). If a free-form "recipeText" blob is present, convert it into structured "add" ingredients and steps. Aim for a usable recipe (roughly 4–10 ingredients and 2–6 steps) unless the instruction asks for something smaller.
+- NEVER return an empty "proposed" array when the instruction is actionable. An empty recipe plus any cooking instruction is always actionable — build it.
 - Use ONLY refIds that appear in the input recipe — never invent ids.
 - For "add", omit refId entirely. Use whereHint to describe placement in plain language.
 - For "change", the "field" must be a column name like "name", "quantityString", "prepNote", "title", "time", "body".

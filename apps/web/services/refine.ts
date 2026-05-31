@@ -156,6 +156,13 @@ async function loadRecipeContext(mealId: string): Promise<RecipeContext> {
     id: mealRow.id,
     name: mealRow.name,
     effortLevel,
+    // Only surface the prose blob when there are no structured rows — once
+    // structured ingredients/steps exist they're the source of truth and
+    // the prose would just be redundant context for the model.
+    recipeText:
+      ingredientRows.length === 0 && stepRows.length === 0
+        ? (mealRow.recipeText?.trim() || null)
+        : null,
     ingredients,
     steps
   };
