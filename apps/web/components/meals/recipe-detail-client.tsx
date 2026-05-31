@@ -574,23 +574,10 @@ export function RecipeDetailClient({
 
         {/* Recipe column */}
         <div className="px-7 py-7 sm:px-9 sm:py-10 md:pr-12">
-          <SectionLabel
-            className="mb-4"
-            action={
-              // Decorative "Cook mode" link for v1 — no separate route
-              // yet. R27 spec parks the cook-mode surface; render as a
-              // muted link to telegraph the planned affordance.
-              <span
-                className="inline-flex cursor-default items-center gap-1 font-medium text-[12px] text-primary opacity-70"
-                aria-disabled
-              >
-                <Sparkles className="h-3 w-3" />
-                Cook mode
-              </span>
-            }
-          >
-            Recipe
-          </SectionLabel>
+          {/* "Cook mode" affordance removed — it was a disabled no-op
+              (the full-screen cook view was never built). Tracked in
+              GH issue #58 to build for real. */}
+          <SectionLabel className="mb-4">Recipe</SectionLabel>
           {stepCards.length > 0 ? (
             <ol className="grid list-none divide-y divide-[var(--border-soft,var(--border))]">
               {stepCards.map((step) => (
