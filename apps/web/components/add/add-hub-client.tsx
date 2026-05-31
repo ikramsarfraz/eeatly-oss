@@ -104,7 +104,7 @@ function CaptureTile({
         {kbd ? (
           <kbd
             className={cn(
-              "self-start rounded border px-1.5 py-0.5 font-mono text-[10px]",
+              "w-fit justify-self-start rounded border px-1.5 py-0.5 font-mono text-[10px]",
               variant === "primary"
                 ? "border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground/80"
                 : "border-border bg-[var(--surface-2)] text-muted-foreground"
@@ -150,7 +150,7 @@ export function AddHubClient() {
             href={"/add/log" as Route}
             title="Log a meal I cooked"
             subtitle="The fast path — name, when, how it went."
-            kbd="⌘ N"
+            kbd="G then L"
             icon={<Utensils className="h-5 w-5" />}
             variant="primary"
           />
@@ -158,14 +158,14 @@ export function AddHubClient() {
             href={"/add/ai" as Route}
             title="Capture with AI"
             subtitle="Photo, paste, or voice — extract a recipe automatically."
-            kbd="⌘ ⇧ K"
+            kbd="G then A"
             icon={<Sparkles className="h-5 w-5" />}
           />
           <CaptureTile
             href={"/add/ai" as Route}
             title="Save a link"
             subtitle="Paste a YouTube, Instagram, or recipe URL. We'll pull the recipe."
-            kbd="⌘ L"
+            kbd="G then U"
             icon={<LinkIcon className="h-5 w-5" />}
           />
         </div>
@@ -179,14 +179,14 @@ export function AddHubClient() {
             href={"/plans/new" as Route}
             title="Plan an occasion menu"
             subtitle="Eid, a dinner party, a school-night rotation. Pick dishes from your library."
-            kbd="⌘ P"
+            kbd="G then P"
             icon={<CalendarDays className="h-5 w-5" />}
           />
           <CaptureTile
             href={"/settings" as Route}
             title="Invite a co-cook"
             subtitle="Share the kitchen. Family member, partner, anyone who cooks with you."
-            kbd="⌘ I"
+            kbd="G then I"
             icon={<UserPlus className="h-5 w-5" />}
           />
         </div>
