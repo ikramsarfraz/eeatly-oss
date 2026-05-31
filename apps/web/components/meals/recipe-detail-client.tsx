@@ -495,12 +495,18 @@ export function RecipeDetailClient({
               compact
               className="min-h-[40px]"
             />
-            <Button asChild variant="outline" className="min-h-[40px]">
-              <Link href={`/meal/${meal.id}/refine` as Route}>
-                <Sparkles className="h-3.5 w-3.5" />
-                Refine with AI
-              </Link>
-            </Button>
+            {/* Refine is a WRITE surface — only the creator can edit the
+                meal. People it's shared with read it (and can save their
+                own copy to edit). Showing this to non-creators led them to
+                a 500 from startSession's creator check. */}
+            {isCreator ? (
+              <Button asChild variant="outline" className="min-h-[40px]">
+                <Link href={`/meal/${meal.id}/refine` as Route}>
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Refine with AI
+                </Link>
+              </Button>
+            ) : null}
             {/* Creator-only device upload. Reuses the presign → R2 flow;
                 the resulting photo becomes the meal's own image and wins
                 over the app-wide AI fallback. */}

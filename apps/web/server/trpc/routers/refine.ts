@@ -122,6 +122,17 @@ function mapServiceError(error: unknown): never {
         cause: { reason: "NOT_HOUSEHOLD_MEMBER" }
       });
     }
+    // Refine is a write surface — only the meal's creator can edit it.
+    // Non-creators (household co-members, people it's shared with) get a
+    // clean FORBIDDEN instead of a 500. The recipe view also hides the
+    // Refine button from them, so this is defense-in-depth.
+    if (msg === "Only the creator can refine this meal.") {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Only the recipe's owner can refine it. Save a copy to make your own changes.",
+        cause: { reason: "NOT_CREATOR" }
+      });
+    }
   }
   logger.warn("refine_unexpected_error", {
     error: error instanceof Error ? error.message : String(error)

@@ -5,7 +5,7 @@ import { db } from "@/lib/db/client";
 import { requireHouseholdMember } from "@/lib/auth/session";
 import { requireFeatureAccess } from "@/lib/gates/resolver";
 import { logger } from "@/lib/observability/logger";
-import { canViewMeal, mealVisibilityFilter } from "@/lib/meals/visibility";
+import { mealVisibilityFilter } from "@/lib/meals/visibility";
 import {
   dishImages,
   householdMembers,
@@ -182,18 +182,18 @@ export async function getPlan(args: { planId: string; userId: string }): Promise
     .orderBy(asc(planDishes.sortOrder), asc(planDishes.createdAt));
 
   // Per-item sharing: instead of hiding inaccessible dishes, mark them
-  // `locked`. A dish is accessible if the viewer owns the recipe, holds a
-  // grant for it, or (legacy, members only) it's a shared recipe in their
-  // household. Co-cooks see locked rows they can "Request".
+  // `locked`. A dish is accessible if the viewer owns the recipe or holds
+  // an active grant for it. The legacy "shared recipe in my household"
+  // branch was removed alongside the recipe visibility flip — household
+  // co-membership no longer grants recipe access. Co-cooks see locked rows
+  // they can "Request".
   const grantedRecipeIds = await accessibleRecipeIds(
     args.userId,
     rows.map((r) => r.mealId)
   );
   const dishes: PlanDishWithMeal[] = rows.map((r) => {
     const accessible =
-      r.mealCreatorUserId === args.userId ||
-      grantedRecipeIds.has(r.mealId) ||
-      (isMember && r.mealSharedAt !== null && r.mealHouseholdId === plan.householdId);
+      r.mealCreatorUserId === args.userId || grantedRecipeIds.has(r.mealId);
     return {
       id: r.id,
       planId: r.planId,
@@ -356,17 +356,12 @@ export async function addDishToPlan(args: {
     throw new Error("Meal not in this household.");
   }
   if (meal.archivedAt) throw new Error("Meal is archived.");
-  // R32 — reject adding a meal the caller can't view. Identical
-  // surfacing to a cross-household add ("not found") so the personal
-  // meal's existence doesn't leak.
-  const isVisible = canViewMeal(
-    {
-      createdByUserId: meal.createdByUserId,
-      householdId: meal.householdId,
-      sharedAt: meal.sharedAt
-    },
-    { id: args.userId, householdId: plan.householdId }
-  );
+  // Reject adding a meal the caller can't view. Per-item: they can add it
+  // only if they own it or hold an active grant. Identical surfacing to a
+  // cross-household add ("not found") so the meal's existence doesn't leak.
+  const isVisible =
+    meal.createdByUserId === args.userId ||
+    (await accessibleRecipeIds(args.userId, [args.mealId])).has(args.mealId);
   if (!isVisible) {
     logger.warn("plan_dish_hidden_meal_attempt", {
       userId: args.userId,

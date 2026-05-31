@@ -1,35 +1,39 @@
-import { and, eq, isNotNull, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
+import { eq, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
 import { meals, plans } from "@/db/schema";
 
 /**
- * Meal visibility predicate — per-item sharing, layered on the legacy
- * household model.
+ * Meal visibility predicate — pure per-item sharing.
  *
- * The viewer sees a meal if ANY of:
+ * The viewer sees a meal if EITHER:
  *   (a) they created it (own it), OR
- *   (b) they hold an active per-item grant for it (the new model), OR
- *   (c) [legacy] it's marked shared AND lives in their household.
+ *   (b) they hold an active per-item grant for it.
  *
- * Clause (b) is the going-forward path: sharing is now an explicit,
- * per-person grant (see db/schema/sharing.ts). Clause (c) is retained
- * during the UI transition so existing multi-member households keep the
- * access they already had — the 0030 migration also backfilled grants
- * for those, so (b) and (c) overlap there and (c) can be dropped once
- * the sharing UI fully lands. For solo users (everyone going forward)
- * clause (c) is inert (no co-members), so visibility reduces to
- * own-or-granted — private by default.
+ * The legacy "shared AND same household" clause was REMOVED: under the old
+ * one-shared-kitchen model every member saw every shared meal, which leaked
+ * the creator's new recipes to household co-members. The 0030 migration
+ * backfilled grants for every recipe that was shared at that point, so
+ * dropping the legacy clause preserves pre-migration access (via clause b)
+ * while making recipes the creator never explicitly shared private again.
+ * Recipes are now private by default (`createMealLog` inserts `sharedAt =
+ * null`); `sharedAt` no longer drives visibility at all.
  *
  * Centralizing the filter here means every consumer ships the same
  * logic. Callers compose it via `where(and(existing, mealVisibilityFilter(...)))`.
+ *
+ * `householdId` is retained in the signature (callers still pass it) but is
+ * no longer referenced — visibility is household-independent now.
  */
 export function mealVisibilityFilter(
   userId: string,
   householdId: string
 ): SQL {
+  // `householdId` is retained for call-site symmetry (and parity with
+  // planVisibilityFilter) but no longer referenced — recipe visibility is
+  // household-independent now (own-or-granted).
+  void householdId;
   return or(
     eq(meals.createdByUserId, userId),
-    hasActiveGrant("recipe", meals.id, userId),
-    and(isNotNull(meals.sharedAt), eq(meals.householdId, householdId))
+    hasActiveGrant("recipe", meals.id, userId)
   )!;
 }
 
@@ -55,9 +59,11 @@ export function hasActiveGrant(
 }
 
 /**
- * Plan visibility predicate. Plans had no per-plan sharing in the old
- * model (every plan was household-wide), so the legacy clause matches the
- * whole household; the new clause adds per-person grants.
+ * Plan visibility predicate. Plan-level visibility intentionally stays
+ * household-wide: co-cooks see each other's plans, but the recipes behind
+ * each dish are locked unless the viewer owns or was granted them (see
+ * `getPlanDetail`'s per-dish `accessible` check). The new clause adds
+ * per-person grants on top for cross-household plan shares.
  */
 export function planVisibilityFilter(userId: string, householdId: string): SQL {
   return or(
@@ -65,30 +71,4 @@ export function planVisibilityFilter(userId: string, householdId: string): SQL {
     hasActiveGrant("plan", plans.id, userId),
     eq(plans.householdId, householdId)
   )!;
-}
-
-/**
- * Pure-function variant for client-side filtering of an already-loaded
- * meal list (e.g. the Library tab filtering after the query lands, or
- * any view that needs to compute a count by visibility class without
- * a round-trip). Same predicate as the SQL helper above.
- *
- * Argument shape kept minimal so any consumer with the four fields can
- * call it without reshaping. Date typing matches Drizzle's projected
- * shape; ISO-string callers (mobile JSON wire format) cast to Date or
- * use `parseISO` upstream.
- */
-export function canViewMeal(
-  meal: {
-    createdByUserId: string | null;
-    householdId: string;
-    sharedAt: Date | string | null;
-  },
-  viewer: { id: string; householdId: string }
-): boolean {
-  if (meal.createdByUserId === viewer.id) return true;
-  if (meal.sharedAt !== null && meal.householdId === viewer.householdId) {
-    return true;
-  }
-  return false;
 }

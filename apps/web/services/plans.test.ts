@@ -181,7 +181,9 @@ describe("addDishToPlan", () => {
 
   it("appends the dish at the end of sortOrder", async () => {
     queue([PLAN_ROW]); // plan lookup
-    queue([{ id: "m-1", householdId: "h-a", archivedAt: null }]); // meal lookup
+    // Caller owns the meal → the per-item visibility check short-circuits
+    // (no grant lookup) just like adding your own recipe.
+    queue([{ id: "m-1", householdId: "h-a", archivedAt: null, createdByUserId: "u-a" }]); // meal lookup
     queue([{ value: 4 }]); // max sortOrder = 4
     queue([
       {
@@ -209,7 +211,7 @@ describe("addDishToPlan", () => {
 
   it("is idempotent: if the dish is already on the plan, returns the existing row without a new insert", async () => {
     queue([PLAN_ROW]); // plan lookup
-    queue([{ id: "m-1", householdId: "h-a", archivedAt: null }]); // meal lookup
+    queue([{ id: "m-1", householdId: "h-a", archivedAt: null, createdByUserId: "u-a" }]); // meal lookup (caller owns it)
     queue([{ value: 0 }]); // max sortOrder
     queue([]); // insert .returning() → empty (ON CONFLICT DO NOTHING fired)
     queue([

@@ -171,13 +171,16 @@ export async function getDashboardMeals(
 }
 
 /**
- * Round 32 — new meals default to `shared`. `createMealLog` always sets
- * `sharedAt = new Date()` on insert. There's no client-visible toggle
- * for the default; the reverse action ("Move to personal") lives on
- * Recipe Detail after creation. An optional `shared` field on the
- * payload exists as a future-proofing knob — today the schema doesn't
- * surface it, but the service-layer parameter would slot in here if it
- * does, and the default would remain `true`.
+ * New meals are PRIVATE by default. Under the per-item sharing model a
+ * recipe is yours until you explicitly share it (which creates a grant —
+ * see services/sharing.ts); household co-membership no longer grants
+ * recipe access. `createMealLog` therefore inserts `sharedAt = null` unless
+ * a caller explicitly opts in via `options.shared === true`.
+ *
+ * (Historically — Round 32 — this defaulted to `shared` and `sharedAt`
+ * drove household-wide visibility. That leaked the creator's new recipes
+ * to co-members, so both the default and the legacy visibility clause were
+ * removed. `sharedAt` is now vestigial: it no longer affects visibility.)
  */
 export async function createMealLog(
   userId: string,
@@ -235,12 +238,11 @@ export async function createMealLog(
             recipeSourceUrl: recipeSourceUrl ?? null,
             servings: servings ?? null,
             ingredients: ingredients ?? null,
-            // R32 — new meals default to shared. The `shared` option is
-            // an explicit future-proofing knob (no client surface today).
-            // Setting `sharedAt = now()` preserves the "shared by default"
-            // behavior the round established; callers that explicitly
-            // pass `shared: false` get a personal meal on creation.
-            sharedAt: options?.shared === false ? null : new Date(),
+            // Private by default — sharing is now an explicit per-item
+            // grant, not a household-wide flag. Only an explicit
+            // `shared: true` opt-in stamps `sharedAt`; it's vestigial now
+            // (no longer drives visibility) but kept for data continuity.
+            sharedAt: options?.shared === true ? new Date() : null,
             updatedAt: new Date()
           })
           .returning()

@@ -1,131 +1,48 @@
 import { describe, expect, it } from "vitest";
-import { canViewMeal } from "./visibility";
+import { PgDialect } from "drizzle-orm/pg-core";
+import { mealVisibilityFilter, planVisibilityFilter } from "./visibility";
 
 /**
- * Round 32 — visibility predicate has six distinguishable cases. Each
- * one matters for either feature correctness or a data-leak guard,
- * so we cover them explicitly rather than parameterizing the matrix.
+ * Visibility is now PURE per-item sharing for recipes: a viewer sees a meal
+ * only if they own it or hold an active grant. The legacy "shared recipe in
+ * my household" clause was removed (it leaked the creator's new recipes to
+ * household co-members). These tests render the predicate SQL and pin that
+ * contract down — most importantly, that `shared_at` no longer appears in
+ * the recipe predicate.
  */
-describe("canViewMeal", () => {
-  const VIEWER = { id: "user-A", householdId: "household-1" };
-  const OTHER_USER = "user-B";
-  const SAME_HH = "household-1";
-  const OTHER_HH = "household-2";
+const dialect = new PgDialect();
+const render = (sql: ReturnType<typeof mealVisibilityFilter>) =>
+  dialect.sqlToQuery(sql).sql;
 
-  it("creator can always view their own shared meal", () => {
-    expect(
-      canViewMeal(
-        {
-          createdByUserId: VIEWER.id,
-          householdId: SAME_HH,
-          sharedAt: new Date()
-        },
-        VIEWER
-      )
-    ).toBe(true);
+describe("mealVisibilityFilter", () => {
+  const sql = render(mealVisibilityFilter("user-A", "household-1"));
+
+  it("matches the creator (owns the recipe)", () => {
+    expect(sql).toContain("created_by_user_id");
   });
 
-  it("creator can always view their own personal meal", () => {
-    expect(
-      canViewMeal(
-        { createdByUserId: VIEWER.id, householdId: SAME_HH, sharedAt: null },
-        VIEWER
-      )
-    ).toBe(true);
+  it("matches an active per-item grant", () => {
+    expect(sql).toContain("item_grants");
+    expect(sql).toContain("revoked_at");
   });
 
-  it("household member can view someone else's shared meal in the same household", () => {
-    expect(
-      canViewMeal(
-        {
-          createdByUserId: OTHER_USER,
-          householdId: SAME_HH,
-          sharedAt: new Date()
-        },
-        VIEWER
-      )
-    ).toBe(true);
+  it("does NOT fall back to household-wide sharing — the leak fix", () => {
+    expect(sql).not.toContain("shared_at");
+    expect(sql).not.toContain("household_id");
+  });
+});
+
+describe("planVisibilityFilter", () => {
+  const sql = render(planVisibilityFilter("user-A", "household-1"));
+
+  it("matches the creator and active grants", () => {
+    expect(sql).toContain("created_by_user_id");
+    expect(sql).toContain("item_grants");
   });
 
-  it("household member cannot view someone else's personal meal — data-leak guard", () => {
-    expect(
-      canViewMeal(
-        {
-          createdByUserId: OTHER_USER,
-          householdId: SAME_HH,
-          sharedAt: null
-        },
-        VIEWER
-      )
-    ).toBe(false);
-  });
-
-  it("non-member cannot view a shared meal in a different household", () => {
-    expect(
-      canViewMeal(
-        {
-          createdByUserId: OTHER_USER,
-          householdId: OTHER_HH,
-          sharedAt: new Date()
-        },
-        VIEWER
-      )
-    ).toBe(false);
-  });
-
-  it("non-member cannot view a personal meal in a different household", () => {
-    expect(
-      canViewMeal(
-        {
-          createdByUserId: OTHER_USER,
-          householdId: OTHER_HH,
-          sharedAt: null
-        },
-        VIEWER
-      )
-    ).toBe(false);
-  });
-
-  // Two edge cases worth pinning down — both are real shapes the
-  // service layer can hand us.
-
-  it("accepts an ISO-string sharedAt without coercion (mobile JSON wire format)", () => {
-    expect(
-      canViewMeal(
-        {
-          createdByUserId: OTHER_USER,
-          householdId: SAME_HH,
-          sharedAt: "2026-01-01T00:00:00.000Z"
-        },
-        VIEWER
-      )
-    ).toBe(true);
-  });
-
-  it("treats a meal with a null creator (deleted member) as personal-to-no-one", () => {
-    // Defense-in-depth: if attribution was lost (R4.7 ON DELETE SET
-    // NULL), other members still need to see the meal as long as it's
-    // shared. The creator branch fails (null !== userId) so the shared
-    // branch is the only path.
-    expect(
-      canViewMeal(
-        {
-          createdByUserId: null,
-          householdId: SAME_HH,
-          sharedAt: new Date()
-        },
-        VIEWER
-      )
-    ).toBe(true);
-    expect(
-      canViewMeal(
-        {
-          createdByUserId: null,
-          householdId: SAME_HH,
-          sharedAt: null
-        },
-        VIEWER
-      )
-    ).toBe(false);
+  it("intentionally KEEPS household-wide plan visibility (co-cook view)", () => {
+    // Plans stay visible household-wide; the recipes behind each dish are
+    // locked unless owned/granted (see getPlanDetail's per-dish check).
+    expect(sql).toContain("household_id");
   });
 });
