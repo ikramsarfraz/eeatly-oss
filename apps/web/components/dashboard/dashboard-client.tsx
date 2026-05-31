@@ -187,9 +187,6 @@ export function DashboardClient({
               />
               Quick log
             </span>
-            <span className="font-mono-brand text-[11px] text-[var(--muted-foreground)]">
-              ⌘ + Enter
-            </span>
           </div>
           <MealLogForm />
         </div>

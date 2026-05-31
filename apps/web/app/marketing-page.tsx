@@ -235,7 +235,6 @@ function WebSidebar({ active }: { active: string }) {
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderRadius: 9, background: "var(--ink)", color: "var(--cream)", fontSize: 12.5, fontWeight: 600 }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
         Log a meal
-        <span style={{ marginLeft: "auto", fontFamily: "var(--font-mono-loaded), monospace", fontSize: 9.5, opacity: 0.55 }}>⌘E</span>
       </div>
       {groups.map((g) => (
         <div key={g.label} style={{ display: "flex", flexDirection: "column", gap: 2 }}>

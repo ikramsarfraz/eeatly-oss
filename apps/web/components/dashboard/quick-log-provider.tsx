@@ -20,18 +20,7 @@ export function useQuickLog(): QuickLogContextValue {
 export function QuickLogProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = React.useState(false);
   const open = React.useCallback(() => setIsOpen(true), []);
-
-  React.useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key !== "e" && event.key !== "E") return;
-      if (!(event.metaKey || event.ctrlKey)) return;
-      if (event.shiftKey || event.altKey) return;
-      event.preventDefault();
-      setIsOpen((prev) => !prev);
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  // The ⌘E shortcut was removed — open via the sidebar "Log a meal" button.
 
   return (
     <QuickLogContext.Provider value={{ open }}>

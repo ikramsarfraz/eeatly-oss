@@ -173,12 +173,6 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
               <Link href={"/add/log" as Route}>
                 <Plus className="h-4 w-4 shrink-0" />
                 <span>Log a meal</span>
-                <span
-                  className="ml-auto rounded bg-white/[0.06] px-[5px] py-px font-mono-brand text-[10.5px] text-[#b8c4be] dark:bg-black/10 dark:text-[#4a463a]"
-                  aria-hidden
-                >
-                  ⌘E
-                </span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

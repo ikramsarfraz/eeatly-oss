@@ -221,28 +221,7 @@ export function MealLogForm({
   });
 
   return (
-    <form
-      id={formId}
-      className="grid gap-3"
-      onSubmit={handlePersist}
-      onKeyDown={(event) => {
-        if (!(event.metaKey || event.ctrlKey) || event.key !== "Enter") {
-          return;
-        }
-
-        const target = event.target as HTMLElement | null;
-        if (!target?.closest("textarea, input:not([type=submit]):not([type=file]):not([type=hidden])")) {
-          return;
-        }
-
-        if (target.closest("button")) {
-          return;
-        }
-
-        event.preventDefault();
-        void handlePersist();
-      }}
-    >
+    <form id={formId} className="grid gap-3" onSubmit={handlePersist}>
       {/* AI prefill */}
       <AiSuggestDialog onSuggestion={handleSuggestion} />
 

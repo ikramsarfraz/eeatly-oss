@@ -3,7 +3,6 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
-import { Sparkles } from "lucide-react";
 
 import {
   CommandDialog,
@@ -11,8 +10,7 @@ import {
   CommandGroup,
   CommandInput,
   CommandItem,
-  CommandList,
-  CommandSeparator
+  CommandList
 } from "@/components/ui/command";
 import { trpc } from "@/lib/trpc/client";
 
@@ -163,15 +161,6 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             )}
           </>
         )}
-        <CommandSeparator />
-        <CommandGroup heading="Tips">
-          <CommandItem disabled value="tip-shortcut">
-            <Sparkles className="size-4 text-muted-foreground" />
-            <span className="text-muted-foreground">
-              Tip: ⌘K opens this anywhere in the app.
-            </span>
-          </CommandItem>
-        </CommandGroup>
       </CommandList>
     </CommandDialog>
   );

@@ -846,12 +846,6 @@ function TextSurface({
       <textarea
         value={draft}
         onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            if (canSubmit) onSubmit();
-          }
-        }}
         placeholder={`e.g. "Bump chicken to 600g and add ginger paste, 1 tbsp."`}
         rows={3}
         disabled={disabled}
@@ -859,7 +853,7 @@ function TextSurface({
       />
       <div className="flex items-center justify-between border-t border-[var(--border)] pt-2">
         <span className="text-[11px] text-muted-foreground">
-          Enter to send · Shift+Enter for newline
+          Describe a change, then tap Send.
         </span>
         <Button
           type="button"

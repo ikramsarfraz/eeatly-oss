@@ -135,12 +135,6 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
           <span className="truncate">
             Search meals, plans, ingredients…
           </span>
-          <kbd
-            className="ml-auto rounded border bg-background px-1.5 py-0.5 font-mono text-[10.5px] text-muted-foreground"
-            aria-hidden
-          >
-            ⌘K
-          </kbd>
         </button>
         {/* Mobile-only — icon-only search trigger when the full bar
             is too wide. */}

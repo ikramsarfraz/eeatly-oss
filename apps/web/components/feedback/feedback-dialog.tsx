@@ -107,22 +107,7 @@ export function FeedbackDialog({ trigger }: FeedbackDialogProps) {
             Tell us what felt confusing, useful, or missing.
           </DialogDescription>
         </DialogHeader>
-        <form
-          className="grid gap-4"
-          onSubmit={handleSend}
-          onKeyDown={(event) => {
-            if (!(event.metaKey || event.ctrlKey) || event.key !== "Enter") {
-              return;
-            }
-
-            if ((event.target as HTMLElement | null)?.tagName !== "TEXTAREA") {
-              return;
-            }
-
-            event.preventDefault();
-            void handleSend();
-          }}
-        >
+        <form className="grid gap-4" onSubmit={handleSend}>
           <div className="grid gap-2">
             <Label htmlFor="feedback-type">Feedback type</Label>
             <Select
@@ -168,9 +153,6 @@ export function FeedbackDialog({ trigger }: FeedbackDialogProps) {
             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Send feedback
           </Button>
-          <p className="text-[11px] text-muted-foreground">
-            Shortcut: ⌘ Enter or Ctrl+Enter from the message field sends feedback.
-          </p>
         </form>
       </DialogContent>
     </Dialog>
