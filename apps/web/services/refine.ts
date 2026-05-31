@@ -42,10 +42,12 @@ import { detectHeadsUp } from "@/lib/refine/heads-up-rules";
  *   - save                — apply pending in a transaction
  *   - discard             — close session without applying
  *
- * Authz is layered: tRPC procedures enforce protectedProcedure (auth),
- * the service calls `requireHouseholdMember` against the meal's
- * household, and sessions also assert user ownership (a different
- * member can't fetch/save another member's draft).
+ * Authz is layered: tRPC procedures enforce protectedProcedure (auth);
+ * Refine is creator-only, so `startSession` authorizes purely on
+ * `meal.createdByUserId === userId` (no household check — a non-creator,
+ * including someone the recipe was shared with, gets a clean FORBIDDEN);
+ * and every subsequent procedure asserts session ownership (a different
+ * user can't fetch/save another's draft).
  */
 
 const ACTIVE_STATUS = "active" as const;
@@ -251,24 +253,21 @@ export async function startSession(args: {
   mealId: string;
   deviceId: string;
 }): Promise<SessionState> {
-  // Authorize: user must be in the meal's household. The lookup also
-  // gives us the household id which the AI context fetcher needs later.
+  // Authorize: Refine is a creator-only WRITE surface (the save path
+  // persists structured ingredients + steps onto the meal). Ownership is
+  // the whole authorization — `createdByUserId === userId` is strictly
+  // tighter than household membership (the creator is always in the meal's
+  // household), so we DON'T call `requireHouseholdMember` here. Doing so
+  // used to throw "Not authorized for this household." for a cross-household
+  // grantee (someone the recipe was shared with) — which, now that recipes
+  // are private-by-default, is exactly who reaches this path when they tap
+  // Refine on a shared recipe. Everyone who isn't the creator gets the same
+  // clean "only the creator can refine" error (mapped to FORBIDDEN), with no
+  // 500 and no leak of whether the meal exists.
   const mealRow = await db.query.meals.findFirst({
     where: and(eq(meals.id, args.mealId), isNull(meals.archivedAt))
   });
-  if (!mealRow) throw new Error("Meal not found.");
-  await requireHouseholdMember(args.userId, mealRow.householdId);
-  // R32 edit-path lockdown — Refine is a write surface (the save path
-  // persists structured ingredients + steps onto the meal). Only the
-  // creator can start a refine session. Other household members can
-  // read the meal (if shared) but can't propose changes to it.
-  //
-  // Behavior change from R31: pre-R32, household-wide members could
-  // start a refine session on any meal in their household. Refine
-  // sessions were per-device per-user, so concurrent drafts were
-  // already possible, but the underlying meal could be edited by any
-  // member. R32 narrows write access to the creator.
-  if (mealRow.createdByUserId !== args.userId) {
+  if (!mealRow || mealRow.createdByUserId !== args.userId) {
     throw new Error("Only the creator can refine this meal.");
   }
 
