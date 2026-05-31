@@ -197,8 +197,10 @@ export function HomeClient({
 
   return (
     <div className="grid gap-7">
-      {/* Hero band — primary "New plan" action lives here (not the top bar). */}
-      <section className="flex flex-wrap items-start justify-between gap-4 pt-2 sm:pt-4">
+      {/* Hero band — editorial only, no action. The dashboard's single
+          "New plan" CTA lives in the Upcoming-plan card (one primary per
+          screen); the hero stays clean. */}
+      <section className="pt-2 sm:pt-4">
         <div className="grid gap-2">
           <p className="font-serif text-[20px] italic text-muted-foreground sm:text-[22px]">
             {timeOfDayKicker()}
@@ -232,12 +234,6 @@ export function HomeClient({
             )}
           </p>
         </div>
-        <Button asChild variant="default" className="min-h-[40px] shrink-0">
-          <Link href={"/plans/new" as Route}>
-            <Plus className="h-3.5 w-3.5" />
-            New plan
-          </Link>
-        </Button>
       </section>
 
       {/* Stats — 4-up. Pending invites degrades to em-dash for non-
@@ -251,11 +247,11 @@ export function HomeClient({
           value={loggedThisWeek}
           tone="sage"
         />
-        <StatCard label="In library" value={inLibrary} tone="wheat" />
+        <StatCard label="In library" value={inLibrary} tone="plain" />
         <StatCard
           label="Reliable repeats"
           value={reliableRepeats}
-          tone="sage"
+          tone="plain"
         />
         <StatCard
           label="Pending invites"
@@ -264,8 +260,10 @@ export function HomeClient({
         />
       </section>
 
-      {/* Two-column body. `320px` right column matches the spec. */}
-      <div className="grid gap-7 lg:grid-cols-[1fr_320px]">
+      {/* Two-column body. 340px right column; `items-start` keeps the
+          right column hugging its content (no stretch) so its sticky
+          panels size to content rather than the taller left column. */}
+      <div className="grid items-start gap-7 lg:grid-cols-[1fr_340px] lg:gap-9">
         <div className="grid gap-7">
           {/* Recently cooked — 5-up MealTile carousel-ish row. Each
               tile links to /meal/[id] for R25 parity. */}
@@ -350,8 +348,9 @@ export function HomeClient({
           </section>
         </div>
 
-        {/* Right column — Upcoming plan + Quick log */}
-        <aside className="grid gap-5">
+        {/* Right column — Upcoming plan + Quick log. Content-height flex
+            stack that pins below the top bar once scrolled (lg+). */}
+        <aside className="grid gap-5 self-start lg:sticky lg:top-[88px]">
           <UpcomingPlanCard plan={upcomingPlan} />
 
           <div
@@ -404,17 +403,21 @@ function StatCard({
 }: {
   label: string;
   value: number | string;
-  tone: "sage" | "wheat";
+  tone: "sage" | "wheat" | "plain";
 }) {
   return (
     <div
       className={cn(
         "rounded-[14px] border p-4 transition-colors",
         // Light tone tints — read from the R26 sidebar palette + R23's
-        // wheat tokens so the stat cards inherit dark mode for free.
+        // wheat tokens so the stat cards inherit dark mode for free. Per
+        // the handoff only the first (sage) and last (wheat) cards are
+        // tinted; the middle pair stays plain white surface.
         tone === "sage"
           ? "bg-[color:var(--sage-soft)] border-[color:var(--sage)]"
-          : "bg-[color:var(--wheat-soft)] border-[color:var(--wheat)]"
+          : tone === "wheat"
+            ? "bg-[color:var(--wheat-soft)] border-[color:var(--wheat)]"
+            : "bg-[var(--surface)] border-[var(--border)]"
       )}
     >
       <p
@@ -566,14 +569,16 @@ function UpcomingPlanCard({
   if (!plan) {
     return (
       <div
-        className="grid gap-3 rounded-[14px] border bg-[var(--surface)] p-[18px]"
+        className="flex flex-col items-center gap-3 rounded-[14px] border bg-[var(--surface)] px-[18px] py-6 text-center"
         style={{ boxShadow: "var(--shadow-sm)" }}
       >
-        <SectionLabel>Upcoming plan</SectionLabel>
-        <p className="text-[13px] text-muted-foreground">
+        <span className="flex h-[52px] w-[52px] items-center justify-center rounded-[14px] bg-[color:var(--sage-soft)] text-[color:var(--sage-fg)]">
+          <Calendar className="h-5 w-5" />
+        </span>
+        <p className="max-w-[240px] text-[13.5px] leading-[1.5] text-muted-foreground">
           No plans scheduled. Sketch out the week to start cooking with intent.
         </p>
-        <Button asChild variant="default" className="min-h-[40px] w-fit">
+        <Button asChild variant="default" className="min-h-[40px]">
           <Link href={"/plans/new" as Route}>
             <Plus className="h-3.5 w-3.5" />
             New plan

@@ -69,7 +69,10 @@ export function PlansClient({ plans }: PlansClientProps) {
     <div className="grid gap-7">
       {/* Header band — display title + description. Filter + Recent
           decorative buttons defer to a future round per spec. */}
-      <header className="flex flex-wrap items-end justify-between gap-3">
+      {/* `items-start` + `pt-1.5` on the action group cap-aligns the
+          button to the top of the serif title's first line, rather than
+          letting it float centered against the title+subtitle block. */}
+      <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="grid gap-2">
           <h1
             className="font-serif text-[44px] leading-[1.02] text-foreground sm:text-[52px] lg:text-[64px]"
@@ -83,12 +86,14 @@ export function PlansClient({ plans }: PlansClientProps) {
           </p>
         </div>
         {/* Primary action lives in the page header (not the top bar). */}
-        <Button asChild variant="default" className="min-h-[40px]">
-          <Link href={"/plans/new" as Route}>
-            <Plus className="h-3.5 w-3.5" />
-            New plan
-          </Link>
-        </Button>
+        <div className="pt-1.5">
+          <Button asChild variant="default" className="min-h-[40px]">
+            <Link href={"/plans/new" as Route}>
+              <Plus className="h-3.5 w-3.5" />
+              New plan
+            </Link>
+          </Button>
+        </div>
       </header>
 
       {/* Scheduled grid — 3-up with empty-state always last */}

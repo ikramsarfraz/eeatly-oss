@@ -522,21 +522,10 @@ export function RecipeDetailClient({
           >
             {metaLine}
           </p>
-          {/* Primary actions live in the hero (not the top bar). */}
+          {/* Primary actions live in the hero (not the top bar). Order
+              per the handoff: "Log a cook" (primary forest) leads, then
+              "Refine with AI" (ghost); contextual Share + photo follow. */}
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            {showShareAffordance ? (
-              <ShareToggleButton
-                mealId={meal.id}
-                mealName={meal.name}
-                isShared={isShared}
-              />
-            ) : null}
-            <Button asChild variant="outline" className="min-h-[40px]">
-              <Link href={`/meal/${meal.id}/refine` as Route}>
-                <Sparkles className="h-3.5 w-3.5" />
-                Refine with AI
-              </Link>
-            </Button>
             <LogAgainButton
               mealName={meal.name}
               effortLevel={meal.effortLevel ?? "easy"}
@@ -547,6 +536,19 @@ export function RecipeDetailClient({
               compact
               className="min-h-[40px]"
             />
+            <Button asChild variant="outline" className="min-h-[40px]">
+              <Link href={`/meal/${meal.id}/refine` as Route}>
+                <Sparkles className="h-3.5 w-3.5" />
+                Refine with AI
+              </Link>
+            </Button>
+            {showShareAffordance ? (
+              <ShareToggleButton
+                mealId={meal.id}
+                mealName={meal.name}
+                isShared={isShared}
+              />
+            ) : null}
             {/* Creator-only device upload. Reuses the presign → R2 flow;
                 the resulting photo becomes the meal's own image and wins
                 over the app-wide AI fallback. */}

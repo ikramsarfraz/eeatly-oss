@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import type { Route } from "next";
-import { Lock, Plus } from "lucide-react";
+import { ArrowUpDown, Lock, Plus } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -219,9 +219,11 @@ export function LibraryClient({
 
   return (
     <div className="grid gap-7">
-      {/* Hero band — left: 64px display + description with count.
-          Right slot: sort decoration. */}
-      <header className="flex flex-wrap items-end justify-between gap-3">
+      {/* `items-start` + `pt-1.5` on the action group cap-aligns the
+          "New recipe" button to the top of the serif title. The A–Z sort
+          moved into the filter toolbar below (grouped with the filters,
+          distinct from the green primary). */}
+      <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="grid gap-2">
           <h1
             className="font-serif text-[44px] leading-[1.02] text-foreground sm:text-[52px] lg:text-[64px]"
@@ -236,14 +238,7 @@ export function LibraryClient({
           </p>
         </div>
         {/* Primary action lives in the page header (not the top bar). */}
-        <div className="flex items-center gap-2">
-          <span
-            className="cursor-default rounded-full border bg-[var(--surface-2)] px-3 py-1.5 font-mono text-[10.5px] uppercase text-muted-foreground opacity-70"
-            style={{ letterSpacing: "0.13em" }}
-            aria-disabled
-          >
-            A–Z
-          </span>
+        <div className="pt-1.5">
           <Button variant="default" className="min-h-[40px]" onClick={openQuickLog}>
             <Plus className="h-3.5 w-3.5" />
             New recipe
@@ -287,6 +282,17 @@ export function LibraryClient({
             onClick={() => setFilter(key)}
           />
         ))}
+        {/* Sort indicator — pushed to the far right (the library is
+            sorted A–Z by name server-side). A proper outlined pill with a
+            sort icon, visually grouped with the filters and distinct from
+            the green "New recipe" primary. */}
+        <span
+          className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-border bg-transparent px-3 py-1.5 text-[12.5px] font-medium text-muted-foreground"
+          style={{ letterSpacing: "-0.05px" }}
+        >
+          <ArrowUpDown className="h-3.5 w-3.5" />
+          A–Z
+        </span>
       </nav>
 
       {/* 4-up grid */}
