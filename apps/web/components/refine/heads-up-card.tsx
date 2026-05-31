@@ -20,10 +20,11 @@ import { cn } from "@/lib/utils";
  *     icon in wheat-fg. The "you probably want to override before
  *     saving" flag.
  *
- * The `suggestedAction` label renders as a small decorative button
- * (forest underline). The plumb-through to a real override endpoint
- * is parked since R20 (mobile) and stays parked here — clicking the
- * button is a no-op. Flagged at the page level.
+ * The advisory `body` is the whole value here. The old `suggestedAction`
+ * ("Keep effort …") rendered as a permanently-disabled no-op button
+ * (there's no effort-override endpoint — effort is derived from cook
+ * logs), so it's no longer rendered. The data still flows through in case
+ * a real override lands later.
  */
 export function HeadsUpCard({ headsUp }: { headsUp: HeadsUp }) {
   const warn = headsUp.severity === "warn";
@@ -64,19 +65,6 @@ export function HeadsUpCard({ headsUp }: { headsUp: HeadsUp }) {
       <p className="text-[13px] leading-[1.55] text-foreground/85">
         {headsUp.body}
       </p>
-      {headsUp.suggestedAction ? (
-        // Decorative: the suggestedAction plumb-through is parked
-        // since R20 (mobile). Click is a no-op; the label cues the
-        // intended interaction for when the procedure lands.
-        <button
-          type="button"
-          disabled
-          aria-disabled
-          className="mt-1 inline-flex w-fit cursor-default items-center gap-1 rounded-md border border-transparent bg-transparent px-0 py-0 text-[12.5px] font-medium text-primary underline-offset-2 hover:underline opacity-80"
-        >
-          {headsUp.suggestedAction.label} →
-        </button>
-      ) : null}
     </div>
   );
 }
