@@ -656,13 +656,15 @@ function SharedCard({ item }: { item: SharedWithMeItem }) {
 
   const save = trpc.sharing.saveCopy.useMutation({
     onSuccess: (res) => {
-      setSavedId(res.newMealId);
+      setSavedId(res.newItemId);
       void utils.sharing.sharedWithMe.invalidate();
       showToast({ variant: "success", title: "Saved to your library" });
     },
     onError: (e) => showToast({ variant: "error", title: "Couldn't save copy", description: e.message })
   });
 
+  const copyHref = (id: string): Route =>
+    item.itemType === "recipe" ? (`/meal/${id}` as Route) : (`/plans/${id}` as Route);
   const ownerLabel = `${item.ownerName ?? "Someone"}'s ${item.itemType}`;
   const href =
     item.itemType === "recipe"
@@ -701,28 +703,26 @@ function SharedCard({ item }: { item: SharedWithMeItem }) {
             View only
           </span>
         </div>
-        {item.itemType === "recipe" ? (
-          savedId ? (
-            <button
-              type="button"
-              onClick={() => router.push(`/meal/${savedId}` as Route)}
-              className="mt-1 inline-flex items-center gap-1.5 self-start rounded-full bg-[color:var(--sage-bg,var(--sage-soft))] px-3 py-1.5 text-[12px] font-medium text-[color:var(--primary)]"
-            >
-              <Copy className="h-3.5 w-3.5" />
-              Copy in your library — open
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={save.isPending}
-              onClick={() => save.mutate({ itemType: "recipe", itemId: item.itemId })}
-              className="mt-1 inline-flex items-center gap-1.5 self-start rounded-full border px-3 py-1.5 text-[12px] font-medium text-foreground hover:bg-[var(--surface-2)]"
-            >
-              <Copy className="h-3.5 w-3.5" />
-              Save a copy to edit
-            </button>
-          )
-        ) : null}
+        {savedId ? (
+          <button
+            type="button"
+            onClick={() => router.push(copyHref(savedId))}
+            className="mt-1 inline-flex items-center gap-1.5 self-start rounded-full bg-[color:var(--sage-bg,var(--sage-soft))] px-3 py-1.5 text-[12px] font-medium text-[color:var(--primary)]"
+          >
+            <Copy className="h-3.5 w-3.5" />
+            Copy in your library — open
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={save.isPending}
+            onClick={() => save.mutate({ itemType: item.itemType, itemId: item.itemId })}
+            className="mt-1 inline-flex items-center gap-1.5 self-start rounded-full border px-3 py-1.5 text-[12px] font-medium text-foreground hover:bg-[var(--surface-2)]"
+          >
+            <Copy className="h-3.5 w-3.5" />
+            Save a copy to edit
+          </button>
+        )}
       </div>
     </div>
   );

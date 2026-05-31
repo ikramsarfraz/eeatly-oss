@@ -9,6 +9,7 @@ import {
   itemRequests,
   mealIngredients,
   meals,
+  planDishes,
   plans,
   recipeShares,
   recipeSteps,
@@ -766,6 +767,116 @@ export async function listActiveShareLinks(userId: string): Promise<ActiveShareL
     mealName: r.mealName,
     url: `${base}/share/${r.token}`
   }));
+}
+
+/**
+ * Save a copy ("fork") of a shared plan into the forker's own library.
+ * Creates a new plan they OWN, copying the structure. Each dish is
+ * smart-remapped: if the forker owns the recipe (or saved a copy of it via
+ * a recipe grant) the new plan references THEIR recipe; otherwise it
+ * references the original (which stays locked for them until they request
+ * or save it). Dedup via `saved_copy_item_id` on the plan grant.
+ */
+export async function forkPlan(args: {
+  forkerUserId: string;
+  sourcePlanId: string;
+}): Promise<{ newPlanId: string }> {
+  const [grant] = await db
+    .select({ id: itemGrants.id, savedCopyItemId: itemGrants.savedCopyItemId })
+    .from(itemGrants)
+    .where(
+      and(
+        eq(itemGrants.itemType, "plan"),
+        eq(itemGrants.itemId, args.sourcePlanId),
+        eq(itemGrants.granteeUserId, args.forkerUserId),
+        isNull(itemGrants.revokedAt)
+      )
+    )
+    .limit(1);
+  if (!grant) throw new Error("This plan isn't shared with you.");
+  if (grant.savedCopyItemId) return { newPlanId: grant.savedCopyItemId }; // dedup
+
+  const [source] = await db
+    .select({
+      name: plans.name,
+      scheduledDate: plans.scheduledDate,
+      notes: plans.notes,
+      archivedAt: plans.archivedAt
+    })
+    .from(plans)
+    .where(eq(plans.id, args.sourcePlanId))
+    .limit(1);
+  if (!source || source.archivedAt) throw new Error("Plan not found.");
+
+  const sourceDishes = await db
+    .select({ mealId: planDishes.mealId, sortOrder: planDishes.sortOrder })
+    .from(planDishes)
+    .where(eq(planDishes.planId, args.sourcePlanId))
+    .orderBy(asc(planDishes.sortOrder));
+  const dishMealIds = sourceDishes.map((d) => d.mealId);
+
+  // Map each source recipe to the forker's equivalent where one exists:
+  // owned recipe → itself; granted+saved recipe → the saved copy.
+  const ownedRows = dishMealIds.length
+    ? await db
+        .select({ id: meals.id })
+        .from(meals)
+        .where(and(eq(meals.createdByUserId, args.forkerUserId), inArray(meals.id, dishMealIds)))
+    : [];
+  const ownedSet = new Set(ownedRows.map((r) => r.id));
+  const savedRows = dishMealIds.length
+    ? await db
+        .select({ itemId: itemGrants.itemId, savedCopyItemId: itemGrants.savedCopyItemId })
+        .from(itemGrants)
+        .where(
+          and(
+            eq(itemGrants.granteeUserId, args.forkerUserId),
+            eq(itemGrants.itemType, "recipe"),
+            inArray(itemGrants.itemId, dishMealIds)
+          )
+        )
+    : [];
+  const savedMap = new Map(
+    savedRows.filter((r) => r.savedCopyItemId).map((r) => [r.itemId, r.savedCopyItemId!])
+  );
+  const remap = (mealId: string): string =>
+    ownedSet.has(mealId) ? mealId : savedMap.get(mealId) ?? mealId;
+
+  const household = await getCurrentHousehold(args.forkerUserId);
+
+  const newPlanId = await db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(plans)
+      .values({
+        householdId: household.id,
+        createdByUserId: args.forkerUserId,
+        name: source.name,
+        scheduledDate: source.scheduledDate,
+        notes: source.notes
+      })
+      .returning({ id: plans.id });
+    const planId = created!.id;
+
+    if (sourceDishes.length > 0) {
+      await tx.insert(planDishes).values(
+        sourceDishes.map((d) => ({
+          planId,
+          mealId: remap(d.mealId),
+          addedByUserId: args.forkerUserId,
+          sortOrder: d.sortOrder
+        }))
+      );
+    }
+
+    await tx
+      .update(itemGrants)
+      .set({ savedCopyItemId: planId })
+      .where(eq(itemGrants.id, grant.id));
+
+    return planId;
+  });
+
+  return { newPlanId };
 }
 
 /**

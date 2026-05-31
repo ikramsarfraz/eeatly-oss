@@ -144,11 +144,13 @@ function GranteeStrip({
   const [savedId, setSavedId] = React.useState<string | null>(savedCopyItemId);
   const save = trpc.sharing.saveCopy.useMutation({
     onSuccess: (res) => {
-      setSavedId(res.newMealId);
+      setSavedId(res.newItemId);
       showToast({ variant: "success", title: "Saved to your library" });
     },
     onError: (e) => showToast({ variant: "error", title: "Couldn't save copy", description: e.message })
   });
+  const copyHref = (id: string): Route =>
+    itemType === "recipe" ? (`/meal/${id}` as Route) : (`/plans/${id}` as Route);
 
   return (
     <div className={STRIP}>
@@ -168,24 +170,22 @@ function GranteeStrip({
           You see their latest version as they edit. Save a copy to make it your own.
         </p>
       </div>
-      {itemType === "recipe" ? (
-        savedId ? (
-          <Button variant="outline" className="min-h-[40px]" onClick={() => router.push(`/meal/${savedId}` as Route)}>
-            <Copy className="h-3.5 w-3.5" />
-            Open my copy
-          </Button>
-        ) : (
-          <Button
-            variant="default"
-            className="min-h-[40px]"
-            disabled={save.isPending}
-            onClick={() => save.mutate({ itemType: "recipe", itemId })}
-          >
-            <Copy className="h-3.5 w-3.5" />
-            Save a copy
-          </Button>
-        )
-      ) : null}
+      {savedId ? (
+        <Button variant="outline" className="min-h-[40px]" onClick={() => router.push(copyHref(savedId))}>
+          <Copy className="h-3.5 w-3.5" />
+          Open my copy
+        </Button>
+      ) : (
+        <Button
+          variant="default"
+          className="min-h-[40px]"
+          disabled={save.isPending}
+          onClick={() => save.mutate({ itemType, itemId })}
+        >
+          <Copy className="h-3.5 w-3.5" />
+          Save a copy
+        </Button>
+      )}
     </div>
   );
 }
