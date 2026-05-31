@@ -20,7 +20,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MealTile } from "@/components/ui/meal-tile";
 import { SectionLabel } from "@/components/ui/section-label";
-import { useSetTopBarActions } from "@/components/layout/top-bar-actions";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 import type {
@@ -162,26 +161,6 @@ export function HomeClient({
     (m) => m.cookCount > 1
   ).length;
 
-  // Register the TopBar's New-plan action. `useMemo` keeps the node
-  // identity stable across rerenders so the provider's `useEffect`
-  // doesn't re-fire on every keystroke.
-  const topBarAction = React.useMemo(
-    () => (
-      <Button
-        asChild
-        variant="default"
-        className="min-h-[40px]"
-      >
-        <Link href={"/plans/new" as Route}>
-          <Plus className="h-3.5 w-3.5" />
-          New plan
-        </Link>
-      </Button>
-    ),
-    []
-  );
-  useSetTopBarActions(topBarAction);
-
   // Quick log — minimal form that calls meals.createLog with
   // R29 — Quick log buttons now route to the dedicated capture pages
   // instead of submitting inline. "Log meal" pushes to `/add/log`
@@ -218,39 +197,47 @@ export function HomeClient({
 
   return (
     <div className="grid gap-7">
-      {/* Hero band */}
-      <section className="grid gap-2 pt-2 sm:pt-4">
-        <p className="font-serif text-[20px] italic text-muted-foreground sm:text-[22px]">
-          {timeOfDayKicker()}
-        </p>
-        <h1
-          className="font-serif text-[56px] font-normal leading-[0.95] text-foreground max-md:text-[44px] sm:text-[72px] lg:text-[88px]"
-          style={{ letterSpacing: "-0.02em" }}
-        >
-          {firstName(currentUserName)}.
-        </h1>
-        <p
-          className="mt-1 font-mono text-[11px] uppercase text-muted-foreground"
-          style={{ letterSpacing: "0.14em" }}
-        >
-          {dateLabel}
-        </p>
-        <p className="mt-2 max-w-[640px] text-[15px] leading-[1.55] text-muted-foreground">
-          You&apos;ve cooked{" "}
-          <strong className="text-foreground">{loggedThisWeek}</strong>{" "}
-          {loggedThisWeek === 1 ? "meal" : "meals"} this week.
-          {upcomingPlan ? (
-            <>
-              {" "}Next up:{" "}
-              <em className="font-serif italic text-foreground">
-                {upcomingPlan.name}
-              </em>
-              .
-            </>
-          ) : (
-            <> Plan something to cook this week.</>
-          )}
-        </p>
+      {/* Hero band — primary "New plan" action lives here (not the top bar). */}
+      <section className="flex flex-wrap items-start justify-between gap-4 pt-2 sm:pt-4">
+        <div className="grid gap-2">
+          <p className="font-serif text-[20px] italic text-muted-foreground sm:text-[22px]">
+            {timeOfDayKicker()}
+          </p>
+          <h1
+            className="font-serif text-[56px] font-normal leading-[0.95] text-foreground max-md:text-[44px] sm:text-[72px] lg:text-[88px]"
+            style={{ letterSpacing: "-0.02em" }}
+          >
+            {firstName(currentUserName)}.
+          </h1>
+          <p
+            className="mt-1 font-mono text-[11px] uppercase text-muted-foreground"
+            style={{ letterSpacing: "0.14em" }}
+          >
+            {dateLabel}
+          </p>
+          <p className="mt-2 max-w-[640px] text-[15px] leading-[1.55] text-muted-foreground">
+            You&apos;ve cooked{" "}
+            <strong className="text-foreground">{loggedThisWeek}</strong>{" "}
+            {loggedThisWeek === 1 ? "meal" : "meals"} this week.
+            {upcomingPlan ? (
+              <>
+                {" "}Next up:{" "}
+                <em className="font-serif italic text-foreground">
+                  {upcomingPlan.name}
+                </em>
+                .
+              </>
+            ) : (
+              <> Plan something to cook this week.</>
+            )}
+          </p>
+        </div>
+        <Button asChild variant="default" className="min-h-[40px] shrink-0">
+          <Link href={"/plans/new" as Route}>
+            <Plus className="h-3.5 w-3.5" />
+            New plan
+          </Link>
+        </Button>
       </section>
 
       {/* Stats — 4-up. Pending invites degrades to em-dash for non-

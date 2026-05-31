@@ -30,7 +30,6 @@ import { SourceUrlEmbed } from "@/components/embeds/source-url-embed";
 
 import { useToast } from "@/components/providers/toast-provider";
 import { useSetBreadcrumb } from "@/components/layout/breadcrumb-context";
-import { useSetTopBarActions } from "@/components/layout/top-bar-actions";
 import { splitMealName } from "@/lib/meal/split-name";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
@@ -318,49 +317,6 @@ export function RecipeDetailClient({
   const isShared = meal.sharedAt !== null;
   const showShareAffordance = isCreator && isMultiMember;
 
-  // TopBar actions — Refine + Log a cook + (R32) Share / Move to
-  // personal toggle. The share/personal button is rendered to the
-  // LEFT of Refine so the destructive-ish "Move to personal" action
-  // is separated from the LOG primary action.
-  const topBarActions = React.useMemo(
-    () => (
-      <>
-        {showShareAffordance ? (
-          <ShareToggleButton
-            mealId={meal.id}
-            mealName={meal.name}
-            isShared={isShared}
-          />
-        ) : null}
-        <Button
-          asChild
-          variant="outline"
-          className="min-h-[40px]"
-        >
-          <Link href={`/meal/${meal.id}/refine` as Route}>
-            <Sparkles className="h-3.5 w-3.5" />
-            Refine with AI
-          </Link>
-        </Button>
-        {/* LogAgainButton wraps `useCreateMealLogImperative` and
-            handles toasts + error mapping. Same hook the dashboard
-            uses, so the funnel telemetry stays consistent. */}
-        <LogAgainButton
-          mealName={meal.name}
-          effortLevel={meal.effortLevel ?? "easy"}
-          variant="default"
-          size="default"
-          icon="check"
-          label="Log a cook"
-          compact
-          className="min-h-[40px]"
-        />
-      </>
-    ),
-    [meal.id, meal.name, meal.effortLevel, isShared, showShareAffordance]
-  );
-  useSetTopBarActions(topBarActions);
-
   return (
     // Outer wrapper bleeds out the layout's `<main>` padding
     // (`px-8 py-7` at md+, `px-4 py-5` below). Negative margins +
@@ -457,6 +413,32 @@ export function RecipeDetailClient({
           >
             {metaLine}
           </p>
+          {/* Primary actions live in the hero (not the top bar). */}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {showShareAffordance ? (
+              <ShareToggleButton
+                mealId={meal.id}
+                mealName={meal.name}
+                isShared={isShared}
+              />
+            ) : null}
+            <Button asChild variant="outline" className="min-h-[40px]">
+              <Link href={`/meal/${meal.id}/refine` as Route}>
+                <Sparkles className="h-3.5 w-3.5" />
+                Refine with AI
+              </Link>
+            </Button>
+            <LogAgainButton
+              mealName={meal.name}
+              effortLevel={meal.effortLevel ?? "easy"}
+              variant="default"
+              size="default"
+              icon="check"
+              label="Log a cook"
+              compact
+              className="min-h-[40px]"
+            />
+          </div>
         </div>
       </section>
 

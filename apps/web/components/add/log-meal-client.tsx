@@ -7,7 +7,6 @@ import type { Route } from "next";
 import { Button } from "@/components/ui/button";
 import { MealLogForm } from "@/components/forms/meal-log-form";
 import { SectionLabel } from "@/components/ui/section-label";
-import { useSetTopBarActions } from "@/components/layout/top-bar-actions";
 
 /**
  * Round 29 — Log a meal page.
@@ -36,43 +35,30 @@ export function LogMealClient({
   const formId = React.useId();
   const externalFormId = `${formId}-log-meal`;
 
-  const topBarActions = React.useMemo(
-    () => (
-      <>
-        <Button
-          variant="outline"
-          className="min-h-[40px]"
-          onClick={() => router.back()}
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          form={externalFormId}
-          variant="default"
-          className="min-h-[40px]"
-        >
-          Save meal
-        </Button>
-      </>
-    ),
-    [externalFormId, router]
-  );
-  useSetTopBarActions(topBarActions);
-
   return (
     <div className="grid gap-7">
-      <header className="grid gap-2">
-        <h1
-          className="font-serif text-[44px] leading-[1.02] text-foreground sm:text-[52px] lg:text-[56px]"
-          style={{ letterSpacing: "-0.025em" }}
-        >
-          Log a meal.
-        </h1>
-        <p className="max-w-[560px] text-[14px] leading-[1.55] text-muted-foreground">
-          What you cooked, when, how it went. Photos are optional — the
-          honest log is what makes the kitchen remember.
-        </p>
+      {/* Primary actions live in the page header (not the top bar). */}
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="grid gap-2">
+          <h1
+            className="font-serif text-[44px] leading-[1.02] text-foreground sm:text-[52px] lg:text-[56px]"
+            style={{ letterSpacing: "-0.025em" }}
+          >
+            Log a meal.
+          </h1>
+          <p className="max-w-[560px] text-[14px] leading-[1.55] text-muted-foreground">
+            What you cooked, when, how it went. Photos are optional — the
+            honest log is what makes the kitchen remember.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" className="min-h-[40px]" onClick={() => router.back()}>
+            Cancel
+          </Button>
+          <Button type="submit" form={externalFormId} variant="default" className="min-h-[40px]">
+            Save meal
+          </Button>
+        </div>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">

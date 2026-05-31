@@ -19,7 +19,6 @@ import { Card } from "@/components/ui/card";
 import { MealLogForm } from "@/components/forms/meal-log-form";
 import { SectionLabel } from "@/components/ui/section-label";
 import { Textarea } from "@/components/ui/textarea";
-import { useSetTopBarActions } from "@/components/layout/top-bar-actions";
 import { useToast } from "@/components/providers/toast-provider";
 import { trpc } from "@/lib/trpc/client";
 import { getCause } from "@/lib/trpc/errors";
@@ -200,74 +199,48 @@ export function CaptureAiClient() {
   const formId = React.useId();
   const externalFormId = `${formId}-capture-ai-form`;
 
-  const topBarActions = React.useMemo(() => {
-    if (suggestion) {
-      return (
-        <>
-          <Button
-            variant="outline"
-            className="min-h-[40px]"
-            onClick={() => {
-              setSuggestion(null);
-              setPhotoFile(null);
-              setTextInput("");
-              setAudioFile(null);
-              recorder.reset();
-            }}
-          >
-            Start over
-          </Button>
-          <Button
-            type="submit"
-            form={externalFormId}
-            variant="default"
-            className="min-h-[40px]"
-          >
-            Save meal
-          </Button>
-        </>
-      );
-    }
-    return (
-      <Button
-        variant="default"
-        className="min-h-[40px]"
-        onClick={handleExtract}
-        disabled={!canExtract}
-      >
-        {isPending ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        ) : (
-          <Sparkles className="h-3.5 w-3.5" />
-        )}
-        {isPending ? "Extracting…" : "Extract recipe"}
-      </Button>
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [suggestion, canExtract, isPending, externalFormId]);
-  useSetTopBarActions(topBarActions);
-
   // Review phase — pre-filled form on the same page.
   if (suggestion) {
     return (
       <div className="grid gap-7">
-        <header className="grid gap-2">
-          <p
-            className="font-serif text-[20px] italic text-muted-foreground sm:text-[22px]"
-            style={{ letterSpacing: "-0.005em" }}
-          >
-            Caught it,
-          </p>
-          <h1
-            className="font-serif text-[40px] leading-[1.02] text-foreground sm:text-[52px] lg:text-[60px]"
-            style={{ letterSpacing: "-0.025em" }}
-          >
-            review &amp; save.
-          </h1>
-          <p className="max-w-[560px] text-[14px] leading-[1.55] text-muted-foreground">
-            The AI guessed the recipe from your input. Tweak anything that
-            doesn&apos;t match, then save it to your library.
-          </p>
+        {/* Primary actions live in the page header (not the top bar). */}
+        <header className="flex flex-wrap items-start justify-between gap-4">
+          <div className="grid gap-2">
+            <p
+              className="font-serif text-[20px] italic text-muted-foreground sm:text-[22px]"
+              style={{ letterSpacing: "-0.005em" }}
+            >
+              Caught it,
+            </p>
+            <h1
+              className="font-serif text-[40px] leading-[1.02] text-foreground sm:text-[52px] lg:text-[60px]"
+              style={{ letterSpacing: "-0.025em" }}
+            >
+              review &amp; save.
+            </h1>
+            <p className="max-w-[560px] text-[14px] leading-[1.55] text-muted-foreground">
+              The AI guessed the recipe from your input. Tweak anything that
+              doesn&apos;t match, then save it to your library.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              className="min-h-[40px]"
+              onClick={() => {
+                setSuggestion(null);
+                setPhotoFile(null);
+                setTextInput("");
+                setAudioFile(null);
+                recorder.reset();
+              }}
+            >
+              Start over
+            </Button>
+            <Button type="submit" form={externalFormId} variant="default" className="min-h-[40px]">
+              Save meal
+            </Button>
+          </div>
         </header>
         <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
           <div className="grid gap-3">
@@ -348,23 +321,39 @@ export function CaptureAiClient() {
   // Capture phase — mode tabs + input surface
   return (
     <div className="grid gap-7">
-      <header className="grid gap-2">
-        <p
-          className="font-serif text-[20px] italic text-muted-foreground sm:text-[22px]"
-          style={{ letterSpacing: "-0.005em" }}
+      {/* Primary action lives in the page header (not the top bar). */}
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="grid gap-2">
+          <p
+            className="font-serif text-[20px] italic text-muted-foreground sm:text-[22px]"
+            style={{ letterSpacing: "-0.005em" }}
+          >
+            Tell us about it,
+          </p>
+          <h1
+            className="font-serif text-[44px] leading-[1.02] text-foreground sm:text-[56px] lg:text-[64px]"
+            style={{ letterSpacing: "-0.025em" }}
+          >
+            we&apos;ll do the typing.
+          </h1>
+          <p className="max-w-[560px] text-[14px] leading-[1.55] text-muted-foreground">
+            Drop a photo of a handwritten card, paste a recipe URL, or
+            record a voice note. AI extracts the structured recipe.
+          </p>
+        </div>
+        <Button
+          variant="default"
+          className="min-h-[40px] shrink-0"
+          onClick={handleExtract}
+          disabled={!canExtract}
         >
-          Tell us about it,
-        </p>
-        <h1
-          className="font-serif text-[44px] leading-[1.02] text-foreground sm:text-[56px] lg:text-[64px]"
-          style={{ letterSpacing: "-0.025em" }}
-        >
-          we&apos;ll do the typing.
-        </h1>
-        <p className="max-w-[560px] text-[14px] leading-[1.55] text-muted-foreground">
-          Drop a photo of a handwritten card, paste a recipe URL, or
-          record a voice note. AI extracts the structured recipe.
-        </p>
+          {isPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Sparkles className="h-3.5 w-3.5" />
+          )}
+          {isPending ? "Extracting…" : "Extract recipe"}
+        </Button>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">

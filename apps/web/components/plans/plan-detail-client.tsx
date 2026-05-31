@@ -21,7 +21,6 @@ import { SectionLabel } from "@/components/ui/section-label";
 import { AddDishPicker } from "@/components/plans/add-dish-picker";
 import { AnnotationEditor } from "@/components/plans/annotation-editor";
 import { useSetBreadcrumb } from "@/components/layout/breadcrumb-context";
-import { useSetTopBarActions } from "@/components/layout/top-bar-actions";
 import { trpc } from "@/lib/trpc/client";
 import { useToast } from "@/components/providers/toast-provider";
 import { cn } from "@/lib/utils";
@@ -140,21 +139,6 @@ export function PlanDetailClient({
   const archiveMutation = trpc.plans.archive.useMutation();
   const unarchiveMutation = trpc.plans.unarchive.useMutation();
 
-  const topBarActions = React.useMemo(
-    () => (
-      <Button
-        variant="outline"
-        className="min-h-[40px]"
-        onClick={() => setEditingPlan((prev) => !prev)}
-      >
-        <Edit3 className="h-3.5 w-3.5" />
-        {editingPlan ? "Done editing" : "Edit plan"}
-      </Button>
-    ),
-    [editingPlan]
-  );
-  useSetTopBarActions(topBarActions);
-
   const dateLabel = (() => {
     try {
       return format(parseISO(plan.scheduledDate), "EEE, MMM d, yyyy");
@@ -244,6 +228,17 @@ export function PlanDetailClient({
                 Archived
               </Badge>
             ) : null}
+          </div>
+          {/* Primary action lives in the hero (not the top bar). */}
+          <div className="mt-1">
+            <Button
+              variant="outline"
+              className="min-h-[40px]"
+              onClick={() => setEditingPlan((prev) => !prev)}
+            >
+              <Edit3 className="h-3.5 w-3.5" />
+              {editingPlan ? "Done editing" : "Edit plan"}
+            </Button>
           </div>
         </div>
 

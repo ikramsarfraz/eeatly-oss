@@ -11,7 +11,6 @@ import { Card } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
 import { useToastShortcuts } from "@/components/ui/toast";
 import { useSetBreadcrumb } from "@/components/layout/breadcrumb-context";
-import { useSetTopBarActions } from "@/components/layout/top-bar-actions";
 import { HeadsUpCard } from "@/components/refine/heads-up-card";
 import {
   describePendingChange,
@@ -198,40 +197,6 @@ function ReviewBody({
 }) {
   useSetBreadcrumb(mealName, "Recipe");
 
-  const topBarActions = React.useMemo(
-    () => (
-      <>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onBack}
-          disabled={saving}
-          className="min-h-[40px]"
-        >
-          Keep refining
-        </Button>
-        <Button
-          type="button"
-          variant="default"
-          onClick={onSave}
-          disabled={saving || counts.total === 0}
-          className="min-h-[40px]"
-        >
-          {saving ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Check className="h-3.5 w-3.5" />
-          )}
-          {saving
-            ? "Saving…"
-            : `Save ${counts.total} change${counts.total === 1 ? "" : "s"}`}
-        </Button>
-      </>
-    ),
-    [counts.total, saving, onSave, onBack]
-  );
-  useSetTopBarActions(topBarActions);
-
   const primaryHeadsUp = headsUp[0] ?? null;
   const extraHeadsUp = headsUp.slice(1);
 
@@ -298,6 +263,34 @@ function ReviewBody({
             <Badge variant="ghost">
               {counts.remove} removal{counts.remove === 1 ? "" : "s"}
             </Badge>
+          </div>
+          {/* Primary actions live in the page header (not the top bar). */}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="default"
+              onClick={onSave}
+              disabled={saving || counts.total === 0}
+              className="min-h-[40px]"
+            >
+              {saving ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Check className="h-3.5 w-3.5" />
+              )}
+              {saving
+                ? "Saving…"
+                : `Save ${counts.total} change${counts.total === 1 ? "" : "s"}`}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onBack}
+              disabled={saving}
+              className="min-h-[40px]"
+            >
+              Keep refining
+            </Button>
           </div>
         </div>
 

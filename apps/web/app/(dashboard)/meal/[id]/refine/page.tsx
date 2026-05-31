@@ -35,7 +35,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToastShortcuts } from "@/components/ui/toast";
 import { useSetBreadcrumb } from "@/components/layout/breadcrumb-context";
-import { useSetTopBarActions } from "@/components/layout/top-bar-actions";
 import { HeadsUpCard } from "@/components/refine/heads-up-card";
 import { RefineDiff } from "@/components/refine/refine-diff";
 import { getDeviceId } from "@/lib/refine/device-id";
@@ -543,47 +542,9 @@ function RefineBody({
   // so deeper routes work without a separate per-route helper.
   useSetBreadcrumb(meal.name, "Recipe");
 
-  // TopBar actions: Discard (decorative ghost when nothing's pending,
-  // confirming AlertDialog when dirty) + Review & save (disabled
-  // until at least one pending change is ready).
+  // Page actions live in the identity strip below (not the top bar):
+  // Discard (ghost / confirming dialog when dirty) + Review & save.
   const dirty = counts.total > 0 || turns.length > 0;
-  const topBarActions = React.useMemo(
-    () => (
-      <>
-        <DiscardButton
-          onConfirm={handleDiscard}
-          pending={discardPending}
-          dirty={dirty}
-        />
-        <Button
-          type="button"
-          variant="default"
-          disabled={counts.total === 0 || !sessionId}
-          onClick={onReviewSave}
-          className="min-h-[40px]"
-        >
-          Review & save
-          {counts.total > 0 ? (
-            <span
-              className="ml-2 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-white/[0.18] px-1.5 font-mono-brand text-[11.5px] font-bold text-primary-foreground"
-              aria-hidden
-            >
-              {counts.total}
-            </span>
-          ) : null}
-        </Button>
-      </>
-    ),
-    [
-      counts.total,
-      sessionId,
-      handleDiscard,
-      discardPending,
-      dirty,
-      onReviewSave
-    ]
-  );
-  useSetTopBarActions(topBarActions);
 
   // Build a thin "Will affect" preview from the pending list.
   const willAffect = React.useMemo(
@@ -626,18 +587,29 @@ function RefineBody({
             {meal.effortLevel ? ` · ${meal.effortLevel}` : ""}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="wheat" className="font-mono">
-            Editing
-          </Badge>
-          {turns.length > 0 ? (
-            <span
-              className="font-mono text-[10.5px] uppercase text-muted-foreground"
-              style={{ letterSpacing: "0.14em" }}
-            >
-              {turns.length} turn{turns.length === 1 ? "" : "s"}
-            </span>
-          ) : null}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <DiscardButton
+            onConfirm={handleDiscard}
+            pending={discardPending}
+            dirty={dirty}
+          />
+          <Button
+            type="button"
+            variant="default"
+            disabled={counts.total === 0 || !sessionId}
+            onClick={onReviewSave}
+            className="min-h-[40px]"
+          >
+            Review & save
+            {counts.total > 0 ? (
+              <span
+                className="ml-2 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-white/[0.18] px-1.5 font-mono-brand text-[11.5px] font-bold text-primary-foreground"
+                aria-hidden
+              >
+                {counts.total}
+              </span>
+            ) : null}
+          </Button>
         </div>
       </section>
 
