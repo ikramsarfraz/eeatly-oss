@@ -93,8 +93,11 @@ function formatDuration(seconds: number): string {
 
 function mimeToExtension(mime: string): string {
   if (mime.includes("webm")) return "webm";
+  if (mime.includes("m4a")) return "m4a";
   if (mime.includes("mp4")) return "mp4";
   if (mime.includes("ogg")) return "ogg";
+  if (mime.includes("opus")) return "opus";
+  if (mime.includes("flac")) return "flac";
   if (mime.includes("wav")) return "wav";
   if (mime.includes("mpeg") || mime.includes("mp3")) return "mp3";
   return "webm";
@@ -156,6 +159,9 @@ export default function RefineComposerPage() {
   const [photoFile, setPhotoFile] = React.useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = React.useState<string | null>(null);
   const recorder = useVoiceRecorder();
+  // Upload fallback for when the mic is blocked/unsupported — voice refine
+  // still works by uploading an audio file.
+  const [audioFile, setAudioFile] = React.useState<File | null>(null);
 
   React.useEffect(() => {
     if (recorder.errorMessage)
@@ -207,6 +213,7 @@ export default function RefineComposerPage() {
       if (!data || !sessionId) return;
       utils.refine.getPendingChanges.setData({ sessionId }, data);
       recorder.reset();
+      setAudioFile(null);
     },
     onError: (err) => handleErrorToast(err, "Couldn't process that voice note.")
   });
@@ -255,11 +262,13 @@ export default function RefineComposerPage() {
   }
 
   async function handleSubmitVoice() {
-    if (!sessionId || !recorder.blob) return;
+    // Prefer a recorded blob; fall back to an uploaded audio file.
+    const source: Blob | null = recorder.blob ?? audioFile;
+    if (!sessionId || !source) return;
     try {
-      const audioBase64 = await blobToBase64(recorder.blob);
-      const ext = mimeToExtension(recorder.blob.type);
-      const mediaType = recorder.blob.type as
+      const audioBase64 = await blobToBase64(source);
+      const ext = mimeToExtension(source.type);
+      const mediaType = source.type as
         | "audio/mpeg"
         | "audio/mp3"
         | "audio/mp4"
@@ -404,6 +413,8 @@ export default function RefineComposerPage() {
       draft={draft}
       setDraft={setDraft}
       recorder={recorder}
+      audioFile={audioFile}
+      setAudioFile={setAudioFile}
       photoFile={photoFile}
       photoInputRef={photoInputRef}
       photoPreview={photoPreview}
@@ -492,6 +503,8 @@ function RefineBody({
   draft,
   setDraft,
   recorder,
+  audioFile,
+  setAudioFile,
   photoFile,
   photoInputRef,
   photoPreview,
@@ -520,6 +533,8 @@ function RefineBody({
   draft: string;
   setDraft: (s: string) => void;
   recorder: ReturnType<typeof useVoiceRecorder>;
+  audioFile: File | null;
+  setAudioFile: (f: File | null) => void;
   photoFile: File | null;
   photoInputRef: React.RefObject<HTMLInputElement | null>;
   photoPreview: string | null;
@@ -660,6 +675,8 @@ function RefineBody({
               {mode === "voice" ? (
                 <VoiceSurface
                   recorder={recorder}
+                  audioFile={audioFile}
+                  onPickAudio={setAudioFile}
                   onSubmit={handleSubmitVoice}
                   sending={submitVoicePending}
                 />
@@ -872,93 +889,153 @@ function TextSurface({
 
 function VoiceSurface({
   recorder,
+  audioFile,
+  onPickAudio,
   onSubmit,
   sending
 }: {
   recorder: ReturnType<typeof useVoiceRecorder>;
+  audioFile: File | null;
+  onPickAudio: (f: File | null) => void;
   onSubmit: () => void;
   sending: boolean;
 }) {
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const isRecording = recorder.state === "recording";
   const isReady = recorder.state === "ready";
   const isRequesting = recorder.state === "requesting";
   const denied = recorder.state === "denied";
-
-  if (!recorder.supported) {
-    return (
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 text-sm text-muted-foreground">
-        Recording isn&apos;t supported in this browser. Try the text or photo mode.
-      </div>
-    );
-  }
+  // Mic is unavailable (blocked or unsupported) — lead with file upload.
+  const micUnavailable = denied || !recorder.supported;
 
   return (
     <div className="grid place-items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-6">
-      <button
-        type="button"
-        onClick={() => {
-          if (isReady) {
-            recorder.reset();
-            void recorder.start();
-            return;
-          }
-          if (isRecording) {
-            recorder.stop();
-            return;
-          }
-          void recorder.start();
-        }}
-        disabled={isRequesting || sending}
-        aria-label={isRecording ? "Stop recording" : "Start recording"}
-        className={cn(
-          "grid h-20 w-20 place-items-center rounded-full text-primary-foreground shadow-md transition",
-          isRecording
-            ? "bg-destructive animate-pulse"
-            : "bg-primary hover:scale-[1.03] active:scale-[0.98]"
-        )}
-      >
-        {isRequesting || sending ? (
-          <Loader2 className="h-7 w-7 animate-spin" />
-        ) : isRecording ? (
-          <Square className="h-7 w-7" fill="currentColor" />
-        ) : (
-          <Mic className="h-8 w-8" />
-        )}
-      </button>
-
-      <Waveform active={isRecording} />
-
-      <p className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted-foreground">
-        {isRecording
-          ? `${formatDuration(recorder.seconds)} · listening`
-          : isReady
-            ? `${formatDuration(recorder.seconds)} captured`
-            : isRequesting
-              ? "Requesting microphone…"
-              : denied
-                ? "Microphone access blocked"
-                : "Tap to record"}
-      </p>
-
-      {isReady && recorder.url ? (
-        <audio src={recorder.url} controls className="w-full max-w-[360px]" />
-      ) : null}
-
-      {isReady ? (
-        <div className="flex gap-2">
-          <Button type="button" onClick={onSubmit} disabled={sending} className="min-h-[40px]">
-            {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-            {sending ? "Sending…" : "Send voice note"}
-          </Button>
-          <Button
+      {!recorder.supported ? null : (
+        <>
+          <button
             type="button"
-            variant="outline"
-            onClick={() => recorder.reset()}
-            disabled={sending}
-            className="min-h-[40px]"
+            onClick={() => {
+              if (isReady) {
+                recorder.reset();
+                void recorder.start();
+                return;
+              }
+              if (isRecording) {
+                recorder.stop();
+                return;
+              }
+              void recorder.start();
+            }}
+            disabled={isRequesting || sending}
+            aria-label={isRecording ? "Stop recording" : "Start recording"}
+            className={cn(
+              "grid h-20 w-20 place-items-center rounded-full text-primary-foreground shadow-md transition",
+              isRecording
+                ? "bg-destructive animate-pulse"
+                : "bg-primary hover:scale-[1.03] active:scale-[0.98]"
+            )}
           >
-            Re-record
-          </Button>
+            {isRequesting || sending ? (
+              <Loader2 className="h-7 w-7 animate-spin" />
+            ) : isRecording ? (
+              <Square className="h-7 w-7" fill="currentColor" />
+            ) : (
+              <Mic className="h-8 w-8" />
+            )}
+          </button>
+
+          <Waveform active={isRecording} />
+
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted-foreground">
+            {isRecording
+              ? `${formatDuration(recorder.seconds)} · listening`
+              : isReady
+                ? `${formatDuration(recorder.seconds)} captured`
+                : isRequesting
+                  ? "Requesting microphone…"
+                  : denied
+                    ? "Microphone access blocked"
+                    : "Tap to record"}
+          </p>
+
+          {isReady && recorder.url ? (
+            <audio src={recorder.url} controls className="w-full max-w-[360px]" />
+          ) : null}
+
+          {isReady ? (
+            <div className="flex gap-2">
+              <Button type="button" onClick={onSubmit} disabled={sending} className="min-h-[40px]">
+                {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                {sending ? "Sending…" : "Send voice note"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => recorder.reset()}
+                disabled={sending}
+                className="min-h-[40px]"
+              >
+                Re-record
+              </Button>
+            </div>
+          ) : null}
+        </>
+      )}
+
+      {/* Upload fallback — always available, and the primary path when the
+          mic is blocked/unsupported (e.g. permission denied). */}
+      {!isReady ? (
+        <div className="grid w-full max-w-[360px] place-items-center gap-2">
+          {recorder.supported ? (
+            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground/70">
+              {micUnavailable ? "Upload an audio file instead" : "or"}
+            </span>
+          ) : (
+            <p className="text-center text-[12.5px] text-muted-foreground">
+              Recording isn&apos;t available here — upload an audio file instead.
+            </p>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="audio/*"
+            className="sr-only"
+            onChange={(e) => onPickAudio(e.target.files?.[0] ?? null)}
+          />
+          {audioFile ? (
+            <div className="grid w-full place-items-center gap-2">
+              <p className="max-w-full truncate text-[13px] text-foreground">
+                {audioFile.name}
+              </p>
+              <div className="flex gap-2">
+                <Button type="button" onClick={onSubmit} disabled={sending} className="min-h-[40px]">
+                  {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                  {sending ? "Sending…" : "Send voice note"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    onPickAudio(null);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
+                  disabled={sending}
+                  className="min-h-[40px]"
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-[40px]"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              Choose audio file
+            </Button>
+          )}
         </div>
       ) : null}
     </div>
