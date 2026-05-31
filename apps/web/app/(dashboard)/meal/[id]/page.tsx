@@ -55,6 +55,7 @@ export default async function MealDetailPage({ params }: PageProps) {
     photoUrl: meal.photoUrl,
     recipeText: meal.recipeText,
     recipeSourceUrl: meal.recipeSourceUrl,
+    servings: meal.servings,
     ingredients: meal.ingredients,
     createdByUserId: meal.createdByUserId,
     createdByName: meal.createdByName,

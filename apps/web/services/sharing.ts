@@ -645,6 +645,7 @@ export async function forkRecipe(args: {
       notes: meals.notes,
       recipeText: meals.recipeText,
       recipeSourceUrl: meals.recipeSourceUrl,
+      servings: meals.servings,
       ingredients: meals.ingredients,
       archivedAt: meals.archivedAt
     })
@@ -712,6 +713,7 @@ export async function forkRecipe(args: {
         notes: source.notes,
         recipeText: source.recipeText,
         recipeSourceUrl: source.recipeSourceUrl,
+        servings: source.servings,
         ingredients: source.ingredients
       })
       .returning({ id: meals.id });

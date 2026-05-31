@@ -47,6 +47,10 @@ export const meals = pgTable(
     notes: text("notes"),
     recipeText: text("recipe_text"),
     recipeSourceUrl: text("recipe_source_url"),
+    // Free-form yield/servings, e.g. "Serves 4", "Makes 8 sliders",
+    // "Feeds 6". Intentionally a string (not a number) so it can carry
+    // the unit naturally. AI-filled on capture/refine; editable via Refine.
+    servings: text("servings"),
     // Round 10: structured ingredient list. Each element is one
     // ingredient line as the AI extracted it ("1 cup basmati rice") —
     // free-text, intentionally not parsed into {name, quantity, unit}.

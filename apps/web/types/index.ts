@@ -68,6 +68,9 @@ export type MealSuggestion = {
   // a finished dish, a recipe-less voice note, etc.). Optional so older
   // call-sites and legacy provider responses still typecheck.
   ingredients?: string[];
+  // Free-form yield/servings, e.g. "Serves 4" / "Makes 8 sliders". Empty
+  // string when the source doesn't state a yield. Optional for back-compat.
+  servings?: string;
 };
 
 export type DashboardMeals = {

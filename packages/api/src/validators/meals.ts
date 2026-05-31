@@ -45,6 +45,14 @@ export const mealLogInputSchema = z.object({
     .optional()
     .or(z.literal("")),
   recipeSourceUrl: httpUrl.optional().or(z.literal("")),
+  // Free-form yield/servings, e.g. "Serves 4", "Makes 8 sliders". AI-filled
+  // on capture; persisted verbatim. Empty string when no yield was stated.
+  servings: z
+    .string()
+    .trim()
+    .max(120, "Keep the servings note under 120 characters.")
+    .optional()
+    .or(z.literal("")),
   // Round 10: AI-extracted ingredient list. Each entry is one line as
   // the recipe presents it ("1 cup basmati rice"). Trimmed in the
   // service before persist; entries that empty out are dropped.

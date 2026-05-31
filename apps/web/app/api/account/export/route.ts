@@ -35,6 +35,7 @@ export async function GET() {
         photoUrl: mealLogs.photoUrl,
         recipeText: meals.recipeText,
         recipeSourceUrl: meals.recipeSourceUrl,
+        servings: meals.servings,
         loggedAt: mealLogs.createdAt
       })
       .from(mealLogs)
@@ -76,6 +77,7 @@ const COLUMNS = [
   "photo_url",
   "recipe_text",
   "recipe_source_url",
+  "servings",
   "logged_at"
 ] as const;
 
@@ -87,6 +89,7 @@ type Row = {
   photoUrl: string | null;
   recipeText: string | null;
   recipeSourceUrl: string | null;
+  servings: string | null;
   loggedAt: Date | string;
 };
 

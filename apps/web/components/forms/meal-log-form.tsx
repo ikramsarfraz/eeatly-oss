@@ -114,6 +114,7 @@ export function MealLogForm({
       photoUrl: "",
       recipeText: "",
       recipeSourceUrl: "",
+      servings: "",
       ingredients: undefined
     }
   });
@@ -136,6 +137,12 @@ export function MealLogForm({
     // on the merge path and surprise the user.
     if (suggestion.ingredients && suggestion.ingredients.length > 0) {
       form.setValue("ingredients", suggestion.ingredients);
+    }
+    // Free-form yield ("Serves 4", "Makes 8 sliders"). Hidden pass-through
+    // field like ingredients — only set when the AI actually returned one so
+    // we don't blank an existing value on the merge path.
+    if (suggestion.servings) {
+      form.setValue("servings", suggestion.servings);
     }
 
     if (aiNoticeTimerRef.current) clearTimeout(aiNoticeTimerRef.current);
@@ -189,6 +196,7 @@ export function MealLogForm({
       photoUrl: "",
       recipeText: "",
       recipeSourceUrl: "",
+      servings: "",
       ingredients: undefined
     });
     setPhotoFile(null);

@@ -62,6 +62,12 @@ export type RecipeContext = {
    * fixtures/callers don't have to thread it; the loader always sets it.
    */
   recipeText?: string | null;
+  /**
+   * Current free-form yield/servings ("Serves 4", "Makes 8 sliders"), or
+   * null when unset. Surfaced so the model can keep it consistent with the
+   * quantities it edits, and set it when building a recipe from scratch.
+   */
+  servings?: string | null;
   ingredients: Array<{
     id: string;
     position: number;

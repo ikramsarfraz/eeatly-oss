@@ -63,7 +63,10 @@ export const metaPayloadSchema = z
     name: z.string().min(1).max(200).optional(),
     notes: z.string().max(2000).nullable().optional(),
     recipeText: z.string().max(20_000).nullable().optional(),
-    recipeSourceUrl: z.string().url().nullable().optional()
+    recipeSourceUrl: z.string().url().nullable().optional(),
+    // Free-form yield/servings ("Serves 4", "Makes 8 sliders"). Nullable so
+    // a refine turn can clear it. Bounded to match the DB convention.
+    servings: z.string().max(120).nullable().optional()
   })
   .strict();
 export type MetaPayload = z.infer<typeof metaPayloadSchema>;
@@ -91,7 +94,8 @@ export const addPayloadSchema = z.object({
   // meta
   notes: z.string().max(2000).nullable().optional(),
   recipeText: z.string().max(20_000).nullable().optional(),
-  recipeSourceUrl: z.string().url().nullable().optional()
+  recipeSourceUrl: z.string().url().nullable().optional(),
+  servings: z.string().max(120).nullable().optional()
 });
 export type AddPayload = z.infer<typeof addPayloadSchema>;
 

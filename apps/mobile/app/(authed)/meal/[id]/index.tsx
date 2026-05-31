@@ -422,6 +422,7 @@ function MealDetailBody({
     photoUrl: string | null;
     recipeText: string | null;
     recipeSourceUrl: string | null;
+    servings: string | null;
     ingredients: string[] | null;
     cookCount: number;
     lastCookedAt: string | Date | null;
@@ -589,6 +590,9 @@ function MealDetailBody({
             >
               {EFFORT_LABEL[meal.effortLevel]}
             </Chip>
+          ) : null}
+          {meal.servings?.trim() ? (
+            <Chip tone="ghost">{meal.servings.trim()}</Chip>
           ) : null}
           {totalTime ? (
             <Chip tone="ghost">{totalTime}</Chip>

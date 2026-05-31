@@ -73,7 +73,8 @@ function titleCaseField(field: string): string {
     ingredientIds: "linked ingredients",
     notes: "notes",
     recipeText: "recipe text",
-    recipeSourceUrl: "source URL"
+    recipeSourceUrl: "source URL",
+    servings: "servings"
   };
   return map[field] ?? field;
 }

@@ -163,6 +163,7 @@ async function loadRecipeContext(mealId: string): Promise<RecipeContext> {
       ingredientRows.length === 0 && stepRows.length === 0
         ? (mealRow.recipeText?.trim() || null)
         : null,
+    servings: mealRow.servings?.trim() || null,
     ingredients,
     steps
   };
@@ -968,6 +969,10 @@ export async function saveSession(args: {
             case "recipeSourceUrl":
               update.recipeSourceUrl =
                 typeof after === "string" ? after : null;
+              break;
+            case "servings":
+              update.servings =
+                typeof after === "string" && after.trim() ? after.trim() : null;
               break;
             default:
               continue;

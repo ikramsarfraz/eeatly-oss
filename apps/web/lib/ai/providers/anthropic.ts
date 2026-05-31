@@ -49,9 +49,14 @@ const suggestMealTool = {
         description:
           "Ordered ingredient lines as they appear in the source ('1 cup basmati rice'). Empty array if no ingredients were named."
       },
+      servings: {
+        type: "string",
+        description:
+          "Free-form yield/servings exactly as the source states it ('Serves 4', 'Makes 8 sliders', 'Feeds 6'). Empty string if no yield is stated."
+      },
       confidence: { type: "string", enum: ["high", "medium", "low"], description: "Confidence level in this suggestion" }
     },
-    required: ["name", "effortGuess", "notes", "recipeText", "ingredients", "confidence"]
+    required: ["name", "effortGuess", "notes", "recipeText", "ingredients", "servings", "confidence"]
   }
 };
 
@@ -72,6 +77,7 @@ function parseSuggestion(input: unknown): MealSuggestion {
     notes: typeof raw.notes === "string" ? raw.notes.trim() : "",
     recipeText: typeof raw.recipeText === "string" ? raw.recipeText.trim() : "",
     ingredients: coerceIngredients(raw.ingredients),
+    servings: typeof raw.servings === "string" ? raw.servings.trim() : "",
     confidence
   };
 }

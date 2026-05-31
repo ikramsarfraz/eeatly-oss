@@ -18,12 +18,14 @@ If it is a finished dish:
 - Write a brief note about what you observe — one sentence at most
 - Leave recipeText empty
 - Leave ingredients as an empty array (the dish photo doesn't tell you the ingredient list)
+- Leave servings empty (a finished-dish photo doesn't reliably tell you the yield)
 
 If it is a recipe card or written recipe:
 - Use the recipe title as the name
 - Estimate effort from the ingredients and steps
 - Extract the full recipe text including ingredients and method steps as recipeText
 - Also extract ingredients as an ordered array of strings. Each entry is one ingredient line as the recipe presents it — preserve quantities, units, and qualifiers ("to taste", "optional", "or ghee"). Follow the order on the recipe card.
+- servings: the recipe's stated yield, copied verbatim if present ("Serves 4", "Makes 12 cookies", "Feeds 6"). If the card gives a numeric yield with no unit, phrase it as "Serves N". Empty string if no yield is stated.
 - Leave notes empty
 
 Set confidence to "high" if the image is clear and the identification is certain, "medium" if reasonably sure, or "low" if the image is blurry, ambiguous, or you are guessing.
@@ -68,6 +70,7 @@ export const SUGGEST_FROM_VOICE_NOTE_PROMPT = `This is a transcript of a voice n
 - notes: cooking tips worth remembering, max 2 sentences. Corrections and asides often contain these — surface non-obvious technique or a specific tip the speaker emphasized. Empty string if nothing stands out.
 - recipeText: ingredients then steps, cleaned up into a readable recipe — preserve quantities and methods, drop fillers, repetitions, and tangents. Plain text only.
 - ingredients: an ordered array of strings — one ingredient line each, in the order the speaker mentioned them. Speakers often skip quantities — a bare "ginger paste" is fine when no quantity was given. Be lenient. Empty array if no ingredients were named.
+- servings: the yield if the speaker mentioned one ("makes about 8 sliders", "enough for four", "feeds the whole family"), normalized to a short phrase ("Makes 8 sliders", "Serves 4"). Empty string if they didn't say how much it makes.
 - confidence: "high" if the transcript clearly described a complete recipe, "medium" if some details required inference, "low" if the transcript was fragmented or barely recipe-shaped.
 
 If the transcript is in Urdu/Hindi/mixed, produce the recipe in English while keeping the traditional dish name in the name field.
@@ -119,6 +122,7 @@ DIFF SCHEMA — return ONLY this shape:
     {"id": "<id>", "kind": "add", "target": "step", "payload": { "title": "Garnish & serve", "time": "2 min", "body": "Finish with chopped cilantro and a wedge of lime.", "ingredientIds": [] }, "whereHint": "after step 5"},
     {"id": "<id>", "kind": "change", "target": "ingredient", "refId": "<ingredient row id from input>", "field": "quantityString", "before": "400 g", "after": "600 g"},
     {"id": "<id>", "kind": "change", "target": "step", "refId": "<step row id from input>", "field": "body", "before": "...old body...", "after": "...new body..."},
+    {"id": "<id>", "kind": "change", "target": "meta", "refId": "meal", "field": "servings", "before": "", "after": "Makes 8 sliders"},
     {"id": "<id>", "kind": "remove", "target": "ingredient", "refId": "<row id>", "before": { "name": "Salt", "quantityString": "1 tsp", "prepNote": null }}
   ],
   "rationale": "one-line summary of what you changed"
@@ -126,12 +130,13 @@ DIFF SCHEMA — return ONLY this shape:
 
 Rules:
 - BUILDING FROM SCRATCH: If the recipe has NO structured ingredients and NO structured steps, treat the instruction as a request to CREATE a complete, sensible recipe for the dish named in the input. Propose "add" ingredients and "add" steps that make a realistic recipe for that dish, shaped by the instruction (e.g. "make it spicier" → build a spicier version; "add prep notes" → include prep notes on the ingredients you add). If a free-form "recipeText" blob is present, convert it into structured "add" ingredients and steps. Aim for a usable recipe (roughly 4–10 ingredients and 2–6 steps) unless the instruction asks for something smaller.
+- YIELD/SERVINGS: The "servings" meta field is the recipe's yield as a short free-form phrase ("Serves 4", "Makes 8 sliders", "Feeds 6"). When building from scratch, ALWAYS include one \`change\` to \`target: "meta"\`, \`field: "servings"\` that matches the quantities you chose. When editing, only touch servings if the instruction changes the yield (e.g. "double the recipe" → bump it) or explicitly asks to set it. Use refId "meal" for meta changes. Never invent a unit the dish doesn't have — prefer "Serves N" when unsure.
 - NEVER return an empty "proposed" array when the instruction is actionable. An empty recipe plus any cooking instruction is always actionable — build it.
 - EVERY "add" step payload MUST have a non-empty "title" (a short step name like "Sear the patties") AND a non-empty "body" (the full instruction sentence, e.g. "Heat a skillet over medium-high and sear the patties 2–3 min per side until browned."). Never emit a step with an empty or placeholder title/body.
 - "whereHint" is ONLY a brief placement note ("at the end", "after the marinade step") — NEVER put the step's name or instructions in whereHint. For a from-scratch build, you can omit whereHint and rely on the order of your "add" steps in the array.
 - Use ONLY refIds that appear in the input recipe — never invent ids.
 - For "add", omit refId entirely. Use whereHint to describe placement in plain language.
-- For "change", the "field" must be a column name like "name", "quantityString", "prepNote", "title", "time", "body".
+- For "change", the "field" must be a column name like "name", "quantityString", "prepNote", "title", "time", "body", or — for target "meta" — "servings", "notes", "recipeSourceUrl".
 - Keep quantityString free-form ("400 g", "½ tsp", "1 large"). Do NOT parse into number + unit.
 - If the user's instruction touches multiple things (e.g. "bump chicken to 600g and add ginger paste"), emit one change per affected row.
 - If a change cascades (e.g. updating an ingredient quantity also requires rewriting the step that mentions it), emit BOTH changes — one for the ingredient, one for the step body.
@@ -149,7 +154,8 @@ Full from-scratch example — instruction "build the recipe" on an empty "Beef S
     {"id": "c1", "kind": "add", "target": "ingredient", "payload": {"name": "Ground beef", "quantityString": "500 g", "prepNote": null}},
     {"id": "c2", "kind": "add", "target": "ingredient", "payload": {"name": "Slider buns", "quantityString": "8", "prepNote": "halved"}},
     {"id": "c3", "kind": "add", "target": "step", "payload": {"title": "Form the patties", "time": "5 min", "body": "Divide the beef into 8 portions and press into thin patties slightly wider than the buns.", "ingredientIds": []}},
-    {"id": "c4", "kind": "add", "target": "step", "payload": {"title": "Cook and assemble", "time": "8 min", "body": "Sear the patties 2 minutes per side, then assemble each in a bun.", "ingredientIds": []}}
+    {"id": "c4", "kind": "add", "target": "step", "payload": {"title": "Cook and assemble", "time": "8 min", "body": "Sear the patties 2 minutes per side, then assemble each in a bun.", "ingredientIds": []}},
+    {"id": "c5", "kind": "change", "target": "meta", "refId": "meal", "field": "servings", "before": "", "after": "Makes 8 sliders"}
   ], "rationale": "Built a basic beef sliders recipe with ingredients and steps."}
 
 Return ONLY the JSON object described above. No prose before or after.`;
@@ -161,6 +167,7 @@ export const SUGGEST_FROM_TEXT_PROMPT = `The user has pasted text about a meal o
 - notes: any useful tips or notable aspects in 1–2 sentences, or an empty string if nothing stands out
 - recipeText: if a recipe is present in the text, extract it fully (ingredients and steps); otherwise leave empty
 - ingredients: an ordered array of strings. Each entry is one ingredient line as the text presents it — preserve quantities, units, and qualifiers ("to taste", "optional", "or ghee"). If the text has a clear ingredients section, preserve that order. If ingredients are scattered through prose, extract them in the order they appear. Empty array if the text doesn't describe a recipe with ingredients.
+- servings: the recipe's stated yield, copied verbatim if present ("Serves 4", "Makes 8 sliders", "Feeds 6"). If the text gives a numeric yield with no unit, phrase it as "Serves N". Empty string if no yield is stated.
 - confidence: "high" if the text clearly describes a specific dish, "medium" if somewhat ambiguous, "low" if very unclear
 
 Return your answer in the required format.

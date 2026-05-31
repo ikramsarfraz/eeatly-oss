@@ -143,6 +143,7 @@ export type RecipeDetailMeal = {
   photoUrl: string | null;
   recipeText: string | null;
   recipeSourceUrl: string | null;
+  servings: string | null;
   ingredients: string[] | null;
   createdByUserId: string | null;
   createdByName: string | null;
@@ -452,6 +453,9 @@ export function RecipeDetailClient({
               <Badge variant={EFFORT_BADGE_VARIANT[meal.effortLevel]}>
                 {EFFORT_LABEL[meal.effortLevel]}
               </Badge>
+            ) : null}
+            {meal.servings?.trim() ? (
+              <Badge variant="ghost">{meal.servings.trim()}</Badge>
             ) : null}
             {ingredientCount > 0 ? (
               <Badge variant="ghost">

@@ -196,6 +196,7 @@ export async function createMealLog(
   const notes = payload.notes || null;
   const recipeText = payload.recipeText !== undefined ? (payload.recipeText.trim() || null) : undefined;
   const recipeSourceUrl = payload.recipeSourceUrl !== undefined ? (payload.recipeSourceUrl.trim() || null) : undefined;
+  const servings = payload.servings !== undefined ? (payload.servings.trim() || null) : undefined;
   // Round 10: pass-through. `undefined` = caller didn't touch ingredients
   // (preserve whatever the existing meal already has); empty array also
   // means "no ingredients to save" so we coerce to null on persist to
@@ -232,6 +233,7 @@ export async function createMealLog(
             photoUrl,
             recipeText: recipeText ?? null,
             recipeSourceUrl: recipeSourceUrl ?? null,
+            servings: servings ?? null,
             ingredients: ingredients ?? null,
             // R32 — new meals default to shared. The `shared` option is
             // an explicit future-proofing knob (no client surface today).
@@ -255,6 +257,7 @@ export async function createMealLog(
           photoUrl: photoUrl && !existingMeal.photoUrl ? photoUrl : existingMeal.photoUrl,
           ...(recipeText !== undefined && { recipeText }),
           ...(recipeSourceUrl !== undefined && { recipeSourceUrl }),
+          ...(servings !== undefined && { servings }),
           ...(ingredients !== undefined && { ingredients }),
           updatedAt: new Date()
         })
@@ -616,6 +619,7 @@ export type MealDetailView = {
   photoUrl: string | null;
   recipeText: string | null;
   recipeSourceUrl: string | null;
+  servings: string | null;
   ingredients: string[] | null;
   notes: string | null;
   createdByUserId: string | null;
@@ -687,6 +691,7 @@ export async function getMealDetail(
       photoUrl: sql<string | null>`coalesce(${meals.photoUrl}, ${dishImages.imageUrl})`,
       recipeText: meals.recipeText,
       recipeSourceUrl: meals.recipeSourceUrl,
+      servings: meals.servings,
       ingredients: meals.ingredients,
       notes: meals.notes,
       sharedAt: meals.sharedAt,
@@ -786,6 +791,7 @@ export async function getMealDetail(
     photoUrl: row.photoUrl,
     recipeText: row.recipeText,
     recipeSourceUrl: row.recipeSourceUrl,
+    servings: row.servings,
     ingredients: row.ingredients,
     notes: row.notes,
     createdByUserId: row.createdByUserId,
