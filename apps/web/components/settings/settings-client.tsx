@@ -6,9 +6,12 @@ import type { Route } from "next";
 import {
   AlertTriangle,
   ChevronRight,
+  Copy,
   Download,
   ExternalLink,
+  Link2,
   Loader2,
+  Lock,
   Mail,
   Pencil,
   Sparkles,
@@ -64,6 +67,7 @@ const DELETE_CONFIRMATION_PHRASE = "delete my account";
 type SectionId =
   | "account"
   | "plan"
+  | "sharing"
   | "kitchen"
   | "notifications"
   | "appearance"
@@ -73,6 +77,7 @@ type SectionId =
 const SECTIONS: ReadonlyArray<{ id: SectionId; label: string; danger?: boolean }> = [
   { id: "account", label: "Account" },
   { id: "plan", label: "Plan" },
+  { id: "sharing", label: "Sharing & privacy" },
   { id: "kitchen", label: "Kitchen" },
   { id: "notifications", label: "Notifications" },
   { id: "appearance", label: "Appearance" },
@@ -279,6 +284,30 @@ export function SettingsClient({
                 last
               />
             </Card>
+          </section>
+
+          <section id="sharing" className="grid gap-3 scroll-mt-24">
+            <SectionLabel>Sharing &amp; privacy</SectionLabel>
+            <Card className="overflow-hidden p-0">
+              <SettingRow
+                label="New recipes &amp; plans are private"
+                sub="Everything you create starts visible to only you. This can't be turned off — sharing is always an explicit, per-item choice."
+                suffix={
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--sage-soft)] px-2.5 py-1 font-mono text-[10px] font-semibold uppercase text-[color:var(--primary)]" style={{ letterSpacing: "0.1em" }}>
+                    <Lock className="h-3 w-3" />
+                    Always on
+                  </span>
+                }
+                last
+              />
+            </Card>
+            <ActiveShareLinks />
+            <p className="text-[12.5px] leading-[1.55] text-muted-foreground">
+              Revoking access removes someone&apos;s <strong className="text-foreground">live copy</strong>{" "}
+              instantly. If they saved their own copy, that copy stays theirs. Manage who can see a
+              specific item from that recipe or plan&apos;s <strong className="text-foreground">Share</strong>{" "}
+              sheet.
+            </p>
           </section>
 
           <section id="kitchen" className="grid gap-3 scroll-mt-24">
@@ -524,5 +553,76 @@ function DeleteAccountRow() {
       danger
       last
     />
+  );
+}
+
+/** Active "anyone with the link" recipe shares — copy + revoke. */
+function ActiveShareLinks() {
+  const { showToast } = useToast();
+  const utils = trpc.useUtils();
+  const linksQuery = trpc.sharing.activeShareLinks.useQuery();
+  const links = linksQuery.data ?? [];
+  const revoke = trpc.shares.revoke.useMutation({
+    onSuccess: () => {
+      void utils.sharing.activeShareLinks.invalidate();
+      showToast({ variant: "success", title: "Link revoked" });
+    },
+    onError: (e) => showToast({ variant: "error", title: "Couldn't revoke", description: e.message })
+  });
+
+  if (linksQuery.isLoading) return null;
+  if (links.length === 0) {
+    return (
+      <Card className="overflow-hidden p-0">
+        <SettingRow
+          label="Active share links"
+          sub="You have no public recipe links. Turn on “anyone with the link” from a recipe's Share sheet to create one."
+          last
+        />
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="overflow-hidden p-0">
+      {links.map((link, i) => (
+        <div
+          key={link.shareId}
+          className={cn(
+            "flex flex-wrap items-center gap-3 px-5 py-4",
+            i > 0 && "border-t border-[var(--border-soft,var(--border))]"
+          )}
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-[var(--surface-2)] text-muted-foreground">
+            <Link2 className="h-4 w-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[14px] font-medium text-foreground">{link.mealName}</p>
+            <p className="truncate font-mono text-[11px] text-muted-foreground">{link.url}</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-9"
+            onClick={() => {
+              void navigator.clipboard?.writeText(link.url);
+              showToast({ variant: "success", title: "Link copied" });
+            }}
+          >
+            <Copy className="h-3.5 w-3.5" />
+            Copy
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-9 text-[color:var(--danger,#b4472e)]"
+            disabled={revoke.isPending}
+            onClick={() => revoke.mutate({ shareId: link.shareId })}
+          >
+            Revoke
+          </Button>
+        </div>
+      ))}
+    </Card>
   );
 }

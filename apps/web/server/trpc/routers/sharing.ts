@@ -6,6 +6,7 @@ import {
   dismissTombstone,
   forkRecipe,
   grantItem,
+  listActiveShareLinks,
   listConnections,
   listGrantsForItem,
   listSharedWithMe,
@@ -65,6 +66,9 @@ export const sharingRouter = router({
 
   /** The recipient's "Recently removed" tombstone strip. */
   tombstones: protectedProcedure.query(({ ctx }) => listTombstones(ctx.user.id)),
+
+  /** Active "anyone with the link" recipe shares (Settings). */
+  activeShareLinks: protectedProcedure.query(({ ctx }) => listActiveShareLinks(ctx.user.id)),
 
   /** Grant an item to a connected person (owner-only, idempotent). */
   grant: protectedProcedure

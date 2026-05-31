@@ -166,6 +166,14 @@ export function NotificationBell() {
   );
 }
 
+/** The sharing-notification kind tag, read from `payload.kind`. */
+const TAG_STYLES: Record<string, { label: string; className: string }> = {
+  share: { label: "Shared", className: "bg-[color:var(--sage-soft)] text-[color:var(--primary)]" },
+  update: { label: "Updated", className: "bg-[color:var(--wheat-soft)] text-[color:var(--wheat-fg)]" },
+  request: { label: "Request", className: "bg-[color:var(--terra-soft)] text-[color:var(--terra,#c66b47)]" },
+  connection_invite: { label: "Invite", className: "bg-[var(--surface-2)] text-muted-foreground" }
+};
+
 function NotificationItem({
   notification,
   onClick
@@ -181,10 +189,17 @@ function NotificationItem({
     { addSuffix: true }
   );
 
+  const kind = typeof notification.payload?.kind === "string" ? notification.payload.kind : null;
+  const tag = kind ? TAG_STYLES[kind] : undefined;
+  const requestId =
+    kind === "request" && typeof notification.payload?.requestId === "string"
+      ? notification.payload.requestId
+      : null;
+
   const content = (
     <div
       className={cn(
-        "grid gap-1 px-3 py-3 transition-colors hover:bg-[var(--surface-2)]",
+        "grid gap-1.5 px-3 py-3 transition-colors hover:bg-[var(--surface-2)]",
         unread ? "bg-[var(--primary-soft)]/30" : ""
       )}
     >
@@ -204,10 +219,33 @@ function NotificationItem({
           {notification.body}
         </p>
       ) : null}
-      <span className="text-[11px] text-muted-foreground">{created}</span>
+      <div className="flex items-center gap-2">
+        {tag ? (
+          <span
+            className={cn(
+              "rounded-full px-1.5 py-0.5 font-mono text-[9.5px] font-semibold uppercase",
+              tag.className
+            )}
+            style={{ letterSpacing: "0.08em" }}
+          >
+            {tag.label}
+          </span>
+        ) : null}
+        <span className="text-[11px] text-muted-foreground">{created}</span>
+      </div>
+      {requestId ? <RequestActions requestId={requestId} notificationId={notification.id} /> : null}
     </div>
   );
 
+  // Request notifications carry inline action buttons, so never wrap them
+  // in a navigating Link or an outer button (no nested interactives).
+  if (requestId) {
+    return (
+      <div className="block w-full border-b border-border text-left last:border-b-0">
+        {content}
+      </div>
+    );
+  }
   if (notification.href) {
     return (
       <Link
@@ -227,5 +265,61 @@ function NotificationItem({
     >
       {content}
     </button>
+  );
+}
+
+/** Share it / Not now actions for a Request notification. */
+function RequestActions({
+  requestId,
+  notificationId
+}: {
+  requestId: string;
+  notificationId: string;
+}) {
+  const { showToast } = useToast();
+  const utils = trpc.useUtils();
+  const [done, setDone] = React.useState<"granted" | "declined" | null>(null);
+
+  const resolve = trpc.sharing.resolveRequest.useMutation({
+    onSuccess: (_d, vars) => {
+      setDone(vars.action === "grant" ? "granted" : "declined");
+      void utils.notifications.list.invalidate();
+      void utils.sharing.grantsForItem.invalidate();
+      showToast({
+        variant: "success",
+        title: vars.action === "grant" ? "Shared" : "Declined"
+      });
+      void notificationId;
+    },
+    onError: (e) => showToast({ variant: "error", title: "Couldn't resolve", description: e.message })
+  });
+
+  if (done) {
+    return (
+      <p className="text-[11.5px] font-medium text-muted-foreground">
+        {done === "granted" ? "You shared it." : "Declined."}
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-0.5 flex items-center gap-2">
+      <button
+        type="button"
+        disabled={resolve.isPending}
+        onClick={() => resolve.mutate({ requestId, action: "grant" })}
+        className="rounded-full bg-[color:var(--primary)] px-3 py-1.5 text-[12px] font-semibold text-[color:var(--primary-foreground)] disabled:opacity-50"
+      >
+        Share it
+      </button>
+      <button
+        type="button"
+        disabled={resolve.isPending}
+        onClick={() => resolve.mutate({ requestId, action: "decline" })}
+        className="rounded-full border px-3 py-1.5 text-[12px] font-medium text-foreground hover:bg-[var(--surface-2)] disabled:opacity-50"
+      >
+        Not now
+      </button>
+    </div>
   );
 }

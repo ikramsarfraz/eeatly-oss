@@ -10,12 +10,14 @@ import {
   mealIngredients,
   meals,
   plans,
+  recipeShares,
   recipeSteps,
   shareTombstones,
   users
 } from "@/db/schema";
 import { createNotification } from "@/services/notifications";
 import { getCurrentHousehold } from "@/lib/auth/session";
+import { getServerEnv } from "@/lib/env/server";
 import { normalizeMealName } from "@/lib/utils";
 import { logger } from "@/lib/observability/logger";
 
@@ -722,6 +724,45 @@ export async function forkRecipe(args: {
   });
 
   return { newMealId };
+}
+
+export type ActiveShareLink = {
+  shareId: string;
+  mealId: string;
+  mealName: string;
+  url: string;
+};
+
+/**
+ * All of the user's active "anyone with the link" recipe shares — for the
+ * Settings → Sharing & privacy "Active share links" list. Reuses the
+ * `recipe_shares` table (recipe link shares); revoke via the shares router.
+ */
+export async function listActiveShareLinks(userId: string): Promise<ActiveShareLink[]> {
+  const base = getServerEnv().NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
+  const rows = await db
+    .select({
+      shareId: recipeShares.id,
+      mealId: recipeShares.mealId,
+      mealName: meals.name,
+      token: recipeShares.token
+    })
+    .from(recipeShares)
+    .innerJoin(meals, eq(meals.id, recipeShares.mealId))
+    .where(
+      and(
+        eq(recipeShares.createdByUserId, userId),
+        isNull(recipeShares.revokedAt),
+        isNull(meals.archivedAt)
+      )
+    )
+    .orderBy(desc(recipeShares.createdAt));
+  return rows.map((r) => ({
+    shareId: r.shareId,
+    mealId: r.mealId,
+    mealName: r.mealName,
+    url: `${base}/share/${r.token}`
+  }));
 }
 
 /** Small helper: a user's display name (falls back to email local part). */
