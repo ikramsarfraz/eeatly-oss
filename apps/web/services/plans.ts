@@ -123,7 +123,10 @@ export async function getPlan(args: { planId: string; userId: string }): Promise
       createdAt: planDishes.createdAt,
       updatedAt: planDishes.updatedAt,
       mealName: meals.name,
-      mealPhotoUrl: meals.photoUrl,
+      // Own photo wins; the app-wide AI dish image is the fallback (same
+      // coalesce the dashboard, library, and recipe reads use). Failed
+      // dish-image rows carry a null image_url, so coalesce skips them.
+      mealPhotoUrl: sql<string | null>`coalesce(${meals.photoUrl}, ${dishImages.imageUrl})`,
       mealCreatorUserId: meals.createdByUserId,
       mealHouseholdId: meals.householdId,
       mealSharedAt: meals.sharedAt,
@@ -131,6 +134,7 @@ export async function getPlan(args: { planId: string; userId: string }): Promise
     })
     .from(planDishes)
     .innerJoin(meals, eq(meals.id, planDishes.mealId))
+    .leftJoin(dishImages, eq(dishImages.normalizedName, meals.normalizedName))
     .leftJoin(users, eq(users.id, planDishes.addedByUserId))
     .where(eq(planDishes.planId, args.planId))
     .orderBy(asc(planDishes.sortOrder), asc(planDishes.createdAt));
