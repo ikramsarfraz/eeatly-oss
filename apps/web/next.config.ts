@@ -69,8 +69,14 @@ const nextConfig: NextConfig = {
             value: "DENY"
           },
           {
+            // `microphone=(self)` lets our OWN pages use getUserMedia for
+            // voice notes (Refine + Capture). `()` blocked everyone —
+            // including the app itself — so getUserMedia threw a
+            // Permissions-Policy violation before the browser even prompted.
+            // Camera/geolocation stay fully disabled (photo capture uses a
+            // file input, not getUserMedia video).
             key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=()"
+            value: "camera=(), microphone=(self), geolocation=()"
           },
           {
             key: "Content-Security-Policy",
