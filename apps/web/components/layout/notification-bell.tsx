@@ -170,7 +170,7 @@ export function NotificationBell() {
 const TAG_STYLES: Record<string, { label: string; className: string }> = {
   share: { label: "Shared", className: "bg-[color:var(--sage-soft)] text-[color:var(--primary)]" },
   update: { label: "Updated", className: "bg-[color:var(--wheat-soft)] text-[color:var(--wheat-fg)]" },
-  request: { label: "Request", className: "bg-[color:var(--terra-soft)] text-[color:var(--terra,#c66b47)]" },
+  request: { label: "Request", className: "bg-[color:var(--terra-soft)] text-[color:var(--terra-fg)]" },
   connection_invite: { label: "Invite", className: "bg-[var(--surface-2)] text-muted-foreground" }
 };
 

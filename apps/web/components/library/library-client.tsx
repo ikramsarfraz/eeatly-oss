@@ -420,7 +420,7 @@ function SurfaceTab({
         active
           ? cn(
               "bg-[var(--surface)] shadow-[var(--shadow-sm)]",
-              tone === "terra" ? "text-[color:var(--terra,#c66b47)]" : "text-foreground"
+              tone === "terra" ? "text-[color:var(--terra-fg)]" : "text-foreground"
             )
           : "text-muted-foreground hover:text-foreground"
       )}
@@ -431,7 +431,7 @@ function SurfaceTab({
         className={cn(
           "rounded-full px-[7px] py-px font-mono text-[11px] font-semibold",
           active && tone === "sage" && "bg-[color:var(--sage-bg,var(--sage-soft))] text-[color:var(--primary)]",
-          active && tone === "terra" && "bg-[color:var(--terra-soft)] text-[color:var(--terra,#c66b47)]",
+          active && tone === "terra" && "bg-[color:var(--terra-soft)] text-[color:var(--terra-fg)]",
           !active && "bg-[var(--surface-2)] text-muted-foreground"
         )}
       >
@@ -621,7 +621,7 @@ function SharedSurface({
   return (
     <div className="grid gap-6">
       <div className="flex items-start gap-2.5 text-[13.5px] leading-[1.5] text-muted-foreground">
-        <span className="mt-0.5 text-[color:var(--terra,#c66b47)]">ⓘ</span>
+        <span className="mt-0.5 text-[color:var(--terra-fg)]">ⓘ</span>
         <p>
           These are live views owned by someone else — they update when the owner edits, and you
           can&apos;t change them. Want to tweak one?{" "}

@@ -295,7 +295,7 @@ function TypeDot({ itemType }: { itemType: ItemChip["itemType"] }) {
       className="h-[7px] w-[7px] shrink-0 rounded-[2px]"
       style={{
         backgroundColor:
-          itemType === "recipe" ? "var(--primary)" : "var(--terra, #c66b47)"
+          itemType === "recipe" ? "var(--primary)" : "var(--terra-fg)"
       }}
     />
   );

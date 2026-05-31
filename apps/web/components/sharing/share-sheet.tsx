@@ -80,7 +80,7 @@ export function ShareSheet({
       <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
           <p
-            className="font-mono text-[10.5px] uppercase text-[color:var(--terra,#c66b47)]"
+            className="font-mono text-[10.5px] uppercase text-[color:var(--terra-fg)]"
             style={{ letterSpacing: "0.16em" }}
           >
             Share · {itemType}
