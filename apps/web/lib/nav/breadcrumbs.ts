@@ -173,6 +173,13 @@ export function getCrumbs(pathname: string): Crumb[] {
     ];
   }
 
+  if (pathname === "/people") {
+    return [
+      { label: "Sharing", href: "/dashboard" as Route },
+      { label: "People" }
+    ];
+  }
+
   if (pathname === "/household") {
     return [
       { label: "Kitchen", href: "/dashboard" as Route },
@@ -182,7 +189,7 @@ export function getCrumbs(pathname: string): Crumb[] {
 
   if (pathname === "/settings") {
     return [
-      { label: "Kitchen", href: "/dashboard" as Route },
+      { label: "Sharing", href: "/dashboard" as Route },
       { label: "Settings" }
     ];
   }

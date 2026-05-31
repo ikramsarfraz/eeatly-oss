@@ -10,8 +10,8 @@ import {
   Home,
   Plus,
   Settings,
+  Share2,
   Sparkles,
-  Users,
   type LucideIcon
 } from "lucide-react";
 
@@ -109,11 +109,11 @@ const captureNav: NavItem[] = [
 ];
 
 /**
- * R31 — Kitchen group reinstated. "Members" lands at `/household`
- * (the new dedicated kitchen page). Existing "Settings" stays below.
+ * Sharing group — "People" is your sharing circle (per-item sharing
+ * model), replacing the old household "Members" page. Settings stays.
  */
-const kitchenNav: NavItem[] = [
-  { href: "/household" as Route, label: "Members", icon: Users },
+const sharingNav: NavItem[] = [
+  { href: "/people" as Route, label: "People", icon: Share2 },
   { href: "/settings" as Route, label: "Settings", icon: Settings }
 ];
 
@@ -252,11 +252,11 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
             className="font-mono uppercase"
             style={{ letterSpacing: "0.14em" }}
           >
-            Kitchen
+            Sharing
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {kitchenNav.map((item) => {
+              {sharingNav.map((item) => {
                 const Icon = item.icon;
                 return (
                   <SidebarMenuItem key={item.href}>
