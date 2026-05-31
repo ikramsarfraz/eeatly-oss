@@ -24,6 +24,11 @@ type SupportedMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp
 // answer than show "both providers down" for a transient blip.
 const FALLBACK_TIMEOUT_MS = 15_000;
 
+// Refine's from-scratch recipe build generates a large diff; the 15s
+// fallback budget aborts it. Give the refine fallback more room (it only
+// fires after the primary already failed).
+const REFINE_FALLBACK_TIMEOUT_MS = 26_000;
+
 const suggestMealTool = {
   name: "suggest_meal",
   description: "Return a structured meal suggestion extracted from the provided image or text.",
@@ -300,7 +305,7 @@ export async function proposeRefineChanges(args: {
       system: REFINE_RECIPE_PROMPT,
       messages: [{ role: "user", content: userBlocks }]
     },
-    { signal: AbortSignal.timeout(FALLBACK_TIMEOUT_MS) }
+    { signal: AbortSignal.timeout(REFINE_FALLBACK_TIMEOUT_MS) }
   );
 
   logger.info("ai_provider_tokens", {

@@ -37,6 +37,13 @@ const MODEL = "gpt-4o-mini";
 // down" for a transient blip.
 const PRIMARY_TIMEOUT_MS = 7_000;
 
+// Refine proposes a structured diff — and for an empty recipe it builds the
+// whole thing from scratch, which generates far more tokens than a small
+// edit. A 7s ceiling aborts those mid-stream; give it a generous budget.
+// (The ceiling only bites the slow build case; quick diffs still return in
+// a couple seconds.)
+const REFINE_TIMEOUT_MS = 22_000;
+
 // Strict JSON-schema mode on OpenAI requires every property in `properties`
 // to also be listed in `required`. We instruct the model in the prompt to
 // return an empty array when no ingredients are present rather than omit
@@ -403,7 +410,7 @@ export async function proposeRefineChanges(args: {
         { role: "user", content: userContent }
       ]
     },
-    { signal: AbortSignal.timeout(PRIMARY_TIMEOUT_MS) }
+    { signal: AbortSignal.timeout(REFINE_TIMEOUT_MS) }
   );
 
   const usage = response.usage;

@@ -21,6 +21,14 @@ import { logger } from "@/lib/observability/logger";
  */
 export const dynamic = "force-dynamic";
 
+// AI procedures on this route can run long: Refine builds a recipe from
+// scratch (up to ~22s primary + ~26s fallback), voice notes hit Whisper
+// (~30s), and dish-image gen calls gpt-image-1 (~30s). The platform default
+// (~10s) would abort these mid-flight, so we lift the ceiling. Vercel
+// clamps to the plan's max (60s Pro / 300s with fluid compute); no-op
+// elsewhere.
+export const maxDuration = 60;
+
 /**
  * Origin allowlist for mobile + dev tooling. Web requests are
  * same-origin, so they don't hit this allowlist — they don't send a
