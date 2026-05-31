@@ -10,6 +10,7 @@ import {
   mealIngredients,
   meals,
   planDishes,
+  planShares,
   plans,
   recipeShares,
   recipeSteps,
@@ -732,41 +733,71 @@ export async function forkRecipe(args: {
 
 export type ActiveShareLink = {
   shareId: string;
-  mealId: string;
-  mealName: string;
+  itemType: ItemType;
+  name: string;
   url: string;
 };
 
 /**
- * All of the user's active "anyone with the link" recipe shares — for the
- * Settings → Sharing & privacy "Active share links" list. Reuses the
- * `recipe_shares` table (recipe link shares); revoke via the shares router.
+ * All of the user's active "anyone with the link" shares (recipes + plans)
+ * — for the Settings → Sharing & privacy "Active share links" list. Revoke
+ * via the shares router (recipe vs plan branch keyed on `itemType`).
  */
 export async function listActiveShareLinks(userId: string): Promise<ActiveShareLink[]> {
   const base = getServerEnv().NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
-  const rows = await db
-    .select({
-      shareId: recipeShares.id,
-      mealId: recipeShares.mealId,
-      mealName: meals.name,
-      token: recipeShares.token
-    })
-    .from(recipeShares)
-    .innerJoin(meals, eq(meals.id, recipeShares.mealId))
-    .where(
-      and(
-        eq(recipeShares.createdByUserId, userId),
-        isNull(recipeShares.revokedAt),
-        isNull(meals.archivedAt)
+  const [recipeRows, planRows] = await Promise.all([
+    db
+      .select({
+        shareId: recipeShares.id,
+        name: meals.name,
+        token: recipeShares.token,
+        createdAt: recipeShares.createdAt
+      })
+      .from(recipeShares)
+      .innerJoin(meals, eq(meals.id, recipeShares.mealId))
+      .where(
+        and(
+          eq(recipeShares.createdByUserId, userId),
+          isNull(recipeShares.revokedAt),
+          isNull(meals.archivedAt)
+        )
+      ),
+    db
+      .select({
+        shareId: planShares.id,
+        name: plans.name,
+        token: planShares.token,
+        createdAt: planShares.createdAt
+      })
+      .from(planShares)
+      .innerJoin(plans, eq(plans.id, planShares.planId))
+      .where(
+        and(
+          eq(planShares.createdByUserId, userId),
+          isNull(planShares.revokedAt),
+          isNull(plans.archivedAt)
+        )
       )
-    )
-    .orderBy(desc(recipeShares.createdAt));
-  return rows.map((r) => ({
-    shareId: r.shareId,
-    mealId: r.mealId,
-    mealName: r.mealName,
-    url: `${base}/share/${r.token}`
-  }));
+  ]);
+  const links: ActiveShareLink[] = [
+    ...recipeRows.map((r) => ({
+      shareId: r.shareId,
+      itemType: "recipe" as const,
+      name: r.name,
+      url: `${base}/share/${r.token}`,
+      createdAt: r.createdAt
+    })),
+    ...planRows.map((r) => ({
+      shareId: r.shareId,
+      itemType: "plan" as const,
+      name: r.name,
+      url: `${base}/share/${r.token}`,
+      createdAt: r.createdAt
+    }))
+  ]
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .map((l) => ({ shareId: l.shareId, itemType: l.itemType, name: l.name, url: l.url }));
+  return links;
 }
 
 /**

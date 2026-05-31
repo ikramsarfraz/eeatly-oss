@@ -562,13 +562,15 @@ function ActiveShareLinks() {
   const utils = trpc.useUtils();
   const linksQuery = trpc.sharing.activeShareLinks.useQuery();
   const links = linksQuery.data ?? [];
-  const revoke = trpc.shares.revoke.useMutation({
-    onSuccess: () => {
-      void utils.sharing.activeShareLinks.invalidate();
-      showToast({ variant: "success", title: "Link revoked" });
-    },
-    onError: (e) => showToast({ variant: "error", title: "Couldn't revoke", description: e.message })
-  });
+  const onRevoked = () => {
+    void utils.sharing.activeShareLinks.invalidate();
+    showToast({ variant: "success", title: "Link revoked" });
+  };
+  const onRevokeError = (e: { message: string }) =>
+    showToast({ variant: "error", title: "Couldn't revoke", description: e.message });
+  const revokeRecipe = trpc.shares.revoke.useMutation({ onSuccess: onRevoked, onError: onRevokeError });
+  const revokePlan = trpc.shares.revokePlan.useMutation({ onSuccess: onRevoked, onError: onRevokeError });
+  const revokeBusy = revokeRecipe.isPending || revokePlan.isPending;
 
   if (linksQuery.isLoading) return null;
   if (links.length === 0) {
@@ -597,7 +599,12 @@ function ActiveShareLinks() {
             <Link2 className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[14px] font-medium text-foreground">{link.mealName}</p>
+            <p className="truncate text-[14px] font-medium text-foreground">
+              {link.name}
+              <span className="ml-2 font-mono text-[9.5px] uppercase text-muted-foreground">
+                {link.itemType}
+              </span>
+            </p>
             <p className="truncate font-mono text-[11px] text-muted-foreground">{link.url}</p>
           </div>
           <Button
@@ -616,8 +623,12 @@ function ActiveShareLinks() {
             variant="ghost"
             size="sm"
             className="h-9 text-[color:var(--danger,#b4472e)]"
-            disabled={revoke.isPending}
-            onClick={() => revoke.mutate({ shareId: link.shareId })}
+            disabled={revokeBusy}
+            onClick={() =>
+              link.itemType === "plan"
+                ? revokePlan.mutate({ shareId: link.shareId })
+                : revokeRecipe.mutate({ shareId: link.shareId })
+            }
           >
             Revoke
           </Button>

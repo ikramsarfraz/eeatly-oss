@@ -167,8 +167,10 @@ export function ShareSheet({
           </div>
 
           {itemType === "recipe" ? (
-            <LinkSection mealId={itemId} />
-          ) : null}
+            <RecipeLinkSection mealId={itemId} />
+          ) : (
+            <PlanLinkSection planId={itemId} />
+          )}
 
           <div className="flex items-center justify-between gap-3 border-t border-[var(--border-soft,var(--border))] pt-3">
             <p className="text-[12.5px] text-muted-foreground">
@@ -186,21 +188,66 @@ export function ShareSheet({
   );
 }
 
-/** "Anyone with the link" — reuses the recipe_shares public-link flow. */
-function LinkSection({ mealId }: { mealId: string }) {
+/** Recipe "anyone with the link" — reuses recipe_shares. */
+function RecipeLinkSection({ mealId }: { mealId: string }) {
   const { showToast } = useToast();
   const utils = trpc.useUtils();
   const activeQuery = trpc.shares.activeForMeal.useQuery({ mealId });
   const active = activeQuery.data ?? null;
-
   const refresh = () => void utils.shares.activeForMeal.invalidate({ mealId });
   const create = trpc.shares.create.useMutation({
     onSuccess: refresh,
     onError: (e) => showToast({ variant: "error", title: "Couldn't create link", description: e.message })
   });
   const revoke = trpc.shares.revoke.useMutation({ onSuccess: refresh });
+  return (
+    <LinkToggle
+      url={active?.url ?? null}
+      busy={create.isPending || revoke.isPending}
+      onToggle={(on) => {
+        if (on && active) revoke.mutate({ shareId: active.shareId });
+        else create.mutate({ mealId });
+      }}
+    />
+  );
+}
 
-  const on = active !== null;
+/** Plan "anyone with the link" — reuses plan_shares. */
+function PlanLinkSection({ planId }: { planId: string }) {
+  const { showToast } = useToast();
+  const utils = trpc.useUtils();
+  const activeQuery = trpc.shares.activeForPlan.useQuery({ planId });
+  const active = activeQuery.data ?? null;
+  const refresh = () => void utils.shares.activeForPlan.invalidate({ planId });
+  const create = trpc.shares.createPlan.useMutation({
+    onSuccess: refresh,
+    onError: (e) => showToast({ variant: "error", title: "Couldn't create link", description: e.message })
+  });
+  const revoke = trpc.shares.revokePlan.useMutation({ onSuccess: refresh });
+  return (
+    <LinkToggle
+      url={active?.url ?? null}
+      busy={create.isPending || revoke.isPending}
+      onToggle={(on) => {
+        if (on && active) revoke.mutate({ shareId: active.shareId });
+        else create.mutate({ planId });
+      }}
+    />
+  );
+}
+
+/** Presentational "Anyone with the link" toggle + copy. */
+function LinkToggle({
+  url,
+  busy,
+  onToggle
+}: {
+  url: string | null;
+  busy: boolean;
+  onToggle: (on: boolean) => void;
+}) {
+  const { showToast } = useToast();
+  const on = url !== null;
   return (
     <div className="grid gap-2">
       <p
@@ -221,11 +268,8 @@ function LinkSection({ mealId }: { mealId: string }) {
           type="button"
           role="switch"
           aria-checked={on}
-          disabled={create.isPending || revoke.isPending}
-          onClick={() => {
-            if (on && active) revoke.mutate({ shareId: active.shareId });
-            else create.mutate({ mealId });
-          }}
+          disabled={busy}
+          onClick={() => onToggle(!on)}
           className={cn(
             "relative h-6 w-[42px] shrink-0 rounded-full transition-colors",
             on ? "bg-[color:var(--primary)]" : "bg-[var(--border-strong,var(--border))]"
@@ -239,11 +283,11 @@ function LinkSection({ mealId }: { mealId: string }) {
           />
         </button>
       </div>
-      {on && active ? (
+      {on && url ? (
         <button
           type="button"
           onClick={() => {
-            void navigator.clipboard?.writeText(active.url);
+            void navigator.clipboard?.writeText(url);
             showToast({ variant: "success", title: "Link copied" });
           }}
           className="justify-self-start font-mono text-[11px] text-[color:var(--primary)] underline-offset-2 hover:underline"

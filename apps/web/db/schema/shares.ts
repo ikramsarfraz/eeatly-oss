@@ -1,6 +1,7 @@
 import { index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { households } from "./households";
 import { meals } from "./meals";
+import { plans } from "./plans";
 import { users } from "./auth";
 
 /**
@@ -67,3 +68,43 @@ export const recipeShares = pgTable(
 
 export type RecipeShare = typeof recipeShares.$inferSelect;
 export type NewRecipeShare = typeof recipeShares.$inferInsert;
+
+/**
+ * Public "anyone with the link" share of a PLAN (R-sharing model). Mirrors
+ * recipeShares: token is the access, soft-revoked via revoked_at. Sharing a
+ * plan link exposes the plan's structure + dish names read-only — NOT the
+ * underlying recipes (those need their own recipe links).
+ */
+export const planShares = pgTable(
+  "plan_shares",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    planId: uuid("plan_id")
+      .notNull()
+      .references(() => plans.id, { onDelete: "cascade" }),
+    householdId: uuid("household_id")
+      .notNull()
+      .references(() => households.id, { onDelete: "cascade" }),
+    token: text("token").notNull().unique(),
+    createdByUserId: text("created_by_user_id").references(() => users.id, {
+      onDelete: "set null"
+    }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => ({
+    tokenIdx: uniqueIndex("plan_shares_token_idx").on(table.token),
+    householdPlanIdx: index("plan_shares_household_plan_idx").on(
+      table.householdId,
+      table.planId
+    ),
+    planRevokedAtIdx: index("plan_shares_plan_revoked_at_idx").on(
+      table.planId,
+      table.revokedAt
+    )
+  })
+);
+
+export type PlanShare = typeof planShares.$inferSelect;
+export type NewPlanShare = typeof planShares.$inferInsert;

@@ -1,10 +1,18 @@
 import "server-only";
 
 import { randomBytes } from "node:crypto";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { requireHouseholdMember } from "@/lib/auth/session";
-import { households, meals, recipeShares, users } from "@/db/schema";
+import {
+  households,
+  meals,
+  planDishes,
+  planShares,
+  plans,
+  recipeShares,
+  users
+} from "@/db/schema";
 import { getServerEnv } from "@/lib/env/server";
 import { requireFeatureAccess } from "@/lib/gates/resolver";
 import { logger } from "@/lib/observability/logger";
@@ -328,4 +336,148 @@ export async function revokeRecipeShare(args: {
     shareId: args.shareId,
     householdId: share.householdId
   });
+}
+
+/* ─── Plan link shares (mirror of recipe shares) ──────────────────── */
+
+export type CreatedPlanShare = { shareId: string; token: string; url: string };
+
+export async function createPlanShare(args: {
+  userId: string;
+  planId: string;
+}): Promise<CreatedPlanShare> {
+  const [plan] = await db
+    .select({
+      id: plans.id,
+      householdId: plans.householdId,
+      archivedAt: plans.archivedAt,
+      createdByUserId: plans.createdByUserId
+    })
+    .from(plans)
+    .where(eq(plans.id, args.planId))
+    .limit(1);
+  if (!plan) throw new Error("Plan not found.");
+  if (plan.archivedAt) throw new Error("Plan is archived.");
+  await requireHouseholdMember(args.userId, plan.householdId);
+  if (plan.createdByUserId !== args.userId) {
+    throw new Error("Only the owner can share this plan.");
+  }
+  await requireFeatureAccess(args.userId, "recipe_share_create");
+
+  const [existing] = await db
+    .select({ id: planShares.id, token: planShares.token })
+    .from(planShares)
+    .where(and(eq(planShares.planId, args.planId), isNull(planShares.revokedAt)))
+    .limit(1);
+  if (existing) {
+    return { shareId: existing.id, token: existing.token, url: buildShareUrl(existing.token) };
+  }
+
+  const token = randomBytes(32).toString("base64url");
+  const [created] = await db
+    .insert(planShares)
+    .values({
+      planId: args.planId,
+      householdId: plan.householdId,
+      token,
+      createdByUserId: args.userId
+    })
+    .returning({ id: planShares.id });
+  return { shareId: created!.id, token, url: buildShareUrl(token) };
+}
+
+export async function revokePlanShare(args: {
+  userId: string;
+  shareId: string;
+}): Promise<void> {
+  const [share] = await db
+    .select({
+      id: planShares.id,
+      revokedAt: planShares.revokedAt,
+      createdByUserId: plans.createdByUserId
+    })
+    .from(planShares)
+    .innerJoin(plans, eq(plans.id, planShares.planId))
+    .where(eq(planShares.id, args.shareId))
+    .limit(1);
+  if (!share) throw new Error("Share not found.");
+  if (share.createdByUserId !== args.userId) {
+    throw new Error("Only the owner can revoke this share.");
+  }
+  if (share.revokedAt) return;
+  await db
+    .update(planShares)
+    .set({ revokedAt: new Date(), updatedAt: new Date() })
+    .where(eq(planShares.id, args.shareId));
+}
+
+export async function activePlanShareForPlan(args: {
+  userId: string;
+  planId: string;
+}): Promise<{ shareId: string; url: string } | null> {
+  const [plan] = await db
+    .select({ householdId: plans.householdId })
+    .from(plans)
+    .where(eq(plans.id, args.planId))
+    .limit(1);
+  if (!plan) return null;
+  await requireHouseholdMember(args.userId, plan.householdId);
+  const [row] = await db
+    .select({ id: planShares.id, token: planShares.token })
+    .from(planShares)
+    .where(and(eq(planShares.planId, args.planId), isNull(planShares.revokedAt)))
+    .limit(1);
+  if (!row) return null;
+  return { shareId: row.id, url: buildShareUrl(row.token) };
+}
+
+export type PublicPlanView = {
+  shareId: string;
+  planName: string;
+  scheduledDate: string | null;
+  notes: string | null;
+  householdName: string;
+  createdAt: Date;
+  dishes: Array<{ name: string; photoUrl: string | null }>;
+};
+
+/** Public — NO auth. Token is the access. Returns null when revoked/missing. */
+export async function getPlanShareByToken(args: {
+  token: string;
+}): Promise<PublicPlanView | null> {
+  const [row] = await db
+    .select({
+      shareId: planShares.id,
+      revokedAt: planShares.revokedAt,
+      createdAt: planShares.createdAt,
+      planId: plans.id,
+      planName: plans.name,
+      scheduledDate: plans.scheduledDate,
+      notes: plans.notes,
+      archivedAt: plans.archivedAt,
+      householdName: households.name
+    })
+    .from(planShares)
+    .innerJoin(plans, eq(plans.id, planShares.planId))
+    .innerJoin(households, eq(households.id, planShares.householdId))
+    .where(eq(planShares.token, args.token))
+    .limit(1);
+  if (!row || row.revokedAt || row.archivedAt) return null;
+
+  const dishes = await db
+    .select({ name: meals.name, photoUrl: meals.photoUrl })
+    .from(planDishes)
+    .innerJoin(meals, eq(meals.id, planDishes.mealId))
+    .where(eq(planDishes.planId, row.planId))
+    .orderBy(asc(planDishes.sortOrder));
+
+  return {
+    shareId: row.shareId,
+    planName: row.planName,
+    scheduledDate: row.scheduledDate,
+    notes: row.notes,
+    householdName: row.householdName,
+    createdAt: row.createdAt,
+    dishes
+  };
 }
