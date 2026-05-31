@@ -17,6 +17,7 @@ import { plansRouter } from "./routers/plans";
 import { refineRouter } from "./routers/refine";
 import { searchRouter } from "./routers/search";
 import { sharesRouter } from "./routers/shares";
+import { sharingRouter } from "./routers/sharing";
 import { urlPreviewRouter } from "./routers/url-preview";
 
 /**
@@ -45,6 +46,7 @@ export const appRouter = router({
   refine: refineRouter,
   search: searchRouter,
   shares: sharesRouter,
+  sharing: sharingRouter,
   urlPreview: urlPreviewRouter
 });
 

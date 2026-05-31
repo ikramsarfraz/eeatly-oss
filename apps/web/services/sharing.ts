@@ -1,0 +1,519 @@
+import "server-only";
+
+import { and, desc, eq, isNull, or } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
+import { db } from "@/lib/db/client";
+import {
+  connections,
+  itemGrants,
+  itemRequests,
+  meals,
+  plans,
+  shareTombstones,
+  users
+} from "@/db/schema";
+import { createNotification } from "@/services/notifications";
+import { logger } from "@/lib/observability/logger";
+
+/**
+ * Per-item sharing engine (Phase 1).
+ *
+ * The access-control core the sharing UI builds on: grant/revoke an item
+ * to a person, enumerate who can see an item, list what's shared with me,
+ * request a locked item, resolve a request, and read/dismiss tombstones.
+ * Forking ("save a copy") lands with the Shared surface in a later phase.
+ *
+ * Ownership of an item is its `created_by_user_id` (backfilled non-null by
+ * migration 0030). Sharing is only allowed between connected users (the
+ * sharing circle). Notifications about shares/requests reuse the `system`
+ * notification type with a `payload.kind` discriminator so the bell can
+ * tag them ('share' | 'request' | 'update' | 'connection_invite') without
+ * an enum migration.
+ */
+
+export type ItemType = "recipe" | "plan";
+
+type ItemRef = { ownerUserId: string; name: string; householdId: string };
+
+/** Resolve an item to its owner + display name, or null if missing/archived. */
+async function resolveItem(itemType: ItemType, itemId: string): Promise<ItemRef | null> {
+  if (itemType === "recipe") {
+    const [row] = await db
+      .select({
+        ownerUserId: meals.createdByUserId,
+        name: meals.name,
+        householdId: meals.householdId,
+        archivedAt: meals.archivedAt
+      })
+      .from(meals)
+      .where(eq(meals.id, itemId))
+      .limit(1);
+    if (!row || row.archivedAt || !row.ownerUserId) return null;
+    return { ownerUserId: row.ownerUserId, name: row.name, householdId: row.householdId };
+  }
+  const [row] = await db
+    .select({
+      ownerUserId: plans.createdByUserId,
+      name: plans.name,
+      householdId: plans.householdId,
+      archivedAt: plans.archivedAt
+    })
+    .from(plans)
+    .where(eq(plans.id, itemId))
+    .limit(1);
+  if (!row || row.archivedAt || !row.ownerUserId) return null;
+  return { ownerUserId: row.ownerUserId, name: row.name, householdId: row.householdId };
+}
+
+/** Canonical (low, high) ordering for the symmetric connections table. */
+function connectionPair(a: string, b: string): { low: string; high: string } {
+  return a < b ? { low: a, high: b } : { low: b, high: a };
+}
+
+/** True if the two users are in each other's sharing circle. */
+export async function areConnected(a: string, b: string): Promise<boolean> {
+  if (a === b) return false;
+  const { low, high } = connectionPair(a, b);
+  const [row] = await db
+    .select({ id: connections.id })
+    .from(connections)
+    .where(and(eq(connections.userLowId, low), eq(connections.userHighId, high)))
+    .limit(1);
+  return Boolean(row);
+}
+
+/** Create a connection if one doesn't exist (idempotent). */
+export async function ensureConnection(a: string, b: string): Promise<void> {
+  if (a === b) return;
+  const { low, high } = connectionPair(a, b);
+  await db
+    .insert(connections)
+    .values({ userLowId: low, userHighId: high })
+    .onConflictDoNothing({ target: [connections.userLowId, connections.userHighId] });
+}
+
+export type ConnectionPerson = {
+  userId: string;
+  name: string | null;
+  email: string;
+};
+
+/** The viewer's sharing circle — everyone they're connected to. */
+export async function listConnections(userId: string): Promise<ConnectionPerson[]> {
+  const lowUser = alias(users, "low_user");
+  const highUser = alias(users, "high_user");
+  const rows = await db
+    .select({
+      lowId: connections.userLowId,
+      highId: connections.userHighId,
+      lowName: lowUser.name,
+      lowEmail: lowUser.email,
+      highName: highUser.name,
+      highEmail: highUser.email
+    })
+    .from(connections)
+    .innerJoin(lowUser, eq(lowUser.id, connections.userLowId))
+    .innerJoin(highUser, eq(highUser.id, connections.userHighId))
+    .where(or(eq(connections.userLowId, userId), eq(connections.userHighId, userId)));
+
+  return rows.map((r) =>
+    r.lowId === userId
+      ? { userId: r.highId, name: r.highName, email: r.highEmail }
+      : { userId: r.lowId, name: r.lowName, email: r.lowEmail }
+  );
+}
+
+export type ItemGranteeView = {
+  grantId: string;
+  granteeUserId: string;
+  name: string | null;
+  email: string;
+  createdAt: string;
+};
+
+/** Owner-side: who currently has access to this item. */
+export async function listGrantsForItem(args: {
+  userId: string;
+  itemType: ItemType;
+  itemId: string;
+}): Promise<ItemGranteeView[]> {
+  const item = await resolveItem(args.itemType, args.itemId);
+  if (!item) throw new Error("Item not found.");
+  if (item.ownerUserId !== args.userId) {
+    throw new Error("Only the owner can view sharing for this item.");
+  }
+
+  const rows = await db
+    .select({
+      grantId: itemGrants.id,
+      granteeUserId: itemGrants.granteeUserId,
+      name: users.name,
+      email: users.email,
+      createdAt: itemGrants.createdAt
+    })
+    .from(itemGrants)
+    .innerJoin(users, eq(users.id, itemGrants.granteeUserId))
+    .where(
+      and(
+        eq(itemGrants.itemType, args.itemType),
+        eq(itemGrants.itemId, args.itemId),
+        isNull(itemGrants.revokedAt)
+      )
+    )
+    .orderBy(desc(itemGrants.createdAt));
+
+  return rows.map((r) => ({
+    grantId: r.grantId,
+    granteeUserId: r.granteeUserId,
+    name: r.name,
+    email: r.email,
+    createdAt: r.createdAt.toISOString()
+  }));
+}
+
+/**
+ * Grant an item to a connected person. Owner-only; idempotent (re-granting
+ * a previously-revoked grant un-revokes the same row). Notifies the grantee.
+ */
+export async function grantItem(args: {
+  ownerUserId: string;
+  itemType: ItemType;
+  itemId: string;
+  granteeUserId: string;
+}): Promise<{ grantId: string }> {
+  if (args.granteeUserId === args.ownerUserId) {
+    throw new Error("You already own this item.");
+  }
+  const item = await resolveItem(args.itemType, args.itemId);
+  if (!item) throw new Error("Item not found.");
+  if (item.ownerUserId !== args.ownerUserId) {
+    throw new Error("Only the owner can share this item.");
+  }
+  if (!(await areConnected(args.ownerUserId, args.granteeUserId))) {
+    throw new Error("You can only share with people in your circle.");
+  }
+
+  const [grant] = await db
+    .insert(itemGrants)
+    .values({
+      itemType: args.itemType,
+      itemId: args.itemId,
+      ownerUserId: args.ownerUserId,
+      granteeUserId: args.granteeUserId,
+      revokedAt: null
+    })
+    .onConflictDoUpdate({
+      target: [itemGrants.itemType, itemGrants.itemId, itemGrants.granteeUserId],
+      // Re-grant: clear any prior revoke, re-stamp ownership + time.
+      set: { revokedAt: null, ownerUserId: args.ownerUserId, createdAt: new Date() }
+    })
+    .returning({ grantId: itemGrants.id });
+
+  const ownerName = await displayName(args.ownerUserId);
+  void createNotification({
+    userId: args.granteeUserId,
+    type: "system",
+    title: `${ownerName} shared "${item.name}" with you`,
+    href: "/library?surface=shared",
+    payload: {
+      kind: "share",
+      itemType: args.itemType,
+      itemId: args.itemId,
+      actorUserId: args.ownerUserId
+    }
+  }).catch((error) => {
+    logger.warn("sharing_grant_notification_failed", {
+      granteeUserId: args.granteeUserId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  });
+
+  return { grantId: grant!.grantId };
+}
+
+/**
+ * Revoke a person's access. Owner-only; idempotent. Writes a tombstone so
+ * the recipient sees the live copy was removed (their saved copy, if any,
+ * is preserved and referenced).
+ */
+export async function revokeItem(args: {
+  ownerUserId: string;
+  itemType: ItemType;
+  itemId: string;
+  granteeUserId: string;
+}): Promise<void> {
+  const item = await resolveItem(args.itemType, args.itemId);
+  if (!item) throw new Error("Item not found.");
+  if (item.ownerUserId !== args.ownerUserId) {
+    throw new Error("Only the owner can change sharing for this item.");
+  }
+
+  const [grant] = await db
+    .select({ id: itemGrants.id, savedCopyItemId: itemGrants.savedCopyItemId })
+    .from(itemGrants)
+    .where(
+      and(
+        eq(itemGrants.itemType, args.itemType),
+        eq(itemGrants.itemId, args.itemId),
+        eq(itemGrants.granteeUserId, args.granteeUserId),
+        isNull(itemGrants.revokedAt)
+      )
+    )
+    .limit(1);
+  if (!grant) return; // already revoked / never granted — no-op
+
+  await db
+    .update(itemGrants)
+    .set({ revokedAt: new Date() })
+    .where(eq(itemGrants.id, grant.id));
+
+  const ownerName = await displayName(args.ownerUserId);
+  await db.insert(shareTombstones).values({
+    granteeUserId: args.granteeUserId,
+    itemType: args.itemType,
+    itemName: item.name,
+    ownerUserId: args.ownerUserId,
+    ownerName,
+    kind: "revoked",
+    savedCopyItemId: grant.savedCopyItemId ?? null
+  });
+}
+
+export type SharedWithMeItem = {
+  itemType: ItemType;
+  itemId: string;
+  name: string;
+  ownerUserId: string;
+  ownerName: string | null;
+  photoUrl: string | null;
+  savedCopyItemId: string | null;
+  grantedAt: string;
+};
+
+/** Grantee-side: the live copies others have shared with me (the Shared surface). */
+export async function listSharedWithMe(userId: string): Promise<SharedWithMeItem[]> {
+  const recipeRows = await db
+    .select({
+      itemId: itemGrants.itemId,
+      name: meals.name,
+      ownerUserId: itemGrants.ownerUserId,
+      ownerName: users.name,
+      photoUrl: meals.photoUrl,
+      savedCopyItemId: itemGrants.savedCopyItemId,
+      grantedAt: itemGrants.createdAt
+    })
+    .from(itemGrants)
+    .innerJoin(meals, eq(meals.id, itemGrants.itemId))
+    .innerJoin(users, eq(users.id, itemGrants.ownerUserId))
+    .where(
+      and(
+        eq(itemGrants.granteeUserId, userId),
+        eq(itemGrants.itemType, "recipe"),
+        isNull(itemGrants.revokedAt),
+        isNull(meals.archivedAt)
+      )
+    );
+
+  const planRows = await db
+    .select({
+      itemId: itemGrants.itemId,
+      name: plans.name,
+      ownerUserId: itemGrants.ownerUserId,
+      ownerName: users.name,
+      savedCopyItemId: itemGrants.savedCopyItemId,
+      grantedAt: itemGrants.createdAt
+    })
+    .from(itemGrants)
+    .innerJoin(plans, eq(plans.id, itemGrants.itemId))
+    .innerJoin(users, eq(users.id, itemGrants.ownerUserId))
+    .where(
+      and(
+        eq(itemGrants.granteeUserId, userId),
+        eq(itemGrants.itemType, "plan"),
+        isNull(itemGrants.revokedAt),
+        isNull(plans.archivedAt)
+      )
+    );
+
+  const items: SharedWithMeItem[] = [
+    ...recipeRows.map((r) => ({
+      itemType: "recipe" as const,
+      itemId: r.itemId,
+      name: r.name,
+      ownerUserId: r.ownerUserId,
+      ownerName: r.ownerName,
+      photoUrl: r.photoUrl,
+      savedCopyItemId: r.savedCopyItemId,
+      grantedAt: r.grantedAt.toISOString()
+    })),
+    ...planRows.map((r) => ({
+      itemType: "plan" as const,
+      itemId: r.itemId,
+      name: r.name,
+      ownerUserId: r.ownerUserId,
+      ownerName: r.ownerName,
+      photoUrl: null,
+      savedCopyItemId: r.savedCopyItemId,
+      grantedAt: r.grantedAt.toISOString()
+    }))
+  ];
+  return items.sort((a, b) => b.grantedAt.localeCompare(a.grantedAt));
+}
+
+/**
+ * A recipient asks the owner to share a (locked) item — e.g. a co-cook
+ * requesting a plan dish's recipe. Notifies the owner with Share-it/Not-now
+ * actions. No-op if the requester already has access or owns it.
+ */
+export async function requestItem(args: {
+  requesterUserId: string;
+  itemType: ItemType;
+  itemId: string;
+}): Promise<{ requested: boolean }> {
+  const item = await resolveItem(args.itemType, args.itemId);
+  if (!item) throw new Error("Item not found.");
+  if (item.ownerUserId === args.requesterUserId) return { requested: false };
+
+  // Already have access?
+  const [existingGrant] = await db
+    .select({ id: itemGrants.id })
+    .from(itemGrants)
+    .where(
+      and(
+        eq(itemGrants.itemType, args.itemType),
+        eq(itemGrants.itemId, args.itemId),
+        eq(itemGrants.granteeUserId, args.requesterUserId),
+        isNull(itemGrants.revokedAt)
+      )
+    )
+    .limit(1);
+  if (existingGrant) return { requested: false };
+
+  const [request] = await db
+    .insert(itemRequests)
+    .values({
+      itemType: args.itemType,
+      itemId: args.itemId,
+      requesterUserId: args.requesterUserId,
+      ownerUserId: item.ownerUserId,
+      status: "pending"
+    })
+    .onConflictDoNothing()
+    .returning({ id: itemRequests.id });
+
+  if (!request) return { requested: true }; // a pending request already existed
+
+  const requesterName = await displayName(args.requesterUserId);
+  void createNotification({
+    userId: item.ownerUserId,
+    type: "system",
+    title: `${requesterName} asked you to share "${item.name}"`,
+    payload: {
+      kind: "request",
+      requestId: request.id,
+      itemType: args.itemType,
+      itemId: args.itemId,
+      actorUserId: args.requesterUserId
+    }
+  }).catch((error) => {
+    logger.warn("sharing_request_notification_failed", {
+      ownerUserId: item.ownerUserId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  });
+
+  return { requested: true };
+}
+
+/**
+ * Owner resolves a pending request: grant it (shares + notifies requester)
+ * or decline it. Owner-only.
+ */
+export async function resolveRequest(args: {
+  ownerUserId: string;
+  requestId: string;
+  action: "grant" | "decline";
+}): Promise<void> {
+  const [request] = await db
+    .select()
+    .from(itemRequests)
+    .where(eq(itemRequests.id, args.requestId))
+    .limit(1);
+  if (!request) throw new Error("Request not found.");
+  if (request.ownerUserId !== args.ownerUserId) {
+    throw new Error("Only the owner can resolve this request.");
+  }
+  if (request.status !== "pending") return; // already resolved — idempotent
+
+  await db
+    .update(itemRequests)
+    .set({
+      status: args.action === "grant" ? "granted" : "declined",
+      resolvedAt: new Date()
+    })
+    .where(eq(itemRequests.id, request.id));
+
+  if (args.action === "grant") {
+    // A requester is, by construction, already connected (they saw a shared
+    // plan). Ensure it anyway so the grant's connection check passes.
+    await ensureConnection(args.ownerUserId, request.requesterUserId);
+    await grantItem({
+      ownerUserId: args.ownerUserId,
+      itemType: request.itemType as ItemType,
+      itemId: request.itemId,
+      granteeUserId: request.requesterUserId
+    });
+  }
+}
+
+export type TombstoneView = {
+  id: string;
+  itemType: ItemType;
+  itemName: string;
+  ownerName: string | null;
+  kind: "revoked" | "deleted";
+  savedCopyItemId: string | null;
+  createdAt: string;
+};
+
+/** Recipient's "Recently removed" strip — active (undismissed) tombstones. */
+export async function listTombstones(userId: string): Promise<TombstoneView[]> {
+  const rows = await db
+    .select()
+    .from(shareTombstones)
+    .where(
+      and(eq(shareTombstones.granteeUserId, userId), isNull(shareTombstones.dismissedAt))
+    )
+    .orderBy(desc(shareTombstones.createdAt))
+    .limit(20);
+
+  return rows.map((r) => ({
+    id: r.id,
+    itemType: r.itemType as ItemType,
+    itemName: r.itemName,
+    ownerName: r.ownerName,
+    kind: r.kind as "revoked" | "deleted",
+    savedCopyItemId: r.savedCopyItemId,
+    createdAt: r.createdAt.toISOString()
+  }));
+}
+
+export async function dismissTombstone(userId: string, tombstoneId: string): Promise<void> {
+  await db
+    .update(shareTombstones)
+    .set({ dismissedAt: new Date() })
+    .where(
+      and(eq(shareTombstones.id, tombstoneId), eq(shareTombstones.granteeUserId, userId))
+    );
+}
+
+/** Small helper: a user's display name (falls back to email local part). */
+async function displayName(userId: string): Promise<string> {
+  const [row] = await db
+    .select({ name: users.name, email: users.email })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!row) return "Someone";
+  return row.name?.trim() || row.email.split("@")[0] || "Someone";
+}

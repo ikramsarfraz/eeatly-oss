@@ -11,5 +11,6 @@ export * from "./subscriptions";
 export * from "./shares";
 export * from "./url-previews";
 export * from "./dish-images";
+export * from "./sharing";
 export * from "./recipe-structure";
 export * from "./refine";
