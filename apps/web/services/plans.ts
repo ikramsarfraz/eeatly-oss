@@ -6,7 +6,17 @@ import { requireHouseholdMember } from "@/lib/auth/session";
 import { requireFeatureAccess } from "@/lib/gates/resolver";
 import { logger } from "@/lib/observability/logger";
 import { canViewMeal, mealVisibilityFilter } from "@/lib/meals/visibility";
-import { dishImages, mealLogs, meals, planDishes, plans, users, type Verdict } from "@/db/schema";
+import {
+  dishImages,
+  householdMembers,
+  mealLogs,
+  meals,
+  planDishes,
+  plans,
+  users,
+  type Verdict
+} from "@/db/schema";
+import { accessibleRecipeIds, hasGrant } from "@/services/sharing";
 
 /**
  * Round 5 — Plans service. All household-scoped: every public fn calls
@@ -36,10 +46,19 @@ export type PlanDishWithMeal = {
   mealName: string;
   mealPhotoUrl: string | null;
   addedByName: string | null;
+  /**
+   * Per-item sharing: true when the viewer is a co-cook who lacks the
+   * dish's recipe (the recipe wasn't shared with them). The Plan Detail UI
+   * renders these as locked rows with a "Request recipe" action instead of
+   * hiding them. False for the owner and for dishes they can access.
+   */
+  locked: boolean;
 };
 
 export type PlanWithDishes = PlanRow & {
   dishes: PlanDishWithMeal[];
+  /** The plan owner's display name (for the grantee "Shared by X" strip). */
+  ownerName: string | null;
   /**
    * Round 32 — count of dishes filtered out because the underlying
    * meal is another member's personal recipe. The Plan Detail UI
@@ -97,7 +116,26 @@ export async function createPlan(args: CreatePlanArgs): Promise<PlanRow> {
 
 export async function getPlan(args: { planId: string; userId: string }): Promise<PlanWithDishes> {
   const plan = await loadPlanOrThrow(args.planId);
-  await requireHouseholdMember(args.userId, plan.householdId);
+
+  // Per-item sharing authz: the owner, a household member (legacy), or a
+  // co-cook holding an active grant for this plan may view it. Co-cooks
+  // are cross-household, so the household-member check can't be the gate.
+  const isOwner = plan.createdByUserId === args.userId;
+  const [memberRow] = await db
+    .select({ id: householdMembers.id })
+    .from(householdMembers)
+    .where(
+      and(
+        eq(householdMembers.userId, args.userId),
+        eq(householdMembers.householdId, plan.householdId)
+      )
+    )
+    .limit(1);
+  const isMember = Boolean(memberRow);
+  const hasPlanGrant = !isOwner && (await hasGrant(args.userId, "plan", args.planId));
+  if (!isOwner && !isMember && !hasPlanGrant) {
+    throw new Error("Not authorized for this plan.");
+  }
 
   // LEFT JOIN users via addedByUserId so a deleted member doesn't drop
   // the dish from the plan (matches the Round 4.7 attribution contract).
@@ -139,22 +177,20 @@ export async function getPlan(args: { planId: string; userId: string }): Promise
     .where(eq(planDishes.planId, args.planId))
     .orderBy(asc(planDishes.sortOrder), asc(planDishes.createdAt));
 
-  const visible: PlanDishWithMeal[] = [];
-  let hiddenDishCount = 0;
-  for (const r of rows) {
-    const ok = canViewMeal(
-      {
-        createdByUserId: r.mealCreatorUserId,
-        householdId: r.mealHouseholdId,
-        sharedAt: r.mealSharedAt
-      },
-      { id: args.userId, householdId: plan.householdId }
-    );
-    if (!ok) {
-      hiddenDishCount += 1;
-      continue;
-    }
-    visible.push({
+  // Per-item sharing: instead of hiding inaccessible dishes, mark them
+  // `locked`. A dish is accessible if the viewer owns the recipe, holds a
+  // grant for it, or (legacy, members only) it's a shared recipe in their
+  // household. Co-cooks see locked rows they can "Request".
+  const grantedRecipeIds = await accessibleRecipeIds(
+    args.userId,
+    rows.map((r) => r.mealId)
+  );
+  const dishes: PlanDishWithMeal[] = rows.map((r) => {
+    const accessible =
+      r.mealCreatorUserId === args.userId ||
+      grantedRecipeIds.has(r.mealId) ||
+      (isMember && r.mealSharedAt !== null && r.mealHouseholdId === plan.householdId);
+    return {
       id: r.id,
       planId: r.planId,
       mealId: r.mealId,
@@ -168,11 +204,22 @@ export async function getPlan(args: { planId: string; userId: string }): Promise
       updatedAt: r.updatedAt,
       mealName: r.mealName,
       mealPhotoUrl: r.mealPhotoUrl,
-      addedByName: r.addedByName
-    });
-  }
+      addedByName: r.addedByName,
+      locked: !accessible
+    };
+  });
 
-  return { ...plan, dishes: visible, hiddenDishCount };
+  const [owner] = plan.createdByUserId
+    ? await db
+        .select({ name: users.name })
+        .from(users)
+        .where(eq(users.id, plan.createdByUserId))
+        .limit(1)
+    : [];
+
+  // `hiddenDishCount` retained for the response shape; locked dishes are
+  // now surfaced inline rather than hidden, so it's always 0.
+  return { ...plan, dishes, ownerName: owner?.name ?? null, hiddenDishCount: 0 };
 }
 
 export type ListPlansArgs = {

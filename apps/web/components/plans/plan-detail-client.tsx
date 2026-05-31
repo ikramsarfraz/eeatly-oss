@@ -7,8 +7,10 @@ import type { Route } from "next";
 import { format, parseISO } from "date-fns";
 import {
   ArchiveRestore,
+  Check,
   Edit3,
   GripVertical,
+  Lock,
   Sparkles
 } from "lucide-react";
 
@@ -68,6 +70,8 @@ export type PlanDetailDish = {
   timeTakenMinutes: number | null;
   verdict: "repeat" | "modify" | "do_not_repeat" | null;
   annotationNotes: string | null;
+  /** Co-cook lacks this dish's recipe → render a locked, requestable row. */
+  locked: boolean;
 };
 
 export type PlanDetailPlan = {
@@ -104,6 +108,7 @@ const EFFORT_LABEL: Record<
 export function PlanDetailClient({
   plan,
   isOwner,
+  ownerName,
   dishes,
   hiddenDishCount,
   members,
@@ -112,6 +117,8 @@ export function PlanDetailClient({
   plan: PlanDetailPlan;
   /** Viewer owns this plan (controls the "Who can see this" strip variant). */
   isOwner: boolean;
+  /** Plan owner's name — for the grantee (co-cook) strip variant. */
+  ownerName: string | null;
   dishes: PlanDetailDish[];
   /**
    * R32 — count of dishes on this plan that were filtered out because
@@ -306,6 +313,7 @@ export function PlanDetailClient({
         itemId={plan.id}
         itemName={plan.name}
         isOwner={isOwner}
+        ownerName={ownerName}
       />
 
       {/* Dishes section */}
@@ -431,7 +439,57 @@ function DishRow({
   planDishId: string;
   dish: PlanDetailDish;
 }) {
+  const { showToast } = useToast();
   const [editingNotes, setEditingNotes] = React.useState(false);
+  const [requested, setRequested] = React.useState(false);
+  const requestMut = trpc.sharing.request.useMutation({
+    onSuccess: () => {
+      setRequested(true);
+      showToast({ variant: "success", title: "Recipe requested" });
+    },
+    onError: (e) => showToast({ variant: "error", title: "Couldn't request", description: e.message })
+  });
+
+  // Locked dish — a co-cook who lacks this recipe. Show a requestable row
+  // instead of a working recipe link.
+  if (dish.locked) {
+    return (
+      <div className="mx-[18px] my-2 flex flex-wrap items-center gap-3 rounded-[12px] border border-dashed border-[var(--border-strong,var(--border))] bg-[var(--paper,var(--surface-2))] px-3 py-3">
+        <span className="flex h-[56px] w-[56px] shrink-0 items-center justify-center rounded-md bg-[var(--border-soft,var(--surface-2))] text-muted-foreground">
+          <Lock className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[15px] font-medium text-[var(--ink-2,var(--muted-foreground))]">
+            {dish.mealName}
+          </p>
+          <p
+            className="mt-0.5 flex items-center gap-1 font-mono text-[10.5px] uppercase text-muted-foreground"
+            style={{ letterSpacing: "0.13em" }}
+          >
+            <Lock className="h-3 w-3" />
+            Recipe not shared with you
+          </p>
+        </div>
+        {requested ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium text-muted-foreground">
+            <Check className="h-3.5 w-3.5" />
+            Requested
+          </span>
+        ) : (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="min-h-[36px] text-[color:var(--primary)]"
+            disabled={requestMut.isPending}
+            onClick={() => requestMut.mutate({ itemType: "recipe", itemId: dish.mealId })}
+          >
+            Request recipe
+          </Button>
+        )}
+      </div>
+    );
+  }
+
   const metaParts: string[] = [];
   if (dish.actualEffort) metaParts.push(EFFORT_LABEL[dish.actualEffort]);
   if (dish.timeTakenMinutes) metaParts.push(`${dish.timeTakenMinutes} min`);

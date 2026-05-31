@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, count, desc, eq, isNull, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/lib/db/client";
 import {
@@ -72,6 +72,50 @@ async function resolveItem(itemType: ItemType, itemId: string): Promise<ItemRef 
 /** Canonical (low, high) ordering for the symmetric connections table. */
 function connectionPair(a: string, b: string): { low: string; high: string } {
   return a < b ? { low: a, high: b } : { low: b, high: a };
+}
+
+/** True if `granteeUserId` holds an active grant for the item. */
+export async function hasGrant(
+  granteeUserId: string,
+  itemType: ItemType,
+  itemId: string
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id: itemGrants.id })
+    .from(itemGrants)
+    .where(
+      and(
+        eq(itemGrants.itemType, itemType),
+        eq(itemGrants.itemId, itemId),
+        eq(itemGrants.granteeUserId, granteeUserId),
+        isNull(itemGrants.revokedAt)
+      )
+    )
+    .limit(1);
+  return Boolean(row);
+}
+
+/**
+ * Of the given recipe ids, the subset the user can access via an active
+ * grant (used to compute "locked" dishes on a shared plan). Returns a Set.
+ */
+export async function accessibleRecipeIds(
+  userId: string,
+  mealIds: string[]
+): Promise<Set<string>> {
+  if (mealIds.length === 0) return new Set();
+  const rows = await db
+    .select({ itemId: itemGrants.itemId })
+    .from(itemGrants)
+    .where(
+      and(
+        eq(itemGrants.granteeUserId, userId),
+        eq(itemGrants.itemType, "recipe"),
+        inArray(itemGrants.itemId, mealIds),
+        isNull(itemGrants.revokedAt)
+      )
+    );
+  return new Set(rows.map((r) => r.itemId));
 }
 
 /** True if the two users are in each other's sharing circle. */

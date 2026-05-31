@@ -55,6 +55,7 @@ export default async function PlanDetailPage(props: {
         archivedAt: plan.archivedAt
       }}
       isOwner={plan.createdByUserId === user.id}
+      ownerName={plan.ownerName}
       dishes={plan.dishes.map((d) => ({
         id: d.id,
         mealId: d.mealId,
@@ -64,7 +65,8 @@ export default async function PlanDetailPage(props: {
         actualEffort: d.actualEffort,
         timeTakenMinutes: d.timeTakenMinutes,
         verdict: d.verdict,
-        annotationNotes: d.annotationNotes
+        annotationNotes: d.annotationNotes,
+        locked: d.locked
       }))}
       hiddenDishCount={plan.hiddenDishCount}
       members={members.map((m) => ({
