@@ -16,7 +16,11 @@ import {
   users,
   type Verdict
 } from "@/db/schema";
-import { accessibleRecipeIds, hasGrant } from "@/services/sharing";
+import {
+  accessibleRecipeIds,
+  hasGrant,
+  notifyGranteesOfUpdate
+} from "@/services/sharing";
 
 /**
  * Round 5 — Plans service. All household-scoped: every public fn calls
@@ -282,6 +286,7 @@ export async function updatePlan(args: UpdatePlanArgs): Promise<PlanRow> {
     .where(eq(plans.id, args.planId))
     .returning();
   if (!updated) throw new Error("Plan not found.");
+  void notifyGranteesOfUpdate({ itemType: "plan", itemId: args.planId }).catch(() => {});
   return updated;
 }
 
@@ -398,7 +403,10 @@ export async function addDishToPlan(args: {
     })
     .returning();
 
-  if (inserted) return inserted;
+  if (inserted) {
+    void notifyGranteesOfUpdate({ itemType: "plan", itemId: args.planId }).catch(() => {});
+    return inserted;
+  }
 
   // Conflict path — the dish was already on the plan. Return the existing
   // row so the caller can update its UI consistently.
@@ -428,6 +436,7 @@ export async function removeDishFromPlan(args: {
     )
     .returning({ id: planDishes.id });
   if (!deleted) throw new Error("Plan dish not found.");
+  void notifyGranteesOfUpdate({ itemType: "plan", itemId: args.planId }).catch(() => {});
 }
 
 /**
@@ -455,6 +464,7 @@ export async function reorderDishes(args: {
         .where(and(eq(planDishes.id, dishId), eq(planDishes.planId, args.planId)));
     }
   });
+  void notifyGranteesOfUpdate({ itemType: "plan", itemId: args.planId }).catch(() => {});
 }
 
 export type UpdateDishAnnotationArgs = {

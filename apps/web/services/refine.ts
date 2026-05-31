@@ -5,6 +5,7 @@ import { and, asc, count, desc, eq, max, isNull } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { requireHouseholdMember } from "@/lib/auth/session";
 import { logger } from "@/lib/observability/logger";
+import { notifyGranteesOfUpdate } from "@/services/sharing";
 import {
   mealIngredients,
   meals,
@@ -969,6 +970,12 @@ export async function saveSession(args: {
       .set({ status: SAVED_STATUS, savedAt: new Date() })
       .where(eq(refineSessions.id, session.id));
   });
+
+  // The recipe content changed — tell anyone it's shared with that their
+  // live copy is current. Fire-and-forget; deduped per grantee per 6h.
+  void notifyGranteesOfUpdate({ itemType: "recipe", itemId: session.mealId }).catch(
+    () => {}
+  );
 
   return { mealId: session.mealId, applied: pending.length };
 }

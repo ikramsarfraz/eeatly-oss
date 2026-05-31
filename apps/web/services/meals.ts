@@ -5,6 +5,7 @@ import { db } from "@/lib/db/client";
 import { requireHouseholdMember } from "@/lib/auth/session";
 import { withSuggestions } from "@/lib/meals/rediscovery";
 import { mealVisibilityFilter } from "@/lib/meals/visibility";
+import { notifyGranteesOfUpdate } from "@/services/sharing";
 import { normalizeMealName } from "@/lib/utils";
 import { mealLogInputSchema, type MealLogInput } from "@eeatly/api/validators/meals";
 import {
@@ -946,6 +947,7 @@ export async function setMealPhoto(args: {
     .update(meals)
     .set({ photoUrl: args.photoUrl, updatedAt: new Date() })
     .where(eq(meals.id, args.mealId));
+  void notifyGranteesOfUpdate({ itemType: "recipe", itemId: args.mealId }).catch(() => {});
   return { photoUrl: args.photoUrl };
 }
 

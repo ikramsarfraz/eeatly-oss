@@ -15,7 +15,10 @@ import {
   shareTombstones,
   users
 } from "@/db/schema";
-import { createNotification } from "@/services/notifications";
+import {
+  createNotification,
+  createNotificationIfNotRecent
+} from "@/services/notifications";
 import { getCurrentHousehold } from "@/lib/auth/session";
 import { getServerEnv } from "@/lib/env/server";
 import { normalizeMealName } from "@/lib/utils";
@@ -763,6 +766,53 @@ export async function listActiveShareLinks(userId: string): Promise<ActiveShareL
     mealName: r.mealName,
     url: `${base}/share/${r.token}`
   }));
+}
+
+/**
+ * Notify every active grantee that the owner edited a shared item ("your
+ * live copy is current"). Fire-and-forget from owner-edit paths. Deduped
+ * per grantee per item within a 6h window so a flurry of edits doesn't
+ * spam the bell. No-op when the item has no grantees.
+ */
+export async function notifyGranteesOfUpdate(args: {
+  itemType: ItemType;
+  itemId: string;
+}): Promise<void> {
+  const item = await resolveItem(args.itemType, args.itemId);
+  if (!item) return;
+
+  const grantees = await db
+    .select({ granteeUserId: itemGrants.granteeUserId })
+    .from(itemGrants)
+    .where(
+      and(
+        eq(itemGrants.itemType, args.itemType),
+        eq(itemGrants.itemId, args.itemId),
+        isNull(itemGrants.revokedAt)
+      )
+    );
+  if (grantees.length === 0) return;
+
+  const ownerName = await displayName(item.ownerUserId);
+  await Promise.all(
+    grantees.map((g) =>
+      createNotificationIfNotRecent(
+        {
+          userId: g.granteeUserId,
+          type: "system",
+          title: `${ownerName} updated "${item.name}" — your live copy is current.`,
+          href: "/library?surface=shared",
+          payload: {
+            kind: "update",
+            itemType: args.itemType,
+            itemId: args.itemId,
+            actorUserId: item.ownerUserId
+          }
+        },
+        6
+      ).catch(() => null)
+    )
+  );
 }
 
 /** Small helper: a user's display name (falls back to email local part). */
