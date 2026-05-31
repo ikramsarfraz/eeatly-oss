@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
   dismissTombstone,
+  forkRecipe,
   grantItem,
   listConnections,
   listGrantsForItem,
@@ -128,6 +129,18 @@ export const sharingRouter = router({
           action: input.action
         });
         return { ok: true as const };
+      } catch (error) {
+        throw mapError(error);
+      }
+    }),
+
+  /** Save a copy (fork) of a shared recipe into your own library. */
+  saveCopy: protectedProcedure
+    .use(rateLimit("mutation"))
+    .input(z.object({ itemType: z.literal("recipe"), itemId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await forkRecipe({ forkerUserId: ctx.user.id, sourceMealId: input.itemId });
       } catch (error) {
         throw mapError(error);
       }

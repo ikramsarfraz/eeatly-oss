@@ -1,18 +1,22 @@
 import "server-only";
 
-import { and, desc, eq, isNull, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNull, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/lib/db/client";
 import {
   connections,
   itemGrants,
   itemRequests,
+  mealIngredients,
   meals,
   plans,
+  recipeSteps,
   shareTombstones,
   users
 } from "@/db/schema";
 import { createNotification } from "@/services/notifications";
+import { getCurrentHousehold } from "@/lib/auth/session";
+import { normalizeMealName } from "@/lib/utils";
 import { logger } from "@/lib/observability/logger";
 
 /**
@@ -121,6 +125,27 @@ export async function listConnections(userId: string): Promise<ConnectionPerson[
       ? { userId: r.highId, name: r.highName, email: r.highEmail }
       : { userId: r.lowId, name: r.lowName, email: r.lowEmail }
   );
+}
+
+/**
+ * Owner-side share counts for the viewer's recipes — `{ mealId: N }` for the
+ * Library "Yours" cards' share button. Only items with ≥1 active grant appear.
+ */
+export async function getRecipeShareCounts(userId: string): Promise<Record<string, number>> {
+  const rows = await db
+    .select({ itemId: itemGrants.itemId, count: count() })
+    .from(itemGrants)
+    .where(
+      and(
+        eq(itemGrants.ownerUserId, userId),
+        eq(itemGrants.itemType, "recipe"),
+        isNull(itemGrants.revokedAt)
+      )
+    )
+    .groupBy(itemGrants.itemId);
+  const out: Record<string, number> = {};
+  for (const r of rows) out[r.itemId] = Number(r.count);
+  return out;
 }
 
 export type ItemGranteeView = {
@@ -505,6 +530,154 @@ export async function dismissTombstone(userId: string, tombstoneId: string): Pro
     .where(
       and(eq(shareTombstones.id, tombstoneId), eq(shareTombstones.granteeUserId, userId))
     );
+}
+
+/**
+ * Save a copy ("fork") of a shared recipe into the forker's own library.
+ * Creates a new meal they OWN (fully editable, no longer live), copying the
+ * core fields + structured ingredients/steps. Records `saved_copy_item_id`
+ * on the grant so the same grant never re-forks (returns the existing copy
+ * on a second call). Recipes only for now; plan fork is deferred.
+ */
+export async function forkRecipe(args: {
+  forkerUserId: string;
+  sourceMealId: string;
+}): Promise<{ newMealId: string }> {
+  // Must hold an active grant for this recipe.
+  const [grant] = await db
+    .select({ id: itemGrants.id, savedCopyItemId: itemGrants.savedCopyItemId })
+    .from(itemGrants)
+    .where(
+      and(
+        eq(itemGrants.itemType, "recipe"),
+        eq(itemGrants.itemId, args.sourceMealId),
+        eq(itemGrants.granteeUserId, args.forkerUserId),
+        isNull(itemGrants.revokedAt)
+      )
+    )
+    .limit(1);
+  if (!grant) throw new Error("This recipe isn't shared with you.");
+  if (grant.savedCopyItemId) return { newMealId: grant.savedCopyItemId }; // dedup
+
+  const [source] = await db
+    .select({
+      name: meals.name,
+      photoUrl: meals.photoUrl,
+      notes: meals.notes,
+      recipeText: meals.recipeText,
+      recipeSourceUrl: meals.recipeSourceUrl,
+      ingredients: meals.ingredients,
+      archivedAt: meals.archivedAt
+    })
+    .from(meals)
+    .where(eq(meals.id, args.sourceMealId))
+    .limit(1);
+  if (!source || source.archivedAt) throw new Error("Recipe not found.");
+
+  const household = await getCurrentHousehold(args.forkerUserId);
+
+  // Pick a name that doesn't collide with the forker's existing recipes
+  // (unique index is per household + normalized name).
+  const taken = new Set(
+    (
+      await db
+        .select({ normalizedName: meals.normalizedName })
+        .from(meals)
+        .where(and(eq(meals.householdId, household.id), isNull(meals.archivedAt)))
+    ).map((r) => r.normalizedName)
+  );
+  let name = source.name;
+  if (taken.has(normalizeMealName(name))) {
+    name = `${source.name} (saved)`;
+    let n = 2;
+    while (taken.has(normalizeMealName(name))) {
+      name = `${source.name} (saved ${n})`;
+      n += 1;
+    }
+  }
+
+  const [sourceIngredients, sourceSteps] = await Promise.all([
+    db
+      .select({
+        id: mealIngredients.id,
+        position: mealIngredients.position,
+        name: mealIngredients.name,
+        quantityString: mealIngredients.quantityString,
+        prepNote: mealIngredients.prepNote
+      })
+      .from(mealIngredients)
+      .where(eq(mealIngredients.mealId, args.sourceMealId))
+      .orderBy(asc(mealIngredients.position)),
+    db
+      .select({
+        position: recipeSteps.position,
+        title: recipeSteps.title,
+        time: recipeSteps.time,
+        body: recipeSteps.body,
+        ingredientIds: recipeSteps.ingredientIds
+      })
+      .from(recipeSteps)
+      .where(eq(recipeSteps.mealId, args.sourceMealId))
+      .orderBy(asc(recipeSteps.position))
+  ]);
+
+  const newMealId = await db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(meals)
+      .values({
+        householdId: household.id,
+        createdByUserId: args.forkerUserId,
+        name,
+        normalizedName: normalizeMealName(name),
+        photoUrl: source.photoUrl,
+        notes: source.notes,
+        recipeText: source.recipeText,
+        recipeSourceUrl: source.recipeSourceUrl,
+        ingredients: source.ingredients
+      })
+      .returning({ id: meals.id });
+    const mealId = created!.id;
+
+    // Copy structured ingredients, remembering old→new ids to remap steps.
+    const idMap = new Map<string, string>();
+    for (const ing of sourceIngredients) {
+      const [row] = await tx
+        .insert(mealIngredients)
+        .values({
+          mealId,
+          position: ing.position,
+          name: ing.name,
+          quantityString: ing.quantityString,
+          prepNote: ing.prepNote
+        })
+        .returning({ id: mealIngredients.id });
+      idMap.set(ing.id, row!.id);
+    }
+
+    if (sourceSteps.length > 0) {
+      await tx.insert(recipeSteps).values(
+        sourceSteps.map((step) => ({
+          mealId,
+          position: step.position,
+          title: step.title,
+          time: step.time,
+          body: step.body,
+          ingredientIds: step.ingredientIds
+            .map((oldId) => idMap.get(oldId))
+            .filter((v): v is string => Boolean(v))
+        }))
+      );
+    }
+
+    await tx
+      .update(itemGrants)
+      .set({ savedCopyItemId: mealId })
+      .where(eq(itemGrants.id, grant.id));
+
+    return mealId;
+  });
+
+  return { newMealId };
 }
 
 /** Small helper: a user's display name (falls back to email local part). */

@@ -3,6 +3,11 @@ import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
 import { countHouseholdMembers } from "@/services/households";
 import { getDashboardMeals } from "@/services/meals";
 import { listMealLibrary } from "@/services/plans";
+import {
+  getRecipeShareCounts,
+  listSharedWithMe,
+  listTombstones
+} from "@/services/sharing";
 import { LibraryClient, type LibraryStat } from "@/components/library/library-client";
 
 export const metadata: Metadata = {
@@ -31,17 +36,25 @@ export const dynamic = "force-dynamic";
  *     dashboard tracks. Stats are joined client-side; meals without
  *     stats render as "Not yet cooked".
  */
-export default async function HistoryPage() {
+export default async function HistoryPage({
+  searchParams
+}: {
+  searchParams: Promise<{ surface?: string }>;
+}) {
   const { user, household } = await requireCurrentUserWithHousehold();
+  const { surface } = await searchParams;
 
-  // R32 — also fetch household member count for the visibility chip +
-  // tile indicator render gate. Cheap query (count(*) on household
-  // members), runs in the same parallel batch.
-  const [rows, dashboard, memberCount] = await Promise.all([
-    listMealLibrary({ userId: user.id, householdId: household.id }),
-    getDashboardMeals(user.id, household.id, { recentMealsLimit: 25 }),
-    countHouseholdMembers(user.id, household.id)
-  ]);
+  // Per-item sharing surfaces fetch alongside the owned-library data:
+  // "Shared with you" items, tombstones, and owner-side share counts.
+  const [rows, dashboard, memberCount, sharedWithMe, tombstones, shareCounts] =
+    await Promise.all([
+      listMealLibrary({ userId: user.id, householdId: household.id }),
+      getDashboardMeals(user.id, household.id, { recentMealsLimit: 25 }),
+      countHouseholdMembers(user.id, household.id),
+      listSharedWithMe(user.id),
+      listTombstones(user.id),
+      getRecipeShareCounts(user.id)
+    ]);
 
   // Build the stat overlay from dashboard data. recentMeals carry
   // per-cook effort (modal effort isn't surfaced here); mostCooked
@@ -95,6 +108,10 @@ export default async function HistoryPage() {
       stats={Array.from(statsById.values())}
       currentUserId={user.id}
       householdMemberCount={memberCount}
+      sharedWithMe={sharedWithMe}
+      tombstones={tombstones}
+      shareCounts={shareCounts}
+      initialSurface={surface === "shared" ? "shared" : "yours"}
     />
   );
 }
