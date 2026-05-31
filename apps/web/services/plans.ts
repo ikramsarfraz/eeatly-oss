@@ -6,7 +6,7 @@ import { requireHouseholdMember } from "@/lib/auth/session";
 import { requireFeatureAccess } from "@/lib/gates/resolver";
 import { logger } from "@/lib/observability/logger";
 import { canViewMeal, mealVisibilityFilter } from "@/lib/meals/visibility";
-import { mealLogs, meals, planDishes, plans, users, type Verdict } from "@/db/schema";
+import { dishImages, mealLogs, meals, planDishes, plans, users, type Verdict } from "@/db/schema";
 
 /**
  * Round 5 — Plans service. All household-scoped: every public fn calls
@@ -741,11 +741,15 @@ export async function listMealLibrary(args: {
     .select({
       id: meals.id,
       name: meals.name,
-      photoUrl: meals.photoUrl,
+      // Own photo wins; the app-wide AI dish image is the fallback (same
+      // coalesce the dashboard + recipe reads use). Failed dish-image rows
+      // carry a null image_url, so coalesce skips them automatically.
+      photoUrl: sql<string | null>`coalesce(${meals.photoUrl}, ${dishImages.imageUrl})`,
       sharedAt: meals.sharedAt,
       createdByUserId: meals.createdByUserId
     })
     .from(meals)
+    .leftJoin(dishImages, eq(dishImages.normalizedName, meals.normalizedName))
     .where(
       and(
         eq(meals.householdId, args.householdId),

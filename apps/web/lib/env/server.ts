@@ -7,9 +7,32 @@ const optionalString = z.preprocess(
   z.string().optional()
 );
 
-const optionalUrl = z.preprocess(
+// R2's public base URL must be the bucket's *public* origin — the r2.dev
+// development subdomain (`https://pub-<hash>.r2.dev`) or a custom domain.
+// The `<account>.r2.cloudflarestorage.com` host is the S3 *API* endpoint:
+// it only answers SigV4-signed requests, so a browser GET of an uploaded
+// object returns 400. Pointing R2_PUBLIC_BASE_URL there silently breaks
+// every image (uploads succeed, displays 400), so reject it at boot with
+// an actionable message instead.
+const r2PublicBaseUrl = z.preprocess(
   (value) => (value === "" ? undefined : value),
-  z.string().url().optional()
+  z
+    .string()
+    .url()
+    .refine(
+      (value) => {
+        try {
+          return !new URL(value).hostname.endsWith(".r2.cloudflarestorage.com");
+        } catch {
+          return false;
+        }
+      },
+      {
+        message:
+          "R2_PUBLIC_BASE_URL must be the bucket's public URL (https://pub-<hash>.r2.dev or a custom domain), not the S3 API endpoint (<account>.r2.cloudflarestorage.com)."
+      }
+    )
+    .optional()
 );
 
 const serverEnvSchema = z.object({
@@ -27,7 +50,7 @@ const serverEnvSchema = z.object({
   R2_ACCESS_KEY_ID: optionalString,
   R2_SECRET_ACCESS_KEY: optionalString,
   R2_BUCKET: optionalString,
-  R2_PUBLIC_BASE_URL: optionalUrl,
+  R2_PUBLIC_BASE_URL: r2PublicBaseUrl,
   UPSTASH_REDIS_REST_URL: z.string().url("UPSTASH_REDIS_REST_URL must be a valid URL."),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1, "UPSTASH_REDIS_REST_TOKEN is required."),
   ANTHROPIC_API_KEY: z.string().min(1, "ANTHROPIC_API_KEY is required."),

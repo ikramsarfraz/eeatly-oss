@@ -1,8 +1,8 @@
 import "server-only";
 
-import { S3Client } from "@aws-sdk/client-s3";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { getServerEnv, hasR2Env } from "@/lib/env/server";
 import type { PresignedUploadInput } from "@eeatly/api/validators/meals";
 
@@ -56,4 +56,51 @@ export async function createPresignedPhotoUpload(
   const publicUrl = `${env.R2_PUBLIC_BASE_URL!.replace(/\/$/, "")}/${key}`;
 
   return { url, fields, publicUrl, key };
+}
+
+/**
+ * Server-side upload of an AI-generated dish image to R2.
+ *
+ * Unlike `createPresignedPhotoUpload` (which hands the browser a presigned
+ * POST for user-supplied photos), this path PUTs bytes we already hold in
+ * memory — the base64 image OpenAI returns. There's no per-user prefix: the
+ * image is shared app-wide, keyed deterministically off the normalized dish
+ * name so the same dish always maps to the same object. Re-generating a dish
+ * overwrites the same key rather than orphaning the old object.
+ *
+ * Returns the public URL. Callers must confirm R2 is configured before
+ * invoking — the dish-image service short-circuits to the monogram fallback
+ * when it isn't, so this throws (rather than silently no-oping) if reached
+ * without credentials.
+ */
+export async function uploadDishImage(
+  normalizedName: string,
+  bytes: Buffer,
+  contentType: string
+): Promise<string> {
+  const env = getServerEnv();
+
+  if (!hasR2Env(env)) {
+    throw new Error("Cloudflare R2 is not configured yet.");
+  }
+
+  // sha256 of the normalized name → a stable, filesystem-safe key. We
+  // slice to 32 hex chars (128 bits) — collision-free at any realistic
+  // dish-catalog size, and shorter keys keep the bucket listing tidy.
+  const hash = createHash("sha256").update(normalizedName).digest("hex").slice(0, 32);
+  const key = `dish-images/${hash}.png`;
+
+  await getR2Client().send(
+    new PutObjectCommand({
+      Bucket: env.R2_BUCKET!,
+      Key: key,
+      Body: bytes,
+      ContentType: contentType,
+      // Generated images are immutable per key (a regeneration writes a
+      // new key only if the name changes), so let the CDN cache hard.
+      CacheControl: "public, max-age=31536000, immutable"
+    })
+  );
+
+  return `${env.R2_PUBLIC_BASE_URL!.replace(/\/$/, "")}/${key}`;
 }

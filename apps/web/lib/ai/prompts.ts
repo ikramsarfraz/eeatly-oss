@@ -1,3 +1,13 @@
+/**
+ * Prompt for generating a fallback dish photo (gpt-image-1) when a meal has
+ * no user-supplied image. Aims for a believable, appetizing food photo — not
+ * an illustration — and explicitly bans text/watermarks so the image reads as
+ * a real plated dish rather than a recipe card.
+ */
+export function buildDishImagePrompt(dishName: string): string {
+  return `A high-quality, appetizing food photograph of "${dishName}". A single serving plated on a simple ceramic dish, shot from a slight overhead angle on a clean neutral surface with soft natural daylight and shallow depth of field. Realistic, editorial food-photography style. No text, no labels, no watermarks, no hands, no people.`;
+}
+
 export const SUGGEST_FROM_IMAGE_PROMPT = `Look at this image and determine whether it shows:
 (a) A finished dish or prepared meal
 (b) A recipe card, cookbook page, or written/printed recipe

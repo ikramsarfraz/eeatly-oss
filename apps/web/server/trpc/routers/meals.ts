@@ -5,13 +5,18 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { trackMealLogLifecycleEvent } from "@/lib/observability/funnel";
 import { logger } from "@/lib/observability/logger";
-import { effortLevelSchema, mealLogInputSchema } from "@eeatly/api/validators/meals";
+import {
+  effortLevelSchema,
+  mealLogInputSchema,
+  setMealPhotoInputSchema
+} from "@eeatly/api/validators/meals";
 import {
   createMealLog,
   deleteMealLog,
   getHistoryRows,
   getHistoryStats,
   getMealDetail,
+  setMealPhoto,
   shareMeal,
   unshareMeal
 } from "@/services/meals";
@@ -219,6 +224,37 @@ export const mealsRouter = router({
           mealId: input.mealId
         });
         return { sharedAt: null };
+      } catch (error) {
+        throw mapMealVisibilityError(error);
+      }
+    }),
+
+  /**
+   * Attach (or replace) a meal's own photo from a device upload. The
+   * client runs the existing presign → R2 flow first, then sends the
+   * resulting public URL here. Creator-only (mirrors share/unshare); the
+   * stored `meals.photoUrl` always wins over the app-wide AI fallback.
+   */
+  setPhoto: householdMemberProcedure
+    .use(rateLimit("mutation"))
+    .input(setMealPhotoInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const result = await setMealPhoto({
+          userId: ctx.user.id,
+          householdId: ctx.household.id,
+          mealId: input.mealId,
+          photoUrl: input.photoUrl
+        });
+        revalidatePath("/dashboard");
+        revalidatePath("/history");
+        revalidatePath("/ideas");
+        revalidatePath(`/meal/${input.mealId}`);
+        logger.info("meal_photo_set", {
+          userId: ctx.user.id,
+          mealId: input.mealId
+        });
+        return { photoUrl: result.photoUrl };
       } catch (error) {
         throw mapMealVisibilityError(error);
       }

@@ -6,6 +6,8 @@ import { withFallback } from "@/lib/ai/providers";
 import * as anthropic from "@/lib/ai/providers/anthropic";
 import * as openai from "@/lib/ai/providers/openai";
 import { households, mealLogs, meals } from "@/db/schema";
+import { generateDishImageForName } from "@/services/dish-images";
+import { mealVisibilityFilter } from "@/lib/meals/visibility";
 import { requireHouseholdMember } from "@/lib/auth/session";
 import {
   AudioInvalidFormatError,
@@ -211,6 +213,54 @@ export async function extractIngredientsForMeal(args: {
     .where(eq(meals.id, args.mealId));
 
   return cleaned;
+}
+
+/**
+ * Resolve (and, on first request, generate) the app-wide AI image for a
+ * meal that has no photo of its own.
+ *
+ * Authz: `requireHouseholdMember` + the same visibility predicate the
+ * recipe view uses, so a member can only trigger generation for a meal
+ * they're actually allowed to see. If the meal already carries its own
+ * `photoUrl`, we return that and never spend an OpenAI call.
+ *
+ * The heavy lifting (cache check, OpenAI, R2 upload, persist) lives in
+ * `services/dish-images.ts`; this wrapper just supplies meal context +
+ * auth. Returns `{ imageUrl: string | null }` — null when generation is
+ * unavailable or fails, in which case the UI keeps the monogram tile.
+ */
+export async function generateDishImageForMeal(args: {
+  userId: string;
+  householdId: string;
+  mealId: string;
+}): Promise<{ imageUrl: string | null }> {
+  await requireHouseholdMember(args.userId, args.householdId);
+
+  const [mealRow] = await db
+    .select({
+      name: meals.name,
+      photoUrl: meals.photoUrl
+    })
+    .from(meals)
+    .where(
+      and(
+        eq(meals.id, args.mealId),
+        eq(meals.householdId, args.householdId),
+        isNull(meals.archivedAt),
+        mealVisibilityFilter(args.userId, args.householdId)
+      )
+    )
+    .limit(1);
+
+  // Missing / archived / not-visible all collapse to "no image" — the
+  // recipe page already 404s these, so we don't leak why.
+  if (!mealRow) return { imageUrl: null };
+
+  // A user's own photo always wins; never spend a generation on it.
+  if (mealRow.photoUrl) return { imageUrl: mealRow.photoUrl };
+
+  const imageUrl = await generateDishImageForName(mealRow.name);
+  return { imageUrl };
 }
 
 // Round 8 — voice notes.

@@ -8,6 +8,7 @@ import { mealVisibilityFilter } from "@/lib/meals/visibility";
 import { normalizeMealName } from "@/lib/utils";
 import { mealLogInputSchema, type MealLogInput } from "@eeatly/api/validators/meals";
 import {
+  dishImages,
   mealIngredients,
   mealLogs,
   meals,
@@ -68,12 +69,16 @@ export async function getDashboardMeals(
         cookedAt: mealLogs.cookedAt,
         effortLevel: mealLogs.effortLevel,
         notes: mealLogs.notes,
-        photoUrl: sql<string | null>`coalesce(${mealLogs.photoUrl}, ${meals.photoUrl})`,
+        // Fallback order: this cook's own photo → the meal's own photo →
+        // the app-wide AI dish image. Failed dish-image rows carry a null
+        // image_url, so coalesce skips them automatically.
+        photoUrl: sql<string | null>`coalesce(${mealLogs.photoUrl}, ${meals.photoUrl}, ${dishImages.imageUrl})`,
         cookedByUserId: mealLogs.cookedByUserId,
         cookedByName: users.name
       })
       .from(mealLogs)
       .innerJoin(meals, eq(mealLogs.mealId, meals.id))
+      .leftJoin(dishImages, eq(dishImages.normalizedName, meals.normalizedName))
       .leftJoin(users, eq(users.id, mealLogs.cookedByUserId))
       // R32 — recent-cooks join hits meals, so the visibility predicate
       // applies to the joined row. Another member's personal meal that
@@ -94,19 +99,23 @@ export async function getDashboardMeals(
         mealName: meals.name,
         cookCount: count(mealLogs.id),
         lastCookedAt: max(mealLogs.cookedAt),
-        photoUrl: meals.photoUrl,
+        photoUrl: sql<string | null>`coalesce(${meals.photoUrl}, ${dishImages.imageUrl})`,
         recipeText: meals.recipeText,
         recipeSourceUrl: meals.recipeSourceUrl
       })
       .from(meals)
       .innerJoin(mealLogs, and(eq(mealLogs.mealId, meals.id), isNull(mealLogs.deletedAt)))
+      .leftJoin(dishImages, eq(dishImages.normalizedName, meals.normalizedName))
       .where(
         and(
           scopeMealsToHousehold(householdId),
           mealVisibilityFilter(userId, householdId)
         )
       )
-      .groupBy(meals.id)
+      // dishImages.imageUrl belongs to a joined table (not the grouped
+      // PK's table), so Postgres requires it in GROUP BY. One row per
+      // normalizedName means it stays constant within each meal.id group.
+      .groupBy(meals.id, dishImages.imageUrl)
       .orderBy(desc(count(mealLogs.id)))
       .limit(6),
 
@@ -116,19 +125,20 @@ export async function getDashboardMeals(
         mealName: meals.name,
         cookCount: count(mealLogs.id),
         lastCookedAt: max(mealLogs.cookedAt),
-        photoUrl: meals.photoUrl,
+        photoUrl: sql<string | null>`coalesce(${meals.photoUrl}, ${dishImages.imageUrl})`,
         recipeText: meals.recipeText,
         recipeSourceUrl: meals.recipeSourceUrl
       })
       .from(meals)
       .leftJoin(mealLogs, and(eq(mealLogs.mealId, meals.id), isNull(mealLogs.deletedAt)))
+      .leftJoin(dishImages, eq(dishImages.normalizedName, meals.normalizedName))
       .where(
         and(
           scopeMealsToHousehold(householdId),
           mealVisibilityFilter(userId, householdId)
         )
       )
-      .groupBy(meals.id)
+      .groupBy(meals.id, dishImages.imageUrl)
       .orderBy(sql`max(${mealLogs.cookedAt}) asc nulls first`)
       .limit(18)
   ]);
@@ -670,7 +680,10 @@ export async function getMealDetail(
     .select({
       id: meals.id,
       name: meals.name,
-      photoUrl: meals.photoUrl,
+      // Own photo wins; the app-wide AI dish image is the fallback. SSR
+      // therefore shows a generated image immediately on repeat visits
+      // (the client only fires generation when this resolves to null).
+      photoUrl: sql<string | null>`coalesce(${meals.photoUrl}, ${dishImages.imageUrl})`,
       recipeText: meals.recipeText,
       recipeSourceUrl: meals.recipeSourceUrl,
       ingredients: meals.ingredients,
@@ -682,6 +695,7 @@ export async function getMealDetail(
     })
     .from(meals)
     .leftJoin(users, eq(users.id, meals.createdByUserId))
+    .leftJoin(dishImages, eq(dishImages.normalizedName, meals.normalizedName))
     // R32 — visibility filter folded in. A direct navigation to a
     // mealId that's another member's personal meal returns null here
     // — the calling page renders `notFound()` exactly like it does
@@ -891,6 +905,48 @@ export async function unshareMeal(args: {
     .set({ sharedAt: null, updatedAt: new Date() })
     .where(eq(meals.id, args.mealId));
   return { sharedAt: null };
+}
+
+/**
+ * Set (or replace) a meal's own photo from a device upload. Creator-only,
+ * mirroring the share/unshare write lockdown: any member can view a shared
+ * meal, but only the creator edits it. The URL is already an uploaded R2
+ * object (the client ran the presign flow first), so we just persist it.
+ * This `meals.photo_url` always wins over the app-wide `dish_images`
+ * fallback at read time.
+ */
+export async function setMealPhoto(args: {
+  userId: string;
+  householdId: string;
+  mealId: string;
+  photoUrl: string;
+}): Promise<{ photoUrl: string }> {
+  await requireHouseholdMember(args.userId, args.householdId);
+
+  const [row] = await db
+    .select({
+      id: meals.id,
+      householdId: meals.householdId,
+      createdByUserId: meals.createdByUserId,
+      archivedAt: meals.archivedAt
+    })
+    .from(meals)
+    .where(eq(meals.id, args.mealId))
+    .limit(1);
+  if (!row) throw new Error("Meal not found.");
+  if (row.archivedAt) throw new Error("Meal is archived.");
+  if (row.householdId !== args.householdId) {
+    throw new Error("Meal not in this household.");
+  }
+  if (row.createdByUserId !== args.userId) {
+    throw new Error("Only the creator can change this meal's photo.");
+  }
+
+  await db
+    .update(meals)
+    .set({ photoUrl: args.photoUrl, updatedAt: new Date() })
+    .where(eq(meals.id, args.mealId));
+  return { photoUrl: args.photoUrl };
 }
 
 export async function deleteMealLog(

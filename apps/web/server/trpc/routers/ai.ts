@@ -17,6 +17,7 @@ import {
 } from "@eeatly/api/validators/ai";
 import {
   extractIngredientsForMeal,
+  generateDishImageForMeal,
   generateShareableRecipe,
   suggestMealFromAudio,
   suggestMealFromImage,
@@ -213,6 +214,40 @@ export const aiRouter = router({
           message: "We couldn't read that audio. Please try again.",
           cause: { reason: "AI_PROVIDER_ERROR" }
         });
+      }
+    }),
+
+  /**
+   * Resolve the app-wide AI image for a meal with no photo of its own.
+   * Cache-first in the service: the first viewer of a never-seen dish
+   * pays for the OpenAI + R2 round-trip, everyone after reuses the URL.
+   *
+   * Open to all users (no feature gate) — images are generated once per
+   * dish app-wide and shared across households, so free users benefit and
+   * the cost ceiling is the distinct-dish count. The `ai` rate-limit
+   * bucket (20/day) is the only abuse guard. The trigger is the recipe
+   * view firing this once on mount when `photoUrl` is null. Returns
+   * `{ imageUrl: null }` (UI keeps the monogram) when generation is
+   * unavailable or fails rather than surfacing an error.
+   */
+  generateDishImage: householdMemberProcedure
+    .use(rateLimit("ai"))
+    .input(mealIdInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await generateDishImageForMeal({
+          userId: ctx.user.id,
+          householdId: ctx.household.id,
+          mealId: input.mealId
+        });
+      } catch (error) {
+        logger.warn("trpc_ai_dish_image_failed", {
+          userId: ctx.user.id,
+          mealId: input.mealId,
+          error: error instanceof Error ? error.message : String(error)
+        });
+        // Non-fatal: the recipe view degrades to the monogram tile.
+        return { imageUrl: null };
       }
     }),
 

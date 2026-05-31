@@ -10,5 +10,6 @@ export * from "./feature-overrides";
 export * from "./subscriptions";
 export * from "./shares";
 export * from "./url-previews";
+export * from "./dish-images";
 export * from "./recipe-structure";
 export * from "./refine";

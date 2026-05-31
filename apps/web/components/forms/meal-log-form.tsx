@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateMealLogImperative } from "@/hooks/use-dashboard-meals";
-import { endpoints, type PresignUploadResponse } from "@/lib/api/endpoints";
+import { uploadPhoto } from "@/lib/uploads/upload-photo";
 import { trpc } from "@/lib/trpc/client";
 import { mealLogInputSchema, type MealLogInput } from "@eeatly/api/validators/meals";
 import { cn } from "@/lib/utils";
@@ -46,46 +46,6 @@ const effortOptions: Array<{ value: MealLogInput["effortLevel"]; label: string }
   { value: "medium", label: "Medium" },
   { value: "high_effort", label: "High" }
 ];
-
-async function uploadPhoto(file: File) {
-  const presignResponse = await fetch(endpoints.uploads.presign(), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      filename: file.name,
-      contentType: file.type
-    })
-  });
-
-  if (!presignResponse.ok) {
-    const error = (await presignResponse.json()) as { error?: string };
-    throw new Error(error.error ?? "Photo upload is not available yet.");
-  }
-
-  const { url, fields, publicUrl } = (await presignResponse.json()) as PresignUploadResponse;
-
-  const formData = new FormData();
-  for (const [name, value] of Object.entries(fields)) {
-    formData.append(name, value);
-  }
-  // Content-Type must be an explicit field to satisfy the policy condition.
-  // The file must be appended last — S3/R2 presigned POST requires it.
-  formData.append("Content-Type", file.type);
-  formData.append("file", file);
-
-  const uploadResponse = await fetch(url, {
-    method: "POST",
-    body: formData
-  });
-
-  if (!uploadResponse.ok) {
-    throw new Error("Unable to upload photo.");
-  }
-
-  return publicUrl;
-}
 
 export function MealLogForm({
   onSuccess,

@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { differenceInCalendarDays, format, formatDistanceToNow, parseISO } from "date-fns";
-import { Loader2, Lock, Share2, Sparkles } from "lucide-react";
+import { Camera, Loader2, Lock, Share2, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ import { useToast } from "@/components/providers/toast-provider";
 import { useSetBreadcrumb } from "@/components/layout/breadcrumb-context";
 import { splitMealName } from "@/lib/meal/split-name";
 import { trpc } from "@/lib/trpc/client";
+import { uploadPhoto } from "@/lib/uploads/upload-photo";
 import { cn } from "@/lib/utils";
 
 /**
@@ -207,6 +208,53 @@ export type RecipeDetailViewer = {
   householdMemberCount: number;
 };
 
+/**
+ * Hero image with read-after-write resilience. A just-generated R2 object
+ * can briefly miss on its very first public GET (edge lag on the r2.dev
+ * domain), which would otherwise leave a broken image stuck until a manual
+ * refresh. On load error we retry the same URL with a cache-busting param a
+ * few times (short backoff); if it still won't load, we fall back to the
+ * monogram tile. State resets naturally because the parent keys this
+ * component on `src`.
+ */
+function DishHeroImage({ src, name }: { src: string; name: string }) {
+  const MAX_IMG_RETRIES = 4;
+  const [retry, setRetry] = React.useState(0);
+  const [failed, setFailed] = React.useState(false);
+
+  function handleError() {
+    if (retry >= MAX_IMG_RETRIES) {
+      setFailed(true);
+      return;
+    }
+    // Back off (~0.6s, 1.2s, 1.8s, 2.4s) so the edge has time to catch up
+    // rather than burning every retry in the same millisecond.
+    const next = retry + 1;
+    window.setTimeout(() => setRetry(next), 600 * next);
+  }
+
+  if (failed) {
+    return (
+      <MealTile name={name} size="l" className="h-full w-full rounded-none border-0" />
+    );
+  }
+
+  // Append the retry counter so the browser refetches instead of reusing a
+  // cached miss. r2.dev ignores the extra query param.
+  const displaySrc =
+    retry > 0 ? `${src}${src.includes("?") ? "&" : "?"}r=${retry}` : src;
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={displaySrc}
+      alt={name}
+      className="h-full w-full object-cover"
+      onError={handleError}
+    />
+  );
+}
+
 export function RecipeDetailClient({
   meal,
   viewer
@@ -317,6 +365,62 @@ export function RecipeDetailClient({
   const isShared = meal.sharedAt !== null;
   const showShareAffordance = isCreator && isMultiMember;
 
+  // Dish image. `meal.photoUrl` arrives already coalesced server-side
+  // (the meal's own photo → the app-wide AI image), so a non-null value
+  // means there's something to show. When it's null no image exists for
+  // this dish yet, and the recipe view triggers a one-time, app-wide
+  // generation. Local state lets the tile swap in place once the
+  // generated image (or a device upload) resolves.
+  const { showToast } = useToast();
+  const [photoUrl, setPhotoUrl] = React.useState<string | null>(meal.photoUrl);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const autoGenFired = React.useRef(false);
+
+  const generateImage = trpc.ai.generateDishImage.useMutation();
+  const setMealPhoto = trpc.meals.setPhoto.useMutation();
+
+  // Auto-generate the app-wide fallback on first view of a dish that has
+  // no image at all. Cache-first on the server: a viewer of an
+  // already-generated dish never lands here (photoUrl is non-null). The
+  // ref guard fires the mutation exactly once per mount.
+  React.useEffect(() => {
+    if (photoUrl || autoGenFired.current) return;
+    autoGenFired.current = true;
+    generateImage.mutate(
+      { mealId: meal.id },
+      {
+        onSuccess: (res) => {
+          if (res.imageUrl) setPhotoUrl(res.imageUrl);
+        }
+      }
+    );
+    // `generateImage.mutate` is stable; meal.id keys the call. Re-running
+    // on photoUrl changes is intentionally guarded by the ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meal.id, photoUrl]);
+
+  const isGeneratingImage = generateImage.isPending;
+  const isUploadingPhoto = setMealPhoto.isPending;
+
+  async function handlePhotoSelected(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    // Reset so re-selecting the same file still fires onChange.
+    event.target.value = "";
+    if (!file) return;
+    try {
+      const url = await uploadPhoto(file);
+      const result = await setMealPhoto.mutateAsync({ mealId: meal.id, photoUrl: url });
+      setPhotoUrl(result.photoUrl);
+      showToast({ variant: "success", title: "Photo updated" });
+    } catch (error) {
+      showToast({
+        variant: "error",
+        title: "Couldn't update the photo",
+        description: error instanceof Error ? error.message : "Try again."
+      });
+    }
+  }
+
   return (
     // Outer wrapper bleeds out the layout's `<main>` padding
     // (`px-8 py-7` at md+, `px-4 py-5` below). Negative margins +
@@ -328,14 +432,11 @@ export function RecipeDetailClient({
     <div className="-mx-4 -my-5 sm:-mx-8 sm:-my-7">
       {/* Hero band — square hashed-palette tile + split title + chips. */}
       <section className="grid gap-0 border-b border-[var(--border)] md:grid-cols-[360px_1fr]">
-        <div className="aspect-square w-full max-md:max-h-[360px] md:max-h-[360px]">
-          {meal.photoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={meal.photoUrl}
-              alt={meal.name}
-              className="h-full w-full object-cover"
-            />
+        <div className="relative aspect-square w-full max-md:max-h-[360px] md:max-h-[360px]">
+          {photoUrl ? (
+            // `key={photoUrl}` remounts (resetting retry/fail state) when a
+            // new generation result or device upload swaps the source in.
+            <DishHeroImage key={photoUrl} src={photoUrl} name={meal.name} />
           ) : (
             <MealTile
               name={meal.name}
@@ -343,6 +444,14 @@ export function RecipeDetailClient({
               className="h-full w-full rounded-none border-0"
             />
           )}
+          {/* While the app-wide image generates (or a device photo
+              uploads), keep the monogram/old photo visible under a
+              subtle spinner overlay rather than flashing a blank box. */}
+          {!photoUrl && (isGeneratingImage || isUploadingPhoto) ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+              <Loader2 className="h-5 w-5 animate-spin text-white drop-shadow" />
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-col gap-3 px-7 pb-7 pt-7 sm:px-9 sm:pt-9 md:gap-4 md:pt-9">
           <p
@@ -438,6 +547,34 @@ export function RecipeDetailClient({
               compact
               className="min-h-[40px]"
             />
+            {/* Creator-only device upload. Reuses the presign → R2 flow;
+                the resulting photo becomes the meal's own image and wins
+                over the app-wide AI fallback. */}
+            {isCreator ? (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={handlePhotoSelected}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-[40px]"
+                  disabled={isUploadingPhoto}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {isUploadingPhoto ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Camera className="h-3.5 w-3.5" />
+                  )}
+                  {photoUrl ? "Change photo" : "Add photo"}
+                </Button>
+              </>
+            ) : null}
           </div>
         </div>
       </section>

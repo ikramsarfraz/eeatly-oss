@@ -65,3 +65,15 @@ export const presignedUploadInputSchema = z.object({
 });
 
 export type PresignedUploadInput = z.infer<typeof presignedUploadInputSchema>;
+
+/**
+ * Attach (or replace) a meal's own photo from a device upload. The URL is
+ * the public R2 location returned by the presign flow; the `httpUrl`
+ * refinement keeps stored values safe to render as `<img src>` later.
+ */
+export const setMealPhotoInputSchema = z.object({
+  mealId: z.string().uuid(),
+  photoUrl: httpUrl
+});
+
+export type SetMealPhotoInput = z.infer<typeof setMealPhotoInputSchema>;

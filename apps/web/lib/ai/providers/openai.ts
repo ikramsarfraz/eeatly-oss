@@ -2,6 +2,7 @@ import "server-only";
 
 import OpenAI, { toFile } from "openai";
 import {
+  buildDishImagePrompt,
   buildSharePrompt,
   EXTRACT_INGREDIENTS_FROM_TEXT_PROMPT,
   REFINE_RECIPE_PROMPT,
@@ -237,6 +238,45 @@ export async function extractIngredientsFromText(recipeText: string): Promise<st
   if (!content) throw new Error("OpenAI returned an empty response.");
   const parsed = JSON.parse(content) as { ingredients?: unknown };
   return coerceIngredients(parsed.ingredients);
+}
+
+// Image-generation timeout. gpt-image-1 routinely takes 10–20s to render
+// a 1024² image — the 7s chat budget would abort essentially every call.
+// Matched to the Whisper budget for the same "this is a slow op" reason.
+const IMAGE_TIMEOUT_MS = 30_000;
+
+/**
+ * Generate a fallback dish photo with gpt-image-1. Returns the raw base64
+ * (PNG) so the caller can upload the bytes straight to R2.
+ *
+ * No Anthropic fallback — Anthropic's SDK has no image-generation API, so
+ * (unlike the suggest/extract paths) there's no second provider to fall
+ * back to. If OpenAI image gen is down, the dish-image service catches the
+ * throw, caches the failure, and the UI degrades to the monogram tile.
+ */
+export async function generateDishImage(dishName: string): Promise<{ base64: string }> {
+  const client = getClient();
+  const start = Date.now();
+  const response = await client.images.generate(
+    {
+      model: "gpt-image-1",
+      prompt: buildDishImagePrompt(dishName),
+      size: "1024x1024",
+      n: 1
+    },
+    { signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS) }
+  );
+
+  logger.info("ai_provider_call", {
+    provider: "openai",
+    operation: "generate_dish_image",
+    success: true,
+    latencyMs: Date.now() - start
+  });
+
+  const base64 = response.data?.[0]?.b64_json;
+  if (!base64) throw new Error("OpenAI returned no image data.");
+  return { base64 };
 }
 
 // Whisper-specific timeout — Whisper is materially slower than chat

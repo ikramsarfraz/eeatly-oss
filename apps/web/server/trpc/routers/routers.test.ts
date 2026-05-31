@@ -67,9 +67,22 @@ const mealsServiceMock = vi.hoisted(() => ({
   getHistoryStats: vi.fn(),
   getMealDetail: vi.fn(),
   createMealLog: vi.fn(),
-  deleteMealLog: vi.fn()
+  deleteMealLog: vi.fn(),
+  setMealPhoto: vi.fn()
 }));
 vi.mock("@/services/meals", () => mealsServiceMock);
+
+// AI service mock — the ai router imports these named exports at module
+// load, so every one must be present or the router fails to construct.
+const aiServiceMock = vi.hoisted(() => ({
+  suggestMealFromImage: vi.fn(),
+  suggestMealFromText: vi.fn(),
+  suggestMealFromAudio: vi.fn(),
+  extractIngredientsForMeal: vi.fn(),
+  generateShareableRecipe: vi.fn(),
+  generateDishImageForMeal: vi.fn()
+}));
+vi.mock("@/services/ai", () => aiServiceMock);
 
 vi.mock("@/lib/observability/funnel", () => ({
   trackMealLogLifecycleEvent: vi.fn()
@@ -189,6 +202,7 @@ beforeEach(() => {
   }
   for (const map of [
     mealsServiceMock,
+    aiServiceMock,
     householdsServiceMock,
     plansServiceMock,
     sharesServiceMock,
@@ -454,6 +468,82 @@ describe("mealsRouter mutations (Task 3)", () => {
       caught = e;
     }
     expect(caught).toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("setPhoto: passes input through and returns the saved photo URL", async () => {
+    mealsServiceMock.setMealPhoto.mockResolvedValueOnce({
+      photoUrl: "https://r2.example/users/u-1/meal-photos/x.jpg"
+    });
+    const result = await call(makeUser()).meals.setPhoto({
+      mealId: "22222222-2222-4222-8222-222222222222",
+      photoUrl: "https://r2.example/users/u-1/meal-photos/x.jpg"
+    });
+    expect(result.photoUrl).toBe(
+      "https://r2.example/users/u-1/meal-photos/x.jpg"
+    );
+    expect(mealsServiceMock.setMealPhoto).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "u-1",
+        householdId: "h-current",
+        mealId: "22222222-2222-4222-8222-222222222222"
+      })
+    );
+  });
+
+  it("setPhoto: maps a non-creator service error to FORBIDDEN", async () => {
+    mealsServiceMock.setMealPhoto.mockRejectedValueOnce(
+      new Error("Only the creator can change this meal's photo.")
+    );
+    let caught: unknown;
+    try {
+      await call(makeUser()).meals.setPhoto({
+        mealId: "22222222-2222-4222-8222-222222222222",
+        photoUrl: "https://r2.example/users/u-9/meal-photos/y.jpg"
+      });
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toMatchObject({
+      code: "FORBIDDEN",
+      cause: { reason: "NOT_CREATOR" }
+    });
+  });
+});
+
+describe("aiRouter.generateDishImage", () => {
+  it("requires auth", async () => {
+    await expect(
+      call(null).ai.generateDishImage({
+        mealId: "33333333-3333-4333-8333-333333333333"
+      })
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
+  it("returns the generated image URL from the service", async () => {
+    aiServiceMock.generateDishImageForMeal.mockResolvedValueOnce({
+      imageUrl: "https://r2.example/dish-images/abc.png"
+    });
+    const result = await call(makeUser()).ai.generateDishImage({
+      mealId: "33333333-3333-4333-8333-333333333333"
+    });
+    expect(result.imageUrl).toBe("https://r2.example/dish-images/abc.png");
+    expect(aiServiceMock.generateDishImageForMeal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "u-1",
+        householdId: "h-current",
+        mealId: "33333333-3333-4333-8333-333333333333"
+      })
+    );
+  });
+
+  it("degrades to { imageUrl: null } when the service throws", async () => {
+    aiServiceMock.generateDishImageForMeal.mockRejectedValueOnce(
+      new Error("provider down")
+    );
+    const result = await call(makeUser()).ai.generateDishImage({
+      mealId: "33333333-3333-4333-8333-333333333333"
+    });
+    expect(result).toEqual({ imageUrl: null });
   });
 });
 
