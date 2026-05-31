@@ -59,16 +59,27 @@ export function hasActiveGrant(
 }
 
 /**
- * Plan visibility predicate. Plan-level visibility intentionally stays
- * household-wide: co-cooks see each other's plans, but the recipes behind
- * each dish are locked unless the viewer owns or was granted them (see
- * `getPlanDetail`'s per-dish `accessible` check). The new clause adds
- * per-person grants on top for cross-household plan shares.
+ * Plan visibility predicate — pure per-item sharing, mirroring meals.
+ *
+ * The viewer sees a plan if EITHER:
+ *   (a) they created it (own it), OR
+ *   (b) they hold an active per-item grant for it.
+ *
+ * The legacy "any plan in my household" clause was REMOVED: under the old
+ * model every member saw every plan household-wide, which leaked the
+ * creator's plans to co-members. The 0030 migration backfilled grants for
+ * every plan that existed at that point, so dropping the clause preserves
+ * pre-migration access (via clause b) while making plans the creator never
+ * shared private again. Plans are private by default (a new plan has no
+ * grants until the owner shares it). The recipes behind each dish stay
+ * independently locked unless owned/granted (see `getPlan`'s per-dish check).
+ *
+ * `householdId` is retained for call-site symmetry but no longer referenced.
  */
 export function planVisibilityFilter(userId: string, householdId: string): SQL {
+  void householdId;
   return or(
     eq(plans.createdByUserId, userId),
-    hasActiveGrant("plan", plans.id, userId),
-    eq(plans.householdId, householdId)
+    hasActiveGrant("plan", plans.id, userId)
   )!;
 }

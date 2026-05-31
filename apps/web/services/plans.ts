@@ -5,10 +5,9 @@ import { db } from "@/lib/db/client";
 import { requireHouseholdMember } from "@/lib/auth/session";
 import { requireFeatureAccess } from "@/lib/gates/resolver";
 import { logger } from "@/lib/observability/logger";
-import { mealVisibilityFilter } from "@/lib/meals/visibility";
+import { mealVisibilityFilter, planVisibilityFilter } from "@/lib/meals/visibility";
 import {
   dishImages,
-  householdMembers,
   mealLogs,
   meals,
   planDishes,
@@ -121,23 +120,14 @@ export async function createPlan(args: CreatePlanArgs): Promise<PlanRow> {
 export async function getPlan(args: { planId: string; userId: string }): Promise<PlanWithDishes> {
   const plan = await loadPlanOrThrow(args.planId);
 
-  // Per-item sharing authz: the owner, a household member (legacy), or a
-  // co-cook holding an active grant for this plan may view it. Co-cooks
-  // are cross-household, so the household-member check can't be the gate.
+  // Per-item sharing authz: only the owner or a co-cook holding an active
+  // grant for this plan may view it. Household co-membership no longer
+  // grants access (dropped alongside the recipe/plan visibility flip), so
+  // a member of the creator's household can't see a plan they weren't
+  // explicitly granted.
   const isOwner = plan.createdByUserId === args.userId;
-  const [memberRow] = await db
-    .select({ id: householdMembers.id })
-    .from(householdMembers)
-    .where(
-      and(
-        eq(householdMembers.userId, args.userId),
-        eq(householdMembers.householdId, plan.householdId)
-      )
-    )
-    .limit(1);
-  const isMember = Boolean(memberRow);
   const hasPlanGrant = !isOwner && (await hasGrant(args.userId, "plan", args.planId));
-  if (!isOwner && !isMember && !hasPlanGrant) {
+  if (!isOwner && !hasPlanGrant) {
     throw new Error("Not authorized for this plan.");
   }
 
@@ -237,9 +227,17 @@ export type PlanListRow = PlanRow & { dishCount: number };
 export async function listPlansForHousehold(args: ListPlansArgs): Promise<PlanListRow[]> {
   await requireHouseholdMember(args.userId, args.householdId);
 
+  // Per-item: the list shows plans you own or were granted, scoped to the
+  // current household. The visibility filter (own-or-granted) replaces the
+  // old household-wide listing that leaked co-members' plans to each other.
+  const visible = planVisibilityFilter(args.userId, args.householdId);
   const where = args.includeArchived
-    ? eq(plans.householdId, args.householdId)
-    : and(eq(plans.householdId, args.householdId), isNull(plans.archivedAt));
+    ? and(eq(plans.householdId, args.householdId), visible)
+    : and(
+        eq(plans.householdId, args.householdId),
+        isNull(plans.archivedAt),
+        visible
+      );
 
   return db
     .select({

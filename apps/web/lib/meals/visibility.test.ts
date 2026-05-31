@@ -40,9 +40,10 @@ describe("planVisibilityFilter", () => {
     expect(sql).toContain("item_grants");
   });
 
-  it("intentionally KEEPS household-wide plan visibility (co-cook view)", () => {
-    // Plans stay visible household-wide; the recipes behind each dish are
-    // locked unless owned/granted (see getPlanDetail's per-dish check).
-    expect(sql).toContain("household_id");
+  it("does NOT fall back to household-wide plan visibility — the leak fix", () => {
+    // Plans are now per-item too: a co-member sees a plan only if they own
+    // it or hold a grant. The list query still scopes to the household, but
+    // the predicate itself no longer grants household-wide access.
+    expect(sql).not.toContain("household_id");
   });
 });
