@@ -69,6 +69,33 @@ export const metaPayloadSchema = z
 export type MetaPayload = z.infer<typeof metaPayloadSchema>;
 
 /**
+ * Permissive payload for an "add" change — the superset of ingredient,
+ * step, and meta fields, all optional. Used INSTEAD of a `z.union(...)`:
+ * a union picks the first member that validates, and since the ingredient
+ * schema is all-optional it matched every payload (including steps) and
+ * stripped the step-only `title`/`body`. A flat superset keeps whatever
+ * the model sent; the apply path reads the fields relevant to `target`.
+ */
+export const addPayloadSchema = z.object({
+  // ingredient
+  name: z.string().min(1).max(200).optional(),
+  quantityString: z.string().max(120).optional(),
+  prepNote: z.string().max(200).nullable().optional(),
+  // step
+  title: z.string().min(1).max(200).optional(),
+  time: z.string().max(120).nullable().optional(),
+  body: z.string().max(4000).optional(),
+  ingredientIds: z.array(z.string()).max(50).optional(),
+  // shared
+  position: z.number().int().min(0).optional(),
+  // meta
+  notes: z.string().max(2000).nullable().optional(),
+  recipeText: z.string().max(20_000).nullable().optional(),
+  recipeSourceUrl: z.string().url().nullable().optional()
+});
+export type AddPayload = z.infer<typeof addPayloadSchema>;
+
+/**
  * `PendingChange` discriminated union — the unit of work for every step
  * of the refine pipeline (AI proposes → user toggles accept → save
  * applies). The variants are intentionally narrow so the apply path can
@@ -79,11 +106,7 @@ export const pendingChangeSchema = z.discriminatedUnion("kind", [
     id: z.string(),
     kind: z.literal("add"),
     target: refineTargetSchema,
-    payload: z.union([
-      ingredientPayloadSchema,
-      stepPayloadSchema,
-      metaPayloadSchema
-    ]),
+    payload: addPayloadSchema,
     /** Optional placement hint for adds (e.g. "after step 5"). */
     whereHint: z.string().max(120).optional()
   }),
