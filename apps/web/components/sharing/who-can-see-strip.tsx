@@ -45,6 +45,7 @@ export function WhoCanSeeStrip({
     <GranteeStrip
       itemType={itemType}
       itemId={itemId}
+      itemName={itemName}
       ownerName={ownerName ?? null}
       savedCopyItemId={savedCopyItemId ?? null}
     />
@@ -132,16 +133,22 @@ function GranteeStrip({
   itemType,
   itemId,
   ownerName,
+  itemName,
   savedCopyItemId
 }: {
   itemType: "recipe" | "plan";
   itemId: string;
+  itemName: string;
   ownerName: string | null;
   savedCopyItemId: string | null;
 }) {
   const { showToast } = useToast();
   const router = useRouter();
   const [savedId, setSavedId] = React.useState<string | null>(savedCopyItemId);
+  const [shareOpen, setShareOpen] = React.useState(false);
+  // The owner may permit re-sharing ("cooks can re-share"); only then does a
+  // grantee get a Share affordance.
+  const canReshare = trpc.sharing.canReshare.useQuery({ itemType, itemId });
   const save = trpc.sharing.saveCopy.useMutation({
     onSuccess: (res) => {
       setSavedId(res.newItemId);
@@ -170,6 +177,12 @@ function GranteeStrip({
           You see their latest version as they edit. Save a copy to make it your own.
         </p>
       </div>
+      {canReshare.data ? (
+        <Button variant="outline" className="min-h-[40px]" onClick={() => setShareOpen(true)}>
+          <Users className="h-3.5 w-3.5" />
+          Share
+        </Button>
+      ) : null}
       {savedId ? (
         <Button variant="outline" className="min-h-[40px]" onClick={() => router.push(copyHref(savedId))}>
           <Copy className="h-3.5 w-3.5" />
@@ -186,6 +199,15 @@ function GranteeStrip({
           Save a copy
         </Button>
       )}
+      {canReshare.data ? (
+        <ShareSheet
+          itemType={itemType}
+          itemId={itemId}
+          itemName={itemName}
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+        />
+      ) : null}
     </div>
   );
 }

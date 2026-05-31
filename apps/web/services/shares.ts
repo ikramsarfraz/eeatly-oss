@@ -15,6 +15,7 @@ import {
 } from "@/db/schema";
 import { getServerEnv } from "@/lib/env/server";
 import { requireFeatureAccess } from "@/lib/gates/resolver";
+import { getUserSettings } from "@/services/user-settings";
 import { logger } from "@/lib/observability/logger";
 
 /**
@@ -77,6 +78,9 @@ export async function createRecipeShare(args: {
   await requireHouseholdMember(args.userId, meal.householdId);
   if (meal.createdByUserId !== args.userId) {
     throw new Error("Only the creator can share this recipe.");
+  }
+  if (!(await getUserSettings(args.userId)).allowLinkShares) {
+    throw new Error("Link sharing is turned off in your settings.");
   }
   await requireFeatureAccess(args.userId, "recipe_share_create");
 
@@ -361,6 +365,9 @@ export async function createPlanShare(args: {
   await requireHouseholdMember(args.userId, plan.householdId);
   if (plan.createdByUserId !== args.userId) {
     throw new Error("Only the owner can share this plan.");
+  }
+  if (!(await getUserSettings(args.userId)).allowLinkShares) {
+    throw new Error("Link sharing is turned off in your settings.");
   }
   await requireFeatureAccess(args.userId, "recipe_share_create");
 

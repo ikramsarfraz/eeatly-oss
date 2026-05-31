@@ -23,6 +23,7 @@ import {
 } from "@/services/notifications";
 import { getCurrentHousehold } from "@/lib/auth/session";
 import { getServerEnv } from "@/lib/env/server";
+import { getUserSettings } from "@/services/user-settings";
 import { normalizeMealName } from "@/lib/utils";
 import { logger } from "@/lib/observability/logger";
 
@@ -79,6 +80,22 @@ async function resolveItem(itemType: ItemType, itemId: string): Promise<ItemRef 
 /** Canonical (low, high) ordering for the symmetric connections table. */
 function connectionPair(a: string, b: string): { low: string; high: string } {
   return a < b ? { low: a, high: b } : { low: b, high: a };
+}
+
+/**
+ * True if `userId` may re-share this item — i.e. they're not the owner but
+ * hold an active grant AND the owner has enabled "cooks can re-share".
+ */
+export async function canReshareItem(
+  userId: string,
+  itemType: ItemType,
+  itemId: string
+): Promise<boolean> {
+  const item = await resolveItem(itemType, itemId);
+  if (!item || item.ownerUserId === userId) return false;
+  if (!(await hasGrant(userId, itemType, itemId))) return false;
+  const ownerSettings = await getUserSettings(item.ownerUserId);
+  return ownerSettings.cooksCanReshare;
 }
 
 /** True if `granteeUserId` holds an active grant for the item. */
@@ -215,7 +232,7 @@ export async function listGrantsForItem(args: {
 }): Promise<ItemGranteeView[]> {
   const item = await resolveItem(args.itemType, args.itemId);
   if (!item) throw new Error("Item not found.");
-  if (item.ownerUserId !== args.userId) {
+  if (item.ownerUserId !== args.userId && !(await canReshareItem(args.userId, args.itemType, args.itemId))) {
     throw new Error("Only the owner can view sharing for this item.");
   }
 
@@ -252,20 +269,30 @@ export async function listGrantsForItem(args: {
  * a previously-revoked grant un-revokes the same row). Notifies the grantee.
  */
 export async function grantItem(args: {
+  /** The acting user (the owner, or a re-sharer when allowed). */
   ownerUserId: string;
   itemType: ItemType;
   itemId: string;
   granteeUserId: string;
 }): Promise<{ grantId: string }> {
-  if (args.granteeUserId === args.ownerUserId) {
-    throw new Error("You already own this item.");
-  }
+  const granter = args.ownerUserId;
   const item = await resolveItem(args.itemType, args.itemId);
   if (!item) throw new Error("Item not found.");
-  if (item.ownerUserId !== args.ownerUserId) {
-    throw new Error("Only the owner can share this item.");
+  const realOwner = item.ownerUserId;
+
+  // Owner can always share. A non-owner can re-share only if they hold an
+  // active grant AND the owner has enabled "cooks can re-share".
+  if (granter !== realOwner) {
+    const granterHasGrant = await hasGrant(granter, args.itemType, args.itemId);
+    const ownerSettings = await getUserSettings(realOwner);
+    if (!granterHasGrant || !ownerSettings.cooksCanReshare) {
+      throw new Error("Only the owner can share this item.");
+    }
   }
-  if (!(await areConnected(args.ownerUserId, args.granteeUserId))) {
+  if (args.granteeUserId === realOwner) {
+    throw new Error("They already own this item.");
+  }
+  if (!(await areConnected(granter, args.granteeUserId))) {
     throw new Error("You can only share with people in your circle.");
   }
 
@@ -274,18 +301,19 @@ export async function grantItem(args: {
     .values({
       itemType: args.itemType,
       itemId: args.itemId,
-      ownerUserId: args.ownerUserId,
+      // Grants are always owned by the real item owner, even when a
+      // re-sharer created them.
+      ownerUserId: realOwner,
       granteeUserId: args.granteeUserId,
       revokedAt: null
     })
     .onConflictDoUpdate({
       target: [itemGrants.itemType, itemGrants.itemId, itemGrants.granteeUserId],
-      // Re-grant: clear any prior revoke, re-stamp ownership + time.
-      set: { revokedAt: null, ownerUserId: args.ownerUserId, createdAt: new Date() }
+      set: { revokedAt: null, ownerUserId: realOwner, createdAt: new Date() }
     })
     .returning({ grantId: itemGrants.id });
 
-  const ownerName = await displayName(args.ownerUserId);
+  const ownerName = await displayName(realOwner);
   void createNotification({
     userId: args.granteeUserId,
     type: "system",

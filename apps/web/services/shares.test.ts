@@ -54,6 +54,17 @@ const gateMock = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/gates/resolver", () => gateMock);
 
+// Link-share gating reads user settings; default to allowed so the existing
+// queue-based expectations hold (no extra db round-trip).
+vi.mock("@/services/user-settings", () => ({
+  getUserSettings: vi.fn(async () => ({
+    allowLinkShares: true,
+    cooksCanReshare: false,
+    whoCanAddYou: "connections",
+    findByEmail: true
+  }))
+}));
+
 import {
   createRecipeShare,
   getRecipeShareByToken,

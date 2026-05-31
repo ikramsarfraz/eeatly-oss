@@ -301,6 +301,7 @@ export function SettingsClient({
                 last
               />
             </Card>
+            <PrivacyToggles />
             <ActiveShareLinks />
             <p className="text-[12.5px] leading-[1.55] text-muted-foreground">
               Revoking access removes someone&apos;s <strong className="text-foreground">live copy</strong>{" "}
@@ -635,5 +636,142 @@ function ActiveShareLinks() {
         </div>
       ))}
     </Card>
+  );
+}
+
+/** Global sharing & privacy toggles + the who-can-add-you segmented radio. */
+function PrivacyToggles() {
+  const { showToast } = useToast();
+  const utils = trpc.useUtils();
+  const query = trpc.sharing.privacySettings.useQuery();
+  const update = trpc.sharing.updatePrivacySettings.useMutation({
+    onSuccess: () => void utils.sharing.privacySettings.invalidate(),
+    onError: (e) => showToast({ variant: "error", title: "Couldn't save", description: e.message })
+  });
+  const s = query.data;
+  if (!s) return null;
+
+  return (
+    <Card className="overflow-hidden p-0">
+      <SettingRow
+        label="Allow “anyone with the link”"
+        sub="Lets you create read-only link views for people without an eeatly account. Turn off to restrict sharing to named people only."
+        suffix={
+          <Toggle
+            on={s.allowLinkShares}
+            busy={update.isPending}
+            onToggle={(v) => update.mutate({ allowLinkShares: v })}
+          />
+        }
+      />
+      <SettingRow
+        label="Co-cooks can re-share my items"
+        sub="If off, only you can grant access to recipes and plans you own."
+        suffix={
+          <Toggle
+            on={s.cooksCanReshare}
+            busy={update.isPending}
+            onToggle={(v) => update.mutate({ cooksCanReshare: v })}
+          />
+        }
+      />
+      <SettingRow
+        label="Who can add you to their kitchen"
+        sub="Controls who can send you a connection invite."
+        suffix={
+          <SegmentedRadio
+            value={s.whoCanAddYou}
+            options={[
+              { value: "anyone", label: "Anyone" },
+              { value: "connections", label: "Shared-with" },
+              { value: "no_one", label: "No one" }
+            ]}
+            busy={update.isPending}
+            onChange={(v) =>
+              update.mutate({ whoCanAddYou: v as "anyone" | "connections" | "no_one" })
+            }
+          />
+        }
+      />
+      <SettingRow
+        label="Find me by email"
+        sub="Whether people who know your email can discover and connect with you."
+        suffix={
+          <Toggle
+            on={s.findByEmail}
+            busy={update.isPending}
+            onToggle={(v) => update.mutate({ findByEmail: v })}
+          />
+        }
+        last
+      />
+    </Card>
+  );
+}
+
+function Toggle({
+  on,
+  busy,
+  onToggle
+}: {
+  on: boolean;
+  busy: boolean;
+  onToggle: (v: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      disabled={busy}
+      onClick={() => onToggle(!on)}
+      className={cn(
+        "relative h-[26px] w-[44px] shrink-0 rounded-full transition-colors disabled:opacity-60",
+        on ? "bg-[color:var(--primary)]" : "bg-[var(--border-strong,var(--border))]"
+      )}
+    >
+      <span
+        className={cn(
+          "absolute top-0.5 h-[22px] w-[22px] rounded-full bg-white transition-transform",
+          on ? "translate-x-[18px]" : "translate-x-0.5"
+        )}
+      />
+    </button>
+  );
+}
+
+function SegmentedRadio({
+  value,
+  options,
+  busy,
+  onChange
+}: {
+  value: string;
+  options: ReadonlyArray<{ value: string; label: string }>;
+  busy: boolean;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="inline-flex rounded-[10px] border bg-[var(--surface-2)] p-0.5">
+      {options.map((o) => {
+        const active = o.value === value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            disabled={busy}
+            onClick={() => onChange(o.value)}
+            className={cn(
+              "rounded-[8px] px-2.5 py-1 text-[12.5px] font-medium transition-colors",
+              active
+                ? "bg-[var(--surface)] text-foreground shadow-[var(--shadow-sm)]"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }

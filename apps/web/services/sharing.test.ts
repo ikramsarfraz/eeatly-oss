@@ -42,9 +42,20 @@ const dbState = vi.hoisted(() => {
 vi.mock("@/lib/db/client", () => ({ db: dbState.chain }));
 
 const notificationsMock = vi.hoisted(() => ({
-  createNotification: vi.fn(async () => undefined)
+  createNotification: vi.fn(async () => undefined),
+  createNotificationIfNotRecent: vi.fn(async () => null)
 }));
 vi.mock("@/services/notifications", () => notificationsMock);
+
+// User settings default to reshare-off so a non-owner can't grant.
+vi.mock("@/services/user-settings", () => ({
+  getUserSettings: vi.fn(async () => ({
+    allowLinkShares: true,
+    cooksCanReshare: false,
+    whoCanAddYou: "connections",
+    findByEmail: true
+  }))
+}));
 
 import { grantItem, revokeItem } from "./sharing";
 
@@ -69,6 +80,7 @@ const itemRow = (ownerUserId: string) => [
 describe("grantItem", () => {
   it("rejects when the caller is not the item owner", async () => {
     queue(itemRow("owner-x")); // resolveItem
+    queue([]); // hasGrant lookup → no grant (so the reshare path is denied)
     await expect(
       grantItem({
         ownerUserId: "not-owner",
@@ -92,7 +104,8 @@ describe("grantItem", () => {
     ).rejects.toThrow(/circle/i);
   });
 
-  it("rejects granting an item to yourself", async () => {
+  it("rejects granting an item to its owner", async () => {
+    queue(itemRow("me")); // resolveItem — owner is "me"
     await expect(
       grantItem({
         ownerUserId: "me",

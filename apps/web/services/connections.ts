@@ -12,6 +12,7 @@ import {
 } from "@/db/schema";
 import { ensureConnection, listConnections, type ItemType } from "@/services/sharing";
 import { createNotification } from "@/services/notifications";
+import { getUserSettings } from "@/services/user-settings";
 import { getServerEnv } from "@/lib/env/server";
 import { logger } from "@/lib/observability/logger";
 
@@ -209,7 +210,11 @@ export async function listPendingInvitations(userId: string): Promise<PendingInv
 
 export type InviteResult =
   | { ok: true; invitationId: string; url: string; expiresAt: string }
-  | { ok: false; code: "ALREADY_CONNECTED" | "ALREADY_INVITED" | "SELF"; message: string };
+  | {
+      ok: false;
+      code: "ALREADY_CONNECTED" | "ALREADY_INVITED" | "SELF" | "BLOCKED";
+      message: string;
+    };
 
 /** Invite someone (by email) into your sharing circle. */
 export async function inviteConnection(userId: string, rawEmail: string): Promise<InviteResult> {
@@ -224,16 +229,51 @@ export async function inviteConnection(userId: string, rawEmail: string): Promis
     return { ok: false, code: "SELF", message: "That's your own email." };
   }
 
-  // Already a user + already connected?
+  // If an account exists for this email, honor that user's privacy
+  // settings. `findByEmail` off makes them undiscoverable — we don't reveal
+  // the account or enforce who-can-add (the email invite still sends; they
+  // opt in on accept). With discovery on, enforce `whoCanAddYou`.
   const [existingUser] = await db
     .select({ id: users.id })
     .from(users)
     .where(eq(users.email, email))
     .limit(1);
   if (existingUser) {
-    const already = (await listConnections(userId)).some((p) => p.userId === existingUser.id);
-    if (already) {
-      return { ok: false, code: "ALREADY_CONNECTED", message: "You're already connected." };
+    const inviteeSettings = await getUserSettings(existingUser.id);
+    if (inviteeSettings.findByEmail) {
+      const already = (await listConnections(userId)).some((p) => p.userId === existingUser.id);
+      if (already) {
+        return { ok: false, code: "ALREADY_CONNECTED", message: "You're already connected." };
+      }
+      if (inviteeSettings.whoCanAddYou === "no_one") {
+        return {
+          ok: false,
+          code: "BLOCKED",
+          message: "This person isn't accepting new connections."
+        };
+      }
+      if (inviteeSettings.whoCanAddYou === "connections") {
+        // "People you've shared with" — allow only if the invitee has
+        // already shared an item with the inviter (they're not strangers).
+        const [sharedWithMe] = await db
+          .select({ id: itemGrants.id })
+          .from(itemGrants)
+          .where(
+            and(
+              eq(itemGrants.ownerUserId, existingUser.id),
+              eq(itemGrants.granteeUserId, userId),
+              isNull(itemGrants.revokedAt)
+            )
+          )
+          .limit(1);
+        if (!sharedWithMe) {
+          return {
+            ok: false,
+            code: "BLOCKED",
+            message: "This person only accepts connections from people they've shared with."
+          };
+        }
+      }
     }
   }
 

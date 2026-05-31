@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   index,
   pgTable,
   text,
@@ -8,6 +9,29 @@ import {
   uuid
 } from "drizzle-orm/pg-core";
 import { users } from "./auth";
+
+/**
+ * Per-user global sharing & privacy settings (Settings → Sharing & privacy).
+ * One row per user; absent row = all defaults. Every field is enforced
+ * server-side (see services/user-settings.ts consumers), not just cosmetic.
+ *   - allow_link_shares: gates creating "anyone with the link" shares.
+ *   - cooks_can_reshare: lets people you've shared an item with re-share it.
+ *   - who_can_add_you: 'anyone' | 'connections' | 'no_one' — gates inbound
+ *     connection invites for existing users.
+ *   - find_by_email: whether others can discover/auto-match you by email.
+ */
+export const userSettings = pgTable("user_settings", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  allowLinkShares: boolean("allow_link_shares").notNull().default(true),
+  cooksCanReshare: boolean("cooks_can_reshare").notNull().default(false),
+  whoCanAddYou: text("who_can_add_you").notNull().default("connections"),
+  findByEmail: boolean("find_by_email").notNull().default(true),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export type UserSettingsRow = typeof userSettings.$inferSelect;
 
 /**
  * Per-item sharing model ("Yours / Shared with you") — the engine.

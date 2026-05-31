@@ -3,6 +3,7 @@ import "server-only";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
+  canReshareItem,
   dismissTombstone,
   forkPlan,
   forkRecipe,
@@ -16,6 +17,7 @@ import {
   resolveRequest,
   revokeItem
 } from "@/services/sharing";
+import { getUserSettings, updateUserSettings } from "@/services/user-settings";
 import { protectedProcedure, rateLimit, router } from "../trpc";
 
 /**
@@ -61,6 +63,26 @@ export const sharingRouter = router({
 
   /** The viewer's sharing circle (people they can share with). */
   connections: protectedProcedure.query(({ ctx }) => listConnections(ctx.user.id)),
+
+  /** Can the viewer re-share this item (granted + owner allows reshare)? */
+  canReshare: protectedProcedure
+    .input(itemRefInput)
+    .query(({ ctx, input }) => canReshareItem(ctx.user.id, input.itemType, input.itemId)),
+
+  /** Global sharing & privacy settings (Settings). */
+  privacySettings: protectedProcedure.query(({ ctx }) => getUserSettings(ctx.user.id)),
+
+  updatePrivacySettings: protectedProcedure
+    .use(rateLimit("mutation"))
+    .input(
+      z.object({
+        allowLinkShares: z.boolean().optional(),
+        cooksCanReshare: z.boolean().optional(),
+        whoCanAddYou: z.enum(["anyone", "connections", "no_one"]).optional(),
+        findByEmail: z.boolean().optional()
+      })
+    )
+    .mutation(({ ctx, input }) => updateUserSettings(ctx.user.id, input)),
 
   /** Grantee-side: live copies others have shared with me. */
   sharedWithMe: protectedProcedure.query(({ ctx }) => listSharedWithMe(ctx.user.id)),
