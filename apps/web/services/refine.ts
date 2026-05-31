@@ -440,6 +440,25 @@ async function persistTurnAndRecompute(args: {
   const turnId = randomUUID();
   const proposed = sanitizeProposed(args.proposed);
 
+  // Diagnostic: when the model returns content that all gets dropped (e.g.
+  // steps with empty title/body), the user sees "0 changes" despite a full
+  // generation. Log the raw shape so we can tell prompt-miss from a real
+  // no-op. Structure only — no recipe content.
+  if (proposed.length < args.proposed.length) {
+    const shapes = args.proposed.map((c) => {
+      const x = c as {
+        payload?: { title?: string; body?: string } | null;
+        whereHint?: string;
+      };
+      return `${c.kind}/${c.target}[title=${Boolean(x.payload?.title?.trim())},body=${Boolean(x.payload?.body?.trim())},where=${Boolean(x.whereHint?.trim())}]`;
+    });
+    logger.warn("refine_dropped_changes", {
+      raw: args.proposed.length,
+      kept: proposed.length,
+      shapes: shapes.join(" ")
+    });
+  }
+
   await db.transaction(async (tx) => {
     await tx.insert(refineTurns).values({
       id: turnId,

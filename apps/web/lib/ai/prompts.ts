@@ -138,6 +138,20 @@ Rules:
 - Keep the proposed array under 20 entries. If the instruction is unreasonably broad, prefer the most impactful changes.
 - ids in your output should be short stable strings ("c1", "c2", …). Server will assign real ids.
 
+WRONG (do NOT do this) — a step with no title/body, content hidden in whereHint:
+  {"id": "c5", "kind": "add", "target": "step", "payload": {}, "whereHint": "sear the patties"}
+
+RIGHT — title + body filled, whereHint omitted:
+  {"id": "c5", "kind": "add", "target": "step", "payload": {"title": "Sear the patties", "time": "6 min", "body": "Heat a skillet over medium-high. Sear the patties 2–3 minutes per side until browned and cooked through.", "ingredientIds": []}}
+
+Full from-scratch example — instruction "build the recipe" on an empty "Beef Sliders":
+  {"proposed": [
+    {"id": "c1", "kind": "add", "target": "ingredient", "payload": {"name": "Ground beef", "quantityString": "500 g", "prepNote": null}},
+    {"id": "c2", "kind": "add", "target": "ingredient", "payload": {"name": "Slider buns", "quantityString": "8", "prepNote": "halved"}},
+    {"id": "c3", "kind": "add", "target": "step", "payload": {"title": "Form the patties", "time": "5 min", "body": "Divide the beef into 8 portions and press into thin patties slightly wider than the buns.", "ingredientIds": []}},
+    {"id": "c4", "kind": "add", "target": "step", "payload": {"title": "Cook and assemble", "time": "8 min", "body": "Sear the patties 2 minutes per side, then assemble each in a bun.", "ingredientIds": []}}
+  ], "rationale": "Built a basic beef sliders recipe with ingredients and steps."}
+
 Return ONLY the JSON object described above. No prose before or after.`;
 
 export const SUGGEST_FROM_TEXT_PROMPT = `The user has pasted text about a meal or recipe. Extract the following information:
