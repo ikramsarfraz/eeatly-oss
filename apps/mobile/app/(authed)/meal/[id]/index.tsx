@@ -427,6 +427,10 @@ function MealDetailBody({
     cookCount: number;
     lastCookedAt: string | Date | null;
     createdByName: string | null;
+    /** Server-authoritative: is the viewer the meal's creator? Refine (a
+     *  write surface) is creator-only — non-creators read it and can save a
+     *  copy instead. */
+    viewerIsCreator: boolean;
     effortLevel: EffortLevel | null;
     /** R18/R19 — structured rows. When non-empty, the screen prefers
      *  these over the parsed-from-prose fallback. */
@@ -503,16 +507,20 @@ function MealDetailBody({
         back
         showSettings={false}
         right={
-          <Pressable
-            hitSlop={10}
-            accessibilityRole="button"
-            accessibilityLabel="Refine recipe"
-            onPress={() =>
-              router.push(`/(authed)/meal/${meal.id}/refine` as never)
-            }
-          >
-            <Ionicons name="create-outline" size={22} color={colors.forest} />
-          </Pressable>
+          // Refine is creator-only (a write surface). Non-creators read the
+          // recipe and can save their own copy instead, so hide the entry.
+          meal.viewerIsCreator ? (
+            <Pressable
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Refine recipe"
+              onPress={() =>
+                router.push(`/(authed)/meal/${meal.id}/refine` as never)
+              }
+            >
+              <Ionicons name="create-outline" size={22} color={colors.forest} />
+            </Pressable>
+          ) : undefined
         }
       />
 

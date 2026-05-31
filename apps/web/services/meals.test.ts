@@ -105,6 +105,7 @@ describe("getMealDetail (Round 10)", () => {
         photoUrl: "https://example.com/biryani.jpg",
         recipeText: "1. rinse rice\n2. cook",
         recipeSourceUrl: null,
+        servings: "Serves 4",
         ingredients: ["1 cup basmati rice", "2 tbsp ghee"],
         notes: null,
         // R32 — sharedAt projected onto MealDetailView. Pin a fixed
@@ -158,10 +159,13 @@ describe("getMealDetail (Round 10)", () => {
       photoUrl: "https://example.com/biryani.jpg",
       recipeText: "1. rinse rice\n2. cook",
       recipeSourceUrl: null,
+      servings: "Serves 4",
       ingredients: ["1 cup basmati rice", "2 tbsp ghee"],
       notes: null,
       createdByUserId: "u-author",
       createdByName: "Ali",
+      // Caller "u-member" ≠ creator "u-author" → not the creator.
+      viewerIsCreator: false,
       cookCount: 3,
       lastCookedAt: "2026-05-10",
       createdAt: "2026-04-01T12:00:00.000Z",

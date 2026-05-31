@@ -626,6 +626,13 @@ export type MealDetailView = {
   notes: string | null;
   createdByUserId: string | null;
   createdByName: string | null;
+  /**
+   * True when the requesting user created this meal. Server-authoritative
+   * (computed from the caller's id), so clients can gate creator-only write
+   * surfaces — the Refine button, photo upload — without separately
+   * resolving the session user. Non-creators see read-only views.
+   */
+  viewerIsCreator: boolean;
   cookCount: number;
   lastCookedAt: string | null;
   createdAt: string;
@@ -798,6 +805,7 @@ export async function getMealDetail(
     notes: row.notes,
     createdByUserId: row.createdByUserId,
     createdByName: row.createdByName,
+    viewerIsCreator: row.createdByUserId === userId,
     cookCount: Number(stats?.cookCount ?? 0),
     lastCookedAt: stats?.lastCookedAt ?? null,
     createdAt: row.createdAt.toISOString(),
