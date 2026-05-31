@@ -371,7 +371,7 @@ function InviteDialog({
         {link ? (
           <div className="grid gap-3">
             <p className="text-[13px] text-muted-foreground">
-              Send them this link to connect:
+              We&apos;ve emailed them an invite. You can also share this link directly:
             </p>
             <div className="flex items-center gap-2">
               <Input readOnly value={link} className="font-mono text-[12px]" />

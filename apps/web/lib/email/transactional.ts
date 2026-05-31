@@ -8,6 +8,7 @@ import { getResendClient } from "@/lib/email/resend-client";
 import { AccountDeletedEmail } from "@/lib/email/templates/account-deleted-email";
 import { FirstMealEncouragementEmail } from "@/lib/email/templates/first-meal-encouragement-email";
 import { HouseholdInvitationEmail } from "@/lib/email/templates/household-invitation-email";
+import { ConnectionInvitationEmail } from "@/lib/email/templates/connection-invitation-email";
 import { HouseholdMemberRemovedEmail } from "@/lib/email/templates/household-member-removed-email";
 import { InactiveReminderEmail } from "@/lib/email/templates/inactive-reminder-email";
 import { WelcomeEmail } from "@/lib/email/templates/welcome-email";
@@ -21,6 +22,7 @@ export type TransactionalTemplate =
   | "inactive_reminder"
   | "weekly_recap_placeholder"
   | "household_invitation"
+  | "connection_invitation"
   | "household_member_removed"
   | "account_deleted";
 
@@ -48,6 +50,12 @@ export type DispatchTransactionalEmailInput = {
   invitation?: {
     inviterName: string;
     householdName: string;
+    inviteUrl: string;
+    expiresInDays: number;
+  };
+  /** For connection_invitation (sharing-circle invite). */
+  connectionInvitation?: {
+    inviterName: string;
     inviteUrl: string;
     expiresInDays: number;
   };
@@ -149,6 +157,21 @@ export async function dispatchTransactionalEmail(
       }
       subject = `${input.invitation.inviterName} invited you to ${input.invitation.householdName} on eeatly`;
       element = React.createElement(HouseholdInvitationEmail, input.invitation);
+      break;
+    }
+
+    case "connection_invitation": {
+      if (!input.connectionInvitation) {
+        logger.error("transactional_email_connection_invite_missing_payload", {
+          toEmail: input.toEmail
+        });
+        return { skipped: true, detail: "Connection invitation payload missing" };
+      }
+      subject = `${input.connectionInvitation.inviterName} wants to share recipes with you on eeatly`;
+      element = React.createElement(
+        ConnectionInvitationEmail,
+        input.connectionInvitation
+      );
       break;
     }
 

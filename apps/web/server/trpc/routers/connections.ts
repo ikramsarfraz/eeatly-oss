@@ -9,6 +9,7 @@ import {
   inviteConnection,
   listOwnedShareableItems
 } from "@/services/connections";
+import { dispatchTransactionalEmail } from "@/lib/email/transactional";
 import { protectedProcedure, publicProcedure, rateLimit, router } from "../trpc";
 
 /**
@@ -30,7 +31,25 @@ export const connectionsRouter = router({
   invite: protectedProcedure
     .use(rateLimit("invitation"))
     .input(z.object({ email: z.string().email().max(320) }))
-    .mutation(({ ctx, input }) => inviteConnection(ctx.user.id, input.email)),
+    .mutation(async ({ ctx, input }) => {
+      const result = await inviteConnection(ctx.user.id, input.email);
+      // Email the invite (fire-and-forget; falls back to console when
+      // Resend isn't configured). The copyable link is still returned.
+      if (result.ok) {
+        void dispatchTransactionalEmail({
+          template: "connection_invitation",
+          toEmail: input.email,
+          toName: input.email,
+          userId: ctx.user.id,
+          connectionInvitation: {
+            inviterName: ctx.user.name?.trim() || ctx.user.email.split("@")[0] || "Someone",
+            inviteUrl: result.url,
+            expiresInDays: 14
+          }
+        }).catch(() => undefined);
+      }
+      return result;
+    }),
 
   cancelInvitation: protectedProcedure
     .use(rateLimit("mutation"))
