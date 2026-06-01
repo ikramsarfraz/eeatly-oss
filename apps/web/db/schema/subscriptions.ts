@@ -35,6 +35,11 @@ export const subscriptions = pgTable(
     stripeSubscriptionId: text("stripe_subscription_id"),
     status: subscriptionStatusEnum("status").notNull(),
     priceId: text("price_id"),
+    // 'plus' | 'pro' — resolved from the Stripe price id at webhook time
+    // (services/billing.ts `tierForPriceId`). Null for unknown/legacy
+    // prices; readers treat null-with-active-status as 'plus' for
+    // back-compat with the single-tier era.
+    tier: text("tier"),
     currentPeriodStart: timestamp("current_period_start", { withTimezone: true }),
     currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
     cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),

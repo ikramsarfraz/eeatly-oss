@@ -11,10 +11,48 @@ import {
 import { logger } from "@/lib/observability/logger";
 import { getStripeClient } from "@/lib/stripe/client";
 import {
+  TOPUP_PACKS,
+  type BillingInterval,
+  type Tier,
+  type TopupPackId
+} from "@/lib/pricing";
+import { applyTierGrant, getUserTier, grantPurchasedCredits } from "@/services/ai-credits";
+import {
   stripeWebhookReceipts,
   subscriptions,
   users
 } from "@/db/schema";
+
+type ServerEnv = ReturnType<typeof getServerEnv>;
+
+/** Map a Stripe price id to a subscription tier, or null if unrecognized. */
+function tierForPriceId(env: ServerEnv, priceId: string | null): Tier | null {
+  if (!priceId) return null;
+  if (priceId === env.STRIPE_PRICE_MONTHLY || priceId === env.STRIPE_PRICE_ANNUAL) {
+    return "plus";
+  }
+  if (priceId === env.STRIPE_PRICE_PRO_MONTHLY || priceId === env.STRIPE_PRICE_PRO_ANNUAL) {
+    return "pro";
+  }
+  return null;
+}
+
+/** The recurring Stripe price id for a (tier, interval), or null if unset. */
+function priceIdForTier(
+  env: ServerEnv,
+  tier: "plus" | "pro",
+  interval: BillingInterval
+): string | null {
+  if (tier === "plus") {
+    return (interval === "monthly" ? env.STRIPE_PRICE_MONTHLY : env.STRIPE_PRICE_ANNUAL) ?? null;
+  }
+  return (interval === "monthly" ? env.STRIPE_PRICE_PRO_MONTHLY : env.STRIPE_PRICE_PRO_ANNUAL) ?? null;
+}
+
+/** The one-time Stripe price id for a top-up pack, or null if unset. */
+function priceIdForPack(env: ServerEnv, packId: TopupPackId): string | null {
+  return (packId === "small" ? env.STRIPE_PRICE_CREDITS_SMALL : env.STRIPE_PRICE_CREDITS_LARGE) ?? null;
+}
 
 /**
  * Round 6 — Stripe billing service. Public entry points:
@@ -51,6 +89,7 @@ export type SubscriptionState = {
   currentPeriodEnd: Date | null;
   cancelAtPeriodEnd: boolean;
   priceId: string | null;
+  tier: "plus" | "pro";
 };
 
 /**
@@ -77,7 +116,8 @@ export async function getSubscriptionState(args: {
   const [sub] = await db
     .select({
       cancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
-      priceId: subscriptions.priceId
+      priceId: subscriptions.priceId,
+      tier: subscriptions.tier
     })
     .from(subscriptions)
     .where(eq(subscriptions.userId, args.userId))
@@ -87,7 +127,9 @@ export async function getSubscriptionState(args: {
     status: user.status,
     currentPeriodEnd: user.currentPeriodEnd,
     cancelAtPeriodEnd: sub?.cancelAtPeriodEnd ?? false,
-    priceId: sub?.priceId ?? null
+    priceId: sub?.priceId ?? null,
+    // Null tier on an active sub = legacy single-tier era → Plus.
+    tier: sub?.tier === "pro" ? "pro" : "plus"
   };
 }
 
@@ -130,15 +172,17 @@ export async function createCheckoutSession(args: {
   userId: string;
   userEmail: string;
   userName: string;
-  priceType: "monthly" | "annual";
+  tier: "plus" | "pro";
+  interval: BillingInterval;
 }): Promise<{ url: string }> {
   const env = getServerEnv();
   if (!hasStripeEnv(env)) {
     throw new BillingNotConfiguredError();
   }
 
-  const priceId =
-    args.priceType === "monthly" ? env.STRIPE_PRICE_MONTHLY : env.STRIPE_PRICE_ANNUAL;
+  const priceId = priceIdForTier(env, args.tier, args.interval);
+  // Pro prices are optional on top of the core Stripe env — a missing one
+  // surfaces as "not configured" rather than a 500.
   if (!priceId) throw new BillingNotConfiguredError();
 
   const stripeCustomerId = await getOrCreateStripeCustomerId({
@@ -156,9 +200,9 @@ export async function createCheckoutSession(args: {
     // client_reference_id + metadata.userId give us two redundant
     // backlinks. The webhook handler reads either; one belt-and-suspenders.
     client_reference_id: args.userId,
-    metadata: { userId: args.userId },
+    metadata: { userId: args.userId, tier: args.tier },
     subscription_data: {
-      metadata: { userId: args.userId }
+      metadata: { userId: args.userId, tier: args.tier }
     },
     success_url: `${base}/settings?upgraded=true`,
     cancel_url: `${base}/pricing?canceled=true`,
@@ -171,7 +215,62 @@ export async function createCheckoutSession(args: {
   logger.info("stripe_checkout_session_created", {
     userId: args.userId,
     sessionId: session.id,
-    priceType: args.priceType
+    tier: args.tier,
+    interval: args.interval
+  });
+  return { url: session.url };
+}
+
+/**
+ * One-time Checkout (`payment` mode) for an AI-credit top-up pack. The
+ * credit amount rides in session metadata so the webhook can grant it
+ * without re-deriving from the price. Idempotency is handled downstream by
+ * `grantPurchasedCredits` (keyed on the Stripe event id).
+ */
+export async function createCreditCheckoutSession(args: {
+  userId: string;
+  userEmail: string;
+  userName: string;
+  packId: TopupPackId;
+}): Promise<{ url: string }> {
+  const env = getServerEnv();
+  if (!hasStripeEnv(env)) {
+    throw new BillingNotConfiguredError();
+  }
+  const pack = TOPUP_PACKS[args.packId];
+  const priceId = priceIdForPack(env, args.packId);
+  if (!priceId) throw new BillingNotConfiguredError();
+
+  const stripeCustomerId = await getOrCreateStripeCustomerId({
+    userId: args.userId,
+    email: args.userEmail,
+    name: args.userName
+  });
+
+  const stripe = getStripeClient();
+  const base = env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    customer: stripeCustomerId,
+    line_items: [{ price: priceId, quantity: 1 }],
+    client_reference_id: args.userId,
+    metadata: {
+      userId: args.userId,
+      kind: "credits",
+      packId: args.packId,
+      credits: String(pack.credits)
+    },
+    success_url: `${base}/settings?credits=true`,
+    cancel_url: `${base}/settings?credits=canceled`
+  });
+
+  if (!session.url) {
+    throw new Error("Stripe didn't return a checkout URL.");
+  }
+  logger.info("stripe_credit_checkout_created", {
+    userId: args.userId,
+    sessionId: session.id,
+    packId: args.packId
   });
   return { url: session.url };
 }
@@ -271,9 +370,6 @@ async function processStripeEvent(event: Stripe.Event): Promise<void> {
         });
         return;
       }
-      // Subscription fields might not be populated yet; the followup
-      // `customer.subscription.created` event carries the canonical
-      // row. Just ensure the customer link is recorded.
       const customerId =
         typeof session.customer === "string"
           ? session.customer
@@ -283,6 +379,27 @@ async function processStripeEvent(event: Stripe.Event): Promise<void> {
           .update(users)
           .set({ stripeCustomerId: customerId, updatedAt: new Date() })
           .where(eq(users.id, userId));
+      }
+
+      // One-time AI-credit purchase (`payment` mode). Grant the credits the
+      // session metadata carries — idempotent on the event id. Subscription
+      // checkouts fall through; their canonical state arrives on the
+      // `customer.subscription.created` event.
+      if (session.mode === "payment" && session.metadata?.kind === "credits") {
+        const credits = Number.parseInt(session.metadata?.credits ?? "", 10);
+        if (Number.isFinite(credits) && credits > 0) {
+          await grantPurchasedCredits({
+            userId,
+            credits,
+            stripeEventId: event.id,
+            packId: session.metadata?.packId
+          });
+        } else {
+          logger.warn("stripe_credit_checkout_bad_metadata", {
+            sessionId: session.id,
+            credits: session.metadata?.credits
+          });
+        }
       }
       return;
     }
@@ -353,6 +470,14 @@ async function upsertSubscriptionFromStripe(
   const currentPeriodEnd =
     item?.current_period_end != null ? new Date(item.current_period_end * 1000) : null;
   const priceId = item?.price?.id ?? null;
+  const env = getServerEnv();
+  // Resolve the tier from the price; keep the prior tier (legacy null → plus)
+  // when the subscription is canceled or the price is unrecognized.
+  const tier = tierForPriceId(env, priceId);
+
+  // Old tier (for the upgrade grant) — only counts while the prior sub was
+  // active/trialing; a re-subscribe from canceled is treated as free→tier.
+  const oldTier = await getUserTier(userId);
 
   // One transaction: write `subscriptions` row + denormalize to `users`.
   await db.transaction(async (tx) => {
@@ -366,6 +491,7 @@ async function upsertSubscriptionFromStripe(
         stripeSubscriptionId: sub.id,
         status,
         priceId,
+        tier,
         currentPeriodStart,
         currentPeriodEnd,
         cancelAtPeriodEnd: Boolean(sub.cancel_at_period_end),
@@ -377,6 +503,8 @@ async function upsertSubscriptionFromStripe(
           stripeSubscriptionId: sub.id,
           status,
           priceId,
+          // Keep the last known tier when the price is unrecognized (null).
+          ...(tier !== null ? { tier } : {}),
           currentPeriodStart,
           currentPeriodEnd,
           cancelAtPeriodEnd: Boolean(sub.cancel_at_period_end),
@@ -394,6 +522,13 @@ async function upsertSubscriptionFromStripe(
       })
       .where(eq(users.id, userId));
   });
+
+  // After the subscription is persisted, top up the monthly AI-credit grant
+  // when the tier increased (e.g. free→Plus on first subscribe, Plus→Pro on
+  // upgrade). No-op on downgrades, cancellations, and same-tier events.
+  const active = status === "active" || status === "trialing";
+  const newTier: Tier = active ? (tier ?? "plus") : "free";
+  await applyTierGrant({ userId, oldTier, newTier });
 }
 
 // Re-export typed errors so callers don't need to know lib/errors/billing.

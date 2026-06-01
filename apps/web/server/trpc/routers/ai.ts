@@ -24,6 +24,8 @@ import {
   suggestMealFromText
 } from "@/services/ai";
 import { getUserSettings } from "@/services/user-settings";
+import { withAiCredits } from "@/services/ai-credits";
+import { InsufficientCreditsError } from "@/lib/errors/credits";
 import {
   gatedProcedure,
   householdMemberProcedure,
@@ -121,6 +123,19 @@ function mapGateError(error: unknown): TRPCError | null {
   return null;
 }
 
+/** Out-of-credits → a typed cause the UI turns into a "buy credits / upgrade"
+ *  prompt. Must be checked before the generic AI_PROVIDER_ERROR fallback. */
+function mapCreditError(error: unknown): TRPCError | null {
+  if (error instanceof InsufficientCreditsError) {
+    return new TRPCError({
+      code: "FORBIDDEN",
+      message: error.message,
+      cause: { reason: "INSUFFICIENT_CREDITS", needed: error.needed, balance: error.balance }
+    });
+  }
+  return null;
+}
+
 export const aiRouter = router({
   /**
    * Photo: image bytes flow as base64 in JSON. The procedure passes
@@ -134,12 +149,12 @@ export const aiRouter = router({
     .mutation(async ({ ctx, input }) => {
       try {
         const { measurementSystem } = await getUserSettings(ctx.user.id);
-        return await suggestMealFromImage(
-          input.imageBase64,
-          input.mediaType,
-          measurementSystem
+        return await withAiCredits(ctx.user.id, "suggest_image", () =>
+          suggestMealFromImage(input.imageBase64, input.mediaType, measurementSystem)
         );
       } catch (error) {
+        const credit = mapCreditError(error);
+        if (credit) throw credit;
         const message = error instanceof Error ? error.message : "Unknown error.";
         if (message.toLowerCase().includes("unsupported image type")) {
           throw new TRPCError({
@@ -162,8 +177,12 @@ export const aiRouter = router({
     .mutation(async ({ ctx, input }) => {
       try {
         const { measurementSystem } = await getUserSettings(ctx.user.id);
-        return await suggestMealFromText(input.text, measurementSystem);
-      } catch {
+        return await withAiCredits(ctx.user.id, "suggest_text", () =>
+          suggestMealFromText(input.text, measurementSystem)
+        );
+      } catch (error) {
+        const credit = mapCreditError(error);
+        if (credit) throw credit;
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "We couldn't read that. Please try again.",
@@ -204,15 +223,17 @@ export const aiRouter = router({
       }
       try {
         const { measurementSystem } = await getUserSettings(ctx.user.id);
-        return await suggestMealFromAudio({
-          audioBuffer,
-          mediaType: input.mediaType,
-          fileName: input.fileName,
-          userId: ctx.user.id,
-          system: measurementSystem
-        });
+        return await withAiCredits(ctx.user.id, "suggest_voice", () =>
+          suggestMealFromAudio({
+            audioBuffer,
+            mediaType: input.mediaType,
+            fileName: input.fileName,
+            userId: ctx.user.id,
+            system: measurementSystem
+          })
+        );
       } catch (error) {
-        const mapped = mapGateError(error) ?? mapAudioError(error);
+        const mapped = mapCreditError(error) ?? mapGateError(error) ?? mapAudioError(error);
         if (mapped) throw mapped;
         logger.warn("trpc_ai_voice_failed", {
           userId: ctx.user.id,
@@ -269,13 +290,17 @@ export const aiRouter = router({
     .input(mealIdInput)
     .mutation(async ({ ctx, input }) => {
       try {
-        const ingredients = await extractIngredientsForMeal({
-          userId: ctx.user.id,
-          householdId: ctx.household.id,
-          mealId: input.mealId
-        });
+        const ingredients = await withAiCredits(ctx.user.id, "extract_ingredients", () =>
+          extractIngredientsForMeal({
+            userId: ctx.user.id,
+            householdId: ctx.household.id,
+            mealId: input.mealId
+          })
+        );
         return { ingredients };
       } catch (error) {
+        const credit = mapCreditError(error);
+        if (credit) throw credit;
         const gated = mapGateError(error);
         if (gated) throw gated;
         if (error instanceof NoRecipeTextError) {

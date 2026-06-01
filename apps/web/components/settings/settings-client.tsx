@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils";
 
 import { SettingRow } from "@/components/settings/setting-row";
 import { ThemeToggle } from "@/components/settings/theme-toggle";
+import { CreditsCard } from "@/components/settings/credits-card";
 
 const DELETE_CONFIRMATION_PHRASE = "delete my account";
 
@@ -285,6 +286,8 @@ export function SettingsClient({
               />
             </Card>
           </section>
+
+          <CreditsCard />
 
           <section id="sharing" className="grid gap-3 scroll-mt-24">
             <SectionLabel>Sharing &amp; privacy</SectionLabel>

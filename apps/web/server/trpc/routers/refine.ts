@@ -8,6 +8,8 @@ import {
   AudioTranscriptionFailedError
 } from "@/lib/errors/audio";
 import { FeatureGateDeniedError } from "@/lib/errors/gates";
+import { InsufficientCreditsError } from "@/lib/errors/credits";
+import { withAiCredits } from "@/services/ai-credits";
 import { logger } from "@/lib/observability/logger";
 import {
   sessionOnlyInputSchema,
@@ -56,6 +58,13 @@ import { protectedProcedure, rateLimit, router } from "../trpc";
  */
 
 function mapServiceError(error: unknown): never {
+  if (error instanceof InsufficientCreditsError) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: error.message,
+      cause: { reason: "INSUFFICIENT_CREDITS", needed: error.needed, balance: error.balance }
+    });
+  }
   if (error instanceof FeatureGateDeniedError) {
     throw new TRPCError({
       code: "FORBIDDEN",
@@ -176,11 +185,13 @@ export const refineRouter = router({
     .input(submitTextTurnInputSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        return await submitTextTurn({
-          userId: ctx.user.id,
-          sessionId: input.sessionId,
-          prompt: input.prompt
-        });
+        return await withAiCredits(ctx.user.id, "refine_text", () =>
+          submitTextTurn({
+            userId: ctx.user.id,
+            sessionId: input.sessionId,
+            prompt: input.prompt
+          })
+        );
       } catch (error) {
         mapServiceError(error);
       }
@@ -192,13 +203,15 @@ export const refineRouter = router({
     .mutation(async ({ ctx, input }) => {
       try {
         const buffer = Buffer.from(input.audioBase64, "base64");
-        return await submitVoiceTurn({
-          userId: ctx.user.id,
-          sessionId: input.sessionId,
-          audioBuffer: buffer,
-          mediaType: input.mediaType,
-          fileName: input.fileName
-        });
+        return await withAiCredits(ctx.user.id, "refine_voice", () =>
+          submitVoiceTurn({
+            userId: ctx.user.id,
+            sessionId: input.sessionId,
+            audioBuffer: buffer,
+            mediaType: input.mediaType,
+            fileName: input.fileName
+          })
+        );
       } catch (error) {
         mapServiceError(error);
       }
@@ -209,12 +222,14 @@ export const refineRouter = router({
     .input(submitPhotoTurnInputSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        return await submitPhotoTurn({
-          userId: ctx.user.id,
-          sessionId: input.sessionId,
-          imageBase64: input.imageBase64,
-          mediaType: input.mediaType
-        });
+        return await withAiCredits(ctx.user.id, "refine_photo", () =>
+          submitPhotoTurn({
+            userId: ctx.user.id,
+            sessionId: input.sessionId,
+            imageBase64: input.imageBase64,
+            mediaType: input.mediaType
+          })
+        );
       } catch (error) {
         mapServiceError(error);
       }

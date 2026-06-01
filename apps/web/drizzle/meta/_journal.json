@@ -253,6 +253,13 @@
       "when": 1779580810000,
       "tag": "0036_drop_meal_shared_at",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1779580811000,
+      "tag": "0037_tiers_and_credits",
+      "breakpoints": true
     }
   ]
 }

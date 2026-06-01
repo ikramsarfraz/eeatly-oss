@@ -41,6 +41,15 @@ const dbState = vi.hoisted(() => {
 
 vi.mock("@/lib/db/client", () => ({ db: dbState.chain }));
 
+// Credit-grant side effects are unit-tested in ai-credits.test; stub them
+// here so the webhook-ingest tests stay focused on subscription persistence
+// (and don't consume the FIFO db queue).
+vi.mock("@/services/ai-credits", () => ({
+  getUserTier: vi.fn(async () => "free"),
+  applyTierGrant: vi.fn(async () => undefined),
+  grantPurchasedCredits: vi.fn(async () => ({ granted: true }))
+}));
+
 // Don't load env / Stripe client at module init — neither is exercised
 // by the webhook-ingest tests (they pass pre-constructed Stripe.Event
 // shapes), but the import chain still pulls these modules.

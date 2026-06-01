@@ -36,14 +36,20 @@ export const billingRouter = router({
 
   createCheckoutSession: protectedProcedure
     .use(rateLimit("mutation"))
-    .input(z.object({ priceType: z.enum(["monthly", "annual"]) }))
+    .input(
+      z.object({
+        tier: z.enum(["plus", "pro"]).default("plus"),
+        interval: z.enum(["monthly", "annual"])
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       try {
         return await createCheckoutSession({
           userId: ctx.user.id,
           userEmail: ctx.user.email,
           userName: ctx.user.name,
-          priceType: input.priceType
+          tier: input.tier,
+          interval: input.interval
         });
       } catch (error) {
         if (error instanceof BillingNotConfiguredError) {

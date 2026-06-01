@@ -36,9 +36,12 @@ function getMealMutationLimiter(): Ratelimit {
 
 function getAiCallLimiter(): Ratelimit {
   if (!_aiCallLimiter) {
+    // Burst/abuse guard only — the real quota is AI credits (see
+    // services/ai-credits.ts). A daily cap here would block a Pro user's
+    // higher allowance, so this is a short rapid-fire window instead.
     _aiCallLimiter = new Ratelimit({
       redis: getRedis(),
-      limiter: Ratelimit.slidingWindow(20, "1 d"),
+      limiter: Ratelimit.slidingWindow(30, "5 m"),
       prefix: "rl:ai"
     });
   }

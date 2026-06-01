@@ -32,8 +32,12 @@ export default async function PricingPage() {
   const authState: React.ComponentProps<typeof PricingCard>["authState"] = !user
     ? { kind: "anonymous" }
     : isActiveSubscriber
-      ? { kind: "active_subscriber" }
+      ? { kind: "active_subscriber", tier: subscription?.tier ?? "plus" }
       : { kind: "signed_in_free" };
+
+  // Pro prices are optional on top of the core Stripe env.
+  const proConfigured =
+    billingConfigured && Boolean(env.STRIPE_PRICE_PRO_MONTHLY && env.STRIPE_PRICE_PRO_ANNUAL);
 
   // Marketing copy pulls feature descriptions from the registry so the
   // comparison stays in sync with what's actually gated. Same source the
@@ -64,12 +68,32 @@ export default async function PricingPage() {
         </p>
       </header>
 
-      <PricingCard
-        billingConfigured={billingConfigured}
-        launchMode={launchMode}
-        authState={authState}
-        features={plusFeatures}
-      />
+      <div className="grid gap-5 sm:grid-cols-2">
+        <PricingCard
+          tier="plus"
+          billingConfigured={billingConfigured}
+          launchMode={launchMode}
+          authState={authState}
+          features={plusFeatures}
+        />
+        <PricingCard
+          tier="pro"
+          billingConfigured={proConfigured}
+          launchMode={false}
+          authState={authState}
+          features={plusFeatures}
+        />
+      </div>
+
+      <section className="mt-10 grid gap-3 rounded-2xl border bg-background/60 p-6">
+        <h2 className="text-lg font-semibold tracking-normal">Out of credits? Top up anytime</h2>
+        <p className="text-sm text-muted-foreground">
+          AI features (photo / text / voice prefill, Refine, ingredient
+          extraction) run on credits. Every plan includes a monthly grant —
+          15 free, 300 on Plus, 1,500 on Pro — and you can buy one-time top-up
+          packs that never expire from <Link href={"/settings" as Route} className="text-primary underline-offset-2 hover:underline">Settings</Link>.
+        </p>
+      </section>
 
       <section className="mt-10 grid gap-3">
         <h2 className="text-lg font-semibold tracking-normal">What&apos;s on the free plan</h2>

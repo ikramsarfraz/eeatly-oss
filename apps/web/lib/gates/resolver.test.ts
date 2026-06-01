@@ -73,21 +73,21 @@ describe("can() — precedence walk", () => {
     // user-context load alone. If the resolver did a redundant query,
     // afterEach would catch it.
 
-    const allowed = await can("u-1", "ai_share_recipe");
+    const allowed = await can("u-1", "plans_create");
     expect(allowed).toBe(true);
   });
 
   it("denies a non-admin, non-beta, non-paid user against the beta_or_paid default", async () => {
     queue([{ id: "u-2", role: "root_app_user", betaCohort: null }]);
     queue([]); // override lookup → no rows
-    const allowed = await can("u-2", "ai_share_recipe");
+    const allowed = await can("u-2", "plans_create");
     expect(allowed).toBe(false);
   });
 
   it("allows beta cohort against beta_or_paid default", async () => {
     queue([{ id: "u-3", role: "root_app_user", betaCohort: "beta_2026" }]);
     queue([]); // override lookup → no rows
-    const allowed = await can("u-3", "ai_share_recipe");
+    const allowed = await can("u-3", "plans_create");
     expect(allowed).toBe(true);
   });
 
@@ -101,7 +101,7 @@ describe("can() — precedence walk", () => {
         ruleOverride: "open"
       }
     ]);
-    const allowed = await can("u-4", "ai_share_recipe");
+    const allowed = await can("u-4", "plans_create");
     expect(allowed).toBe(true);
   });
 
@@ -118,7 +118,7 @@ describe("can() — precedence walk", () => {
         ruleOverride: "paid_only"
       }
     ]);
-    const allowed = await can("u-5", "ai_share_recipe");
+    const allowed = await can("u-5", "plans_create");
     expect(allowed).toBe(false);
   });
 
@@ -131,7 +131,7 @@ describe("can() — precedence walk", () => {
       { userId: "u-6", cohort: null, ruleOverride: "paid_only" },
       { userId: null, cohort: "beta_2026", ruleOverride: "open" }
     ]);
-    const allowed = await can("u-6", "ai_share_recipe");
+    const allowed = await can("u-6", "plans_create");
     expect(allowed).toBe(false);
   });
 
@@ -141,7 +141,7 @@ describe("can() — precedence walk", () => {
     // The cohort-override pins to paid_only; user has no sub → denied,
     // even though the default rule (beta_or_paid) would have allowed via
     // the cohort.
-    const allowed = await can("u-7", "ai_share_recipe");
+    const allowed = await can("u-7", "plans_create");
     expect(allowed).toBe(false);
   });
 
@@ -165,7 +165,7 @@ describe("can() — launch promo (release v1)", () => {
     launchFreeAccess.value = true;
     queue([{ id: "u-l1", role: "root_app_user", betaCohort: null }]);
     queue([]); // override lookup → no rows
-    const allowed = await can("u-l1", "ai_share_recipe");
+    const allowed = await can("u-l1", "plans_create");
     expect(allowed).toBe(true);
   });
 
@@ -173,7 +173,7 @@ describe("can() — launch promo (release v1)", () => {
     launchFreeAccess.value = false;
     queue([{ id: "u-l2", role: "root_app_user", betaCohort: null }]);
     queue([]);
-    const allowed = await can("u-l2", "ai_share_recipe");
+    const allowed = await can("u-l2", "plans_create");
     expect(allowed).toBe(false);
   });
 
@@ -185,7 +185,7 @@ describe("can() — launch promo (release v1)", () => {
     launchFreeAccess.value = true;
     queue([{ id: "u-l3", role: "root_app_user", betaCohort: null }]);
     queue([{ userId: "u-l3", cohort: null, ruleOverride: "paid_only" }]);
-    const allowed = await can("u-l3", "ai_share_recipe");
+    const allowed = await can("u-l3", "plans_create");
     expect(allowed).toBe(false);
   });
 });
@@ -201,13 +201,13 @@ describe("can() — memoization", () => {
     // behavior — the test documents what to expect rather than
     // pretending memoization works in this harness.
     queue([{ id: "u-9", role: "platform_admin", betaCohort: null }]);
-    const first = await can("u-9", "ai_share_recipe");
+    const first = await can("u-9", "plans_create");
     expect(first).toBe(true);
 
     // Second call: queue another user lookup since cache doesn't kick
     // in here. In a real Next request the cache would dedupe.
     queue([{ id: "u-9", role: "platform_admin", betaCohort: null }]);
-    const second = await can("u-9", "ai_share_recipe");
+    const second = await can("u-9", "plans_create");
     expect(second).toBe(true);
   });
 });

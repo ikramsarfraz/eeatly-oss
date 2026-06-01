@@ -64,8 +64,16 @@ const serverEnvSchema = z.object({
   STRIPE_SECRET_KEY: optionalString,
   STRIPE_PUBLISHABLE_KEY: optionalString,
   STRIPE_WEBHOOK_SECRET: optionalString,
+  // Plus tier (the original single-tier prices — kept for back-compat).
   STRIPE_PRICE_MONTHLY: optionalString,
   STRIPE_PRICE_ANNUAL: optionalString,
+  // Pro tier (recurring). Optional on top of the core Stripe env — when
+  // unset, the Pro CTA degrades to "coming soon" while Plus still works.
+  STRIPE_PRICE_PRO_MONTHLY: optionalString,
+  STRIPE_PRICE_PRO_ANNUAL: optionalString,
+  // One-time AI-credit top-up packs (Stripe `payment`-mode prices).
+  STRIPE_PRICE_CREDITS_SMALL: optionalString,
+  STRIPE_PRICE_CREDITS_LARGE: optionalString,
   // Note: display prices are NOT env-driven — they live in `lib/pricing.ts`
   // (the single source of truth) so the marketing + pricing pages render
   // real numbers even before Stripe is configured. When you create the

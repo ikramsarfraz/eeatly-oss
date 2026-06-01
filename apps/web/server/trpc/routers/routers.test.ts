@@ -127,9 +127,24 @@ const sharesServiceMock = vi.hoisted(() => ({
 vi.mock("@/services/shares", () => sharesServiceMock);
 
 const billingServiceMock = vi.hoisted(() => ({
-  getSubscriptionState: vi.fn()
+  getSubscriptionState: vi.fn(),
+  createCheckoutSession: vi.fn(),
+  createPortalSession: vi.fn(),
+  createCreditCheckoutSession: vi.fn()
 }));
 vi.mock("@/services/billing", () => billingServiceMock);
+
+// withAiCredits is a passthrough in tests — credit metering is unit-tested
+// separately in ai-credits.test. The router-level tests only care that the
+// wrapped service is invoked.
+const aiCreditsMock = vi.hoisted(() => ({
+  withAiCredits: vi.fn(<T>(_u: string, _op: string, fn: () => Promise<T>) => fn()),
+  getCreditBalance: vi.fn(),
+  getUserTier: vi.fn(),
+  applyTierGrant: vi.fn(),
+  grantPurchasedCredits: vi.fn()
+}));
+vi.mock("@/services/ai-credits", () => aiCreditsMock);
 
 const notificationsServiceMock = vi.hoisted(() => ({
   listNotificationsForUser: vi.fn(),

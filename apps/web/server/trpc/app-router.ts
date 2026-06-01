@@ -7,6 +7,7 @@ import { analyticsRouter } from "./routers/analytics";
 import { authRouter } from "./routers/auth";
 import { billingRouter } from "./routers/billing";
 import { connectionsRouter } from "./routers/connections";
+import { creditsRouter } from "./routers/credits";
 import { dashboardRouter } from "./routers/dashboard";
 import { feedbackRouter } from "./routers/feedback";
 import { healthRouter } from "./routers/health";
@@ -37,6 +38,7 @@ export const appRouter = router({
   auth: authRouter,
   billing: billingRouter,
   connections: connectionsRouter,
+  credits: creditsRouter,
   dashboard: dashboardRouter,
   feedback: feedbackRouter,
   health: healthRouter,

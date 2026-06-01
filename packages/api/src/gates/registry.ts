@@ -20,17 +20,22 @@ import type { GateRule } from "./rules";
  * role and per-user allowlists win over everything.
  */
 export const FEATURE_REGISTRY = {
+  // AI features are OPEN — anyone can reach them. Usage is metered by AI
+  // credits (lib/pricing.ts + services/ai-credits.ts), not a paywall: free
+  // users get a small monthly grant and can buy top-ups, while Plus/Pro
+  // include larger grants. The gate stays registered so admin overrides can
+  // still force-deny a specific user/cohort.
   ai_suggest_image: {
     description: "AI: suggest meal details from a photo",
-    defaultRule: "beta_or_paid" as GateRule
+    defaultRule: "open" as GateRule
   },
   ai_suggest_text: {
     description: "AI: suggest meal details from pasted text",
-    defaultRule: "beta_or_paid" as GateRule
+    defaultRule: "open" as GateRule
   },
   ai_share_recipe: {
     description: "AI: generate a shareable recipe message",
-    defaultRule: "beta_or_paid" as GateRule
+    defaultRule: "open" as GateRule
   },
   household_create: {
     description: "Create a shared household",
@@ -54,7 +59,7 @@ export const FEATURE_REGISTRY = {
   },
   ai_suggest_voice: {
     description: "Extract recipes from voice notes",
-    defaultRule: "beta_or_paid" as GateRule
+    defaultRule: "open" as GateRule
   }
 } as const satisfies Record<string, { description: string; defaultRule: GateRule }>;
 

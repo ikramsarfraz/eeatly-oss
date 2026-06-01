@@ -8,51 +8,48 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/providers/toast-provider";
 import { trpc } from "@/lib/trpc/client";
-import { LAUNCH_BADGE, PRICING } from "@/lib/pricing";
+import { LAUNCH_BADGE, TIERS } from "@/lib/pricing";
 
 type AuthState =
   | { kind: "anonymous" }
-  | { kind: "active_subscriber" }
+  | { kind: "active_subscriber"; tier: "plus" | "pro" }
   | { kind: "signed_in_free" };
 
 type PricingCardProps = {
-  /**
-   * Stripe wired (all STRIPE_* env vars present) → the "Upgrade" CTA can
-   * fire real checkout. When false, there's no checkout to fire; the card
-   * either shows the launch promo (see `launchMode`) or a "Coming soon"
-   * placeholder.
-   */
+  /** Which paid tier this card represents. */
+  tier: "plus" | "pro";
+  /** Whether the Stripe price for THIS tier/interval is configured. */
   billingConfigured: boolean;
-  /**
-   * Release-v1 launch promo. When true, prices render struck-through with
-   * the launch badge and the CTA points everyone into the app (Plus is
-   * already unlocked) instead of checkout.
-   */
+  /** Launch promo (Plus-era) — only meaningful for the Plus card. */
   launchMode: boolean;
   authState: AuthState;
   features: string[];
 };
 
 export function PricingCard({
+  tier,
   billingConfigured,
   launchMode,
   authState,
   features
 }: PricingCardProps) {
   const { showToast } = useToast();
-  // Default to annual — better unit economics, higher LTV. The toggle
-  // is a state, not a free-floating decision, so I keep it in component.
   const [priceType, setPriceType] = React.useState<"monthly" | "annual">("annual");
   const checkoutMutation = trpc.billing.createCheckoutSession.useMutation();
   const pending = checkoutMutation.isPending;
 
-  const activePrice = priceType === "monthly" ? PRICING.monthly : PRICING.annual;
+  const tierConfig = TIERS[tier];
+  const tierName = tierConfig.name;
+  const activePrice = priceType === "monthly" ? tierConfig.monthly : tierConfig.annual;
+  // Already subscribed AT or ABOVE this card's tier?
+  const RANK = { plus: 1, pro: 2 } as const;
+  const subscribedHere =
+    authState.kind === "active_subscriber" && RANK[authState.tier] >= RANK[tier];
 
   async function handleUpgrade() {
     if (pending) return;
     try {
-      const result = await checkoutMutation.mutateAsync({ priceType });
-      // Stripe hosts the checkout — full navigation, not a fetch.
+      const result = await checkoutMutation.mutateAsync({ tier, interval: priceType });
       window.location.href = result.url;
     } catch (error) {
       showToast({
@@ -65,21 +62,30 @@ export function PricingCard({
 
   return (
     <section
-      className="grid gap-5 rounded-2xl border-2 border-primary/30 bg-background/70 p-6 shadow-sm sm:p-7"
+      className={cn(
+        "grid gap-5 rounded-2xl border-2 bg-background/70 p-6 shadow-sm sm:p-7",
+        tier === "pro" ? "border-primary" : "border-primary/30"
+      )}
       style={{ boxShadow: "var(--shadow-sm)" }}
     >
       <header className="grid gap-2">
         <div className="flex items-center gap-1.5 text-primary">
           <Sparkles className="h-4 w-4" aria-hidden />
           <span className="text-[12px] font-medium uppercase tracking-wide">
-            eeatly Plus
+            eeatly {tierName}
           </span>
+          {tier === "pro" ? (
+            <span className="rounded-full bg-primary/10 px-2 py-px text-[10px] font-semibold text-primary">
+              Most credits
+            </span>
+          ) : null}
         </div>
-        <h2 className="font-serif text-[28px] font-normal leading-tight">
-          Your family&apos;s recipe library, with AI to capture and share
+        <h2 className="font-serif text-[26px] font-normal leading-tight">
+          {tierConfig.blurb}
         </h2>
         <p className="text-sm text-muted-foreground">
-          The cooking memory keeps getting smarter the more you use it.
+          {tierConfig.monthlyCredits.toLocaleString()} AI credits / month · all
+          features unlocked.
         </p>
       </header>
 
@@ -123,7 +129,7 @@ export function PricingCard({
 
       <div className="grid gap-1">
         <div className="flex items-baseline gap-2">
-          {launchMode ? (
+          {launchMode && tier === "plus" ? (
             <>
               <span className="text-3xl font-semibold tracking-normal text-muted-foreground line-through decoration-2">
                 {activePrice.display}
@@ -131,9 +137,7 @@ export function PricingCard({
               <span className="text-3xl font-semibold tracking-normal text-primary">
                 $0
               </span>
-              <span className="text-sm font-normal text-muted-foreground">
-                today
-              </span>
+              <span className="text-sm font-normal text-muted-foreground">today</span>
             </>
           ) : (
             <div className="text-3xl font-semibold tracking-normal">
@@ -144,31 +148,29 @@ export function PricingCard({
             </div>
           )}
         </div>
-        {priceType === "annual" ? (
-          <p className="text-xs font-medium text-primary">{PRICING.annual.note}</p>
+        {priceType === "annual" && "note" in activePrice && activePrice.note ? (
+          <p className="text-xs font-medium text-primary">{activePrice.note}</p>
         ) : null}
         <p className="text-xs text-muted-foreground">
-          {launchMode
+          {launchMode && tier === "plus"
             ? LAUNCH_BADGE
             : `Billed ${priceType === "monthly" ? "monthly" : "yearly"} via Stripe. Cancel anytime.`}
         </p>
       </div>
 
-      {/* CTA varies by launch mode, then auth + billing-configured state. */}
-      {launchMode ? (
+      {/* CTA: launch promo (Plus only) → app, else auth/billing state. */}
+      {launchMode && tier === "plus" ? (
         authState.kind === "anonymous" ? (
           <Button asChild className="w-full">
             <Link href={"/sign-up" as Route}>Start free during launch</Link>
           </Button>
-        ) : authState.kind === "active_subscriber" ? (
+        ) : subscribedHere ? (
           <Button asChild variant="outline" className="w-full">
-            <Link href={"/settings" as Route}>You&apos;re on Plus — manage billing</Link>
+            <Link href={"/settings" as Route}>Manage billing</Link>
           </Button>
         ) : (
           <Button asChild className="w-full">
-            <Link href={"/dashboard" as Route}>
-              You&apos;re all set — Plus is unlocked
-            </Link>
+            <Link href={"/dashboard" as Route}>You&apos;re all set — Plus is unlocked</Link>
           </Button>
         )
       ) : !billingConfigured ? (
@@ -179,9 +181,11 @@ export function PricingCard({
         <Button asChild className="w-full">
           <Link href={"/sign-in?next=/pricing" as Route}>Sign in to upgrade</Link>
         </Button>
-      ) : authState.kind === "active_subscriber" ? (
+      ) : subscribedHere ? (
         <Button asChild variant="outline" className="w-full">
-          <Link href={"/settings" as Route}>You&apos;re on Plus — manage billing</Link>
+          <Link href={"/settings" as Route}>
+            Your plan — manage billing
+          </Link>
         </Button>
       ) : (
         <Button
@@ -189,9 +193,10 @@ export function PricingCard({
           onClick={handleUpgrade}
           disabled={pending}
           className="w-full"
+          variant={tier === "pro" ? "default" : "default"}
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          Upgrade to Plus
+          {authState.kind === "active_subscriber" ? `Switch to ${tierName}` : `Upgrade to ${tierName}`}
         </Button>
       )}
 
