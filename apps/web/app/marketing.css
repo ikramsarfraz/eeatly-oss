@@ -267,6 +267,12 @@
 .mkt section {
   padding: 88px 0;
 }
+/* Doc pages (privacy / help / pricing) lay out their own <section> blocks
+   with Tailwind spacing — opt them out of the landing page's tall 88px
+   section bands so the content isn't flung apart by huge gaps. */
+.mkt-doc section {
+  padding: 0;
+}
 
 /* ─── Hero ───────────────────────────────────────────────────── */
 .mkt .hero {

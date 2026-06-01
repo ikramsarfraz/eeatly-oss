@@ -59,7 +59,7 @@ export default async function PricingPage() {
     <main
       id="main"
       tabIndex={-1}
-      className="mx-auto max-w-3xl px-4 py-10 pb-20 sm:px-6 sm:py-12"
+      className="mkt-doc mx-auto max-w-3xl px-4 py-10 pb-20 sm:px-6 sm:py-12"
     >
       <header className="mb-8 grid gap-3">
         <Link href="/" className="flex w-fit items-center text-foreground">

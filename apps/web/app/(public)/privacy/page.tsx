@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6 lg:px-8">
+    <div className="mkt-doc mx-auto max-w-2xl px-4 py-12 sm:px-6 lg:px-8">
       <h1 className="font-serif text-[40px] font-normal" style={{ letterSpacing: "-0.02em" }}>Privacy</h1>
       <p className="mt-3 text-muted-foreground">
         eeatly is your family&apos;s food memory, and you should know exactly

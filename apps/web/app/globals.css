@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/*
+ * next-themes toggles `.dark` on <html> (attribute="class"). Make Tailwind's
+ * `dark:` variant follow that class instead of v4's default
+ * `prefers-color-scheme` media query — otherwise a user who picks Light while
+ * their OS is in Dark gets system-driven dark-mode colors on `dark:` utilities
+ * (e.g. the wordmark logo) while the class-based palette stays light.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme inline {
   /* Responsive shell breakpoints from CookLoop Responsive handoff.
      sm:600 (phablet boundary) / md:820 (sidebar↔sheet, tab bar)

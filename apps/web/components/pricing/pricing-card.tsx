@@ -80,30 +80,27 @@ export function PricingCard({
   return (
     <section
       className={cn(
-        "grid gap-5 rounded-2xl border-2 bg-background/70 p-6 shadow-sm sm:p-7",
-        tier === "pro" ? "border-primary" : "border-primary/30"
+        "flex flex-col gap-4 rounded-2xl border bg-background/70 p-6",
+        tier === "pro" ? "border-primary shadow-[var(--shadow-sm)]" : "border-border"
       )}
-      style={{ boxShadow: "var(--shadow-sm)" }}
     >
       <header className="grid gap-2">
-        <div className="flex items-center gap-1.5 text-primary">
-          <Sparkles className="h-4 w-4" aria-hidden />
-          <span className="text-[12px] font-medium uppercase tracking-wide">
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-primary">
+            <Sparkles className="h-3.5 w-3.5" aria-hidden />
             eeatly {tierName}
           </span>
           {tier === "pro" ? (
-            <span className="rounded-full bg-primary/10 px-2 py-px text-[10px] font-semibold text-primary">
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
               Most credits
             </span>
           ) : null}
         </div>
-        <h2 className="font-serif text-[26px] font-normal leading-tight">
-          {tierConfig.blurb}
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          {tierConfig.monthlyCredits.toLocaleString()} AI credits / month · all
-          features unlocked.
+        <p className="font-serif text-[24px] leading-tight text-foreground">
+          {tierConfig.monthlyCredits.toLocaleString()} AI credits
+          <span className="text-muted-foreground"> / month</span>
         </p>
+        <p className="text-[13px] text-muted-foreground">Every feature included.</p>
       </header>
 
       <div
@@ -215,14 +212,19 @@ export function PricingCard({
         </Button>
       )}
 
-      <ul className="grid gap-2">
-        {features.map((f) => (
-          <li key={f} className="flex items-start gap-2 text-sm">
-            <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-            <span className="text-foreground">{f}</span>
-          </li>
-        ))}
-      </ul>
+      <div className="mt-1 border-t border-[var(--border-soft,var(--border))] pt-4">
+        <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Everything included
+        </p>
+        <ul className="grid gap-2">
+          {features.map((f) => (
+            <li key={f} className="flex items-start gap-2 text-[13.5px]">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+              <span className="text-foreground">{f}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </section>
   );
 }
