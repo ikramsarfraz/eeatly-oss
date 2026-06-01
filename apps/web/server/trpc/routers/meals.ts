@@ -16,9 +16,7 @@ import {
   getHistoryRows,
   getHistoryStats,
   getMealDetail,
-  setMealPhoto,
-  shareMeal,
-  unshareMeal
+  setMealPhoto
 } from "@/services/meals";
 import { createNotification } from "@/services/notifications";
 import { householdMemberProcedure, rateLimit, router } from "../trpc";
@@ -165,75 +163,10 @@ export const mealsRouter = router({
     }),
 
   /**
-   * Round 32 — flip a meal between personal and shared. Creator-only
-   * at both the service and procedure layers. The service throws
-   * plain `Error` objects for "not found / wrong household / not
-   * creator"; we map those to the right TRPCError codes here so the
-   * client can branch on `cause.reason`.
-   *
-   * Idempotent on both sides:
-   *   - share() on an already-shared meal updates the timestamp.
-   *   - unshare() on an already-personal meal is a no-op.
-   *
-   * After mutation we revalidate `/dashboard`, `/history`, `/ideas`
-   * (anywhere a meal tile renders) so other members' next navigation
-   * picks up the new visibility. The home / library / plans procedures
-   * use TanStack Query invalidation client-side too — see
-   * `recipe-detail-client.tsx`.
-   */
-  share: householdMemberProcedure
-    .use(rateLimit("mutation"))
-    .input(z.object({ mealId: z.string().uuid() }))
-    .mutation(async ({ ctx, input }) => {
-      try {
-        const result = await shareMeal({
-          userId: ctx.user.id,
-          householdId: ctx.household.id,
-          mealId: input.mealId
-        });
-        revalidatePath("/dashboard");
-        revalidatePath("/history");
-        revalidatePath("/ideas");
-        revalidatePath(`/meal/${input.mealId}`);
-        logger.info("meal_shared", {
-          userId: ctx.user.id,
-          mealId: input.mealId
-        });
-        return { sharedAt: result.sharedAt.toISOString() };
-      } catch (error) {
-        throw mapMealVisibilityError(error);
-      }
-    }),
-
-  unshare: householdMemberProcedure
-    .use(rateLimit("mutation"))
-    .input(z.object({ mealId: z.string().uuid() }))
-    .mutation(async ({ ctx, input }) => {
-      try {
-        await unshareMeal({
-          userId: ctx.user.id,
-          householdId: ctx.household.id,
-          mealId: input.mealId
-        });
-        revalidatePath("/dashboard");
-        revalidatePath("/history");
-        revalidatePath("/ideas");
-        revalidatePath(`/meal/${input.mealId}`);
-        logger.info("meal_unshared", {
-          userId: ctx.user.id,
-          mealId: input.mealId
-        });
-        return { sharedAt: null };
-      } catch (error) {
-        throw mapMealVisibilityError(error);
-      }
-    }),
-
-  /**
    * Attach (or replace) a meal's own photo from a device upload. The
    * client runs the existing presign → R2 flow first, then sends the
-   * resulting public URL here. Creator-only (mirrors share/unshare); the
-   * stored `meals.photoUrl` always wins over the app-wide AI fallback.
+   * resulting public URL here. Editable by the owner + edit/admin grantees;
+   * the stored `meals.photoUrl` always wins over the app-wide AI fallback.
    */
   setPhoto: householdMemberProcedure
     .use(rateLimit("mutation"))
