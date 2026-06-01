@@ -18,7 +18,7 @@ type AuthState =
 /** Live display prices for this tier, sourced from the Stripe catalog. */
 type TierPriceDisplay = {
   monthly: { display: string } | null;
-  annual: { display: string } | null;
+  annual: { display: string; perMonthDisplay: string } | null;
 };
 
 type PricingCardProps = {
@@ -48,13 +48,16 @@ export function PricingCard({
   const tierName = tierConfig.name;
   // This tier is sellable when the catalog has at least one interval price.
   const billingConfigured = Boolean(prices.monthly || prices.annual);
-  const livePrice = priceType === "monthly" ? prices.monthly : prices.annual;
-  const suffix = priceType === "monthly" ? "/ month" : "/ year";
-  const activePrice = {
-    display: livePrice?.display ?? "—",
-    suffix,
-    note: priceType === "annual" ? "2 months free" : undefined
-  };
+  // Both intervals show a per-MONTH headline; annual just shows the (lower)
+  // effective monthly + a "billed yearly" sub-line.
+  const headline =
+    priceType === "monthly"
+      ? (prices.monthly?.display ?? "—")
+      : (prices.annual?.perMonthDisplay ?? "—");
+  const annualNote =
+    priceType === "annual" && prices.annual
+      ? `Billed ${prices.annual.display} yearly · 2 months free`
+      : null;
   // Already subscribed AT or ABOVE this card's tier?
   const RANK = { plus: 1, pro: 2 } as const;
   const subscribedHere =
@@ -146,7 +149,7 @@ export function PricingCard({
           {launchMode && tier === "plus" ? (
             <>
               <span className="text-3xl font-semibold tracking-normal text-muted-foreground line-through decoration-2">
-                {activePrice.display}
+                {headline}
               </span>
               <span className="text-3xl font-semibold tracking-normal text-primary">
                 $0
@@ -155,20 +158,18 @@ export function PricingCard({
             </>
           ) : (
             <div className="text-3xl font-semibold tracking-normal">
-              {activePrice.display}
-              <span className="ml-1 text-sm font-normal text-muted-foreground">
-                {activePrice.suffix}
-              </span>
+              {headline}
+              <span className="ml-1 text-sm font-normal text-muted-foreground">/ month</span>
             </div>
           )}
         </div>
-        {priceType === "annual" && "note" in activePrice && activePrice.note ? (
-          <p className="text-xs font-medium text-primary">{activePrice.note}</p>
+        {annualNote ? (
+          <p className="text-xs font-medium text-primary">{annualNote}</p>
         ) : null}
         <p className="text-xs text-muted-foreground">
           {launchMode && tier === "plus"
             ? LAUNCH_BADGE
-            : `Billed ${priceType === "monthly" ? "monthly" : "yearly"} via Stripe. Cancel anytime.`}
+            : "Cancel anytime from Settings."}
         </p>
       </div>
 

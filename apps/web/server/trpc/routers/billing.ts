@@ -12,7 +12,18 @@ import {
   createPortalSession,
   getSubscriptionState
 } from "@/services/billing";
+import { getStripeCatalog, perMonthDisplay } from "@/services/stripe-catalog";
+import { MONTHLY_CREDIT_GRANT } from "@/lib/pricing";
 import { protectedProcedure, rateLimit, router } from "../trpc";
+
+function tierDisplay(tp: import("@/services/stripe-catalog").TierPrices) {
+  return {
+    monthly: tp.monthly ? { display: tp.monthly.display } : null,
+    annual: tp.annual
+      ? { display: tp.annual.display, perMonthDisplay: perMonthDisplay(tp.annual) }
+      : null
+  };
+}
 
 /**
  * Round 11 — billing.
@@ -33,6 +44,21 @@ export const billingRouter = router({
   currentSubscription: protectedProcedure.query(({ ctx }) =>
     getSubscriptionState({ userId: ctx.user.id })
   ),
+
+  /** Live tier prices (from the Stripe catalog) + included monthly credits. */
+  catalog: protectedProcedure.query(async () => {
+    const catalog = await getStripeCatalog();
+    return {
+      plus: {
+        ...tierDisplay(catalog.tiers.plus),
+        monthlyCredits: MONTHLY_CREDIT_GRANT.plus
+      },
+      pro: {
+        ...tierDisplay(catalog.tiers.pro),
+        monthlyCredits: MONTHLY_CREDIT_GRANT.pro
+      }
+    };
+  }),
 
   createCheckoutSession: protectedProcedure
     .use(rateLimit("mutation"))

@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { getServerEnv, hasStripeEnv, isLaunchFreeAccess } from "@/lib/env/server";
 import { FEATURE_REGISTRY, type FeatureKey } from "@eeatly/api/gates/registry";
 import { getSubscriptionState } from "@/services/billing";
-import { getStripeCatalog } from "@/services/stripe-catalog";
+import { getStripeCatalog, perMonthDisplay } from "@/services/stripe-catalog";
 import { PricingCard } from "@/components/pricing/pricing-card";
 import "../marketing.css";
 
@@ -38,15 +38,14 @@ export default async function PricingPage() {
 
   // Live prices come from the Stripe catalog (metadata-tagged), not env.
   const catalog = await getStripeCatalog();
-  const toDisplay = (p: { display: string } | null) => (p ? { display: p.display } : null);
-  const plusPrices = {
-    monthly: toDisplay(catalog.tiers.plus.monthly),
-    annual: toDisplay(catalog.tiers.plus.annual)
-  };
-  const proPrices = {
-    monthly: toDisplay(catalog.tiers.pro.monthly),
-    annual: toDisplay(catalog.tiers.pro.annual)
-  };
+  const tierPrices = (tp: (typeof catalog.tiers)["plus"]) => ({
+    monthly: tp.monthly ? { display: tp.monthly.display } : null,
+    annual: tp.annual
+      ? { display: tp.annual.display, perMonthDisplay: perMonthDisplay(tp.annual) }
+      : null
+  });
+  const plusPrices = tierPrices(catalog.tiers.plus);
+  const proPrices = tierPrices(catalog.tiers.pro);
 
   // Marketing copy pulls feature descriptions from the registry so the
   // comparison stays in sync with what's actually gated. Same source the

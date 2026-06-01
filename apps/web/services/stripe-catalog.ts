@@ -65,6 +65,11 @@ function formatAmount(unitAmount: number, currency: string): string {
   return currency.toLowerCase() === "usd" ? `$${whole}` : `${whole} ${currency.toUpperCase()}`;
 }
 
+/** Effective per-month display for an annual price (annual ÷ 12, rounded). */
+export function perMonthDisplay(annual: CatalogPrice): string {
+  return formatAmount(Math.round(annual.unitAmount / 12), annual.currency);
+}
+
 function toCatalogPrice(priceId: string, unitAmount: number, currency: string): CatalogPrice {
   return {
     priceId,

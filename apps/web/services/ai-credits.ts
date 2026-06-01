@@ -163,18 +163,23 @@ export async function withAiCredits<T>(
   } catch (error) {
     // Refund the op cost (to the monthly bucket) so a provider failure
     // doesn't cost the user credits.
-    await db
+    const [refunded] = await db
       .update(aiCredits)
       .set({
         monthlyRemaining: sql`${aiCredits.monthlyRemaining} + ${cost}`,
         updatedAt: new Date()
       })
-      .where(eq(aiCredits.userId, userId));
+      .where(eq(aiCredits.userId, userId))
+      .returning({
+        monthlyRemaining: aiCredits.monthlyRemaining,
+        topupRemaining: aiCredits.topupRemaining
+      });
     await db.insert(aiCreditLedger).values({
       userId,
       delta: cost,
       reason: "refund",
-      operation
+      operation,
+      balanceAfter: refunded ? refunded.monthlyRemaining + refunded.topupRemaining : null
     });
     logger.info("ai_credits_refunded", {
       userId,
@@ -221,7 +226,7 @@ export async function grantPurchasedCredits(args: {
 
   // Ensure a row exists (a buyer who never used AI may have none yet), then
   // add the purchased credits to the rolling top-up bucket.
-  await db
+  const [row] = await db
     .insert(aiCredits)
     .values({ userId: args.userId, topupRemaining: args.credits, monthlyRemaining: 0 })
     .onConflictDoUpdate({
@@ -230,7 +235,18 @@ export async function grantPurchasedCredits(args: {
         topupRemaining: sql`${aiCredits.topupRemaining} + ${args.credits}`,
         updatedAt: new Date()
       }
+    })
+    .returning({
+      monthlyRemaining: aiCredits.monthlyRemaining,
+      topupRemaining: aiCredits.topupRemaining
     });
+  // Backfill the balance snapshot on the ledger row we just inserted.
+  if (row) {
+    await db
+      .update(aiCreditLedger)
+      .set({ balanceAfter: row.monthlyRemaining + row.topupRemaining })
+      .where(eq(aiCreditLedger.id, inserted[0]!.id));
+  }
 
   logger.info("ai_credits_purchased", {
     userId: args.userId,
@@ -254,7 +270,7 @@ export async function applyTierGrant(args: {
   if (TIER_RANK[args.newTier] <= TIER_RANK[args.oldTier]) return;
   const grant = MONTHLY_CREDIT_GRANT[args.newTier];
 
-  await db
+  const [row] = await db
     .insert(aiCredits)
     .values({ userId: args.userId, monthlyRemaining: grant, topupRemaining: 0 })
     .onConflictDoUpdate({
@@ -264,12 +280,17 @@ export async function applyTierGrant(args: {
         monthlyRemaining: sql`GREATEST(${aiCredits.monthlyRemaining}, ${grant})`,
         updatedAt: new Date()
       }
+    })
+    .returning({
+      monthlyRemaining: aiCredits.monthlyRemaining,
+      topupRemaining: aiCredits.topupRemaining
     });
   await db.insert(aiCreditLedger).values({
     userId: args.userId,
     delta: grant,
     reason: "monthly_grant",
-    operation: `upgrade:${args.newTier}`
+    operation: `upgrade:${args.newTier}`,
+    balanceAfter: row ? row.monthlyRemaining + row.topupRemaining : null
   });
   logger.info("ai_credits_tier_grant", {
     userId: args.userId,

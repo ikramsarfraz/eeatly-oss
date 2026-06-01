@@ -8,7 +8,6 @@ import {
   ChevronRight,
   Copy,
   Download,
-  ExternalLink,
   Link2,
   Loader2,
   Lock,
@@ -19,7 +18,6 @@ import {
   Users
 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -42,6 +40,7 @@ import { cn } from "@/lib/utils";
 import { SettingRow } from "@/components/settings/setting-row";
 import { ThemeToggle } from "@/components/settings/theme-toggle";
 import { CreditsCard } from "@/components/settings/credits-card";
+import { PlanManager } from "@/components/settings/plan-manager";
 
 const DELETE_CONFIRMATION_PHRASE = "delete my account";
 
@@ -115,14 +114,9 @@ export function SettingsClient({
   pendingInviteCount,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- see prop comment
   isOwner: _isOwner,
-  isPlus,
-  launchMode,
+  // isPlus / launchMode are now resolved live inside <PlanManager/>.
   version
 }: SettingsClientProps) {
-  // Plus features are active either through a real subscription or the
-  // launch promo. `isPaidPlus` distinguishes the two for the copy below.
-  const isPaidPlus = isPlus;
-  const hasPlus = isPlus || launchMode;
   const [active, setActive] = React.useState<SectionId>("account");
 
   // IntersectionObserver for scroll-driven active state. Each section
@@ -253,39 +247,7 @@ export function SettingsClient({
             </Card>
           </section>
 
-          <section id="plan" className="grid gap-3 scroll-mt-24">
-            <SectionLabel>Plan</SectionLabel>
-            <Card className="overflow-hidden p-0">
-              <SettingRow
-                label={hasPlus ? "Plus" : "Current plan"}
-                sub={
-                  isPaidPlus
-                    ? "All Plus features active. Manage billing on the web."
-                    : launchMode
-                      ? "All Plus features unlocked free during launch — no card required."
-                      : "Free tier — logging, library, basic plans. AI capture is gated; planning is gated."
-                }
-                suffix={
-                  <Badge variant={hasPlus ? "sage" : "ghost"}>
-                    {hasPlus ? "Plus" : "Free"}
-                  </Badge>
-                }
-              />
-              <SettingRow
-                label="See Plus features"
-                sub="AI capture across photo, voice, paste · Plan an occasion · Cook history pulled forward."
-                suffix={
-                  <Button asChild variant="outline" size="sm" className="h-9">
-                    <Link href={"/pricing" as Route}>
-                      <ExternalLink className="h-3.5 w-3.5" />
-                      Compare Plus
-                    </Link>
-                  </Button>
-                }
-                last
-              />
-            </Card>
-          </section>
+          <PlanManager />
 
           <CreditsCard />
 

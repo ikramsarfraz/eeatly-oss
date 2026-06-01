@@ -81,7 +81,8 @@ describe("getUserTier", () => {
 describe("grantPurchasedCredits", () => {
   it("credits the user and is idempotent on the Stripe event id", async () => {
     queue([{ id: "ledger-1" }]); // ledger insert returning (fresh)
-    queue(undefined); // ai_credits upsert (+credits)
+    queue([{ monthlyRemaining: 0, topupRemaining: 200 }]); // ai_credits upsert RETURNING
+    queue(undefined); // backfill ledger balance_after
     const first = await grantPurchasedCredits({
       userId: "u-1",
       credits: 200,
@@ -110,8 +111,8 @@ describe("applyTierGrant", () => {
   });
 
   it("tops up the monthly bucket on an upgrade", async () => {
-    queue(undefined); // ai_credits upsert (GREATEST)
-    queue(undefined); // ledger insert
+    queue([{ monthlyRemaining: 1500, topupRemaining: 0 }]); // ai_credits upsert RETURNING
+    queue(undefined); // ledger insert (with balance_after)
     await applyTierGrant({ userId: "u-1", oldTier: "free", newTier: "pro" });
     expect(dbState.queue.length).toBe(0);
   });
