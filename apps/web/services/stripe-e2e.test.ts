@@ -18,9 +18,11 @@ loadEnv({ path: ".env.local", override: true });
 // The catalog is synced from Stripe by Price metadata; the webhook resolves
 // tier from the price's own metadata (no env). hasStripeEnv just needs the
 // core trio — use whatever real test keys .env.local already has, else dummies.
-process.env.STRIPE_SECRET_KEY ??= "sk_test_e2e";
-process.env.STRIPE_PUBLISHABLE_KEY ??= "pk_test_e2e";
-process.env.STRIPE_WEBHOOK_SECRET ??= "whsec_e2e";
+// `||=` (not `??=`) so a present-but-empty value from .env.local still gets a
+// dummy — hasStripeEnv needs all three non-empty for the live catalog fetch.
+process.env.STRIPE_SECRET_KEY ||= "sk_test_e2e";
+process.env.STRIPE_PUBLISHABLE_KEY ||= "pk_test_e2e";
+process.env.STRIPE_WEBHOOK_SECRET ||= "whsec_e2e";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
@@ -33,6 +35,7 @@ import {
   getUserTier,
   withAiCredits
 } from "@/services/ai-credits";
+import { getStripeCatalog, __resetCatalogCache } from "@/services/stripe-catalog";
 import { InsufficientCreditsError } from "@/lib/errors/credits";
 
 const run = describe.runIf(Boolean(process.env.E2E_STRIPE));
@@ -58,6 +61,20 @@ run("Stripe integration — end to end (real DB)", () => {
   afterAll(async () => {
     // Cascades delete subscriptions / ai_credits / ai_credit_ledger.
     await db.delete(users).where(eq(users.id, USER_ID));
+  });
+
+  it("syncs the live catalog from Stripe (tiers + credit packs)", async () => {
+    __resetCatalogCache();
+    const catalog = await getStripeCatalog({ force: true });
+    // Two tiers, both intervals priced.
+    expect(catalog.tiers.plus.monthly?.amount).toBe(5);
+    expect(catalog.tiers.plus.annual?.amount).toBe(50);
+    expect(catalog.tiers.pro.monthly?.amount).toBe(12);
+    expect(catalog.tiers.pro.annual?.amount).toBe(120);
+    // Two credit packs, ordered cheapest-first.
+    expect(catalog.packs.map((p) => p.credits)).toEqual([200, 500]);
+    expect(catalog.packs[0].amount).toBe(5);
+    expect(catalog.packs[1].amount).toBe(10);
   });
 
   it("a free user starts on the free tier with the free monthly grant", async () => {
