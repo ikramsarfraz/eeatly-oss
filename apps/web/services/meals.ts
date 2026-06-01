@@ -5,7 +5,14 @@ import { db } from "@/lib/db/client";
 import { requireHouseholdMember } from "@/lib/auth/session";
 import { withSuggestions } from "@/lib/meals/rediscovery";
 import { mealVisibilityFilter } from "@/lib/meals/visibility";
-import { notifyGranteesOfUpdate } from "@/services/sharing";
+import {
+  canEditItem,
+  canManageSharing,
+  getGrantRole,
+  notifyGranteesOfUpdate,
+  requireItemEditor,
+  type ItemRole
+} from "@/services/sharing";
 import { normalizeMealName } from "@/lib/utils";
 import { mealLogInputSchema, type MealLogInput } from "@eeatly/api/validators/meals";
 import {
@@ -627,12 +634,15 @@ export type MealDetailView = {
   createdByUserId: string | null;
   createdByName: string | null;
   /**
-   * True when the requesting user created this meal. Server-authoritative
-   * (computed from the caller's id), so clients can gate creator-only write
-   * surfaces — the Refine button, photo upload — without separately
-   * resolving the session user. Non-creators see read-only views.
+   * The requesting user's effective role on this recipe — server-authoritative
+   * so clients gate write surfaces without resolving the session user:
+   *   - `viewerIsCreator`     — they own it (the only one who can delete it)
+   *   - `viewerCanEdit`       — owner / admin / editor → Refine, photo, edits
+   *   - `viewerCanManageSharing` — owner / admin → the Share sheet's role controls
    */
   viewerIsCreator: boolean;
+  viewerCanEdit: boolean;
+  viewerCanManageSharing: boolean;
   cookCount: number;
   lastCookedAt: string | null;
   createdAt: string;
@@ -716,10 +726,13 @@ export async function getMealDetail(
     // — the calling page renders `notFound()` exactly like it does
     // for cross-household IDs, so we don't leak the meal's existence
     // through error messages.
+    // Per-item: a recipe is viewable if you own it or hold a grant —
+    // independent of household. (We intentionally DON'T scope to the
+    // viewer's household here, so a recipe shared with you by a connection
+    // in another household opens in detail.)
     .where(
       and(
         eq(meals.id, mealId),
-        eq(meals.householdId, householdId),
         isNull(meals.archivedAt),
         mealVisibilityFilter(userId, householdId)
       )
@@ -727,6 +740,14 @@ export async function getMealDetail(
     .limit(1);
 
   if (!row) return null;
+
+  // Viewer's effective role drives the client's write affordances. We already
+  // have the creator from `row`, so resolve the grant role directly (one
+  // extra query only when the viewer isn't the owner).
+  const viewerRole: ItemRole | null =
+    row.createdByUserId === userId
+      ? "owner"
+      : await getGrantRole(userId, "recipe", mealId);
 
   // Cook count + last-cooked roll-up. Joined separately so the meal row
   // returns even when there are no logs (a meal can be added without
@@ -805,7 +826,9 @@ export async function getMealDetail(
     notes: row.notes,
     createdByUserId: row.createdByUserId,
     createdByName: row.createdByName,
-    viewerIsCreator: row.createdByUserId === userId,
+    viewerIsCreator: viewerRole === "owner",
+    viewerCanEdit: canEditItem(viewerRole),
+    viewerCanManageSharing: canManageSharing(viewerRole),
     cookCount: Number(stats?.cookCount ?? 0),
     lastCookedAt: stats?.lastCookedAt ?? null,
     createdAt: row.createdAt.toISOString(),
@@ -925,12 +948,11 @@ export async function unshareMeal(args: {
 }
 
 /**
- * Set (or replace) a meal's own photo from a device upload. Creator-only,
- * mirroring the share/unshare write lockdown: any member can view a shared
- * meal, but only the creator edits it. The URL is already an uploaded R2
- * object (the client ran the presign flow first), so we just persist it.
- * This `meals.photo_url` always wins over the app-wide `dish_images`
- * fallback at read time.
+ * Set (or replace) a meal's own photo from a device upload. Editable by the
+ * owner and anyone granted edit/admin (in-place edit of the shared recipe);
+ * viewers can't. The URL is already an uploaded R2 object (the client ran the
+ * presign flow first), so we just persist it. This `meals.photo_url` always
+ * wins over the app-wide `dish_images` fallback at read time.
  */
 export async function setMealPhoto(args: {
   userId: string;
@@ -938,8 +960,6 @@ export async function setMealPhoto(args: {
   mealId: string;
   photoUrl: string;
 }): Promise<{ photoUrl: string }> {
-  await requireHouseholdMember(args.userId, args.householdId);
-
   const [row] = await db
     .select({
       id: meals.id,
@@ -952,12 +972,8 @@ export async function setMealPhoto(args: {
     .limit(1);
   if (!row) throw new Error("Meal not found.");
   if (row.archivedAt) throw new Error("Meal is archived.");
-  if (row.householdId !== args.householdId) {
-    throw new Error("Meal not in this household.");
-  }
-  if (row.createdByUserId !== args.userId) {
-    throw new Error("Only the creator can change this meal's photo.");
-  }
+  // Owner + anyone granted edit/admin can change the photo (in-place edit).
+  await requireItemEditor(args.userId, "recipe", args.mealId, row.createdByUserId);
 
   await db
     .update(meals)

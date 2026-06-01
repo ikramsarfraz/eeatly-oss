@@ -69,6 +69,15 @@ function mapPlanServiceError(error: unknown): TRPCError {
       cause: { reason: "NOT_FOUND" }
     });
   }
+  // Per-item permission failures: edit/manage/owner-only checks, and the
+  // view-access guard on read sub-queries. All map to FORBIDDEN.
+  if (lower.includes("not authorized") || lower.includes("only the owner")) {
+    return new TRPCError({
+      code: "FORBIDDEN",
+      message,
+      cause: { reason: "FORBIDDEN" }
+    });
+  }
   return new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
 }
 

@@ -145,6 +145,9 @@ export type RecipeDetailMeal = {
   recipeSourceUrl: string | null;
   servings: string | null;
   ingredients: string[] | null;
+  /** Viewer's effective permissions (owner / admin / editor / viewer). */
+  viewerCanEdit: boolean;
+  viewerCanManageSharing: boolean;
   createdByUserId: string | null;
   createdByName: string | null;
   cookCount: number;
@@ -233,11 +236,13 @@ function DishHeroImage({ src, name }: { src: string; name: string }) {
 }
 
 export function RecipeDetailClient({
-  meal,
-  viewer
+  meal
 }: {
   meal: RecipeDetailMeal;
-  viewer: RecipeDetailViewer;
+  // `viewer` is still accepted for call-site compatibility but no longer
+  // read — write affordances are gated by the server-sent permission flags
+  // on `meal` (viewerCanEdit / viewerCanManageSharing).
+  viewer?: RecipeDetailViewer;
 }) {
   // Structured-prefer with legacy fallback — mirrors mobile (R19) +
   // R21's web parity. Empty structured arrays mean the meal predates
@@ -331,13 +336,11 @@ export function RecipeDetailClient({
     meal.lastCookedAt
   ]);
 
-  // R32 — derive sharing affordance state once. The viewer is the
-  // creator iff `meal.createdByUserId === viewer.currentUserId`; the
-  // affordance only renders for the creator AND only when the
-  // household has more than one member (no point sharing with nobody).
-  const isCreator =
-    meal.createdByUserId !== null &&
-    meal.createdByUserId === viewer.currentUserId;
+  // Per-item permissions (server-authoritative). `canEdit` gates write
+  // affordances (Refine, photo) for the owner + edit/admin grantees;
+  // `canManageSharing` gates the Share sheet's role controls (owner/admin).
+  const canEdit = meal.viewerCanEdit;
+  const canManageSharing = meal.viewerCanManageSharing;
 
   // Dish image. `meal.photoUrl` arrives already coalesced server-side
   // (the meal's own photo → the app-wide AI image), so a non-null value
@@ -495,11 +498,10 @@ export function RecipeDetailClient({
               compact
               className="min-h-[40px]"
             />
-            {/* Refine is a WRITE surface — only the creator can edit the
-                meal. People it's shared with read it (and can save their
-                own copy to edit). Showing this to non-creators led them to
-                a 500 from startSession's creator check. */}
-            {isCreator ? (
+            {/* Refine is a WRITE surface — owner + edit/admin grantees can
+                use it. Viewers read the recipe (and can save their own copy
+                to edit). Non-editors are hidden from it to avoid a FORBIDDEN. */}
+            {canEdit ? (
               <Button asChild variant="outline" className="min-h-[40px]">
                 <Link href={`/meal/${meal.id}/refine` as Route}>
                   <Sparkles className="h-3.5 w-3.5" />
@@ -507,10 +509,10 @@ export function RecipeDetailClient({
                 </Link>
               </Button>
             ) : null}
-            {/* Creator-only device upload. Reuses the presign → R2 flow;
-                the resulting photo becomes the meal's own image and wins
-                over the app-wide AI fallback. */}
-            {isCreator ? (
+            {/* Device photo upload — editors (owner/admin/edit) only. Reuses
+                the presign → R2 flow; the photo becomes the meal's own image
+                and wins over the app-wide AI fallback. */}
+            {canEdit ? (
               <>
                 <input
                   ref={fileInputRef}
@@ -544,7 +546,7 @@ export function RecipeDetailClient({
         itemType="recipe"
         itemId={meal.id}
         itemName={meal.name}
-        isOwner={isCreator}
+        isOwner={canManageSharing}
         ownerName={meal.createdByName}
       />
 

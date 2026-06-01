@@ -427,10 +427,11 @@ function MealDetailBody({
     cookCount: number;
     lastCookedAt: string | Date | null;
     createdByName: string | null;
-    /** Server-authoritative: is the viewer the meal's creator? Refine (a
-     *  write surface) is creator-only — non-creators read it and can save a
-     *  copy instead. */
+    /** Server-authoritative permissions. `viewerCanEdit` is true for the
+     *  owner + edit/admin grantees — Refine (a write surface) shows only for
+     *  them; viewers read the recipe and can save a copy instead. */
     viewerIsCreator: boolean;
+    viewerCanEdit: boolean;
     effortLevel: EffortLevel | null;
     /** R18/R19 — structured rows. When non-empty, the screen prefers
      *  these over the parsed-from-prose fallback. */
@@ -507,9 +508,9 @@ function MealDetailBody({
         back
         showSettings={false}
         right={
-          // Refine is creator-only (a write surface). Non-creators read the
-          // recipe and can save their own copy instead, so hide the entry.
-          meal.viewerIsCreator ? (
+          // Refine is a write surface — owner + edit/admin grantees only.
+          // Viewers read the recipe and can save their own copy instead.
+          meal.viewerCanEdit ? (
             <Pressable
               hitSlop={10}
               accessibilityRole="button"

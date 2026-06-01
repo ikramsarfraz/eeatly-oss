@@ -115,22 +115,21 @@ function mapServiceError(error: unknown): never {
         cause: { reason: "SESSION_NOT_ACTIVE" }
       });
     }
+    // Refine is a write surface — owner/admin/editor only. Viewers and
+    // non-grantees get a clean FORBIDDEN (not a 500). The recipe view also
+    // hides the Refine entry from non-editors, so this is defense-in-depth.
+    if (msg === "Not authorized to edit this item.") {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "You don't have edit access to this recipe. Ask the owner for edit access, or save a copy.",
+        cause: { reason: "NOT_EDITOR" }
+      });
+    }
     if (msg.toLowerCase().includes("not authorized")) {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: "Not authorized for this household.",
         cause: { reason: "NOT_HOUSEHOLD_MEMBER" }
-      });
-    }
-    // Refine is a write surface — only the meal's creator can edit it.
-    // Non-creators (household co-members, people it's shared with) get a
-    // clean FORBIDDEN instead of a 500. The recipe view also hides the
-    // Refine button from them, so this is defense-in-depth.
-    if (msg === "Only the creator can refine this meal.") {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "Only the recipe's owner can refine it. Save a copy to make your own changes.",
-        cause: { reason: "NOT_CREATOR" }
       });
     }
   }

@@ -116,6 +116,8 @@ describe("getMealDetail (Round 10)", () => {
         createdByName: "Ali"
       }
     ]);
+    // getGrantRole — caller is a non-owner; no grant row → viewer is a viewer.
+    queue([]);
     queue([
       {
         cookCount: 3,
@@ -164,8 +166,10 @@ describe("getMealDetail (Round 10)", () => {
       notes: null,
       createdByUserId: "u-author",
       createdByName: "Ali",
-      // Caller "u-member" ≠ creator "u-author" → not the creator.
+      // Caller "u-member" ≠ creator "u-author", no grant → read-only viewer.
       viewerIsCreator: false,
+      viewerCanEdit: false,
+      viewerCanManageSharing: false,
       cookCount: 3,
       lastCookedAt: "2026-05-10",
       createdAt: "2026-04-01T12:00:00.000Z",
@@ -212,6 +216,8 @@ describe("getMealDetail (Round 10)", () => {
         createdByName: null
       }
     ]);
+    // getGrantRole — non-owner, no grant row.
+    queue([]);
     queue([{ cookCount: 0, lastCookedAt: null }]);
     // No logs → empty effort aggregate → effortLevel: null.
     queue([] as Array<{ effortLevel: "quick" | "easy" | "medium" | "high_effort"; n: number }>);

@@ -239,6 +239,13 @@
       "when": 1779580808000,
       "tag": "0034_measurement_system",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1779580809000,
+      "tag": "0035_grant_roles",
+      "breakpoints": true
     }
   ]
 }

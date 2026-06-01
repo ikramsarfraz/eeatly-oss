@@ -57,6 +57,8 @@ export default async function MealDetailPage({ params }: PageProps) {
     recipeSourceUrl: meal.recipeSourceUrl,
     servings: meal.servings,
     ingredients: meal.ingredients,
+    viewerCanEdit: meal.viewerCanEdit,
+    viewerCanManageSharing: meal.viewerCanManageSharing,
     createdByUserId: meal.createdByUserId,
     createdByName: meal.createdByName,
     cookCount: meal.cookCount,

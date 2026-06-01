@@ -15,7 +15,8 @@ import {
   listTombstones,
   requestItem,
   resolveRequest,
-  revokeItem
+  revokeItem,
+  setGrantRole
 } from "@/services/sharing";
 import { getUserSettings, updateUserSettings } from "@/services/user-settings";
 import { protectedProcedure, rateLimit, router } from "../trpc";
@@ -94,18 +95,48 @@ export const sharingRouter = router({
   /** Active "anyone with the link" recipe shares (Settings). */
   activeShareLinks: protectedProcedure.query(({ ctx }) => listActiveShareLinks(ctx.user.id)),
 
-  /** Grant an item to a connected person (owner-only, idempotent). */
+  /** Grant an item to a connected person at a role (owner/admin, idempotent). */
   grant: protectedProcedure
     .use(rateLimit("mutation"))
-    .input(itemRefInput.extend({ granteeUserId: z.string().min(1) }))
+    .input(
+      itemRefInput.extend({
+        granteeUserId: z.string().min(1),
+        role: z.enum(["view", "edit", "admin"]).optional()
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       try {
         return await grantItem({
           ownerUserId: ctx.user.id,
           itemType: input.itemType,
           itemId: input.itemId,
-          granteeUserId: input.granteeUserId
+          granteeUserId: input.granteeUserId,
+          role: input.role
         });
+      } catch (error) {
+        throw mapError(error);
+      }
+    }),
+
+  /** Change a grantee's role on a shared item (owner/admin). */
+  setRole: protectedProcedure
+    .use(rateLimit("mutation"))
+    .input(
+      itemRefInput.extend({
+        granteeUserId: z.string().min(1),
+        role: z.enum(["view", "edit", "admin"])
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        await setGrantRole({
+          actingUserId: ctx.user.id,
+          itemType: input.itemType,
+          itemId: input.itemId,
+          granteeUserId: input.granteeUserId,
+          role: input.role
+        });
+        return { ok: true as const };
       } catch (error) {
         throw mapError(error);
       }

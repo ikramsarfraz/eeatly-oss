@@ -107,7 +107,8 @@ const EFFORT_LABEL: Record<
 
 export function PlanDetailClient({
   plan,
-  isOwner,
+  canEdit,
+  canManageSharing,
   ownerName,
   dishes,
   hiddenDishCount,
@@ -115,8 +116,14 @@ export function PlanDetailClient({
   library
 }: {
   plan: PlanDetailPlan;
-  /** Viewer owns this plan (controls the "Who can see this" strip variant). */
-  isOwner: boolean;
+  /** Viewer owns this plan. Accepted for call-site compatibility; sharing
+   *  controls now gate on `canManageSharing`. */
+  isOwner?: boolean;
+  /** Viewer can edit the plan in place (owner/admin/editor) — gates add-dish,
+   *  reorder, annotation editing. */
+  canEdit: boolean;
+  /** Viewer can manage who has access (owner/admin) — gates the share strip. */
+  canManageSharing: boolean;
   /** Plan owner's name — for the grantee (co-cook) strip variant. */
   ownerName: string | null;
   dishes: PlanDetailDish[];
@@ -312,7 +319,7 @@ export function PlanDetailClient({
         itemType="plan"
         itemId={plan.id}
         itemName={plan.name}
-        isOwner={isOwner}
+        isOwner={canManageSharing}
         ownerName={ownerName}
       />
 
@@ -338,7 +345,7 @@ export function PlanDetailClient({
             <ul className="grid divide-y divide-[var(--border-soft,var(--border))]">
               {sortedDishes.map((dish) => (
                 <li key={dish.id}>
-                  <DishRow planDishId={dish.id} dish={dish} />
+                  <DishRow planDishId={dish.id} dish={dish} canEdit={canEdit} />
                 </li>
               ))}
             </ul>
@@ -367,17 +374,20 @@ export function PlanDetailClient({
               </p>
             </div>
           ) : null}
-          <div className="flex items-center justify-center border-t border-dashed border-[var(--border-strong,var(--border))] px-[18px] py-3">
-            {/* AddDishPicker exports its own trigger button (Dialog
-                from shadcn). Rendering it inline gives us the picker
-                + the trigger in one place; the dashed-bottom row is
-                its native UX. */}
-            <AddDishPicker
-              planId={plan.id}
-              library={library}
-              existingMealIds={existingMealIds}
-            />
-          </div>
+          {/* Add-dish is an edit affordance — owner/admin/editor only. */}
+          {canEdit ? (
+            <div className="flex items-center justify-center border-t border-dashed border-[var(--border-strong,var(--border))] px-[18px] py-3">
+              {/* AddDishPicker exports its own trigger button (Dialog
+                  from shadcn). Rendering it inline gives us the picker
+                  + the trigger in one place; the dashed-bottom row is
+                  its native UX. */}
+              <AddDishPicker
+                planId={plan.id}
+                library={library}
+                existingMealIds={existingMealIds}
+              />
+            </div>
+          ) : null}
         </Card>
       </section>
 
@@ -434,10 +444,13 @@ export function PlanDetailClient({
 
 function DishRow({
   planDishId,
-  dish
+  dish,
+  canEdit
 }: {
   planDishId: string;
   dish: PlanDetailDish;
+  /** Owner/admin/editor — gates the annotation (cook's-notes) editor. */
+  canEdit: boolean;
 }) {
   const { showToast } = useToast();
   const [editingNotes, setEditingNotes] = React.useState(false);
@@ -544,15 +557,17 @@ function DishRow({
               Open recipe
             </Link>
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-9 w-9 px-0"
-            onClick={() => setEditingNotes((prev) => !prev)}
-            aria-label={editingNotes ? "Close annotation editor" : "Edit annotation"}
-          >
-            <Edit3 className="h-3.5 w-3.5" />
-          </Button>
+          {canEdit ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 w-9 px-0"
+              onClick={() => setEditingNotes((prev) => !prev)}
+              aria-label={editingNotes ? "Close annotation editor" : "Edit annotation"}
+            >
+              <Edit3 className="h-3.5 w-3.5" />
+            </Button>
+          ) : null}
         </div>
       </div>
       {dish.annotationNotes ? (

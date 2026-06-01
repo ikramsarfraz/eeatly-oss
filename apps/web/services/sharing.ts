@@ -45,6 +45,28 @@ import { logger } from "@/lib/observability/logger";
 
 export type ItemType = "recipe" | "plan";
 
+/** Grantable permission levels (what an `item_grants.role` can hold). */
+export type GrantRole = "view" | "edit" | "admin";
+/** A viewer's effective role on an item — `owner` is the implicit creator. */
+export type ItemRole = "owner" | GrantRole;
+
+const GRANT_ROLES: readonly GrantRole[] = ["view", "edit", "admin"];
+
+/** Coerce an arbitrary string (DB text column) to a GrantRole, defaulting view. */
+export function asGrantRole(value: unknown): GrantRole {
+  return GRANT_ROLES.includes(value as GrantRole) ? (value as GrantRole) : "view";
+}
+
+/** Can this effective role edit the item's content in place? */
+export function canEditItem(role: ItemRole | null): boolean {
+  return role === "owner" || role === "admin" || role === "edit";
+}
+
+/** Can this effective role manage who has access (grant/revoke/change roles)? */
+export function canManageSharing(role: ItemRole | null): boolean {
+  return role === "owner" || role === "admin";
+}
+
 type ItemRef = { ownerUserId: string; name: string; householdId: string };
 
 /** Resolve an item to its owner + display name, or null if missing/archived. */
@@ -98,14 +120,14 @@ export async function canReshareItem(
   return ownerSettings.cooksCanReshare;
 }
 
-/** True if `granteeUserId` holds an active grant for the item. */
-export async function hasGrant(
+/** The grantee's active grant role for an item, or null if not granted. */
+export async function getGrantRole(
   granteeUserId: string,
   itemType: ItemType,
   itemId: string
-): Promise<boolean> {
+): Promise<GrantRole | null> {
   const [row] = await db
-    .select({ id: itemGrants.id })
+    .select({ role: itemGrants.role })
     .from(itemGrants)
     .where(
       and(
@@ -116,7 +138,82 @@ export async function hasGrant(
       )
     )
     .limit(1);
-  return Boolean(row);
+  return row ? asGrantRole(row.role) : null;
+}
+
+/** True if `granteeUserId` holds an active grant for the item (any role). */
+export async function hasGrant(
+  granteeUserId: string,
+  itemType: ItemType,
+  itemId: string
+): Promise<boolean> {
+  return (await getGrantRole(granteeUserId, itemType, itemId)) !== null;
+}
+
+/**
+ * The viewer's EFFECTIVE role on an item: `owner` if they created it, else
+ * their active grant role, else null (no access). One query — resolves the
+ * item's owner and the viewer's grant in a single round trip per call.
+ */
+export async function getItemRole(
+  userId: string,
+  itemType: ItemType,
+  itemId: string
+): Promise<ItemRole | null> {
+  const item = await resolveItem(itemType, itemId);
+  if (!item) return null;
+  if (item.ownerUserId === userId) return "owner";
+  return getGrantRole(userId, itemType, itemId);
+}
+
+/**
+ * The viewer's effective role given an item's already-known owner — avoids a
+ * second item lookup when the caller has the row in hand. `owner` short-
+ * circuits with zero queries; otherwise one grant lookup.
+ */
+export async function resolveRole(
+  userId: string,
+  itemType: ItemType,
+  itemId: string,
+  ownerUserId: string | null
+): Promise<ItemRole | null> {
+  if (ownerUserId !== null && userId === ownerUserId) return "owner";
+  return getGrantRole(userId, itemType, itemId);
+}
+
+/**
+ * Authorize an in-place edit of a shared item. Throws the canonical
+ * not-authorized error (mapped to FORBIDDEN at the procedure boundary) when
+ * the user is neither owner, admin, nor editor. Pass the item's known owner
+ * (every write path has already loaded the row) to skip a redundant lookup.
+ */
+export async function requireItemEditor(
+  userId: string,
+  itemType: ItemType,
+  itemId: string,
+  ownerUserId: string | null
+): Promise<ItemRole> {
+  const role = await resolveRole(userId, itemType, itemId, ownerUserId);
+  if (!canEditItem(role)) {
+    throw new Error("Not authorized to edit this item.");
+  }
+  return role!;
+}
+
+/**
+ * Authorize managing an item's sharing (grant/revoke/change roles). Owner or
+ * admin only. Throws the canonical not-authorized error otherwise.
+ */
+export async function requireItemSharingManager(
+  userId: string,
+  itemType: ItemType,
+  itemId: string
+): Promise<ItemRole> {
+  const role = await getItemRole(userId, itemType, itemId);
+  if (!canManageSharing(role)) {
+    throw new Error("Not authorized to manage sharing for this item.");
+  }
+  return role!;
 }
 
 /**
@@ -221,10 +318,11 @@ export type ItemGranteeView = {
   granteeUserId: string;
   name: string | null;
   email: string;
+  role: GrantRole;
   createdAt: string;
 };
 
-/** Owner-side: who currently has access to this item. */
+/** Owner-side: who currently has access to this item + at what role. */
 export async function listGrantsForItem(args: {
   userId: string;
   itemType: ItemType;
@@ -232,8 +330,13 @@ export async function listGrantsForItem(args: {
 }): Promise<ItemGranteeView[]> {
   const item = await resolveItem(args.itemType, args.itemId);
   if (!item) throw new Error("Item not found.");
-  if (item.ownerUserId !== args.userId && !(await canReshareItem(args.userId, args.itemType, args.itemId))) {
-    throw new Error("Only the owner can view sharing for this item.");
+  // Owner, admins, and legacy re-sharers can see the access list.
+  const role: ItemRole | null =
+    args.userId === item.ownerUserId
+      ? "owner"
+      : await getGrantRole(args.userId, args.itemType, args.itemId);
+  if (!canManageSharing(role) && !(await canReshareItem(args.userId, args.itemType, args.itemId))) {
+    throw new Error("Not authorized to view sharing for this item.");
   }
 
   const rows = await db
@@ -242,6 +345,7 @@ export async function listGrantsForItem(args: {
       granteeUserId: itemGrants.granteeUserId,
       name: users.name,
       email: users.email,
+      role: itemGrants.role,
       createdAt: itemGrants.createdAt
     })
     .from(itemGrants)
@@ -260,6 +364,7 @@ export async function listGrantsForItem(args: {
     granteeUserId: r.granteeUserId,
     name: r.name,
     email: r.email,
+    role: asGrantRole(r.role),
     createdAt: r.createdAt.toISOString()
   }));
 }
@@ -269,25 +374,35 @@ export async function listGrantsForItem(args: {
  * a previously-revoked grant un-revokes the same row). Notifies the grantee.
  */
 export async function grantItem(args: {
-  /** The acting user (the owner, or a re-sharer when allowed). */
+  /** The acting user (the owner, an admin, or a re-sharer when allowed). */
   ownerUserId: string;
   itemType: ItemType;
   itemId: string;
   granteeUserId: string;
+  /** Permission to grant. Defaults to 'view' (read-only). */
+  role?: GrantRole;
 }): Promise<{ grantId: string }> {
   const granter = args.ownerUserId;
+  const requestedRole = asGrantRole(args.role ?? "view");
   const item = await resolveItem(args.itemType, args.itemId);
   if (!item) throw new Error("Item not found.");
   const realOwner = item.ownerUserId;
 
-  // Owner can always share. A non-owner can re-share only if they hold an
-  // active grant AND the owner has enabled "cooks can re-share".
-  if (granter !== realOwner) {
-    const granterHasGrant = await hasGrant(granter, args.itemType, args.itemId);
+  // Owner and admins manage sharing and can grant any role. A non-manager
+  // grantee may re-share only when the owner enabled "cooks can re-share",
+  // and only as 'view' (a viewer/editor can't hand out edit/admin power).
+  // (Role computed from the already-resolved `item` — no second lookup.)
+  const granterRole: ItemRole | null =
+    granter === realOwner
+      ? "owner"
+      : await getGrantRole(granter, args.itemType, args.itemId);
+  let role = requestedRole;
+  if (!canManageSharing(granterRole)) {
     const ownerSettings = await getUserSettings(realOwner);
-    if (!granterHasGrant || !ownerSettings.cooksCanReshare) {
-      throw new Error("Only the owner can share this item.");
+    if (granterRole === null || !ownerSettings.cooksCanReshare) {
+      throw new Error("Not authorized to manage sharing for this item.");
     }
+    role = "view";
   }
   if (args.granteeUserId === realOwner) {
     throw new Error("They already own this item.");
@@ -305,11 +420,12 @@ export async function grantItem(args: {
       // re-sharer created them.
       ownerUserId: realOwner,
       granteeUserId: args.granteeUserId,
+      role,
       revokedAt: null
     })
     .onConflictDoUpdate({
       target: [itemGrants.itemType, itemGrants.itemId, itemGrants.granteeUserId],
-      set: { revokedAt: null, ownerUserId: realOwner, createdAt: new Date() }
+      set: { revokedAt: null, ownerUserId: realOwner, role, createdAt: new Date() }
     })
     .returning({ grantId: itemGrants.id });
 
@@ -341,6 +457,7 @@ export async function grantItem(args: {
  * is preserved and referenced).
  */
 export async function revokeItem(args: {
+  /** Acting user — must be the owner or an admin grantee. */
   ownerUserId: string;
   itemType: ItemType;
   itemId: string;
@@ -348,8 +465,14 @@ export async function revokeItem(args: {
 }): Promise<void> {
   const item = await resolveItem(args.itemType, args.itemId);
   if (!item) throw new Error("Item not found.");
-  if (item.ownerUserId !== args.ownerUserId) {
-    throw new Error("Only the owner can change sharing for this item.");
+  // Owner or admin may revoke. (Param name kept as `ownerUserId` for call-site
+  // compatibility, but it's the acting user.) Role from the resolved item.
+  const actorRole: ItemRole | null =
+    args.ownerUserId === item.ownerUserId
+      ? "owner"
+      : await getGrantRole(args.ownerUserId, args.itemType, args.itemId);
+  if (!canManageSharing(actorRole)) {
+    throw new Error("Not authorized to manage sharing for this item.");
   }
 
   const [grant] = await db
@@ -371,16 +494,58 @@ export async function revokeItem(args: {
     .set({ revokedAt: new Date() })
     .where(eq(itemGrants.id, grant.id));
 
-  const ownerName = await displayName(args.ownerUserId);
+  // Tombstone is attributed to the REAL owner, not the acting admin.
+  const ownerName = await displayName(item.ownerUserId);
   await db.insert(shareTombstones).values({
     granteeUserId: args.granteeUserId,
     itemType: args.itemType,
     itemName: item.name,
-    ownerUserId: args.ownerUserId,
+    ownerUserId: item.ownerUserId,
     ownerName,
     kind: "revoked",
     savedCopyItemId: grant.savedCopyItemId ?? null
   });
+}
+
+/**
+ * Change a grantee's role (view/edit/admin) on a shared item. Owner or admin
+ * only; no-op-safe if the grant doesn't exist (throws "not found" so the UI
+ * can refresh). Can't target the owner (they have no grant row).
+ */
+export async function setGrantRole(args: {
+  actingUserId: string;
+  itemType: ItemType;
+  itemId: string;
+  granteeUserId: string;
+  role: GrantRole;
+}): Promise<void> {
+  const item = await resolveItem(args.itemType, args.itemId);
+  if (!item) throw new Error("Item not found.");
+  const actorRole: ItemRole | null =
+    args.actingUserId === item.ownerUserId
+      ? "owner"
+      : await getGrantRole(args.actingUserId, args.itemType, args.itemId);
+  if (!canManageSharing(actorRole)) {
+    throw new Error("Not authorized to manage sharing for this item.");
+  }
+  if (args.granteeUserId === item.ownerUserId) {
+    throw new Error("The owner's role can't be changed.");
+  }
+  const role = asGrantRole(args.role);
+
+  const result = await db
+    .update(itemGrants)
+    .set({ role })
+    .where(
+      and(
+        eq(itemGrants.itemType, args.itemType),
+        eq(itemGrants.itemId, args.itemId),
+        eq(itemGrants.granteeUserId, args.granteeUserId),
+        isNull(itemGrants.revokedAt)
+      )
+    )
+    .returning({ id: itemGrants.id });
+  if (result.length === 0) throw new Error("Grant not found.");
 }
 
 export type SharedWithMeItem = {

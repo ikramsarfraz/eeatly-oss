@@ -43,7 +43,10 @@ export function ShareSheet({
     { itemType, itemId },
     { enabled: open }
   );
-  const hasAccess = new Set((grantsQuery.data ?? []).map((g) => g.granteeUserId));
+  // granteeUserId → current role (absent = no access).
+  const roleByUser = new Map(
+    (grantsQuery.data ?? []).map((g) => [g.granteeUserId, g.role])
+  );
 
   const refresh = () => {
     void utils.sharing.grantsForItem.invalidate({ itemType, itemId });
@@ -53,6 +56,10 @@ export function ShareSheet({
   const grant = trpc.sharing.grant.useMutation({
     onSuccess: refresh,
     onError: (e) => showToast({ variant: "error", title: "Couldn't share", description: e.message })
+  });
+  const setRole = trpc.sharing.setRole.useMutation({
+    onSuccess: refresh,
+    onError: (e) => showToast({ variant: "error", title: "Couldn't update role", description: e.message })
   });
   const revoke = trpc.sharing.revoke.useMutation({
     onSuccess: (_d, vars) => {
@@ -67,12 +74,16 @@ export function ShareSheet({
     onError: (e) => showToast({ variant: "error", title: "Couldn't update", description: e.message })
   });
 
-  const togglePerson = (userId: string, on: boolean) => {
-    if (on) grant.mutate({ itemType, itemId, granteeUserId: userId });
-    else revoke.mutate({ itemType, itemId, granteeUserId: userId });
-  };
+  const busy = grant.isPending || revoke.isPending || setRole.isPending;
+  // Add → grant as a viewer (the safe default); they can be bumped to Edit/Admin.
+  const addPerson = (userId: string) =>
+    grant.mutate({ itemType, itemId, granteeUserId: userId, role: "view" });
+  const removePerson = (userId: string) =>
+    revoke.mutate({ itemType, itemId, granteeUserId: userId });
+  const changeRole = (userId: string, role: "view" | "edit" | "admin") =>
+    setRole.mutate({ itemType, itemId, granteeUserId: userId, role });
 
-  const sharedCount = hasAccess.size;
+  const sharedCount = roleByUser.size;
   const people = peopleQuery.data ?? [];
 
   return (
@@ -106,50 +117,64 @@ export function ShareSheet({
             ) : (
               <ul className="grid gap-1">
                 {people.map((p) => {
-                  const on = hasAccess.has(p.userId);
+                  const role = roleByUser.get(p.userId);
+                  const on = role !== undefined;
                   const label = p.name?.trim() || p.email;
                   return (
-                    <li key={p.userId}>
-                      <button
-                        type="button"
-                        disabled={grant.isPending || revoke.isPending}
-                        onClick={() => togglePerson(p.userId, !on)}
-                        className={cn(
-                          "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors",
-                          on
-                            ? "bg-[color:var(--sage-soft)]"
-                            : "hover:bg-[var(--surface-2)]"
-                        )}
-                      >
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] font-serif text-[15px] text-foreground">
-                          {(label[0] ?? "?").toUpperCase()}
+                    <li
+                      key={p.userId}
+                      className={cn(
+                        "flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors",
+                        on ? "bg-[color:var(--sage-soft)]" : "hover:bg-[var(--surface-2)]"
+                      )}
+                    >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] font-serif text-[15px] text-foreground">
+                        {(label[0] ?? "?").toUpperCase()}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[14px] font-medium text-foreground">
+                          {label}
                         </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="flex items-center gap-2">
-                            <span className="truncate text-[14px] font-medium text-foreground">
-                              {label}
-                            </span>
-                            {on ? (
-                              <span className="rounded-full bg-[color:var(--primary)] px-1.5 py-0.5 text-[9.5px] font-semibold uppercase text-[color:var(--primary-foreground)]">
-                                Has access
-                              </span>
-                            ) : null}
-                          </span>
-                          <span className="block truncate font-mono text-[11px] text-muted-foreground">
-                            {p.email}
-                          </span>
+                        <span className="block truncate font-mono text-[11px] text-muted-foreground">
+                          {p.email}
                         </span>
-                        <span
-                          className={cn(
-                            "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border",
-                            on
-                              ? "border-[color:var(--primary)] bg-[color:var(--primary)] text-[color:var(--primary-foreground)]"
-                              : "border-[var(--border-strong,var(--border))] text-transparent"
-                          )}
+                      </span>
+                      {on ? (
+                        <div className="flex shrink-0 items-center gap-2">
+                          <select
+                            aria-label={`${label}'s access level`}
+                            value={role}
+                            disabled={busy}
+                            onChange={(e) =>
+                              changeRole(p.userId, e.target.value as "view" | "edit" | "admin")
+                            }
+                            className="rounded-[8px] border bg-[var(--surface)] px-2 py-1 text-[12.5px] font-medium text-foreground"
+                          >
+                            <option value="view">Can view</option>
+                            <option value="edit">Can edit</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => removePerson(p.userId)}
+                            className="font-mono text-[10.5px] uppercase text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                            style={{ letterSpacing: "0.1em" }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => addPerson(p.userId)}
+                          className="flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--border-strong,var(--border))] px-3 py-1.5 text-[12.5px] font-medium text-foreground transition-colors hover:bg-[var(--surface-2)]"
                         >
                           <Check className="h-3.5 w-3.5" />
-                        </span>
-                      </button>
+                          Add
+                        </button>
+                      )}
                     </li>
                   );
                 })}
@@ -161,8 +186,9 @@ export function ShareSheet({
             <RefreshCw className="mt-0.5 h-4 w-4 shrink-0" />
             <p>
               People you add get a <strong>live copy</strong> in their &ldquo;Shared with you.&rdquo;
-              When you edit <strong>{itemName}</strong>, their copy updates too — and they can&apos;t
-              change yours. To make it their own, they save a copy.
+              <strong> Can view</strong> is read-only; <strong>Can edit</strong> lets them change{" "}
+              <strong>{itemName}</strong> in place; <strong>Admin</strong> can also manage who else
+              has access. Only you can delete it.
             </p>
           </div>
 

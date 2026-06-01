@@ -314,22 +314,25 @@ describe("extractIngredientsForMeal (Round 10)", () => {
     ]);
   });
 
-  it("rejects non-members BEFORE the gate or meal lookup runs", async () => {
-    sessionMock.requireHouseholdMember.mockRejectedValueOnce(
-      new Error("Not authorized for this household.")
-    );
+  it("rejects a view-only grantee (no edit access) with NoRecipeTextError", async () => {
+    queue([
+      {
+        id: "m-1",
+        recipeText: "1 cup rice. Cook.",
+        createdByUserId: "u-creator"
+      }
+    ]);
+    queue([{ role: "view" }]); // getGrantRole → view-only, can't extract/overwrite
 
     await expect(
       extractIngredientsForMeal({
-        userId: "u-stranger",
-        householdId: "h-other",
+        userId: "u-viewer",
+        householdId: "h-a",
         mealId: "m-1"
       })
-    ).rejects.toThrow(/Not authorized/);
+    ).rejects.toBeInstanceOf(NoRecipeTextError);
 
-    expect(gateMock.requireFeatureAccess).not.toHaveBeenCalled();
     expect(openaiMock.extractIngredientsFromText).not.toHaveBeenCalled();
-    expect(dbState.queue).toHaveLength(0);
   });
 
   it("rejects on a denied feature gate BEFORE touching the AI provider", async () => {
@@ -384,15 +387,15 @@ describe("extractIngredientsForMeal (Round 10)", () => {
     expect(openaiMock.extractIngredientsFromText).not.toHaveBeenCalled();
   });
 
-  it("R32 — rejects when the caller isn't the meal's creator", async () => {
+  it("rejects when the caller has no access to the meal", async () => {
     queue([
       {
         id: "m-1",
         recipeText: "1 cup rice. Cook.",
-        createdByUserId: "u-creator",
-        sharedAt: new Date("2026-04-01")
+        createdByUserId: "u-creator"
       }
     ]);
+    queue([]); // getGrantRole → no grant at all
 
     await expect(
       extractIngredientsForMeal({

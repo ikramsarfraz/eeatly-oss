@@ -17,8 +17,13 @@ import {
 } from "@/db/schema";
 import {
   accessibleRecipeIds,
-  hasGrant,
-  notifyGranteesOfUpdate
+  canEditItem,
+  canManageSharing,
+  getGrantRole,
+  notifyGranteesOfUpdate,
+  requireItemEditor,
+  resolveRole,
+  type ItemRole
 } from "@/services/sharing";
 
 /**
@@ -62,6 +67,10 @@ export type PlanWithDishes = PlanRow & {
   dishes: PlanDishWithMeal[];
   /** The plan owner's display name (for the grantee "Shared by X" strip). */
   ownerName: string | null;
+  /** Viewer's effective permissions on this plan (server-authoritative). */
+  viewerIsOwner: boolean;
+  viewerCanEdit: boolean;
+  viewerCanManageSharing: boolean;
   /**
    * Round 32 — count of dishes filtered out because the underlying
    * meal is another member's personal recipe. The Plan Detail UI
@@ -126,10 +135,11 @@ export async function getPlan(args: { planId: string; userId: string }): Promise
   // a member of the creator's household can't see a plan they weren't
   // explicitly granted.
   const isOwner = plan.createdByUserId === args.userId;
-  const hasPlanGrant = !isOwner && (await hasGrant(args.userId, "plan", args.planId));
-  if (!isOwner && !hasPlanGrant) {
+  const grantRole = isOwner ? null : await getGrantRole(args.userId, "plan", args.planId);
+  if (!isOwner && grantRole === null) {
     throw new Error("Not authorized for this plan.");
   }
+  const viewerRole: ItemRole = isOwner ? "owner" : grantRole!;
 
   // LEFT JOIN users via addedByUserId so a deleted member doesn't drop
   // the dish from the plan (matches the Round 4.7 attribution contract).
@@ -213,7 +223,15 @@ export async function getPlan(args: { planId: string; userId: string }): Promise
 
   // `hiddenDishCount` retained for the response shape; locked dishes are
   // now surfaced inline rather than hidden, so it's always 0.
-  return { ...plan, dishes, ownerName: owner?.name ?? null, hiddenDishCount: 0 };
+  return {
+    ...plan,
+    dishes,
+    ownerName: owner?.name ?? null,
+    hiddenDishCount: 0,
+    viewerIsOwner: isOwner,
+    viewerCanEdit: canEditItem(viewerRole),
+    viewerCanManageSharing: canManageSharing(viewerRole)
+  };
 }
 
 export type ListPlansArgs = {
@@ -271,7 +289,7 @@ export type UpdatePlanArgs = {
 
 export async function updatePlan(args: UpdatePlanArgs): Promise<PlanRow> {
   const plan = await loadPlanOrThrow(args.planId);
-  await requireHouseholdMember(args.userId, plan.householdId);
+  await requireItemEditor(args.userId, "plan", plan.id, plan.createdByUserId);
 
   const set: Record<string, unknown> = { updatedAt: new Date() };
   if (args.patch.name !== undefined) set.name = args.patch.name;
@@ -290,7 +308,10 @@ export async function updatePlan(args: UpdatePlanArgs): Promise<PlanRow> {
 
 export async function archivePlan(args: { planId: string; userId: string }): Promise<void> {
   const plan = await loadPlanOrThrow(args.planId);
-  await requireHouseholdMember(args.userId, plan.householdId);
+  // Archiving is delete-adjacent — owner only (editors/admins can't delete).
+  if (plan.createdByUserId !== args.userId) {
+    throw new Error("Only the owner can archive this plan.");
+  }
 
   await db
     .update(plans)
@@ -301,7 +322,9 @@ export async function archivePlan(args: { planId: string; userId: string }): Pro
 
 export async function unarchivePlan(args: { planId: string; userId: string }): Promise<void> {
   const plan = await loadPlanOrThrow(args.planId);
-  await requireHouseholdMember(args.userId, plan.householdId);
+  if (plan.createdByUserId !== args.userId) {
+    throw new Error("Only the owner can restore this plan.");
+  }
 
   await db
     .update(plans)
@@ -325,7 +348,7 @@ export async function addDishToPlan(args: {
   mealId: string;
 }): Promise<typeof planDishes.$inferSelect> {
   const plan = await loadPlanOrThrow(args.planId);
-  await requireHouseholdMember(args.userId, plan.householdId);
+  await requireItemEditor(args.userId, "plan", plan.id, plan.createdByUserId);
 
   const [meal] = await db
     .select({
@@ -420,7 +443,7 @@ export async function removeDishFromPlan(args: {
   planDishId: string;
 }): Promise<void> {
   const plan = await loadPlanOrThrow(args.planId);
-  await requireHouseholdMember(args.userId, plan.householdId);
+  await requireItemEditor(args.userId, "plan", plan.id, plan.createdByUserId);
 
   const [deleted] = await db
     .delete(planDishes)
@@ -446,7 +469,7 @@ export async function reorderDishes(args: {
   dishIdsInOrder: string[];
 }): Promise<void> {
   const plan = await loadPlanOrThrow(args.planId);
-  await requireHouseholdMember(args.userId, plan.householdId);
+  await requireItemEditor(args.userId, "plan", plan.id, plan.createdByUserId);
 
   await db.transaction(async (tx) => {
     for (let i = 0; i < args.dishIdsInOrder.length; i++) {
@@ -488,7 +511,7 @@ export async function updateDishAnnotation(
     .limit(1);
   if (!dish) throw new Error("Plan dish not found.");
   const plan = await loadPlanOrThrow(dish.planId);
-  await requireHouseholdMember(args.userId, plan.householdId);
+  await requireItemEditor(args.userId, "plan", plan.id, plan.createdByUserId);
 
   const set: Record<string, unknown> = { updatedAt: new Date() };
   if (args.patch.actualEffort !== undefined) set.actualEffort = args.patch.actualEffort;
@@ -538,7 +561,11 @@ export async function clonePlanFromPast(args: {
   newScheduledDate: string;
 }): Promise<ClonePlanResult> {
   const source = await loadPlanOrThrow(args.sourcePlanId);
-  await requireHouseholdMember(args.userId, source.householdId);
+  // Cloning makes a NEW plan you own; you just need to be able to VIEW the
+  // source (own it or hold any grant).
+  if ((await resolveRole(args.userId, "plan", source.id, source.createdByUserId)) === null) {
+    throw new Error("Not authorized for this plan.");
+  }
   await requireFeatureAccess(args.userId, "plans_clone");
 
   return db.transaction(async (tx) => {
@@ -647,7 +674,10 @@ export async function getPlanEffortAggregate(args: {
   userId: string;
 }): Promise<PlanEffortAggregate> {
   const plan = await loadPlanOrThrow(args.planId);
-  await requireHouseholdMember(args.userId, plan.householdId);
+  // Read sub-view of a plan you're viewing — any access (own/grant) suffices.
+  if ((await resolveRole(args.userId, "plan", plan.id, plan.createdByUserId)) === null) {
+    throw new Error("Not authorized for this plan.");
+  }
 
   // Pull every dish on the plan + its current annotation effort, in
   // one query. The most-recent-log lookup is a correlated subquery so
@@ -724,7 +754,9 @@ export async function getPlanAnnotationsByMealId(args: {
   userId: string;
 }): Promise<PreviousAnnotationsMap> {
   const plan = await loadPlanOrThrow(args.planId);
-  await requireHouseholdMember(args.userId, plan.householdId);
+  if ((await resolveRole(args.userId, "plan", plan.id, plan.createdByUserId)) === null) {
+    throw new Error("Not authorized for this plan.");
+  }
 
   const rows = await db
     .select({

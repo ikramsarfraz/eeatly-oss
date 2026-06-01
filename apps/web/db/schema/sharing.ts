@@ -61,11 +61,20 @@ export type UserSettingsRow = typeof userSettings.$inferSelect;
 //   'recipe' → meals.id   ·   'plan' → plans.id
 
 /**
- * A live, read-only grant of one item to one person. Creating a grant is
- * how an owner shares; the grantee then sees a live copy under "Shared
- * with you". Soft-revoked via `revoked_at` (which also spawns a
- * tombstone). `saved_copy_item_id` records that the grantee forked the
- * item into their own library (dedup: never re-fork the same grant).
+ * A live grant of one item to one person. Creating a grant is how an owner
+ * shares; the grantee then sees a live copy under "Shared with you".
+ * Soft-revoked via `revoked_at` (which also spawns a tombstone).
+ * `saved_copy_item_id` records that the grantee forked the item into their
+ * own library (dedup: never re-fork the same grant).
+ *
+ * `role` is the grantee's permission level on the SHARED original:
+ *   - 'view'  — read-only (the default; a grantee edits by forking a copy)
+ *   - 'edit'  — can edit the owner's item in place (Refine, photos,
+ *               ingredients, plan dishes, rename) but can't manage sharing
+ *   - 'admin' — everything 'edit' can, plus manage who has access
+ *               (grant/revoke/change roles). The OWNER stays the only one
+ *               who can delete/archive the item.
+ * The creator is the implicit 'owner' and never has a grant row.
  */
 export const itemGrants = pgTable(
   "item_grants",
@@ -79,6 +88,9 @@ export const itemGrants = pgTable(
     granteeUserId: text("grantee_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    // Permission level on the shared original. 'view' | 'edit' | 'admin'.
+    // Defaults to 'view' so a bare share stays read-only.
+    role: text("role").notNull().default("view"),
     // The grantee's forked copy, if they saved one. Points at a new
     // `meals`/`plans` row they own; null until they save a copy.
     savedCopyItemId: uuid("saved_copy_item_id"),

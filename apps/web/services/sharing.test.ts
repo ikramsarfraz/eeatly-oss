@@ -57,7 +57,13 @@ vi.mock("@/services/user-settings", () => ({
   }))
 }));
 
-import { grantItem, revokeItem } from "./sharing";
+import {
+  canEditItem,
+  canManageSharing,
+  grantItem,
+  revokeItem,
+  setGrantRole
+} from "./sharing";
 
 function queue<T>(value: T) {
   dbState.queue.push(async () => value);
@@ -78,9 +84,9 @@ const itemRow = (ownerUserId: string) => [
 ];
 
 describe("grantItem", () => {
-  it("rejects when the caller is not the item owner", async () => {
+  it("rejects when the caller is not the item owner (or an admin)", async () => {
     queue(itemRow("owner-x")); // resolveItem
-    queue([]); // hasGrant lookup → no grant (so the reshare path is denied)
+    queue([]); // getGrantRole lookup → no grant (so the reshare path is denied)
     await expect(
       grantItem({
         ownerUserId: "not-owner",
@@ -88,7 +94,7 @@ describe("grantItem", () => {
         itemId: "11111111-1111-4111-8111-111111111111",
         granteeUserId: "grantee-1"
       })
-    ).rejects.toThrow(/only the owner/i);
+    ).rejects.toThrow(/not authorized to manage sharing/i);
   });
 
   it("rejects granting to someone outside the sharing circle", async () => {
@@ -114,6 +120,72 @@ describe("grantItem", () => {
         granteeUserId: "me"
       })
     ).rejects.toThrow(/already own/i);
+  });
+});
+
+describe("grant roles", () => {
+  it("canEditItem / canManageSharing encode the role matrix", () => {
+    expect(canEditItem("owner")).toBe(true);
+    expect(canEditItem("admin")).toBe(true);
+    expect(canEditItem("edit")).toBe(true);
+    expect(canEditItem("view")).toBe(false);
+    expect(canEditItem(null)).toBe(false);
+
+    expect(canManageSharing("owner")).toBe(true);
+    expect(canManageSharing("admin")).toBe(true);
+    expect(canManageSharing("edit")).toBe(false);
+    expect(canManageSharing("view")).toBe(false);
+    expect(canManageSharing(null)).toBe(false);
+  });
+
+  it("grantItem persists the requested role when the owner shares", async () => {
+    queue(itemRow("me")); // resolveItem (owner = me, so no grant lookup)
+    queue([{ id: "c-1" }]); // areConnected → connected
+    queue([{ grantId: "g-new" }]); // insert ... returning
+    queue([{ name: "Me", email: "me@example.com" }]); // displayName (notification)
+
+    const result = await grantItem({
+      ownerUserId: "me",
+      itemType: "recipe",
+      itemId: "11111111-1111-4111-8111-111111111111",
+      granteeUserId: "friend",
+      role: "edit"
+    });
+
+    expect(result).toEqual({ grantId: "g-new" });
+    expect(dbState.queue.length).toBe(0);
+  });
+
+  it("setGrantRole rejects a non-manager (editor can't change roles)", async () => {
+    queue(itemRow("owner-x")); // resolveItem (owner is someone else)
+    queue([{ role: "edit" }]); // getGrantRole(actor) → editor, not a manager
+
+    await expect(
+      setGrantRole({
+        actingUserId: "an-editor",
+        itemType: "recipe",
+        itemId: "11111111-1111-4111-8111-111111111111",
+        granteeUserId: "friend",
+        role: "admin"
+      })
+    ).rejects.toThrow(/not authorized to manage sharing/i);
+  });
+
+  it("setGrantRole updates the grant when an admin acts", async () => {
+    queue(itemRow("owner-x")); // resolveItem
+    queue([{ role: "admin" }]); // getGrantRole(actor) → admin → may manage
+    queue([{ id: "g-1" }]); // update ... returning (grant found)
+
+    await expect(
+      setGrantRole({
+        actingUserId: "an-admin",
+        itemType: "recipe",
+        itemId: "11111111-1111-4111-8111-111111111111",
+        granteeUserId: "friend",
+        role: "edit"
+      })
+    ).resolves.toBeUndefined();
+    expect(dbState.queue.length).toBe(0);
   });
 });
 

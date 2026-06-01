@@ -54,7 +54,9 @@ export default async function PlanDetailPage(props: {
         notes: plan.notes,
         archivedAt: plan.archivedAt
       }}
-      isOwner={plan.createdByUserId === user.id}
+      isOwner={plan.viewerIsOwner}
+      canEdit={plan.viewerCanEdit}
+      canManageSharing={plan.viewerCanManageSharing}
       ownerName={plan.ownerName}
       dishes={plan.dishes.map((d) => ({
         id: d.id,

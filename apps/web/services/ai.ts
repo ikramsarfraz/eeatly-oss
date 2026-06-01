@@ -7,6 +7,7 @@ import * as anthropic from "@/lib/ai/providers/anthropic";
 import * as openai from "@/lib/ai/providers/openai";
 import { households, mealLogs, meals } from "@/db/schema";
 import { generateDishImageForName } from "@/services/dish-images";
+import { canEditItem, getGrantRole } from "@/services/sharing";
 import { mealVisibilityFilter } from "@/lib/meals/visibility";
 import { requireHouseholdMember } from "@/lib/auth/session";
 import {
@@ -155,37 +156,31 @@ export async function extractIngredientsForMeal(args: {
   householdId: string;
   mealId: string;
 }): Promise<string[]> {
-  await requireHouseholdMember(args.userId, args.householdId);
   await requireFeatureAccess(args.userId, "ai_suggest_text");
 
-  // R32 — this is a write path (overwrites meal.ingredients) so it
-  // gates on creator-only via the visibility predicate's stricter
-  // check below. The lookup pulls createdByUserId so we can verify the
-  // caller is the creator after the read. Other surfacings (recipe
-  // detail with no recipe text → "extract ingredients" CTA) only
-  // render for the creator anyway, so this is defense-in-depth.
+  // Write path (overwrites meal.ingredients): editable by the owner and
+  // anyone granted edit/admin. We surface every non-editable case — missing,
+  // archived, no access — as the same NoRecipeTextError so nothing leaks.
   const [mealRow] = await db
     .select({
       id: meals.id,
       recipeText: meals.recipeText,
-      createdByUserId: meals.createdByUserId,
-      sharedAt: meals.sharedAt
+      createdByUserId: meals.createdByUserId
     })
     .from(meals)
-    .where(
-      and(eq(meals.id, args.mealId), eq(meals.householdId, args.householdId), isNull(meals.archivedAt))
-    )
+    .where(and(eq(meals.id, args.mealId), isNull(meals.archivedAt)))
     .limit(1);
 
   if (!mealRow) {
-    // Treat missing/archived/cross-household the same way as the page
-    // does — 404 surface, no leakage about WHY.
     throw new NoRecipeTextError();
   }
-  if (mealRow.createdByUserId !== args.userId) {
-    // R32 edit-path lockdown — only the creator can extract /
-    // overwrite ingredients on their meal. Other members can read it
-    // (if shared) but the write surface is creator-only.
+  // Editable by owner + edit/admin grantees. We have the creator from the
+  // row, so resolve the grant role directly (one extra query for non-owners).
+  const role =
+    mealRow.createdByUserId === args.userId
+      ? "owner"
+      : await getGrantRole(args.userId, "recipe", args.mealId);
+  if (!canEditItem(role)) {
     throw new NoRecipeTextError();
   }
 

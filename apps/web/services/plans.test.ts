@@ -342,11 +342,10 @@ describe("clonePlanFromPast", () => {
     expect(result.previousAnnotations["m-salad"]).toBeUndefined();
   });
 
-  it("rejects when the caller isn't a member of the source plan's household", async () => {
-    queue([{ ...PLAN_ROW, id: "p-source", householdId: "h-other" }]);
-    sessionMock.requireHouseholdMember.mockRejectedValueOnce(
-      new Error("Not authorized for this household.")
-    );
+  it("rejects when the caller can't view the source plan (not owner, no grant)", async () => {
+    // PLAN_ROW is owned by "u-a"; the caller is a stranger with no grant.
+    queue([{ ...PLAN_ROW, id: "p-source", householdId: "h-other" }]); // loadPlanOrThrow
+    queue([]); // getGrantRole → no grant → resolveRole null → rejected
 
     await expect(
       clonePlanFromPast({
@@ -356,10 +355,6 @@ describe("clonePlanFromPast", () => {
         newScheduledDate: "2025-06-07"
       })
     ).rejects.toThrow(/Not authorized/);
-    expect(sessionMock.requireHouseholdMember).toHaveBeenCalledWith(
-      "u-stranger",
-      "h-other"
-    );
   });
 
   it("handles source plans with no dishes (clone is just a header)", async () => {

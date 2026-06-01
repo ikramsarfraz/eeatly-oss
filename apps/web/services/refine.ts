@@ -3,9 +3,8 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { and, asc, count, desc, eq, max, isNull } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { requireHouseholdMember } from "@/lib/auth/session";
 import { logger } from "@/lib/observability/logger";
-import { notifyGranteesOfUpdate } from "@/services/sharing";
+import { notifyGranteesOfUpdate, requireItemEditor } from "@/services/sharing";
 import {
   mealIngredients,
   meals,
@@ -253,23 +252,17 @@ export async function startSession(args: {
   mealId: string;
   deviceId: string;
 }): Promise<SessionState> {
-  // Authorize: Refine is a creator-only WRITE surface (the save path
-  // persists structured ingredients + steps onto the meal). Ownership is
-  // the whole authorization — `createdByUserId === userId` is strictly
-  // tighter than household membership (the creator is always in the meal's
-  // household), so we DON'T call `requireHouseholdMember` here. Doing so
-  // used to throw "Not authorized for this household." for a cross-household
-  // grantee (someone the recipe was shared with) — which, now that recipes
-  // are private-by-default, is exactly who reaches this path when they tap
-  // Refine on a shared recipe. Everyone who isn't the creator gets the same
-  // clean "only the creator can refine" error (mapped to FORBIDDEN), with no
-  // 500 and no leak of whether the meal exists.
+  // Authorize: Refine is a WRITE surface (the save path persists structured
+  // ingredients + steps onto the meal). The owner and anyone granted
+  // edit/admin can refine; viewers and non-grantees cannot. `requireItemEditor`
+  // resolves the effective role (owner | admin | edit | view | none) and
+  // throws a canonical not-authorized error (→ FORBIDDEN) for everyone else,
+  // without leaking whether the meal exists.
   const mealRow = await db.query.meals.findFirst({
     where: and(eq(meals.id, args.mealId), isNull(meals.archivedAt))
   });
-  if (!mealRow || mealRow.createdByUserId !== args.userId) {
-    throw new Error("Only the creator can refine this meal.");
-  }
+  if (!mealRow) throw new Error("Not authorized to edit this item.");
+  await requireItemEditor(args.userId, "recipe", args.mealId, mealRow.createdByUserId);
 
   // Resume the active session if there is one, else insert.
   const existing = await db.query.refineSessions.findFirst({
@@ -714,12 +707,14 @@ export async function saveSession(args: {
     throw new Error("Session was discarded.");
   }
 
-  // Authz: still in the meal's household.
+  // Authz: the saver still holds edit access (owner/admin/edit). The session
+  // is already user-scoped via ensureSessionOwnership above; this guards
+  // against access being revoked mid-draft.
   const mealRow = await db.query.meals.findFirst({
     where: and(eq(meals.id, session.mealId), isNull(meals.archivedAt))
   });
   if (!mealRow) throw new Error("Meal not found.");
-  await requireHouseholdMember(args.userId, mealRow.householdId);
+  await requireItemEditor(args.userId, "recipe", session.mealId, mealRow.createdByUserId);
 
   const pending = await db
     .select()
