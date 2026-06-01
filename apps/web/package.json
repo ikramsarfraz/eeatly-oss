@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e:stripe": "E2E_STRIPE=1 vitest run stripe-e2e",
     "test:coverage": "vitest run --coverage",
     "check:deploy": "node scripts/check-deploy.mjs",
     "smoke:prod": "node scripts/smoke-prod.mjs",
