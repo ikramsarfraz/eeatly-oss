@@ -102,7 +102,6 @@ export default async function HistoryPage({
         id: r.id,
         name: r.name,
         photoUrl: r.photoUrl,
-        sharedAt: r.sharedAt ? r.sharedAt.toISOString() : null,
         createdByUserId: r.createdByUserId
       }))}
       stats={Array.from(statsById.values())}

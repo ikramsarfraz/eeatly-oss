@@ -173,7 +173,6 @@ describe("getMealDetail (Round 10)", () => {
       cookCount: 3,
       lastCookedAt: "2026-05-10",
       createdAt: "2026-04-01T12:00:00.000Z",
-      sharedAt: "2026-04-02T00:00:00.000Z",
       effortLevel: "medium",
       structuredIngredients: [
         {

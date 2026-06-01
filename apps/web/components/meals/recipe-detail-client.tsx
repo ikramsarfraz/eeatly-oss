@@ -152,13 +152,6 @@ export type RecipeDetailMeal = {
   createdByName: string | null;
   cookCount: number;
   lastCookedAt: string | null;
-  /**
-   * Round 32 — meal sharing state. `null` = personal (only the creator
-   * sees the meal); ISO string = when the meal became shared with the
-   * household. The TopBar share/personal affordance and the visibility
-   * chip in the hero band branch on this + the viewer's identity.
-   */
-  sharedAt: string | null;
   effortLevel: "quick" | "easy" | "medium" | "high_effort" | null;
   structuredIngredients: Array<{
     id: string;

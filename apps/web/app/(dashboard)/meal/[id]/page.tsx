@@ -63,7 +63,6 @@ export default async function MealDetailPage({ params }: PageProps) {
     createdByName: meal.createdByName,
     cookCount: meal.cookCount,
     lastCookedAt: meal.lastCookedAt,
-    sharedAt: meal.sharedAt,
     effortLevel: meal.effortLevel,
     structuredIngredients: meal.structuredIngredients ?? [],
     structuredSteps: meal.structuredSteps ?? []

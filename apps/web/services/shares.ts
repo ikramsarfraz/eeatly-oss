@@ -207,8 +207,7 @@ export async function listSharesForMeal(args: {
     .select({
       id: meals.id,
       householdId: meals.householdId,
-      createdByUserId: meals.createdByUserId,
-      sharedAt: meals.sharedAt
+      createdByUserId: meals.createdByUserId
     })
     .from(meals)
     .where(eq(meals.id, args.mealId))

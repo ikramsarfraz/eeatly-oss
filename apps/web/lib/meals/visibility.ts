@@ -14,8 +14,8 @@ import { meals, plans } from "@/db/schema";
  * backfilled grants for every recipe that was shared at that point, so
  * dropping the legacy clause preserves pre-migration access (via clause b)
  * while making recipes the creator never explicitly shared private again.
- * Recipes are now private by default (`createMealLog` inserts `sharedAt =
- * null`); `sharedAt` no longer drives visibility at all.
+ * Recipes are private by default — sharing is entirely grant-based now (the
+ * old `meals.shared_at` flag was dropped in migration 0036).
  *
  * Centralizing the filter here means every consumer ships the same
  * logic. Callers compose it via `where(and(existing, mealVisibilityFilter(...)))`.

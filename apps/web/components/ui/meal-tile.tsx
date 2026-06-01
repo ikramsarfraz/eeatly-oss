@@ -101,14 +101,10 @@ export function MealTile({
   size?: MealTileSize;
   className?: string;
   /**
-   * Round 32 — when true, a small lock icon renders in the top-right
-   * corner to signal "personal — only the creator sees this meal."
-   * The prop is intentionally undefined-able rather than defaulting
-   * to false so caller pages can pass `isPersonal={isMultiMember &&
-   * meal.sharedAt === null}` without further branching: undefined
-   * skips the icon entirely. Single-member households never set it,
-   * so the indicator stays out of the way when there's no one else
-   * to hide from.
+   * When true, a small lock icon renders in the top-right corner to signal
+   * "personal — you haven't shared this recipe with anyone." Callers pass
+   * `isPersonal={isMultiMember && shareCount === 0}`; undefined skips the
+   * icon entirely so single-member contexts stay clean.
    */
   isPersonal?: boolean;
 }) {

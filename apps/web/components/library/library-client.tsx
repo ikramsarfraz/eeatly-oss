@@ -70,13 +70,6 @@ export type LibraryRow = {
   id: string;
   name: string;
   photoUrl: string | null;
-  /**
-   * Round 32 — meal sharing state. ISO string when shared, null when
-   * personal. Filtered down to "creator-own + shared" by the service;
-   * the client uses these to power the Personal / Shared filter chips
-   * and the per-tile lock indicator.
-   */
-  sharedAt: string | null;
   createdByUserId: string | null;
 };
 
@@ -185,14 +178,15 @@ export function LibraryClient({
     let personal = 0;
     let shared = 0;
     for (const row of rows) {
-      // R32 — Personal = the viewer's own personal meal. Shared = the
-      // meal has a non-null sharedAt regardless of creator. Other
-      // members' personal meals were filtered out server-side, so the
-      // only personal rows we ever see here are the viewer's own.
-      if (row.sharedAt === null && row.createdByUserId === currentUserId) {
-        personal += 1;
-      } else if (row.sharedAt !== null) {
+      // Per-item: a recipe is "Shared" once you've granted it to ≥1 person
+      // (grant counts come from getRecipeShareCounts, owner-side). Everything
+      // else you own is "Personal". Only your own recipes carry outbound
+      // grants, so a positive count already implies ownership.
+      const grantCount = shareCounts[row.id] ?? 0;
+      if (grantCount > 0) {
         shared += 1;
+      } else if (row.createdByUserId === currentUserId) {
+        personal += 1;
       }
       const stat = statsByMealId.get(row.id);
       if (!stat) {
@@ -217,7 +211,7 @@ export function LibraryClient({
       high: 0,
       never
     } as Record<FilterKey, number>;
-  }, [rows, statsByMealId, now, thirtyDays, currentUserId]);
+  }, [rows, statsByMealId, now, thirtyDays, currentUserId, shareCounts]);
 
   // Apply filter to rows.
   const filteredRows = React.useMemo(() => {
@@ -238,14 +232,14 @@ export function LibraryClient({
       }
       if (filter === "most") return (stat?.cookCount ?? 0) >= 2;
       if (filter === "personal") {
-        return row.sharedAt === null && row.createdByUserId === currentUserId;
+        return (shareCounts[row.id] ?? 0) === 0 && row.createdByUserId === currentUserId;
       }
       if (filter === "shared") {
-        return row.sharedAt !== null;
+        return (shareCounts[row.id] ?? 0) > 0;
       }
       return true;
     });
-  }, [rows, statsByMealId, filter, now, thirtyDays, currentUserId]);
+  }, [rows, statsByMealId, filter, now, thirtyDays, currentUserId, shareCounts]);
 
   return (
     <div className="grid gap-7">
@@ -364,7 +358,7 @@ export function LibraryClient({
                 row={row}
                 stat={statsByMealId.get(row.id)}
                 showPersonalIndicator={
-                  isMultiMember && row.sharedAt === null
+                  isMultiMember && (shareCounts[row.id] ?? 0) === 0
                 }
                 shareCount={shareCounts[row.id] ?? 0}
                 isOwner={row.createdByUserId === currentUserId}

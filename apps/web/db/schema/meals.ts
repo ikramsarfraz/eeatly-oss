@@ -58,19 +58,11 @@ export const meals = pgTable(
     ingredients: text("ingredients").array(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-    archivedAt: timestamp("archived_at", { withTimezone: true }),
-    // Round 32 — meal sharing model. NULL = personal (only the creator
-    // sees the meal); non-NULL timestamp = shared with the rest of the
-    // household (everyone in the household sees it). New meals default
-    // to shared on insert (`createMealLog` sets `sharedAt: new Date()`).
-    // The 0028 migration backfills `sharedAt = NOW()` on every existing
-    // row to preserve current household-wide visibility.
-    //
-    // The canonical visibility predicate lives in
-    // `apps/web/lib/meals/visibility.ts` and every meal-reading
-    // procedure applies it: `creatorUserId = me OR (sharedAt IS NOT
-    // NULL AND householdId = my.householdId)`.
-    sharedAt: timestamp("shared_at", { withTimezone: true })
+    archivedAt: timestamp("archived_at", { withTimezone: true })
+    // Sharing is fully per-item now (see db/schema/sharing.ts `item_grants`).
+    // The legacy `shared_at` flag + its visibility clause were removed; the
+    // canonical predicate in `apps/web/lib/meals/visibility.ts` is
+    // own-or-granted.
   },
   (table) => ({
     // Round 4: unique scope moved to (householdId, normalizedName). Two
@@ -87,14 +79,6 @@ export const meals = pgTable(
     householdArchivedAtIdx: index("meals_household_archived_at_idx").on(
       table.householdId,
       table.archivedAt
-    ),
-    // Round 32 — covering index on `(household_id, shared_at)` so the
-    // visibility predicate's `sharedAt IS NOT NULL AND householdId = X`
-    // branch can use an index instead of a sequential scan once a
-    // household has many personal meals.
-    householdSharedAtIdx: index("meals_household_shared_at_idx").on(
-      table.householdId,
-      table.sharedAt
     )
   })
 );

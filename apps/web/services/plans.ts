@@ -171,7 +171,6 @@ export async function getPlan(args: { planId: string; userId: string }): Promise
       mealPhotoUrl: sql<string | null>`coalesce(${meals.photoUrl}, ${dishImages.imageUrl})`,
       mealCreatorUserId: meals.createdByUserId,
       mealHouseholdId: meals.householdId,
-      mealSharedAt: meals.sharedAt,
       addedByName: users.name
     })
     .from(planDishes)
@@ -355,12 +354,11 @@ export async function addDishToPlan(args: {
       id: meals.id,
       householdId: meals.householdId,
       archivedAt: meals.archivedAt,
-      // R32 — visibility fields so we can reject the add if the meal
-      // isn't visible to the caller. Treating it as "not found"
-      // matches the rest of the read path: never leak the existence
-      // of another member's personal meal through error messages.
-      createdByUserId: meals.createdByUserId,
-      sharedAt: meals.sharedAt
+      // Visibility field so we can reject the add if the meal isn't
+      // visible to the caller. Treating it as "not found" matches the
+      // rest of the read path: never leak the existence of a recipe the
+      // caller has no access to through error messages.
+      createdByUserId: meals.createdByUserId
     })
     .from(meals)
     .where(eq(meals.id, args.mealId))
@@ -800,15 +798,6 @@ export type MealLibraryRow = {
   id: string;
   name: string;
   photoUrl: string | null;
-  /**
-   * Round 32 — exposes the meal's sharing state so the Library +
-   * search UIs can render the personal/shared indicators inline (the
-   * "Personal" lock icon on tiles, and the chip filter on Library).
-   * Server-side filtering still strips other members' personal meals
-   * via `mealVisibilityFilter`; this field lets the client tell a
-   * member's OWN personal meal apart from a shared one.
-   */
-  sharedAt: Date | null;
   createdByUserId: string | null;
 };
 
@@ -831,7 +820,6 @@ export async function listMealLibrary(args: {
       // coalesce the dashboard + recipe reads use). Failed dish-image rows
       // carry a null image_url, so coalesce skips them automatically.
       photoUrl: sql<string | null>`coalesce(${meals.photoUrl}, ${dishImages.imageUrl})`,
-      sharedAt: meals.sharedAt,
       createdByUserId: meals.createdByUserId
     })
     .from(meals)

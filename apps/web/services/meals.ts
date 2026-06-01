@@ -180,20 +180,14 @@ export async function getDashboardMeals(
 /**
  * New meals are PRIVATE by default. Under the per-item sharing model a
  * recipe is yours until you explicitly share it (which creates a grant —
- * see services/sharing.ts); household co-membership no longer grants
- * recipe access. `createMealLog` therefore inserts `sharedAt = null` unless
- * a caller explicitly opts in via `options.shared === true`.
- *
- * (Historically — Round 32 — this defaulted to `shared` and `sharedAt`
- * drove household-wide visibility. That leaked the creator's new recipes
- * to co-members, so both the default and the legacy visibility clause were
- * removed. `sharedAt` is now vestigial: it no longer affects visibility.)
+ * see services/sharing.ts); household co-membership no longer grants recipe
+ * access. Sharing is entirely grant-based now, so the meal row carries no
+ * sharing flag of its own.
  */
 export async function createMealLog(
   userId: string,
   householdId: string,
-  input: MealLogInput,
-  options?: { shared?: boolean }
+  input: MealLogInput
 ): Promise<{
   mealLog: (typeof mealLogs.$inferSelect) | undefined;
   mealLogCount: number;
@@ -245,11 +239,6 @@ export async function createMealLog(
             recipeSourceUrl: recipeSourceUrl ?? null,
             servings: servings ?? null,
             ingredients: ingredients ?? null,
-            // Private by default — sharing is now an explicit per-item
-            // grant, not a household-wide flag. Only an explicit
-            // `shared: true` opt-in stamps `sharedAt`; it's vestigial now
-            // (no longer drives visibility) but kept for data continuity.
-            sharedAt: options?.shared === true ? new Date() : null,
             updatedAt: new Date()
           })
           .returning()
@@ -647,14 +636,6 @@ export type MealDetailView = {
   lastCookedAt: string | null;
   createdAt: string;
   /**
-   * Round 32 — meal sharing flag. `null` = personal (only the creator
-   * sees the meal); ISO timestamp = when it became shared with the
-   * household. The Recipe Detail view renders a "Personal" / "Shared"
-   * chip off this field, and the TopBar's share affordance branches on
-   * whether the viewer is the creator and the current sharing state.
-   */
-  sharedAt: string | null;
-  /**
    * Modal effort across all logs of this meal — `null` when there are
    * no logs yet (a meal can be added without being cooked, e.g. via
    * AI re-extract flows that save a recipe before the first cook).
@@ -713,7 +694,6 @@ export async function getMealDetail(
       servings: meals.servings,
       ingredients: meals.ingredients,
       notes: meals.notes,
-      sharedAt: meals.sharedAt,
       createdAt: meals.createdAt,
       createdByUserId: meals.createdByUserId,
       createdByName: users.name
@@ -832,7 +812,6 @@ export async function getMealDetail(
     cookCount: Number(stats?.cookCount ?? 0),
     lastCookedAt: stats?.lastCookedAt ?? null,
     createdAt: row.createdAt.toISOString(),
-    sharedAt: row.sharedAt ? row.sharedAt.toISOString() : null,
     effortLevel: pickModalEffort(effortRows),
     structuredIngredients: structuredIngredientRows,
     structuredSteps: structuredStepRows
