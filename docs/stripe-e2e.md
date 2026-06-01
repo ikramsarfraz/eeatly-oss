@@ -36,11 +36,22 @@ Stripe **test mode**.
 
 ### One-time setup
 
-1. Create 6 test-mode Prices and put their ids in `apps/web/.env.local`:
-   - `STRIPE_PRICE_MONTHLY` / `STRIPE_PRICE_ANNUAL` — Plus, recurring ($5 / $50)
-   - `STRIPE_PRICE_PRO_MONTHLY` / `STRIPE_PRICE_PRO_ANNUAL` — Pro, recurring ($12 / $120)
-   - `STRIPE_PRICE_CREDITS_SMALL` / `STRIPE_PRICE_CREDITS_LARGE` — one-time ($5 / $10)
-   - **Amounts must match `lib/pricing.ts`.** Credit packs are **one-time**, tiers are **recurring**.
+The sellable catalog is **synced live from Stripe** (`services/stripe-catalog.ts`),
+not configured via env. You tag each Price with metadata and the app discovers
+them. Only the three core Stripe keys go in `apps/web/.env.local`:
+`STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`.
+
+1. Create 6 test-mode Prices and **tag each with metadata** (amounts must match
+   the credit math; tiers are **recurring**, credit packs are **one-time**):
+   - Plus monthly $5 → `metadata.plan=plus`, `metadata.interval=month`
+   - Plus annual $50 → `metadata.plan=plus`, `metadata.interval=year`
+   - Pro monthly $12 → `metadata.plan=pro`, `metadata.interval=month`
+   - Pro annual $120 → `metadata.plan=pro`, `metadata.interval=year`
+   - Credits $5 → `metadata.kind=credits`, `metadata.credits=200`
+   - Credits $10 → `metadata.kind=credits`, `metadata.credits=500`
+
+   Via CLI, e.g.: `stripe prices update <price_id> -d "metadata[plan]=pro" -d "metadata[interval]=month"`.
+   (To add/retire a tier or pack later, just edit Stripe — no code or env change.)
 2. Set `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`.
 3. Start the app: `pnpm dev` (port 3003).
 4. Forward webhooks and copy the printed `whsec_…` into `STRIPE_WEBHOOK_SECRET`, then restart:
@@ -48,6 +59,9 @@ Stripe **test mode**.
 ```bash
 stripe listen --forward-to localhost:3003/api/webhooks/stripe
 ```
+
+The catalog is cached ~5 min in-process; restart the dev server (or wait) after
+editing Prices in Stripe to see changes.
 
 ### Flows to verify
 

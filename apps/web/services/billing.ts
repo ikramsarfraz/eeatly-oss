@@ -10,48 +10,36 @@ import {
 } from "@/lib/errors/billing";
 import { logger } from "@/lib/observability/logger";
 import { getStripeClient } from "@/lib/stripe/client";
-import {
-  TOPUP_PACKS,
-  type BillingInterval,
-  type Tier,
-  type TopupPackId
-} from "@/lib/pricing";
+import { type BillingInterval, type Tier } from "@/lib/pricing";
 import { applyTierGrant, getUserTier, grantPurchasedCredits } from "@/services/ai-credits";
+import {
+  creditPackForPriceId,
+  getStripeCatalog,
+  priceIdForTier
+} from "@/services/stripe-catalog";
 import {
   stripeWebhookReceipts,
   subscriptions,
   users
 } from "@/db/schema";
 
-type ServerEnv = ReturnType<typeof getServerEnv>;
-
-/** Map a Stripe price id to a subscription tier, or null if unrecognized. */
-function tierForPriceId(env: ServerEnv, priceId: string | null): Tier | null {
-  if (!priceId) return null;
-  if (priceId === env.STRIPE_PRICE_MONTHLY || priceId === env.STRIPE_PRICE_ANNUAL) {
-    return "plus";
-  }
-  if (priceId === env.STRIPE_PRICE_PRO_MONTHLY || priceId === env.STRIPE_PRICE_PRO_ANNUAL) {
-    return "pro";
+/**
+ * Resolve a subscription tier from a Stripe Price. Prefers the price's own
+ * `metadata.plan` (present on the webhook payload — no extra fetch), falling
+ * back to the cached catalog. Returns null for unrecognized prices.
+ */
+async function tierForPrice(price: {
+  id?: string | null;
+  metadata?: Record<string, string> | null;
+}): Promise<Tier | null> {
+  const planMeta = price.metadata?.plan;
+  if (planMeta === "plus" || planMeta === "pro") return planMeta;
+  if (price.id) {
+    const catalog = await getStripeCatalog();
+    const entry = catalog.byPriceId[price.id];
+    if (entry?.kind === "tier") return entry.plan;
   }
   return null;
-}
-
-/** The recurring Stripe price id for a (tier, interval), or null if unset. */
-function priceIdForTier(
-  env: ServerEnv,
-  tier: "plus" | "pro",
-  interval: BillingInterval
-): string | null {
-  if (tier === "plus") {
-    return (interval === "monthly" ? env.STRIPE_PRICE_MONTHLY : env.STRIPE_PRICE_ANNUAL) ?? null;
-  }
-  return (interval === "monthly" ? env.STRIPE_PRICE_PRO_MONTHLY : env.STRIPE_PRICE_PRO_ANNUAL) ?? null;
-}
-
-/** The one-time Stripe price id for a top-up pack, or null if unset. */
-function priceIdForPack(env: ServerEnv, packId: TopupPackId): string | null {
-  return (packId === "small" ? env.STRIPE_PRICE_CREDITS_SMALL : env.STRIPE_PRICE_CREDITS_LARGE) ?? null;
 }
 
 /**
@@ -180,9 +168,8 @@ export async function createCheckoutSession(args: {
     throw new BillingNotConfiguredError();
   }
 
-  const priceId = priceIdForTier(env, args.tier, args.interval);
-  // Pro prices are optional on top of the core Stripe env — a missing one
-  // surfaces as "not configured" rather than a 500.
+  // Resolved from the live Stripe catalog (metadata-tagged prices), not env.
+  const priceId = await priceIdForTier(args.tier, args.interval);
   if (!priceId) throw new BillingNotConfiguredError();
 
   const stripeCustomerId = await getOrCreateStripeCustomerId({
@@ -231,15 +218,16 @@ export async function createCreditCheckoutSession(args: {
   userId: string;
   userEmail: string;
   userName: string;
-  packId: TopupPackId;
+  /** Stripe price id of the pack (from the live catalog). */
+  priceId: string;
 }): Promise<{ url: string }> {
   const env = getServerEnv();
   if (!hasStripeEnv(env)) {
     throw new BillingNotConfiguredError();
   }
-  const pack = TOPUP_PACKS[args.packId];
-  const priceId = priceIdForPack(env, args.packId);
-  if (!priceId) throw new BillingNotConfiguredError();
+  // Validate the price is a real credit pack in the catalog + read its grant.
+  const pack = await creditPackForPriceId(args.priceId);
+  if (!pack) throw new BillingNotConfiguredError();
 
   const stripeCustomerId = await getOrCreateStripeCustomerId({
     userId: args.userId,
@@ -252,12 +240,11 @@ export async function createCreditCheckoutSession(args: {
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     customer: stripeCustomerId,
-    line_items: [{ price: priceId, quantity: 1 }],
+    line_items: [{ price: pack.priceId, quantity: 1 }],
     client_reference_id: args.userId,
     metadata: {
       userId: args.userId,
       kind: "credits",
-      packId: args.packId,
       credits: String(pack.credits)
     },
     success_url: `${base}/settings?credits=true`,
@@ -270,7 +257,8 @@ export async function createCreditCheckoutSession(args: {
   logger.info("stripe_credit_checkout_created", {
     userId: args.userId,
     sessionId: session.id,
-    packId: args.packId
+    priceId: pack.priceId,
+    credits: pack.credits
   });
   return { url: session.url };
 }
@@ -470,10 +458,9 @@ async function upsertSubscriptionFromStripe(
   const currentPeriodEnd =
     item?.current_period_end != null ? new Date(item.current_period_end * 1000) : null;
   const priceId = item?.price?.id ?? null;
-  const env = getServerEnv();
-  // Resolve the tier from the price; keep the prior tier (legacy null → plus)
-  // when the subscription is canceled or the price is unrecognized.
-  const tier = tierForPriceId(env, priceId);
+  // Resolve the tier from the price's metadata (catalog-driven, not env).
+  // Keeps the prior tier when the price is unrecognized.
+  const tier = item?.price ? await tierForPrice(item.price) : null;
 
   // Old tier (for the upgrade grant) — only counts while the prior sub was
   // active/trialing; a re-subscribe from canceled is treated as free→tier.

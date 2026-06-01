@@ -33,10 +33,10 @@ export function CreditsCard() {
     showToast({ variant: "success", title: "Credits added", description: "Your top-up is ready to use." });
   }, [credited, showToast, utils]);
 
-  async function handleBuy(packId: string) {
+  async function handleBuy(priceId: string) {
     if (pending) return;
     try {
-      const session = await buy.mutateAsync({ packId });
+      const session = await buy.mutateAsync({ priceId });
       window.location.assign(session.url);
     } catch (error) {
       showToast({
@@ -95,12 +95,12 @@ export function CreditsCard() {
         <div className="flex flex-wrap gap-2">
           {packs.map((pack) => (
             <Button
-              key={pack.id}
+              key={pack.priceId}
               type="button"
               variant="outline"
               className="h-10"
               disabled={pending}
-              onClick={() => handleBuy(pack.id)}
+              onClick={() => handleBuy(pack.priceId)}
             >
               {pending ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />

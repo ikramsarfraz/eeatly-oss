@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { getServerEnv, hasStripeEnv, isLaunchFreeAccess } from "@/lib/env/server";
 import { FEATURE_REGISTRY, type FeatureKey } from "@eeatly/api/gates/registry";
 import { getSubscriptionState } from "@/services/billing";
+import { getStripeCatalog } from "@/services/stripe-catalog";
 import { PricingCard } from "@/components/pricing/pricing-card";
 import "../marketing.css";
 
@@ -35,9 +36,17 @@ export default async function PricingPage() {
       ? { kind: "active_subscriber", tier: subscription?.tier ?? "plus" }
       : { kind: "signed_in_free" };
 
-  // Pro prices are optional on top of the core Stripe env.
-  const proConfigured =
-    billingConfigured && Boolean(env.STRIPE_PRICE_PRO_MONTHLY && env.STRIPE_PRICE_PRO_ANNUAL);
+  // Live prices come from the Stripe catalog (metadata-tagged), not env.
+  const catalog = await getStripeCatalog();
+  const toDisplay = (p: { display: string } | null) => (p ? { display: p.display } : null);
+  const plusPrices = {
+    monthly: toDisplay(catalog.tiers.plus.monthly),
+    annual: toDisplay(catalog.tiers.plus.annual)
+  };
+  const proPrices = {
+    monthly: toDisplay(catalog.tiers.pro.monthly),
+    annual: toDisplay(catalog.tiers.pro.annual)
+  };
 
   // Marketing copy pulls feature descriptions from the registry so the
   // comparison stays in sync with what's actually gated. Same source the
@@ -71,14 +80,14 @@ export default async function PricingPage() {
       <div className="grid gap-5 sm:grid-cols-2">
         <PricingCard
           tier="plus"
-          billingConfigured={billingConfigured}
+          prices={plusPrices}
           launchMode={launchMode}
           authState={authState}
           features={plusFeatures}
         />
         <PricingCard
           tier="pro"
-          billingConfigured={proConfigured}
+          prices={proPrices}
           launchMode={false}
           authState={authState}
           features={plusFeatures}

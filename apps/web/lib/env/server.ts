@@ -58,22 +58,13 @@ const serverEnvSchema = z.object({
   GOOGLE_CLIENT_ID: optionalString,
   GOOGLE_CLIENT_SECRET: optionalString,
   CRON_SECRET: optionalString,
-  // Round 6 — Stripe paid tier. Optional individually (all-or-none
-  // enforced via `hasStripeEnv` below); the pricing page surfaces
-  // "Coming soon" when missing instead of crashing.
+  // Stripe. The sellable catalog (tiers + credit packs) is NOT configured
+  // via env — it's synced live from Stripe (`services/stripe-catalog.ts`),
+  // keyed by Price metadata. Only the three core keys live here; the pricing
+  // page shows "coming soon" when they're missing instead of crashing.
   STRIPE_SECRET_KEY: optionalString,
   STRIPE_PUBLISHABLE_KEY: optionalString,
   STRIPE_WEBHOOK_SECRET: optionalString,
-  // Plus tier (the original single-tier prices — kept for back-compat).
-  STRIPE_PRICE_MONTHLY: optionalString,
-  STRIPE_PRICE_ANNUAL: optionalString,
-  // Pro tier (recurring). Optional on top of the core Stripe env — when
-  // unset, the Pro CTA degrades to "coming soon" while Plus still works.
-  STRIPE_PRICE_PRO_MONTHLY: optionalString,
-  STRIPE_PRICE_PRO_ANNUAL: optionalString,
-  // One-time AI-credit top-up packs (Stripe `payment`-mode prices).
-  STRIPE_PRICE_CREDITS_SMALL: optionalString,
-  STRIPE_PRICE_CREDITS_LARGE: optionalString,
   // Note: display prices are NOT env-driven — they live in `lib/pricing.ts`
   // (the single source of truth) so the marketing + pricing pages render
   // real numbers even before Stripe is configured. When you create the
@@ -149,11 +140,7 @@ export function hasGoogleAuthEnv(env = getServerEnv()) {
  */
 export function hasStripeEnv(env = getServerEnv()) {
   return Boolean(
-    env.STRIPE_SECRET_KEY &&
-      env.STRIPE_PUBLISHABLE_KEY &&
-      env.STRIPE_WEBHOOK_SECRET &&
-      env.STRIPE_PRICE_MONTHLY &&
-      env.STRIPE_PRICE_ANNUAL
+    env.STRIPE_SECRET_KEY && env.STRIPE_PUBLISHABLE_KEY && env.STRIPE_WEBHOOK_SECRET
   );
 }
 

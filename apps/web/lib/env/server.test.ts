@@ -17,12 +17,12 @@ function makeEnv(over: Partial<ServerEnv>): ServerEnv {
   } as ServerEnv;
 }
 
+// The sellable catalog is synced from Stripe (not env) — the core trio is
+// all `hasStripeEnv` needs now.
 const FULL_STRIPE: Partial<ServerEnv> = {
   STRIPE_SECRET_KEY: "sk",
   STRIPE_PUBLISHABLE_KEY: "pk",
-  STRIPE_WEBHOOK_SECRET: "whsec",
-  STRIPE_PRICE_MONTHLY: "price_m",
-  STRIPE_PRICE_ANNUAL: "price_a"
+  STRIPE_WEBHOOK_SECRET: "whsec"
 };
 
 describe("isLaunchFreeAccess", () => {

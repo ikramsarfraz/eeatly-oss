@@ -15,11 +15,17 @@ type AuthState =
   | { kind: "active_subscriber"; tier: "plus" | "pro" }
   | { kind: "signed_in_free" };
 
+/** Live display prices for this tier, sourced from the Stripe catalog. */
+type TierPriceDisplay = {
+  monthly: { display: string } | null;
+  annual: { display: string } | null;
+};
+
 type PricingCardProps = {
   /** Which paid tier this card represents. */
   tier: "plus" | "pro";
-  /** Whether the Stripe price for THIS tier/interval is configured. */
-  billingConfigured: boolean;
+  /** Live prices from the Stripe catalog (null when that interval isn't sold). */
+  prices: TierPriceDisplay;
   /** Launch promo (Plus-era) — only meaningful for the Plus card. */
   launchMode: boolean;
   authState: AuthState;
@@ -28,7 +34,7 @@ type PricingCardProps = {
 
 export function PricingCard({
   tier,
-  billingConfigured,
+  prices,
   launchMode,
   authState,
   features
@@ -40,7 +46,15 @@ export function PricingCard({
 
   const tierConfig = TIERS[tier];
   const tierName = tierConfig.name;
-  const activePrice = priceType === "monthly" ? tierConfig.monthly : tierConfig.annual;
+  // This tier is sellable when the catalog has at least one interval price.
+  const billingConfigured = Boolean(prices.monthly || prices.annual);
+  const livePrice = priceType === "monthly" ? prices.monthly : prices.annual;
+  const suffix = priceType === "monthly" ? "/ month" : "/ year";
+  const activePrice = {
+    display: livePrice?.display ?? "—",
+    suffix,
+    note: priceType === "annual" ? "2 months free" : undefined
+  };
   // Already subscribed AT or ABOVE this card's tier?
   const RANK = { plus: 1, pro: 2 } as const;
   const subscribedHere =

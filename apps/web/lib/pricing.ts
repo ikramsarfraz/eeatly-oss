@@ -108,27 +108,9 @@ export function creditCost(op: AiOperation): number {
   return AI_CREDIT_COSTS[op];
 }
 
-/**
- * One-time top-up packs (Stripe `payment`-mode Checkout). `id` is the
- * stable handle the client/checkout passes; `credits` is granted on
- * `checkout.session.completed`. Display amounts must match the Stripe
- * one-time Prices (env `STRIPE_PRICE_CREDITS_*`).
- */
-export const TOPUP_PACKS = {
-  small: { id: "small", credits: 200, amount: 5, display: "$5", label: "200 credits" },
-  large: { id: "large", credits: 500, amount: 10, display: "$10", label: "500 credits" }
-} as const satisfies Record<
-  string,
-  { id: string; credits: number; amount: number; display: string; label: string }
->;
-
-export type TopupPackId = keyof typeof TOPUP_PACKS;
-
-export const TOPUP_PACK_IDS = Object.keys(TOPUP_PACKS) as TopupPackId[];
-
-export function isTopupPackId(value: string): value is TopupPackId {
-  return Object.prototype.hasOwnProperty.call(TOPUP_PACKS, value);
-}
+// Credit top-up packs are NOT configured here — they're synced from Stripe
+// (one-time Prices tagged `metadata.kind=credits` + `metadata.credits`), read
+// via `services/stripe-catalog.ts`. Add/retire a pack in Stripe, no code change.
 
 /** Launch-promo badge copy, shown when `isLaunchFreeAccess` is on. */
 export const LAUNCH_BADGE = "Free during launch · no card needed";

@@ -15,13 +15,9 @@ import { config as loadEnv } from "dotenv";
 loadEnv({ path: ".env" });
 loadEnv({ path: ".env.local", override: true });
 
-process.env.STRIPE_PRICE_MONTHLY ??= "price_plus_monthly_test";
-process.env.STRIPE_PRICE_ANNUAL ??= "price_plus_annual_test";
-process.env.STRIPE_PRICE_PRO_MONTHLY ??= "price_pro_monthly_test";
-process.env.STRIPE_PRICE_PRO_ANNUAL ??= "price_pro_annual_test";
-process.env.STRIPE_PRICE_CREDITS_SMALL ??= "price_credits_small_test";
-process.env.STRIPE_PRICE_CREDITS_LARGE ??= "price_credits_large_test";
-// hasStripeEnv needs the core trio; harmless dummies for the webhook path.
+// The catalog is synced from Stripe by Price metadata; the webhook resolves
+// tier from the price's own metadata (no env). hasStripeEnv just needs the
+// core trio — use whatever real test keys .env.local already has, else dummies.
 process.env.STRIPE_SECRET_KEY ??= "sk_test_e2e";
 process.env.STRIPE_PUBLISHABLE_KEY ??= "pk_test_e2e";
 process.env.STRIPE_WEBHOOK_SECRET ??= "whsec_e2e";
@@ -128,7 +124,11 @@ run("Stripe integration — end to end (real DB)", () => {
           items: {
             data: [
               {
-                price: { id: process.env.STRIPE_PRICE_PRO_MONTHLY },
+                // Tier is resolved from the price's metadata (catalog contract).
+                price: {
+                  id: "price_e2e_pro_month",
+                  metadata: { plan: "pro", interval: "month" }
+                },
                 current_period_start: nowSec(),
                 current_period_end: nowSec() + 30 * 86400
               }

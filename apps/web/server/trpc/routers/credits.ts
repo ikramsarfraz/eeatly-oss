@@ -6,12 +6,8 @@ import { BillingNotConfiguredError } from "@/lib/errors/billing";
 import { logger } from "@/lib/observability/logger";
 import { getCreditBalance } from "@/services/ai-credits";
 import { createCreditCheckoutSession } from "@/services/billing";
-import {
-  AI_CREDIT_COSTS,
-  TOPUP_PACKS,
-  TOPUP_PACK_IDS,
-  isTopupPackId
-} from "@/lib/pricing";
+import { getStripeCatalog } from "@/services/stripe-catalog";
+import { AI_CREDIT_COSTS } from "@/lib/pricing";
 import { protectedProcedure, rateLimit, router } from "../trpc";
 
 /**
@@ -24,29 +20,31 @@ import { protectedProcedure, rateLimit, router } from "../trpc";
 export const creditsRouter = router({
   balance: protectedProcedure.query(({ ctx }) => getCreditBalance(ctx.user.id)),
 
-  /** Static config for the credits UI — no auth-specific data. */
-  catalog: protectedProcedure.query(() => ({
-    packs: TOPUP_PACK_IDS.map((id) => TOPUP_PACKS[id]),
-    costs: AI_CREDIT_COSTS
-  })),
+  /** Top-up packs from the live Stripe catalog + the per-op credit costs. */
+  catalog: protectedProcedure.query(async () => {
+    const catalog = await getStripeCatalog();
+    return {
+      packs: catalog.packs.map((p) => ({
+        priceId: p.priceId,
+        credits: p.credits,
+        amount: p.amount,
+        display: p.display,
+        label: `${p.credits.toLocaleString()} credits`
+      })),
+      costs: AI_CREDIT_COSTS
+    };
+  }),
 
   buy: protectedProcedure
     .use(rateLimit("mutation"))
-    .input(z.object({ packId: z.string() }))
+    .input(z.object({ priceId: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
-      if (!isTopupPackId(input.packId)) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Unknown credit pack.",
-          cause: { reason: "INVALID_INPUT" }
-        });
-      }
       try {
         return await createCreditCheckoutSession({
           userId: ctx.user.id,
           userEmail: ctx.user.email,
           userName: ctx.user.name,
-          packId: input.packId
+          priceId: input.priceId
         });
       } catch (error) {
         if (error instanceof BillingNotConfiguredError) {
