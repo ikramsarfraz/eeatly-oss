@@ -242,7 +242,7 @@ export function KitchenSection({
     <Card className="overflow-hidden p-0">
       <SettingRow
         label="Members & invitations"
-        sub="The people who share this kitchen and see everything in it."
+        sub="The people you cook with. Manage members, roles, and invitations."
         value={`${memberCount} ${memberCount === 1 ? "member" : "members"}${
           pendingInviteCount > 0 ? ` · ${pendingInviteCount} pending` : ""
         }`}

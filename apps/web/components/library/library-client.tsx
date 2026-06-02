@@ -528,6 +528,18 @@ function LibraryCard({
     meta = "Not yet cooked";
   }
 
+  // Warm the Share sheet's queries on hover/focus so it opens populated
+  // (people + grants + link state) instead of fetching after the click.
+  const utils = trpc.useUtils();
+  const prefetchShare = React.useCallback(() => {
+    void utils.sharing.connections.prefetch(undefined, { staleTime: 30_000 });
+    void utils.sharing.grantsForItem.prefetch(
+      { itemType: "recipe", itemId: row.id },
+      { staleTime: 30_000 }
+    );
+    void utils.shares.activeForMeal.prefetch({ mealId: row.id }, { staleTime: 30_000 });
+  }, [utils, row.id]);
+
   return (
     <Link
       href={`/meal/${row.id}` as Route}
@@ -567,6 +579,8 @@ function LibraryCard({
               e.stopPropagation();
               onShare();
             }}
+            onPointerEnter={prefetchShare}
+            onFocus={prefetchShare}
             className={cn(
               "absolute right-2 top-2 inline-flex h-[30px] items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium transition-colors",
               shareCount > 0

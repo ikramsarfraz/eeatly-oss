@@ -69,6 +69,18 @@ function OwnerStrip({
   const grants = grantsQuery.data ?? [];
   const shared = grants.length > 0;
 
+  // Grants are already fetched above; warm the remaining sheet queries
+  // (people + link state) on hover/focus so the sheet opens populated.
+  const utils = trpc.useUtils();
+  const prefetchShare = React.useCallback(() => {
+    void utils.sharing.connections.prefetch(undefined, { staleTime: 30_000 });
+    if (itemType === "recipe") {
+      void utils.shares.activeForMeal.prefetch({ mealId: itemId }, { staleTime: 30_000 });
+    } else {
+      void utils.shares.activeForPlan.prefetch({ planId: itemId }, { staleTime: 30_000 });
+    }
+  }, [utils, itemType, itemId]);
+
   const names = grants
     .map((g) => g.name?.trim() || g.email.split("@")[0])
     .slice(0, 2)
@@ -113,7 +125,13 @@ function OwnerStrip({
             </>
           )}
         </div>
-        <Button variant={shared ? "outline" : "default"} className="min-h-[40px]" onClick={() => setOpen(true)}>
+        <Button
+          variant={shared ? "outline" : "default"}
+          className="min-h-[40px]"
+          onClick={() => setOpen(true)}
+          onPointerEnter={prefetchShare}
+          onFocus={prefetchShare}
+        >
           {shared ? "Manage sharing" : "Share"}
         </Button>
       </div>
