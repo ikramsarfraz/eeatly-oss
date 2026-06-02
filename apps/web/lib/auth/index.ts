@@ -209,6 +209,18 @@ function buildAuth() {
     }
   },
   session: {
+    // A recipe library is used occasionally, not daily, so sign-in
+    // friction is amplified by being rare and forgotten between visits.
+    // Long ROLLING sessions make re-auth a ~twice-a-year non-event. This
+    // governs BOTH the web cookie and the mobile bearer token (same server
+    // session) — no per-platform change needed.
+    //
+    // `expiresIn` is the inactive window: how long you can stay away
+    // before re-auth. `updateAge` refreshes an active session's expiry on
+    // use (at most once a day), so an active user effectively never gets
+    // logged out. Default was 7d/1d; we lean long (low-sensitivity data).
+    expiresIn: 60 * 60 * 24 * 90, // 90 days
+    updateAge: 60 * 60 * 24, // 1 day (rolling refresh)
     cookieCache: {
       enabled: true,
       maxAge: 5 * 60
