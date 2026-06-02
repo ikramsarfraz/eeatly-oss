@@ -3,8 +3,9 @@ import "server-only";
 import { cache } from "react";
 import { and, eq, or } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { featureOverrides, users } from "@/db/schema";
+import { featureOverrides, subscriptions, users } from "@/db/schema";
 import { isLaunchFreeAccess } from "@/lib/env/server";
+import { resolveTier } from "@/lib/pricing";
 import { FeatureGateDeniedError } from "@/lib/errors/gates";
 import { logger } from "@/lib/observability/logger";
 import {
@@ -39,9 +40,15 @@ const loadGateContext = cache(async (userId: string): Promise<GateContext> => {
       id: users.id,
       role: users.role,
       betaCohort: users.betaCohort,
-      subscriptionStatus: users.subscriptionStatus
+      subscriptionStatus: users.subscriptionStatus,
+      createdAt: users.createdAt,
+      // Tier lives on the subscriptions row (the denormalized user column
+      // only carries status). Left join so trial/free users with no row
+      // still resolve.
+      subscriptionTier: subscriptions.tier
     })
     .from(users)
+    .leftJoin(subscriptions, eq(subscriptions.userId, users.id))
     .where(eq(users.id, userId))
     .limit(1);
   if (!user) {
@@ -53,11 +60,21 @@ const loadGateContext = cache(async (userId: string): Promise<GateContext> => {
       role: "root_app_user",
       betaCohort: null,
       subscriptionStatus: null,
+      tier: "free",
       allowlistedUserIds: [],
       envFlags: {},
       launchFreeAccess: isLaunchFreeAccess()
     };
   }
+
+  // Effective tier folds in the no-card first-time Pro trial (account-age
+  // based) so trial users reach paid/pro features without a Stripe row.
+  const { tier } = resolveTier({
+    subscriptionStatus: user.subscriptionStatus,
+    subscriptionTier: user.subscriptionTier,
+    createdAt: user.createdAt,
+    now: new Date()
+  });
 
   return {
     userId,
@@ -68,6 +85,7 @@ const loadGateContext = cache(async (userId: string): Promise<GateContext> => {
     // `subscriptions.status` inside one transaction — drift is
     // theoretical, fixable by a future reconcile tool.
     subscriptionStatus: user.subscriptionStatus,
+    tier,
     // Allowlist + env-flag are evaluated per-feature inside `can()` —
     // loading them all up-front would be wasteful for the common case
     // (rules other than `allowlist` / `env_flag`).

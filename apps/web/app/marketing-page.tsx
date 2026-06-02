@@ -730,11 +730,11 @@ export default function MarketingPage() {
         <div className="wrap">
           <div className="pricing-card">
             <span className="section-eyebrow">Pricing</span>
-            <h2 className="section-title" style={{ marginBottom: 14 }}>Free for personal use. Plus for the whole family.</h2>
-            <p className="section-sub" style={{ marginBottom: 0 }}>Log meals, save photos, and search your own kitchen — free, forever. Plus unlocks AI capture, shared family kitchens, and more.</p>
+            <h2 className="section-title" style={{ marginBottom: 14 }}>Free for personal use. Chef for the whole family.</h2>
+            <p className="section-sub" style={{ marginBottom: 0 }}>Log meals, save photos, and search your own kitchen — free, forever. Chef unlocks AI capture, shared family kitchens, and more.</p>
             <div className="pricing-table">
               <table>
-                <thead><tr><th>Feature</th><th>Free</th><th>Plus</th></tr></thead>
+                <thead><tr><th>Feature</th><th>Cook</th><th>Chef</th></tr></thead>
                 <tbody>
                   <tr><td>Save unlimited recipes</td><td className="check">✓</td><td className="check">✓</td></tr>
                   <tr><td>Search your recipes</td><td className="check">✓</td><td className="check">✓</td></tr>

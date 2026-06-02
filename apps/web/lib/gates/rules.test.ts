@@ -6,34 +6,35 @@ const baseCtx: GateContext = {
   role: "root_app_user",
   betaCohort: null,
   subscriptionStatus: null,
+  tier: "free",
   allowlistedUserIds: [],
   envFlags: {},
   launchFreeAccess: false
 };
 
 describe("ruleEvaluators", () => {
-  it("paid_only allows active subscriptions", () => {
-    expect(ruleEvaluators.paid_only({ ...baseCtx, subscriptionStatus: "active" }, "x")).toBe(true);
-    expect(ruleEvaluators.paid_only({ ...baseCtx, subscriptionStatus: "trialing" }, "x")).toBe(true);
+  it("paid_only allows Plus and Pro tiers", () => {
+    expect(ruleEvaluators.paid_only({ ...baseCtx, tier: "plus" }, "x")).toBe(true);
+    expect(ruleEvaluators.paid_only({ ...baseCtx, tier: "pro" }, "x")).toBe(true);
   });
 
-  it("paid_only denies cancellation, past_due, etc.", () => {
-    expect(ruleEvaluators.paid_only({ ...baseCtx, subscriptionStatus: "canceled" }, "x")).toBe(false);
-    expect(ruleEvaluators.paid_only({ ...baseCtx, subscriptionStatus: "past_due" }, "x")).toBe(false);
-    expect(ruleEvaluators.paid_only({ ...baseCtx, subscriptionStatus: null }, "x")).toBe(false);
+  it("paid_only denies the free tier", () => {
+    expect(ruleEvaluators.paid_only({ ...baseCtx, tier: "free" }, "x")).toBe(false);
   });
 
-  it("beta_or_paid allows either cohort or active sub", () => {
+  it("pro_only allows only the Pro tier (incl. trial)", () => {
+    expect(ruleEvaluators.pro_only({ ...baseCtx, tier: "pro" }, "x")).toBe(true);
+    expect(ruleEvaluators.pro_only({ ...baseCtx, tier: "plus" }, "x")).toBe(false);
+    expect(ruleEvaluators.pro_only({ ...baseCtx, tier: "free" }, "x")).toBe(false);
+  });
+
+  it("beta_or_paid allows either cohort or any paid tier", () => {
     expect(
       ruleEvaluators.beta_or_paid({ ...baseCtx, betaCohort: "beta_2026" }, "x")
     ).toBe(true);
-    expect(
-      ruleEvaluators.beta_or_paid({ ...baseCtx, subscriptionStatus: "active" }, "x")
-    ).toBe(true);
-    // Past-due isn't a free pass.
-    expect(
-      ruleEvaluators.beta_or_paid({ ...baseCtx, subscriptionStatus: "past_due" }, "x")
-    ).toBe(false);
+    expect(ruleEvaluators.beta_or_paid({ ...baseCtx, tier: "plus" }, "x")).toBe(true);
+    expect(ruleEvaluators.beta_or_paid({ ...baseCtx, tier: "pro" }, "x")).toBe(true);
+    // Free with no cohort isn't a free pass.
     expect(ruleEvaluators.beta_or_paid(baseCtx, "x")).toBe(false);
   });
 

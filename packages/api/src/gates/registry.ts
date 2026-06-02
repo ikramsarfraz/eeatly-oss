@@ -37,6 +37,10 @@ export const FEATURE_REGISTRY = {
     description: "AI: generate a shareable recipe message",
     defaultRule: "open" as GateRule
   },
+  // Plus-tier features. `beta_or_paid` now means "beta cohort OR any paid
+  // tier" — and the no-card trial counts as Pro — so Free users get a
+  // personal library only (no sharing, plans, or household), while the
+  // legacy beta-cohort allowlist still works.
   household_create: {
     description: "Create a shared household",
     defaultRule: "beta_or_paid" as GateRule
@@ -56,6 +60,18 @@ export const FEATURE_REGISTRY = {
   recipe_share_create: {
     description: "Share recipes with anyone via a public link",
     defaultRule: "beta_or_paid" as GateRule
+  },
+  // Pro-only — shareable meal plans with public plan pages.
+  plan_share_create: {
+    description: "Share meal plans via a public link",
+    defaultRule: "pro_only" as GateRule
+  },
+  // Pro-only — co-editing. Checked in the sharing service whenever a granter
+  // hands out an Edit/Admin role (not just read-only). Lets family change
+  // your recipes and plans in place.
+  co_editing: {
+    description: "Let family Edit & Admin your recipes and plans",
+    defaultRule: "pro_only" as GateRule
   },
   ai_suggest_voice: {
     description: "Extract recipes from voice notes",

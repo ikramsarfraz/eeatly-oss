@@ -19,6 +19,7 @@ import {
   setGrantRole
 } from "@/services/sharing";
 import { getUserSettings, updateUserSettings } from "@/services/user-settings";
+import { FeatureGateDeniedError } from "@/lib/errors/gates";
 import { protectedProcedure, rateLimit, router } from "../trpc";
 
 /**
@@ -37,6 +38,15 @@ const itemRefInput = z.object({
 
 function mapError(error: unknown): TRPCError {
   if (error instanceof TRPCError) return error;
+  // Co-editing (Edit/Admin grants) is Pro-only — surface as an upgrade
+  // prompt the client already knows how to render.
+  if (error instanceof FeatureGateDeniedError) {
+    return new TRPCError({
+      code: "FORBIDDEN",
+      message: "Co-editing is a Master Chef feature. Upgrade to let family edit your recipes and plans.",
+      cause: { reason: "UPGRADE_REQUIRED", feature: error.feature }
+    });
+  }
   const message = error instanceof Error ? error.message : "Sharing failed.";
   const lower = message.toLowerCase();
   if (lower.includes("not found")) {

@@ -3,16 +3,16 @@ import type { Metadata, Route } from "next";
 import { Wordmark } from "@/components/brand/logo";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getServerEnv, hasStripeEnv, isLaunchFreeAccess } from "@/lib/env/server";
-import { FEATURE_REGISTRY, type FeatureKey } from "@eeatly/api/gates/registry";
+import { TIER_FEATURES } from "@/lib/pricing";
 import { getSubscriptionState } from "@/services/billing";
 import { getStripeCatalog, perMonthDisplay } from "@/services/stripe-catalog";
 import { PricingCard } from "@/components/pricing/pricing-card";
 import "../marketing.css";
 
 export const metadata: Metadata = {
-  title: "Pricing — eeatly Plus",
+  title: "Pricing — eeatly",
   description:
-    "eeatly Plus unlocks AI prefill from photos / text / voice, public recipe share links, household sharing, and planning. Free tier keeps your cooking memory."
+    "Cook is free forever. Chef shares your kitchen with family — household sharing, meal plans, and public recipe links. Master Chef adds co-editing, shareable plans, and priority AI."
 };
 
 export const dynamic = "force-dynamic";
@@ -47,13 +47,6 @@ export default async function PricingPage() {
   const plusPrices = tierPrices(catalog.tiers.plus);
   const proPrices = tierPrices(catalog.tiers.pro);
 
-  // Marketing copy pulls feature descriptions from the registry so the
-  // comparison stays in sync with what's actually gated. Same source the
-  // /admin/features panel uses.
-  const plusFeatures = (Object.keys(FEATURE_REGISTRY) as FeatureKey[]).map(
-    (key) => FEATURE_REGISTRY[key].description
-  );
-
   return (
     <div className="mkt min-h-screen">
     <main
@@ -69,10 +62,11 @@ export default async function PricingPage() {
           A kitchen that remembers what worked
         </h1>
         <p className="max-w-xl text-base text-muted-foreground">
-          The free plan keeps your cooking history forever. Plus adds AI that
-          fills in a recipe from a photo, a paste, or a voice note,
-          public share links you can send to family, household sharing, and
-          planning.
+          Cook keeps your personal cooking library forever, free. Chef shares
+          your kitchen with family and adds meal planning + public recipe
+          links. Master Chef is for cooking together — co-editing, shareable
+          plans, and priority AI. Every new account starts with a 14-day
+          Master Chef trial, no card needed.
         </p>
       </header>
 
@@ -82,14 +76,14 @@ export default async function PricingPage() {
           prices={plusPrices}
           launchMode={launchMode}
           authState={authState}
-          features={plusFeatures}
+          features={TIER_FEATURES.plus}
         />
         <PricingCard
           tier="pro"
           prices={proPrices}
           launchMode={false}
           authState={authState}
-          features={plusFeatures}
+          features={TIER_FEATURES.pro}
         />
       </div>
 
@@ -98,7 +92,7 @@ export default async function PricingPage() {
         <p className="text-sm text-muted-foreground">
           AI features (photo / text / voice prefill, Refine, ingredient
           extraction) run on credits. Every plan includes a monthly grant —
-          15 free, 300 on Plus, 1,500 on Pro — and you can buy one-time top-up
+          15 on Cook, 300 on Chef, 1,500 on Master Chef — and you can buy one-time top-up
           packs that never expire from <Link href={"/settings" as Route} className="text-primary underline-offset-2 hover:underline">Settings</Link>.
         </p>
       </section>
@@ -106,10 +100,9 @@ export default async function PricingPage() {
       <section className="mt-10 grid gap-3">
         <h2 className="text-lg font-semibold tracking-normal">What&apos;s on the free plan</h2>
         <ul className="grid gap-2 text-sm text-muted-foreground">
-          <li>· Log every meal, with notes and photos</li>
-          <li>· Browse and search your full cooking history</li>
-          <li>· Rediscovery suggestions on the dashboard</li>
-          <li>· One-person household (your own kitchen)</li>
+          {TIER_FEATURES.free.map((f) => (
+            <li key={f}>· {f}</li>
+          ))}
         </ul>
       </section>
 
@@ -117,19 +110,23 @@ export default async function PricingPage() {
         <h2 className="text-lg font-semibold tracking-normal">Common questions</h2>
         <dl className="grid gap-4 text-sm">
           <div className="grid gap-1">
-            <dt className="font-medium text-foreground">What does &ldquo;free during launch&rdquo; mean?</dt>
+            <dt className="font-medium text-foreground">How does the free Master Chef trial work?</dt>
             <dd className="text-muted-foreground">
-              Every Plus feature is unlocked for everyone right now — no card
-              needed. We&apos;ll give plenty of notice before paid plans begin, and
-              early users will get a launch discount as a thank-you. The prices
-              above are what they&apos;ll be.
+              Every new account gets 14 days of Master Chef automatically — no
+              card needed. You&apos;ll have the full set of features, including
+              co-editing and priority AI. Near the end we&apos;ll prompt you to
+              pick a plan; if you don&apos;t, your account simply drops to the
+              free Cook tier and your library stays exactly as it is.
             </dd>
           </div>
           <div className="grid gap-1">
-            <dt className="font-medium text-foreground">Does Plus apply to the whole household?</dt>
+            <dt className="font-medium text-foreground">What&apos;s the difference between Chef and Master Chef?</dt>
             <dd className="text-muted-foreground">
-              Yes — anyone you invite to your household uses Plus features too. One
-              account, the whole kitchen benefits.
+              Chef shares your kitchen with family — invites, meal plans, and
+              public recipe links — with 300 AI credits a month. Master Chef is
+              for cooking together: family can edit your recipes and plans in
+              place, you can share meal plans as public pages, you get 1,500
+              credits, and AI runs without burst limits.
             </dd>
           </div>
           <div className="grid gap-1">

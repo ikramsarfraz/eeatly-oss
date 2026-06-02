@@ -25,10 +25,10 @@ export function UpgradePrompt({ feature, description }: UpgradePromptProps) {
     >
       <div className="flex items-center gap-1.5 text-foreground">
         <Sparkles className="h-4 w-4 text-primary" aria-hidden />
-        <span className="font-medium">eeatly Plus</span>
+        <span className="font-medium">Upgrade your plan</span>
       </div>
       <p className="text-muted-foreground">
-        {copy} is part of <strong className="text-foreground">eeatly Plus</strong>.
+        {copy} is part of <strong className="text-foreground">a paid plan</strong>.
       </p>
       <div>
         <Button asChild variant="outline" size="sm" className="w-fit">

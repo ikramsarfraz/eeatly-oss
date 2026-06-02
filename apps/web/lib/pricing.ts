@@ -7,37 +7,92 @@
  * from env (`STRIPE_PRICE_*`, read in `services/billing.ts`); the env →
  * tier/pack mapping also lives in the billing service.
  *
- * Two paid tiers (Plus, Pro) differ ONLY by their included monthly AI
- * credit grant + burst limits — every feature is unlocked on both. Free
- * users get a small monthly grant so they can taste AI. Everyone can buy
- * one-time top-up packs that roll over.
+ * Three tiers, genuinely differentiated (R20):
+ *   - Free   — personal cooking library + 15 AI credits/mo. No sharing,
+ *              no plans, no household.
+ *   - Plus   — shared household + invites, meal plans (+clone), public
+ *              recipe share links, 300 AI credits/mo.
+ *   - Pro    — everything in Plus + 1,500 credits, co-editing (family can
+ *              Edit/Admin your recipes & plans), shareable meal plans, and
+ *              priority AI (no burst limit).
+ * Everyone can buy one-time top-up packs that roll over.
+ *
+ * First-time sign-ups get a 14-day Pro trial automatically — no card. It's
+ * tracked off the account's `createdAt` (see `resolveTier`), so it needs no
+ * extra column and a real subscription always supersedes it.
  */
 
 export type Tier = "free" | "plus" | "pro";
 export type BillingInterval = "monthly" | "annual";
 
+/** Length of the automatic first-time Pro trial, in days. */
+export const TRIAL_DAYS = 14;
+/** Tier granted during the trial window. */
+export const TRIAL_TIER: Tier = "pro";
+
+/**
+ * Resolve a user's effective tier from their raw subscription + account
+ * age. Pure (no DB) so it's shared by the credit engine and the gate
+ * resolver and is unit-testable.
+ *
+ * Precedence: an active/trialing Stripe subscription always wins; otherwise
+ * an account still inside its first `TRIAL_DAYS` is treated as Pro (the
+ * no-card trial); otherwise Free.
+ */
+export function resolveTier(input: {
+  subscriptionStatus: string | null;
+  subscriptionTier: string | null;
+  createdAt: Date | null;
+  now: Date;
+}): { tier: Tier; onTrial: boolean; trialDaysLeft: number; trialEndsAt: Date | null } {
+  const active =
+    input.subscriptionStatus === "active" || input.subscriptionStatus === "trialing";
+  if (active) {
+    // Null tier on an active sub = legacy single-tier era → Plus.
+    return {
+      tier: input.subscriptionTier === "pro" ? "pro" : "plus",
+      onTrial: false,
+      trialDaysLeft: 0,
+      trialEndsAt: null
+    };
+  }
+  if (input.createdAt) {
+    const trialEndsAt = new Date(input.createdAt.getTime() + TRIAL_DAYS * 86_400_000);
+    const msLeft = trialEndsAt.getTime() - input.now.getTime();
+    if (msLeft > 0) {
+      return {
+        tier: TRIAL_TIER,
+        onTrial: true,
+        trialDaysLeft: Math.max(1, Math.ceil(msLeft / 86_400_000)),
+        trialEndsAt
+      };
+    }
+  }
+  return { tier: "free", onTrial: false, trialDaysLeft: 0, trialEndsAt: null };
+}
+
 /** Subscription tiers — display + the monthly AI credit grant each includes. */
 export const TIERS = {
   free: {
-    name: "Free",
+    name: "Cook",
     monthly: { amount: 0, display: "$0" },
     annual: { amount: 0, display: "$0" },
     monthlyCredits: 15,
-    blurb: "Your cooking memory, plus a taste of AI."
+    blurb: "Your personal cooking library, plus a taste of AI."
   },
   plus: {
-    name: "Plus",
+    name: "Chef",
     monthly: { amount: 5, display: "$5", suffix: "/ month" },
     annual: { amount: 50, display: "$50", suffix: "/ year", monthsFree: 2, note: "2 months free" },
     monthlyCredits: 300,
-    blurb: "Everything unlocked + 300 AI credits a month."
+    blurb: "Share your kitchen & plan together + 300 AI credits a month."
   },
   pro: {
-    name: "Pro",
+    name: "Master Chef",
     monthly: { amount: 12, display: "$12", suffix: "/ month" },
     annual: { amount: 120, display: "$120", suffix: "/ year", monthsFree: 2, note: "2 months free" },
     monthlyCredits: 1500,
-    blurb: "For heavy cooks — 1,500 AI credits a month + priority.",
+    blurb: "Collaborate & cook at scale — 1,500 AI credits, co-editing + priority AI.",
     highlight: true
   }
 } as const satisfies Record<
@@ -114,3 +169,32 @@ export function creditCost(op: AiOperation): number {
 
 /** Launch-promo badge copy, shown when `isLaunchFreeAccess` is on. */
 export const LAUNCH_BADGE = "Free during launch · no card needed";
+
+/**
+ * Marketing feature lists per tier — the source of truth for the pricing
+ * cards and the Settings plan picker. Each list is what that tier UNLOCKS;
+ * Pro's list leads with "Everything in Plus" since it's a superset. Keep in
+ * sync with the actual gating (registry rules + service-level Pro checks).
+ */
+export const TIER_FEATURES: Record<Tier, string[]> = {
+  free: [
+    "Your personal recipe library, forever",
+    "Log every cook with notes & photos",
+    "Search your full cooking history",
+    "Rediscovery suggestions",
+    "15 AI credits / month"
+  ],
+  plus: [
+    "300 AI credits / month",
+    "Shared household — invite your family",
+    "Meal plans for occasions (+ clone past plans)",
+    "Public recipe share links",
+    "AI prefill from photo, text & voice"
+  ],
+  pro: [
+    "1,500 AI credits / month",
+    "Co-editing — let family Edit & Admin your recipes and plans",
+    "Shareable meal plans with public plan pages",
+    "Priority AI — no burst limits"
+  ]
+};

@@ -12,7 +12,7 @@ import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 
 type PaidTier = "plus" | "pro";
-const TIER_NAME: Record<string, string> = { free: "Free", plus: "Plus", pro: "Pro" };
+const TIER_NAME: Record<string, string> = { free: "Cook", plus: "Chef", pro: "Master Chef" };
 const RANK: Record<string, number> = { free: 0, plus: 1, pro: 2 };
 
 function formatDate(iso: string | Date | null): string {
@@ -31,6 +31,7 @@ export function PlanManager() {
   const { showToast } = useToast();
   const utils = trpc.useUtils();
   const subQuery = trpc.billing.currentSubscription.useQuery();
+  const tierStatusQuery = trpc.billing.tierStatus.useQuery();
   const catalogQuery = trpc.billing.catalog.useQuery();
   const checkout = trpc.billing.createCheckoutSession.useMutation();
   const portal = trpc.billing.createPortalSession.useMutation();
@@ -47,7 +48,14 @@ export function PlanManager() {
 
   const sub = subQuery.data;
   const active = sub?.status === "active" || sub?.status === "trialing";
-  const currentTier: string = active ? sub!.tier : "free";
+  const onTrial = !active && Boolean(tierStatusQuery.data?.onTrial);
+  const trialDaysLeft = tierStatusQuery.data?.trialDaysLeft ?? 0;
+  // During the no-card trial the user has no subscription row, but their
+  // effective tier is Pro — show that in the header, badged as a trial.
+  const currentTier: string = active ? sub!.tier : onTrial ? "pro" : "free";
+  // The cards' "Your plan" / upgrade state tracks only the *paid* tier — a
+  // trial user hasn't subscribed, so both cards stay purchasable.
+  const subscribedTier: string = active ? sub!.tier : "free";
   const catalog = catalogQuery.data;
 
   async function upgradeTo(tier: PaidTier) {
@@ -78,11 +86,13 @@ export function PlanManager() {
     }
   }
 
-  const statusLine = !active
-    ? "Free plan — AI runs on your monthly credit grant."
-    : sub!.cancelAtPeriodEnd
+  const statusLine = active
+    ? sub!.cancelAtPeriodEnd
       ? `Cancels ${formatDate(sub!.currentPeriodEnd)} — access until then.`
-      : `Renews ${formatDate(sub!.currentPeriodEnd)}.`;
+      : `Renews ${formatDate(sub!.currentPeriodEnd)}.`
+    : onTrial
+      ? `${trialDaysLeft} day${trialDaysLeft === 1 ? "" : "s"} left in your Master Chef trial. Pick a plan to keep these features.`
+      : "Free plan — AI runs on your monthly credit grant.";
 
   return (
     <section id="plan" className="grid gap-3 scroll-mt-24">
@@ -98,6 +108,10 @@ export function PlanManager() {
               {active ? (
                 <span className="rounded-full bg-[color:var(--sage-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--sage-fg)]">
                   Active
+                </span>
+              ) : onTrial ? (
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                  Trial
                 </span>
               ) : null}
             </div>
@@ -161,8 +175,8 @@ export function PlanManager() {
               interval === "monthly"
                 ? price?.display
                 : (t?.annual && "perMonthDisplay" in t.annual ? t.annual.perMonthDisplay : undefined);
-            const isCurrent = currentTier === tier;
-            const isUpgrade = RANK[tier] > RANK[currentTier];
+            const isCurrent = subscribedTier === tier;
+            const isUpgrade = RANK[tier] > RANK[subscribedTier];
             return (
               <div
                 key={tier}

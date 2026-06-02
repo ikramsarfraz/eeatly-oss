@@ -3,10 +3,12 @@ import "server-only";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { getServerEnv } from "@/lib/env/server";
+import { getUserTier } from "@/services/ai-credits";
 
 let _redis: Redis | null = null;
 let _mealMutationLimiter: Ratelimit | null = null;
 let _aiCallLimiter: Ratelimit | null = null;
+let _aiCallLimiterPro: Ratelimit | null = null;
 let _uploadPresignLimiter: Ratelimit | null = null;
 let _feedbackLimiter: Ratelimit | null = null;
 let _invitationLimiter: Ratelimit | null = null;
@@ -48,6 +50,20 @@ function getAiCallLimiter(): Ratelimit {
   return _aiCallLimiter;
 }
 
+function getAiCallLimiterPro(): Ratelimit {
+  if (!_aiCallLimiterPro) {
+    // Priority AI (Pro perk): a much wider burst window so heavy cooks
+    // never hit the abuse guard in normal use. The real ceiling is still
+    // their AI-credit grant — this only relaxes rapid-fire throttling.
+    _aiCallLimiterPro = new Ratelimit({
+      redis: getRedis(),
+      limiter: Ratelimit.slidingWindow(150, "5 m"),
+      prefix: "rl:ai:pro"
+    });
+  }
+  return _aiCallLimiterPro;
+}
+
 function getUploadPresignLimiter(): Ratelimit {
   if (!_uploadPresignLimiter) {
     _uploadPresignLimiter = new Ratelimit({
@@ -78,7 +94,10 @@ export async function checkMealMutationLimit(userId: string): Promise<void> {
 }
 
 export async function checkAiCallLimit(userId: string): Promise<void> {
-  const { success } = await getAiCallLimiter().limit(userId);
+  // Pro (incl. the no-card trial) gets priority AI — a wider burst window.
+  const tier = await getUserTier(userId);
+  const limiter = tier === "pro" ? getAiCallLimiterPro() : getAiCallLimiter();
+  const { success } = await limiter.limit(userId);
   if (!success) {
     throw new Error("You've hit your daily AI limit. Try again tomorrow.");
   }

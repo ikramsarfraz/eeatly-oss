@@ -268,11 +268,11 @@ export function AiSuggestDialog({ onSuggestion }: AiSuggestDialogProps) {
     if (reason === "UPGRADE_REQUIRED") {
       if (tab === "voice") {
         setError(
-          "Voice notes are part of eeatly Plus. Visit /pricing to see what's included."
+          "Voice notes are part of a paid plan. Visit /pricing to see what's included."
         );
       } else {
         setError(
-          "AI assist is part of eeatly Plus. Visit /pricing to see what's included."
+          "AI assist is part of a paid plan. Visit /pricing to see what's included."
         );
       }
       return;

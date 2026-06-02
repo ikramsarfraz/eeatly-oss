@@ -361,7 +361,7 @@ export function HouseholdClient({
               Icon={Crown}
               tone="sage"
               title="Owner"
-              body="One per kitchen. Invites and removes members, and (later) controls billing for Plus."
+              body="One per kitchen. Invites and removes members, and (later) controls billing for Chef."
             />
             <RoleCard
               Icon={Users}

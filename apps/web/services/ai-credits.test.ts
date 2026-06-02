@@ -57,23 +57,27 @@ afterEach(() => {
 });
 
 describe("getUserTier", () => {
+  // The query joins `user` (for createdAt — the trial window) with its
+  // subscription. A null createdAt means "no trial" so these rows isolate
+  // the subscription-status mapping. Trial behavior is covered by resolveTier
+  // unit tests in pricing.test.ts.
   it("returns free when there's no subscription row", async () => {
-    queue([]); // subscriptions lookup → none
+    queue([{ status: null, subTier: null, createdAt: null }]);
     expect(await getUserTier("u-1")).toBe("free");
   });
 
   it("returns free when the subscription isn't active", async () => {
-    queue([{ status: "canceled", tier: "pro" }]);
+    queue([{ status: "canceled", subTier: "pro", createdAt: null }]);
     expect(await getUserTier("u-1")).toBe("free");
   });
 
   it("maps an active pro subscription to pro", async () => {
-    queue([{ status: "active", tier: "pro" }]);
+    queue([{ status: "active", subTier: "pro", createdAt: null }]);
     expect(await getUserTier("u-1")).toBe("pro");
   });
 
   it("treats an active sub with a null tier as plus (legacy)", async () => {
-    queue([{ status: "active", tier: null }]);
+    queue([{ status: "active", subTier: null, createdAt: null }]);
     expect(await getUserTier("u-1")).toBe("plus");
   });
 });

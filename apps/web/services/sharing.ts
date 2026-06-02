@@ -23,6 +23,7 @@ import {
 } from "@/services/notifications";
 import { getCurrentHousehold } from "@/lib/auth/session";
 import { getServerEnv } from "@/lib/env/server";
+import { requireFeatureAccess } from "@/lib/gates/resolver";
 import { getUserSettings } from "@/services/user-settings";
 import { normalizeMealName } from "@/lib/utils";
 import { logger } from "@/lib/observability/logger";
@@ -407,6 +408,12 @@ export async function grantItem(args: {
   if (args.granteeUserId === realOwner) {
     throw new Error("They already own this item.");
   }
+  // Co-editing (Edit/Admin) is a Pro perk of the item's OWNER — a Plus/Free
+  // owner can share read-only, but handing out edit rights needs Pro. Throws
+  // FeatureGateDeniedError, which the router maps to an upgrade prompt.
+  if (role === "edit" || role === "admin") {
+    await requireFeatureAccess(realOwner, "co_editing");
+  }
   if (!(await areConnected(granter, args.granteeUserId))) {
     throw new Error("You can only share with people in your circle.");
   }
@@ -532,6 +539,10 @@ export async function setGrantRole(args: {
     throw new Error("The owner's role can't be changed.");
   }
   const role = asGrantRole(args.role);
+  // Co-editing (Edit/Admin) requires the owner to be on Pro.
+  if (role === "edit" || role === "admin") {
+    await requireFeatureAccess(item.ownerUserId, "co_editing");
+  }
 
   const result = await db
     .update(itemGrants)

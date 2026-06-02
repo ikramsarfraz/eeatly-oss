@@ -57,6 +57,12 @@ vi.mock("@/services/user-settings", () => ({
   }))
 }));
 
+// Co-editing (Edit/Admin grants) is gated on the owner's Pro tier via
+// `requireFeatureAccess`. Default to allow; individual tests override it to
+// assert the gated path. The gate logic itself is covered in resolver.test.
+const gateMock = vi.hoisted(() => ({ requireFeatureAccess: vi.fn(async () => undefined) }));
+vi.mock("@/lib/gates/resolver", () => gateMock);
+
 import {
   canEditItem,
   canManageSharing,
@@ -64,6 +70,7 @@ import {
   revokeItem,
   setGrantRole
 } from "./sharing";
+import { FeatureGateDeniedError } from "@/lib/errors/gates";
 
 function queue<T>(value: T) {
   dbState.queue.push(async () => value);
@@ -73,6 +80,8 @@ beforeEach(() => {
   dbState.queue.length = 0;
   notificationsMock.createNotification.mockReset();
   notificationsMock.createNotification.mockResolvedValue(undefined);
+  gateMock.requireFeatureAccess.mockReset();
+  gateMock.requireFeatureAccess.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -154,6 +163,42 @@ describe("grant roles", () => {
 
     expect(result).toEqual({ grantId: "g-new" });
     expect(dbState.queue.length).toBe(0);
+  });
+
+  it("grantItem rejects an Edit grant when the owner isn't Pro (co-editing gated)", async () => {
+    gateMock.requireFeatureAccess.mockRejectedValueOnce(
+      new FeatureGateDeniedError("co_editing")
+    );
+    queue(itemRow("me")); // resolveItem (owner = me)
+    await expect(
+      grantItem({
+        ownerUserId: "me",
+        itemType: "recipe",
+        itemId: "11111111-1111-4111-8111-111111111111",
+        granteeUserId: "friend",
+        role: "edit"
+      })
+    ).rejects.toBeInstanceOf(FeatureGateDeniedError);
+    // The gate was checked against the item's owner.
+    expect(gateMock.requireFeatureAccess).toHaveBeenCalledWith("me", "co_editing");
+  });
+
+  it("grantItem allows a view-only grant without a Pro check", async () => {
+    queue(itemRow("me")); // resolveItem
+    queue([{ id: "c-1" }]); // areConnected → connected
+    queue([{ grantId: "g-view" }]); // insert ... returning
+    queue([{ name: "Me", email: "me@example.com" }]); // displayName
+
+    const result = await grantItem({
+      ownerUserId: "me",
+      itemType: "recipe",
+      itemId: "11111111-1111-4111-8111-111111111111",
+      granteeUserId: "friend",
+      role: "view"
+    });
+
+    expect(result).toEqual({ grantId: "g-view" });
+    expect(gateMock.requireFeatureAccess).not.toHaveBeenCalled();
   });
 
   it("setGrantRole rejects a non-manager (editor can't change roles)", async () => {

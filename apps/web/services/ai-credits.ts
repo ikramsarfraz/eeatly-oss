@@ -2,12 +2,13 @@ import "server-only";
 
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { aiCredits, aiCreditLedger, subscriptions } from "@/db/schema";
+import { aiCredits, aiCreditLedger, subscriptions, users } from "@/db/schema";
 import { InsufficientCreditsError } from "@/lib/errors/credits";
 import { logger } from "@/lib/observability/logger";
 import {
   creditCost,
   MONTHLY_CREDIT_GRANT,
+  resolveTier,
   type AiOperation,
   type Tier
 } from "@/lib/pricing";
@@ -24,18 +25,42 @@ import {
 
 const TIER_RANK: Record<Tier, number> = { free: 0, plus: 1, pro: 2 };
 
-/** The user's effective tier from their subscription state. */
+/**
+ * The user's effective tier — their active subscription if any, otherwise
+ * the no-card first-time Pro trial (14 days from signup), otherwise Free.
+ * One query joins the account row (for `createdAt`) with its subscription.
+ */
 export async function getUserTier(userId: string): Promise<Tier> {
+  return (await getTierStatus(userId)).tier;
+}
+
+/**
+ * Full tier + trial snapshot for a user. UI surfaces (Settings, pricing)
+ * use the trial fields to show "X days left in your Pro trial"; the credit
+ * engine and gates only need `.tier`.
+ */
+export async function getTierStatus(userId: string): Promise<{
+  tier: Tier;
+  onTrial: boolean;
+  trialDaysLeft: number;
+  trialEndsAt: Date | null;
+}> {
   const [row] = await db
-    .select({ status: subscriptions.status, tier: subscriptions.tier })
-    .from(subscriptions)
-    .where(eq(subscriptions.userId, userId))
+    .select({
+      status: subscriptions.status,
+      subTier: subscriptions.tier,
+      createdAt: users.createdAt
+    })
+    .from(users)
+    .leftJoin(subscriptions, eq(subscriptions.userId, users.id))
+    .where(eq(users.id, userId))
     .limit(1);
-  if (!row) return "free";
-  const active = row.status === "active" || row.status === "trialing";
-  if (!active) return "free";
-  // Null tier on an active sub = legacy single-tier era → Plus.
-  return row.tier === "pro" ? "pro" : "plus";
+  return resolveTier({
+    subscriptionStatus: row?.status ?? null,
+    subscriptionTier: row?.subTier ?? null,
+    createdAt: row?.createdAt ?? null,
+    now: new Date()
+  });
 }
 
 function sameCalendarMonth(a: Date, b: Date): boolean {

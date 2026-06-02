@@ -10,7 +10,7 @@ import { SectionLabel } from "@/components/ui/section-label";
 import { useToast } from "@/components/providers/toast-provider";
 import { trpc } from "@/lib/trpc/client";
 
-const TIER_LABEL: Record<string, string> = { free: "Free", plus: "Plus", pro: "Pro" };
+const TIER_LABEL: Record<string, string> = { free: "Cook", plus: "Chef", pro: "Master Chef" };
 
 /**
  * Settings → AI credits. Shows the user's balance (monthly grant + rolled-over

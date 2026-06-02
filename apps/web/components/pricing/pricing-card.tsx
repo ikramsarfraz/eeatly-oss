@@ -92,7 +92,7 @@ export function PricingCard({
           </span>
           {tier === "pro" ? (
             <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-              Most credits
+              Most powerful
             </span>
           ) : null}
         </div>
@@ -100,7 +100,7 @@ export function PricingCard({
           {tierConfig.monthlyCredits.toLocaleString()} AI credits
           <span className="text-muted-foreground"> / month</span>
         </p>
-        <p className="text-[13px] text-muted-foreground">Every feature included.</p>
+        <p className="text-[13px] text-muted-foreground">{tierConfig.blurb}</p>
       </header>
 
       <div
@@ -182,7 +182,7 @@ export function PricingCard({
           </Button>
         ) : (
           <Button asChild className="w-full">
-            <Link href={"/dashboard" as Route}>You&apos;re all set — Plus is unlocked</Link>
+            <Link href={"/dashboard" as Route}>You&apos;re all set — Chef is unlocked</Link>
           </Button>
         )
       ) : !billingConfigured ? (
@@ -214,7 +214,7 @@ export function PricingCard({
 
       <div className="mt-1 border-t border-[var(--border-soft,var(--border))] pt-4">
         <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Everything included
+          {tier === "pro" ? "Everything in Chef, and" : "What's included"}
         </p>
         <ul className="grid gap-2">
           {features.map((f) => (

@@ -368,7 +368,9 @@ export async function createPlanShare(args: {
   if (!(await getUserSettings(args.userId)).allowLinkShares) {
     throw new Error("Link sharing is turned off in your settings.");
   }
-  await requireFeatureAccess(args.userId, "recipe_share_create");
+  // Plan link-sharing (public plan pages) is Pro-only — recipe sharing is
+  // Plus, but shareable meal plans are a top-tier perk.
+  await requireFeatureAccess(args.userId, "plan_share_create");
 
   const [existing] = await db
     .select({ id: planShares.id, token: planShares.token })

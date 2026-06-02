@@ -11,6 +11,7 @@
  */
 export const GATE_RULES = [
   "paid_only",
+  "pro_only",
   "beta_or_paid",
   "admin_only",
   "allowlist",
@@ -38,6 +39,13 @@ export type GateContext = {
     | "trialing"
     | "unpaid"
     | null;
+  /**
+   * Effective billing tier — computed by the resolver from the active
+   * subscription OR the no-card first-time Pro trial (see
+   * `lib/pricing.ts#resolveTier`). This, not `subscriptionStatus`, is what
+   * the paid/pro rule evaluators key off so a trial user is treated as Pro.
+   */
+  tier: "free" | "plus" | "pro";
   /** Allowlist user ids supplied per-feature via overrides. */
   allowlistedUserIds: string[];
   /** Env-flag rule consults this — feature key → boolean. */
@@ -58,12 +66,12 @@ export type GateContext = {
  * overrides bypass this layer.
  */
 export const ruleEvaluators: Record<GateRule, (ctx: GateContext, feature: string) => boolean> = {
-  paid_only: (ctx) =>
-    ctx.subscriptionStatus === "active" || ctx.subscriptionStatus === "trialing",
-  beta_or_paid: (ctx) =>
-    ctx.betaCohort !== null ||
-    ctx.subscriptionStatus === "active" ||
-    ctx.subscriptionStatus === "trialing",
+  // Plus OR Pro (the trial counts as Pro). Keyed off the resolved tier so
+  // the no-card trial unlocks paid features without a Stripe subscription.
+  paid_only: (ctx) => ctx.tier === "plus" || ctx.tier === "pro",
+  // Pro only — co-editing, plan sharing, and other top-tier perks.
+  pro_only: (ctx) => ctx.tier === "pro",
+  beta_or_paid: (ctx) => ctx.betaCohort !== null || ctx.tier !== "free",
   admin_only: (ctx) => ctx.role === "platform_admin",
   allowlist: (ctx) => ctx.allowlistedUserIds.includes(ctx.userId),
   env_flag: (ctx, feature) => Boolean(ctx.envFlags[feature]),

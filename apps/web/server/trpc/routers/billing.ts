@@ -13,6 +13,7 @@ import {
   getSubscriptionState
 } from "@/services/billing";
 import { getStripeCatalog, perMonthDisplay } from "@/services/stripe-catalog";
+import { getTierStatus } from "@/services/ai-credits";
 import { MONTHLY_CREDIT_GRANT } from "@/lib/pricing";
 import { protectedProcedure, rateLimit, router } from "../trpc";
 
@@ -44,6 +45,13 @@ export const billingRouter = router({
   currentSubscription: protectedProcedure.query(({ ctx }) =>
     getSubscriptionState({ userId: ctx.user.id })
   ),
+
+  /**
+   * Effective tier + no-card trial snapshot. Unlike `currentSubscription`
+   * (raw Stripe state), this folds in the 14-day first-time Pro trial — so
+   * a trial user reads as `tier: "pro"` with `onTrial: true`.
+   */
+  tierStatus: protectedProcedure.query(({ ctx }) => getTierStatus(ctx.user.id)),
 
   /** Live tier prices (from the Stripe catalog) + included monthly credits. */
   catalog: protectedProcedure.query(async () => {

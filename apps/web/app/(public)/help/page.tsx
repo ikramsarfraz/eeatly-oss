@@ -126,7 +126,7 @@ const topics: Topic[] = [
         and tap <span className="font-medium text-foreground">Manage billing</span>.
         That opens the Stripe billing portal where you can cancel, change
         plan, or update your card. Cancellation takes effect at the end of
-        your current billing period — you keep Plus features until then.
+        your current billing period — you keep your plan&apos;s features until then.
       </>
     )
   },
