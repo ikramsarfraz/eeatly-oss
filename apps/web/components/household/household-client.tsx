@@ -2,15 +2,18 @@
 
 import * as React from "react";
 import {
+  Check,
   Crown,
   Loader2,
   MailPlus,
   MoreHorizontal,
+  Pencil,
   ShieldCheck,
   Sparkles,
   Trash2,
   UserMinus,
-  Users
+  Users,
+  X
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -111,11 +114,39 @@ export function HouseholdClient({
   const [email, setEmail] = React.useState("");
   const [revokingId, setRevokingId] = React.useState<string | null>(null);
   const [removingUserId, setRemovingUserId] = React.useState<string | null>(null);
+  // Kitchen-name edit (owner only). `displayName` is the live value so the
+  // hero updates immediately after a successful rename without a refresh.
+  const [displayName, setDisplayName] = React.useState(householdName);
+  const [editingName, setEditingName] = React.useState(false);
+  const [nameDraft, setNameDraft] = React.useState(householdName);
 
   const inviteMutation = trpc.households.invite.useMutation();
   const revokeMutation = trpc.households.revokeInvitation.useMutation();
   const removeMutation = trpc.households.removeMember.useMutation();
+  const renameMutation = trpc.households.rename.useMutation();
   const pendingInvite = inviteMutation.isPending;
+
+  async function handleRename(e: React.FormEvent) {
+    e.preventDefault();
+    const next = nameDraft.trim();
+    if (!next || renameMutation.isPending) return;
+    if (next === displayName) {
+      setEditingName(false);
+      return;
+    }
+    try {
+      const result = await renameMutation.mutateAsync({ name: next });
+      setDisplayName(result.name);
+      setEditingName(false);
+      showToast({ variant: "success", title: "Kitchen renamed" });
+    } catch (error) {
+      showToast({
+        variant: "error",
+        title: "Couldn't rename",
+        description: error instanceof Error ? error.message : undefined
+      });
+    }
+  }
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
@@ -188,12 +219,65 @@ export function HouseholdClient({
         >
           The
         </p>
-        <h1
-          className="font-serif text-[44px] leading-[1.02] text-foreground sm:text-[60px] lg:text-[80px]"
-          style={{ letterSpacing: "-0.028em" }}
-        >
-          {householdName.toLowerCase()}.
-        </h1>
+        {editingName ? (
+          <form onSubmit={handleRename} className="grid gap-2.5 sm:max-w-[560px]">
+            <Input
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              maxLength={60}
+              autoFocus
+              aria-label="Kitchen name"
+              className="h-auto py-2 font-serif text-[28px] leading-tight sm:text-[36px]"
+            />
+            <div className="flex items-center gap-2">
+              <Button
+                type="submit"
+                disabled={renameMutation.isPending || !nameDraft.trim()}
+              >
+                {renameMutation.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Check className="h-3.5 w-3.5" />
+                )}
+                Save
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setNameDraft(displayName);
+                  setEditingName(false);
+                }}
+              >
+                <X className="h-3.5 w-3.5" />
+                Cancel
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
+            <h1
+              className="font-serif text-[44px] leading-[1.02] text-foreground sm:text-[60px] lg:text-[80px]"
+              style={{ letterSpacing: "-0.028em" }}
+            >
+              {displayName.toLowerCase()}.
+            </h1>
+            {isOwner ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="mb-2 min-h-[32px] text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  setNameDraft(displayName);
+                  setEditingName(true);
+                }}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Rename
+              </Button>
+            ) : null}
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-2 pt-1">
           <Badge variant="sage" className="text-[11.5px]">
             {members.length} {members.length === 1 ? "member" : "members"}

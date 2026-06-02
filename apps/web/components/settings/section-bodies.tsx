@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -60,10 +61,11 @@ export function SharingSection() {
       <PrivacyToggles />
       <ActiveShareLinks />
       <p className="text-[12.5px] leading-[1.55] text-muted-foreground">
-        Revoking access removes someone&apos;s{" "}
-        <strong className="text-foreground">live copy</strong> instantly. If they saved their own
-        copy, that copy stays theirs. Manage who can see a specific item from that recipe or
-        plan&apos;s <strong className="text-foreground">Share</strong> sheet.
+        Revoking a link removes the{" "}
+        <strong className="text-foreground">live copy</strong>{" "}
+        instantly. If someone saved their own copy, that copy stays theirs. To change who can
+        see a specific recipe or plan, open its{" "}
+        <strong className="text-foreground">Share</strong> sheet.
       </p>
     </>
   );
@@ -170,13 +172,17 @@ function ActiveShareLinks() {
 
   return (
     <Card className="overflow-hidden p-0">
-      {links.map((link, i) => (
+      <div className="px-5 pt-4 pb-3">
+        <p className="text-[14px] font-medium text-foreground">Active share links</p>
+        <p className="mt-0.5 text-[12.5px] leading-[1.5] text-muted-foreground">
+          Public &ldquo;anyone with the link&rdquo; shares. Sharing with specific people is
+          managed from each item&apos;s Share sheet, not here.
+        </p>
+      </div>
+      {links.map((link) => (
         <div
           key={link.shareId}
-          className={cn(
-            "flex flex-wrap items-center gap-3 px-5 py-4",
-            i > 0 && "border-t border-[var(--border-soft,var(--border))]"
-          )}
+          className="flex flex-wrap items-center gap-3 border-t border-[var(--border-soft,var(--border))] px-5 py-4"
         >
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-[var(--surface-2)] text-muted-foreground">
             <Link2 className="h-4 w-4" />
@@ -440,26 +446,7 @@ function Toggle({
   busy: boolean;
   onToggle: (v: boolean) => void;
 }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      disabled={busy}
-      onClick={() => onToggle(!on)}
-      className={cn(
-        "relative h-[26px] w-[44px] shrink-0 rounded-full transition-colors disabled:opacity-60",
-        on ? "bg-[color:var(--primary)]" : "bg-[var(--border-strong,var(--border))]"
-      )}
-    >
-      <span
-        className={cn(
-          "absolute top-0.5 h-[22px] w-[22px] rounded-full bg-white transition-transform",
-          on ? "translate-x-[18px]" : "translate-x-0.5"
-        )}
-      />
-    </button>
-  );
+  return <Switch checked={on} disabled={busy} onCheckedChange={onToggle} />;
 }
 
 function SegmentedRadio({

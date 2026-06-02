@@ -1015,3 +1015,21 @@ export async function listPendingInvitations(
     )
     .orderBy(sql`${householdInvitations.createdAt} desc`);
 }
+
+/**
+ * Rename the household (kitchen). Owner-only — the caller gates on
+ * `householdOwnerProcedure`, so we trust the resolved `householdId`. The
+ * procedure's zod input bounds the value; we trim + guard empty here too.
+ */
+export async function renameHousehold(args: {
+  householdId: string;
+  name: string;
+}): Promise<{ name: string }> {
+  const trimmed = args.name.trim();
+  if (trimmed.length === 0) throw new Error("Kitchen name can't be empty.");
+  await db
+    .update(households)
+    .set({ name: trimmed })
+    .where(eq(households.id, args.householdId));
+  return { name: trimmed };
+}

@@ -1,10 +1,11 @@
 import "server-only";
 
-import { and, asc, count, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/lib/db/client";
 import {
   connections,
+  dishImages,
   householdMembers,
   itemGrants,
   itemRequests,
@@ -647,13 +648,17 @@ export async function listSharedWithMe(userId: string): Promise<SharedWithMeItem
       name: meals.name,
       ownerUserId: itemGrants.ownerUserId,
       ownerName: users.name,
-      photoUrl: meals.photoUrl,
+      // Own photo wins; the app-wide AI dish image is the fallback — same
+      // coalesce the dashboard + Library "Yours" reads use, so a shared
+      // recipe shows its image instead of a blank tile.
+      photoUrl: sql<string | null>`coalesce(${meals.photoUrl}, ${dishImages.imageUrl})`,
       savedCopyItemId: itemGrants.savedCopyItemId,
       grantedAt: itemGrants.createdAt
     })
     .from(itemGrants)
     .innerJoin(meals, eq(meals.id, itemGrants.itemId))
     .innerJoin(users, eq(users.id, itemGrants.ownerUserId))
+    .leftJoin(dishImages, eq(dishImages.normalizedName, meals.normalizedName))
     .where(
       and(
         eq(itemGrants.granteeUserId, userId),

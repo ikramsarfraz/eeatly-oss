@@ -34,6 +34,7 @@ import {
   listHouseholdMembers,
   listPendingInvitations,
   removeMemberFromHousehold,
+  renameHousehold,
   revokeHouseholdInvitation
 } from "@/services/households";
 import {
@@ -88,6 +89,27 @@ export const householdsRouter = router({
   pendingInvitations: householdOwnerProcedure.query(({ ctx }) =>
     listPendingInvitations(ctx.user.id, ctx.household.id)
   ),
+
+  /** Owner-only: rename the kitchen. */
+  rename: householdOwnerProcedure
+    .use(rateLimit("mutation"))
+    .input(
+      z.object({
+        name: z
+          .string()
+          .trim()
+          .min(1, "Kitchen name can't be empty.")
+          .max(60, "Keep it under 60 characters.")
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const result = await renameHousehold({
+        householdId: ctx.household.id,
+        name: input.name
+      });
+      revalidatePath("/kitchen");
+      return result;
+    }),
 
   invitationByToken: publicProcedure
     .input(z.object({ token: z.string().min(8).max(256) }))

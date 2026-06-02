@@ -4,6 +4,7 @@ import * as React from "react";
 import { Check, Link2, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -290,24 +291,7 @@ function LinkToggle({
             A read-only live view — no eeatly account needed.
           </p>
         </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={on}
-          disabled={busy}
-          onClick={() => onToggle(!on)}
-          className={cn(
-            "relative h-6 w-[42px] shrink-0 rounded-full transition-colors",
-            on ? "bg-[color:var(--primary)]" : "bg-[var(--border-strong,var(--border))]"
-          )}
-        >
-          <span
-            className={cn(
-              "absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform",
-              on ? "translate-x-[18px]" : "translate-x-0.5"
-            )}
-          />
-        </button>
+        <Switch checked={on} disabled={busy} onCheckedChange={onToggle} />
       </div>
       {on && url ? (
         <button
