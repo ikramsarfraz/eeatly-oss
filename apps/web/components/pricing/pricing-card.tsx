@@ -138,7 +138,7 @@ export function PricingCard({ tier, prices, launchMode, authState, interval }: P
             "Billed monthly"
           )}
         </p>
-        <p className="mt-0.5 text-[12px] text-muted-foreground">
+        <p className="mt-[3px] text-[12px] text-muted-foreground">
           {isFree ? "Your library stays yours." : "Cancel anytime from Settings."}
         </p>
       </div>
@@ -184,8 +184,8 @@ export function PricingCard({ tier, prices, launchMode, authState, interval }: P
         onUpgrade={handleUpgrade}
       />
 
-      {/* Feature list */}
-      <div className="mt-6 border-t border-[var(--border-soft,var(--border))] pt-5">
+      {/* Feature list — flows directly after the CTA (no bottom-align). */}
+      <div className="mt-6 border-t border-[var(--border-soft,var(--border))] pt-[22px]">
         <p className="mb-3.5 font-mono text-[10px] font-medium uppercase tracking-[1.2px] text-muted-foreground">
           {FEAT_LABEL[tier]}
         </p>
@@ -217,8 +217,14 @@ type CardCtaProps = {
   onUpgrade: () => void;
 };
 
-/** The bottom-aligned CTA. Free links out; paid tiers carry the full
- *  auth / billing / launch-promo branching the page relied on before. */
+/**
+ * The CTA. Two visual variants only, keyed off the tier (not the state):
+ * Master Chef is the single filled-primary button on the page; Cook + Chef
+ * are ghost. The ghost class forces `bg-transparent` because shadcn's
+ * `outline` ships `bg-background`, which reads as a solid fill on the
+ * translucent card. Free links out; paid tiers keep the full
+ * auth / billing / launch-promo branching.
+ */
 function CardCta({
   tier,
   tierName,
@@ -231,13 +237,20 @@ function CardCta({
   pending,
   onUpgrade
 }: CardCtaProps) {
-  const ctaClass = "mt-auto w-full rounded-[13px] py-[13px]";
-  const variant = isFeatured ? "default" : "outline";
+  // Let padding define the height (no fixed `h-10` from the default size).
+  const base = "h-auto w-full rounded-[13px] px-[18px] py-[13px] text-[14.5px] font-semibold";
+  const variant = isFeatured ? "default" : "ghost";
+  const className = cn(
+    base,
+    isFeatured
+      ? "shadow-[0_8px_22px_-10px_color-mix(in_srgb,var(--primary)_60%,transparent)] hover:bg-primary/90"
+      : "border border-border bg-transparent text-foreground hover:border-primary hover:bg-primary/5 hover:text-primary"
+  );
 
   // Cook — non-purchasing. Anonymous → sign up; signed in → straight to app.
   if (isFree) {
     return (
-      <Button asChild variant="outline" className={ctaClass}>
+      <Button asChild variant={variant} className={className}>
         <Link href={(authState.kind === "anonymous" ? "/sign-up" : "/dashboard") as Route}>
           Start free
         </Link>
@@ -249,20 +262,20 @@ function CardCta({
   if (launchMode && tier === "plus") {
     if (authState.kind === "anonymous") {
       return (
-        <Button asChild variant={variant} className={ctaClass}>
+        <Button asChild variant={variant} className={className}>
           <Link href={"/sign-up" as Route}>Start free during launch</Link>
         </Button>
       );
     }
     if (subscribedHere) {
       return (
-        <Button asChild variant="outline" className={ctaClass}>
+        <Button asChild variant={variant} className={className}>
           <Link href={"/settings" as Route}>Manage billing</Link>
         </Button>
       );
     }
     return (
-      <Button asChild variant={variant} className={ctaClass}>
+      <Button asChild variant={variant} className={className}>
         <Link href={"/dashboard" as Route}>You&apos;re all set — Chef is unlocked</Link>
       </Button>
     );
@@ -270,7 +283,7 @@ function CardCta({
 
   if (!billingConfigured) {
     return (
-      <Button type="button" disabled variant={variant} className={ctaClass}>
+      <Button type="button" disabled variant={variant} className={className}>
         Coming soon
       </Button>
     );
@@ -278,7 +291,7 @@ function CardCta({
 
   if (authState.kind === "anonymous") {
     return (
-      <Button asChild variant={variant} className={ctaClass}>
+      <Button asChild variant={variant} className={className}>
         <Link href={"/sign-in?next=/pricing" as Route}>Sign in to upgrade</Link>
       </Button>
     );
@@ -286,14 +299,14 @@ function CardCta({
 
   if (subscribedHere) {
     return (
-      <Button asChild variant="outline" className={ctaClass}>
+      <Button asChild variant={variant} className={className}>
         <Link href={"/settings" as Route}>Your plan — manage billing</Link>
       </Button>
     );
   }
 
   return (
-    <Button type="button" onClick={onUpgrade} disabled={pending} variant={variant} className={ctaClass}>
+    <Button type="button" onClick={onUpgrade} disabled={pending} variant={variant} className={className}>
       {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
       {authState.kind === "active_subscriber" ? `Switch to ${tierName}` : `Choose ${tierName}`}
     </Button>

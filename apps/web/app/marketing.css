@@ -264,14 +264,13 @@
   margin: 0 auto;
   padding: 0 32px;
 }
-.mkt section {
+/* Landing-page bands only. Scoped to DIRECT children of `.mkt` so the tall
+   88px rhythm applies to the landing's top-level <section> bands and never
+   bleeds into nested <section> elements — e.g. the pricing cards (which set
+   their own `p-7`) or the doc pages' content blocks (privacy / help /
+   pricing), which lay themselves out with Tailwind spacing. */
+.mkt > section {
   padding: 88px 0;
-}
-/* Doc pages (privacy / help / pricing) lay out their own <section> blocks
-   with Tailwind spacing — opt them out of the landing page's tall 88px
-   section bands so the content isn't flung apart by huge gaps. */
-.mkt-doc section {
-  padding: 0;
 }
 
 /* ─── Hero ───────────────────────────────────────────────────── */
@@ -1473,10 +1472,24 @@
 }
 .mkt .pricing-table th:nth-child(2),
 .mkt .pricing-table th:nth-child(3),
+.mkt .pricing-table th:nth-child(4),
 .mkt .pricing-table td:nth-child(2),
-.mkt .pricing-table td:nth-child(3) {
+.mkt .pricing-table td:nth-child(3),
+.mkt .pricing-table td:nth-child(4) {
   text-align: center;
-  width: 100px;
+  width: 112px;
+}
+/* The featured tier column (Master Chef) gets a subtle wash + accent header. */
+.mkt .pricing-table th:nth-child(4),
+.mkt .pricing-table td:nth-child(4) {
+  background: color-mix(in srgb, var(--forest) 6%, transparent);
+}
+.mkt .pricing-table th:nth-child(4) {
+  color: var(--forest);
+}
+.mkt .pricing-table .tier-num {
+  font-weight: 600;
+  color: var(--ink);
 }
 .mkt .pricing-table tr:last-child td {
   border-bottom: none;
@@ -1651,7 +1664,7 @@
     padding: 12px 14px;
     font-size: 13px;
   }
-  .mkt section {
+  .mkt > section {
     padding: 64px 0;
   }
   .mkt .device-stage {

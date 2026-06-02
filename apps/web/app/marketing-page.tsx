@@ -3,7 +3,8 @@
 import * as React from "react";
 import Link from "next/link";
 import type { Route } from "next";
-import { useTheme } from "next-themes";
+import { SiteHeader } from "@/components/marketing/site-header";
+import { SiteFooter } from "@/components/marketing/site-footer";
 import "./marketing.css";
 
 /**
@@ -51,28 +52,6 @@ const planIcon = (
 const shareIcon = (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
 );
-const moon = (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
-);
-const sun = (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
-);
-
-/* ─── Brand wordmark (uses scoped .brand-wordmark tokens) ───────── */
-function BrandWordmark({ size = 26 }: { size?: number }) {
-  return (
-    <span className="brand-wordmark" style={{ fontSize: size }} aria-label="eeatly">
-      <span className="bw-ee" aria-hidden>e</span>
-      <span className="bw-ee" aria-hidden>e</span>
-      <span className="bw-atly" aria-hidden>a</span>
-      <span className="bw-atly" aria-hidden>t</span>
-      <span className="bw-atly" aria-hidden>l</span>
-      <span className="bw-atly" aria-hidden>y</span>
-      <span className="bw-dot" aria-hidden />
-    </span>
-  );
-}
-
 /* ─── Meal tile (hashed warm palette + monogram) ───────────────── */
 const MEAL_PALETTES = [
   { bg: "#D7DEC8", fg: "#2E5739", dot: "#A8B79A" },
@@ -533,50 +512,11 @@ function ShowcaseGallery() {
   );
 }
 
-/* ─── Theme toggle (next-themes) ───────────────────────────────── */
-function ThemeToggle() {
-  const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- next-themes mount swap (single transition, intentional)
-    setMounted(true);
-  }, []);
-  const isDark = resolvedTheme === "dark";
-  return (
-    <button type="button" className="theme-toggle" aria-label="Toggle theme" onClick={() => setTheme(isDark ? "light" : "dark")}>
-      {mounted ? (isDark ? sun : moon) : moon}
-    </button>
-  );
-}
-
 export default function MarketingPage() {
-  const { theme, setTheme } = useTheme();
-  React.useEffect(() => {
-    // Handoff: light is the default for the marketing page. Convert the
-    // implicit "system" default to explicit light on first visit; an
-    // explicit dark choice (via the toggle) is preserved.
-    if (theme === "system") {
-      setTheme("light");
-    }
-  }, [theme, setTheme]);
-
   return (
     <div className="mkt" id="top">
-      {/* Header */}
-      <header className="topnav">
-        <div className="topnav-inner">
-          <Link href="/" className="brand" aria-label="eeatly home"><BrandWordmark size={26} /></Link>
-          <div className="topnav-links">
-            <a href="#features">Features</a>
-            <a href="#pricing">Pricing</a>
-          </div>
-          <div className="topnav-actions">
-            <Link href={"/sign-in" as Route}>Sign in</Link>
-            <Link href={"/sign-up" as Route} className="btn btn-primary">Get started</Link>
-          </div>
-          <ThemeToggle />
-        </div>
-      </header>
+      {/* Header — shared marketing chrome (landing variant uses in-page anchors). */}
+      <SiteHeader variant="landing" />
 
       {/* Hero */}
       <section className="hero">
@@ -730,19 +670,23 @@ export default function MarketingPage() {
         <div className="wrap">
           <div className="pricing-card">
             <span className="section-eyebrow">Pricing</span>
-            <h2 className="section-title" style={{ marginBottom: 14 }}>Free for personal use. Chef for the whole family.</h2>
-            <p className="section-sub" style={{ marginBottom: 0 }}>Log meals, save photos, and search your own kitchen — free, forever. Chef unlocks AI capture, shared family kitchens, and more.</p>
+            <h2 className="section-title" style={{ marginBottom: 14 }}>Free to start. Chef to share. Master Chef to collaborate.</h2>
+            <p className="section-sub" style={{ marginBottom: 0 }}>Log meals, save photos, and search your own kitchen — free, forever. Chef unlocks AI capture and shared family kitchens; Master Chef adds co-editing, shareable plans, and priority AI.</p>
             <div className="pricing-table">
               <table>
-                <thead><tr><th>Feature</th><th>Cook</th><th>Chef</th></tr></thead>
+                <thead><tr><th>Feature</th><th>Cook</th><th>Chef</th><th>Master Chef</th></tr></thead>
                 <tbody>
-                  <tr><td>Save unlimited recipes</td><td className="check">✓</td><td className="check">✓</td></tr>
-                  <tr><td>Search your recipes</td><td className="check">✓</td><td className="check">✓</td></tr>
-                  <tr><td>Log meals you cook</td><td className="check">✓</td><td className="check">✓</td></tr>
-                  <tr><td>AI capture (voice, photo, video)</td><td className="cross">×</td><td className="check">✓</td></tr>
-                  <tr><td>Shared family kitchens</td><td className="cross">×</td><td className="check">✓</td></tr>
-                  <tr><td>Occasion &amp; meal planning</td><td className="cross">×</td><td className="check">✓</td></tr>
-                  <tr><td>Public share links</td><td className="cross">×</td><td className="check">✓</td></tr>
+                  <tr><td>Save unlimited recipes</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
+                  <tr><td>Search your recipes</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
+                  <tr><td>Log meals you cook</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
+                  <tr><td>AI capture (voice, photo, video)</td><td className="cross">×</td><td className="check">✓</td><td className="check">✓</td></tr>
+                  <tr><td>Shared family kitchens</td><td className="cross">×</td><td className="check">✓</td><td className="check">✓</td></tr>
+                  <tr><td>Occasion &amp; meal planning</td><td className="cross">×</td><td className="check">✓</td><td className="check">✓</td></tr>
+                  <tr><td>Public recipe share links</td><td className="cross">×</td><td className="check">✓</td><td className="check">✓</td></tr>
+                  <tr><td>Co-editing — family edits your recipes &amp; plans</td><td className="cross">×</td><td className="cross">×</td><td className="check">✓</td></tr>
+                  <tr><td>Shareable meal plans (public plan pages)</td><td className="cross">×</td><td className="cross">×</td><td className="check">✓</td></tr>
+                  <tr><td>Priority AI — no burst limits</td><td className="cross">×</td><td className="cross">×</td><td className="check">✓</td></tr>
+                  <tr><td>AI credits / month</td><td className="tier-num">15</td><td className="tier-num">300</td><td className="tier-num">1,500</td></tr>
                 </tbody>
               </table>
             </div>
@@ -771,26 +715,7 @@ export default function MarketingPage() {
       </section>
 
       {/* Footer */}
-      <footer>
-        <div className="wrap">
-          <div className="foot-inner">
-            <div>
-              <div className="brand"><BrandWordmark size={28} /></div>
-              <p className="foot-tag">Where your family&apos;s recipes live. Across phones, across chats, across continents.</p>
-            </div>
-            <div className="foot-links">
-              <a href="#pricing">Pricing</a>
-              <Link href={"/privacy" as Route}>Privacy</Link>
-              <Link href={"/help" as Route}>Help</Link>
-              <Link href={"/sign-in" as Route}>Sign in</Link>
-            </div>
-          </div>
-          <div className="foot-bottom">
-            <span>© 2026 eeatly</span>
-            <span>Made for families who cook apart</span>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

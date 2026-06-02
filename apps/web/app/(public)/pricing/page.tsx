@@ -1,15 +1,12 @@
 import Link from "next/link";
 import type { Metadata, Route } from "next";
 import { Sparkles } from "lucide-react";
-import { Wordmark } from "@/components/brand/logo";
-import { ThemeToggle } from "@/components/settings/theme-toggle";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getServerEnv, hasStripeEnv, isLaunchFreeAccess } from "@/lib/env/server";
 import { TIERS, type Tier } from "@/lib/pricing";
 import { getSubscriptionState } from "@/services/billing";
 import { getStripeCatalog, perMonthDisplay } from "@/services/stripe-catalog";
 import { PricingGrid } from "@/components/pricing/pricing-grid";
-import "../marketing.css";
 
 export const metadata: Metadata = {
   title: "Pricing — eeatly",
@@ -56,8 +53,8 @@ export default async function PricingPage() {
   const proPrices = tierPrices(catalog.tiers.pro);
 
   return (
-    <div className="mkt relative min-h-screen">
-      {/* Decorative dot grid bleeding out of the top of the page. */}
+    <div className="relative">
+      {/* Decorative dot grid bleeding full-width out of the top. */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 h-[620px] opacity-20 dark:opacity-[0.38]"
@@ -70,29 +67,9 @@ export default async function PricingPage() {
         }}
       />
 
-      <main
-        id="main"
-        tabIndex={-1}
-        className="mkt-doc relative z-[1] mx-auto max-w-[1120px] px-7 pb-12"
-      >
-        {/* Top bar */}
-        <div className="flex items-center justify-between py-6">
-          <Link href="/" className="flex w-fit items-center text-foreground">
-            <Wordmark size={28} />
-          </Link>
-          <div className="flex items-center gap-4">
-            <Link
-              href={"#faq" as Route}
-              className="text-[13.5px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Questions
-            </Link>
-            <ThemeToggle />
-          </div>
-        </div>
-
+      <div className="mkt-doc relative z-[1] mx-auto max-w-[1120px] px-7 pb-16 pt-10">
         {/* Header */}
-        <header className="pb-11 pt-10">
+        <header className="pb-11">
           <span className="mb-5 inline-flex items-center gap-2.5 font-mono text-[11px] uppercase tracking-[1.8px] text-primary">
             <span aria-hidden className="h-px w-[26px] bg-primary/55" />
             Plans &amp; pricing
@@ -186,27 +163,7 @@ export default async function PricingPage() {
           </dl>
         </section>
 
-        {/* Footer */}
-        <footer className="mt-[72px] flex flex-wrap items-center justify-between gap-4 border-t border-[var(--border-soft,var(--border))] py-7">
-          <div className="flex gap-6">
-            {[
-              { href: "/privacy", label: "Privacy" },
-              { href: "/help", label: "Help" }
-            ].map((l) => (
-              <Link
-                key={l.href}
-                href={l.href as Route}
-                className="text-[13px] text-muted-foreground transition-colors hover:text-foreground"
-              >
-                {l.label}
-              </Link>
-            ))}
-          </div>
-          <span className="text-[12.5px] text-muted-foreground">
-            A kitchen that remembers what worked.
-          </span>
-        </footer>
-      </main>
+      </div>
     </div>
   );
 }
