@@ -13,6 +13,8 @@ import {
 import { ensureConnection, listConnections, type ItemType } from "@/services/sharing";
 import { createNotification } from "@/services/notifications";
 import { getUserSettings } from "@/services/user-settings";
+import { listHouseholdMembers } from "@/services/households";
+import { getCurrentHousehold } from "@/lib/auth/session";
 import { getServerEnv } from "@/lib/env/server";
 import { logger } from "@/lib/observability/logger";
 
@@ -65,6 +67,13 @@ export type PendingInvitation = {
 };
 
 export type PeopleOverview = {
+  /**
+   * Household co-members. Like any connection, they only see items you've
+   * explicitly shared (recipes are private by default) — they're surfaced as
+   * a pinned group, with per-item chips, so you know they're in your kitchen.
+   */
+  kitchenMates: PersonOverview[];
+  /** One-to-one connections you share individual items with. */
   people: PersonOverview[];
   pendingInvitations: PendingInvitation[];
 };
@@ -136,12 +145,20 @@ async function grantsWithNames(
 
 /** Everything the People page needs: connections + both-way items + invites. */
 export async function getPeopleOverview(userId: string): Promise<PeopleOverview> {
-  const [people, outbound, inbound, pendingInvitations] = await Promise.all([
+  // Resolve the household first so we can split co-members (who see the
+  // whole library) out of the per-item connection list. getCurrentHousehold
+  // is React-cached, so this is cheap.
+  const household = await getCurrentHousehold(userId);
+  const [people, outbound, inbound, pendingInvitations, members] = await Promise.all([
     listConnections(userId),
     grantsWithNames(userId, "out"),
     grantsWithNames(userId, "in"),
-    listPendingInvitations(userId)
+    listPendingInvitations(userId),
+    listHouseholdMembers(userId, household.id)
   ]);
+  const mateIds = new Set(
+    members.map((m) => m.userId).filter((id) => id !== userId)
+  );
 
   const byCounterparty = (rows: Array<{ counterpartyId: string } & ItemChip>) => {
     const map = new Map<string, ItemChip[]>();
@@ -155,14 +172,33 @@ export async function getPeopleOverview(userId: string): Promise<PeopleOverview>
   const outMap = byCounterparty(outbound);
   const inMap = byCounterparty(inbound);
 
+  const mappedPeople = people.map((p) => ({
+    userId: p.userId,
+    name: p.name,
+    email: p.email,
+    sharedToThem: outMap.get(p.userId) ?? [],
+    sharedToMe: inMap.get(p.userId) ?? []
+  }));
+
+  // Pinned group is built from the membership list directly (not the
+  // connection list) so co-members appear even when there's no 1:1
+  // connection row. Chips come from the same grant maps — sharing with a
+  // kitchen-mate is per-item, just like a connection.
+  const kitchenMates: PersonOverview[] = members
+    .filter((m) => m.userId !== userId)
+    .map((m) => ({
+      userId: m.userId,
+      name: m.name,
+      email: m.email,
+      sharedToThem: outMap.get(m.userId) ?? [],
+      sharedToMe: inMap.get(m.userId) ?? []
+    }));
+
   return {
-    people: people.map((p) => ({
-      userId: p.userId,
-      name: p.name,
-      email: p.email,
-      sharedToThem: outMap.get(p.userId) ?? [],
-      sharedToMe: inMap.get(p.userId) ?? []
-    })),
+    kitchenMates,
+    // A co-member who's also a 1:1 connection shows only under the kitchen
+    // group (avoids listing the same person twice).
+    people: mappedPeople.filter((p) => !mateIds.has(p.userId)),
     pendingInvitations
   };
 }

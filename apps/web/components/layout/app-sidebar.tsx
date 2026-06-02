@@ -7,6 +7,7 @@ import type { Route } from "next";
 import {
   BookOpen,
   CalendarDays,
+  ChefHat,
   Home,
   Plus,
   Settings,
@@ -59,8 +60,6 @@ import type { AppUser } from "@/lib/auth/session";
  *     `AISuggestDialog`, opened from the meal log form.
  *   - Saved links `/saved` → no route.
  *   - History `/history` is the Library route; no separate page.
- *   - Members `/household` → no route. Household lives inside
- *     `/settings`.
  */
 
 type NavItem = {
@@ -109,10 +108,13 @@ const captureNav: NavItem[] = [
 ];
 
 /**
- * Sharing group — "People" is your sharing circle (per-item sharing
- * model), replacing the old household "Members" page. Settings stays.
+ * Sharing group — Kitchen is the shared group (everyone sees everything);
+ * People is one-to-one, per-item sharing. They're distinct surfaces, so
+ * each gets its own nav item with a pinned active path to avoid the old
+ * double-highlight where `/household` lit up "People".
  */
 const sharingNav: NavItem[] = [
+  { href: "/household" as Route, label: "Kitchen", icon: ChefHat, matchPaths: ["/household"] },
   { href: "/people" as Route, label: "People", icon: Share2 },
   { href: "/settings" as Route, label: "Settings", icon: Settings }
 ];

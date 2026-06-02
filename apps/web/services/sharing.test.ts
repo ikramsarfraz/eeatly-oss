@@ -106,9 +106,11 @@ describe("grantItem", () => {
     ).rejects.toThrow(/not authorized to manage sharing/i);
   });
 
-  it("rejects granting to someone outside the sharing circle", async () => {
+  it("rejects granting to someone outside the sharing circle and kitchen", async () => {
     queue(itemRow("me")); // resolveItem
     queue([]); // areConnected → no connection row
+    queue([{ householdId: "h-1" }]); // householdIdsForUser("me")
+    queue([{ householdId: "h-2" }]); // householdIdsForUser("stranger") → different kitchen
     await expect(
       grantItem({
         ownerUserId: "me",
@@ -116,7 +118,26 @@ describe("grantItem", () => {
         itemId: "11111111-1111-4111-8111-111111111111",
         granteeUserId: "stranger"
       })
-    ).rejects.toThrow(/circle/i);
+    ).rejects.toThrow(/circle|kitchen/i);
+  });
+
+  it("allows granting to a kitchen co-member even without a connection", async () => {
+    queue(itemRow("me")); // resolveItem (owner = me)
+    queue([]); // areConnected → no connection row
+    queue([{ householdId: "h-1" }]); // householdIdsForUser("me")
+    queue([{ householdId: "h-1" }]); // householdIdsForUser("mate") → same kitchen
+    queue([{ grantId: "g-mate" }]); // insert ... returning
+    queue([{ name: "Me", email: "me@example.com" }]); // displayName (notification)
+
+    const result = await grantItem({
+      ownerUserId: "me",
+      itemType: "recipe",
+      itemId: "11111111-1111-4111-8111-111111111111",
+      granteeUserId: "mate"
+    });
+
+    expect(result).toEqual({ grantId: "g-mate" });
+    expect(dbState.queue.length).toBe(0);
   });
 
   it("rejects granting an item to its owner", async () => {

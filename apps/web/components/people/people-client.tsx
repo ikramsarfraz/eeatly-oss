@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Check, Copy, Plus, Share2, UserPlus, X } from "lucide-react";
+import Link from "next/link";
+import type { Route } from "next";
+import { Check, ChevronRight, Copy, Plus, Share2, UserPlus, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,7 +74,11 @@ export function PeopleClient({ initialOverview }: { initialOverview: PeopleOverv
 
   const hasPeople = overview.people.length > 0;
   const hasPending = overview.pendingInvitations.length > 0;
-  const firstRun = !hasPeople && !hasPending;
+  const hasKitchen = overview.kitchenMates.length > 0;
+  // The full first-run hero only when there's nothing at all — no DM
+  // connections, no pending invites, AND no kitchen-mates. A solo cook with
+  // a kitchen-mate sees the pinned group + a compact empty-DM nudge instead.
+  const firstRun = !hasPeople && !hasPending && !hasKitchen;
 
   return (
     <div className="grid gap-7">
@@ -99,13 +105,44 @@ export function PeopleClient({ initialOverview }: { initialOverview: PeopleOverv
         </div>
       </header>
 
+      {hasKitchen ? (
+        <section className="grid gap-4">
+          <SectionLabel>In your kitchen · {overview.kitchenMates.length}</SectionLabel>
+          <p className="-mt-2 max-w-[560px] text-[13px] leading-[1.5] text-muted-foreground">
+            People in your kitchen. They only see the recipes and plans you share with them, item
+            by item — same as anyone else. Manage who&apos;s in the kitchen from{" "}
+            <Link href={"/household" as Route} className="text-foreground underline-offset-2 hover:underline">
+              Kitchen
+            </Link>
+            .
+          </p>
+          <div className="grid gap-4">
+            {overview.kitchenMates.map((mate) => (
+              <PersonCard
+                key={mate.userId}
+                person={mate}
+                isKitchenMate
+                onShareSomething={() => setShareTarget(mate)}
+                onUnshare={(item) =>
+                  revoke.mutate({
+                    itemType: item.itemType,
+                    itemId: item.itemId,
+                    granteeUserId: mate.userId
+                  })
+                }
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {firstRun ? (
         <FirstRun onInvite={() => setInviteOpen(true)} />
       ) : (
         <>
           {hasPeople ? (
             <section className="grid gap-4">
-              <SectionLabel>Your people · {overview.people.length}</SectionLabel>
+              <SectionLabel>You share with · {overview.people.length}</SectionLabel>
               <div className="grid gap-4">
                 {overview.people.map((person) => (
                   <PersonCard
@@ -123,6 +160,8 @@ export function PeopleClient({ initialOverview }: { initialOverview: PeopleOverv
                 ))}
               </div>
             </section>
+          ) : !hasPending ? (
+            <EmptyDm onInvite={() => setInviteOpen(true)} />
           ) : null}
 
           {hasPending ? (
@@ -195,14 +234,39 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Compact empty state for the DM list when you have kitchen-mates but no
+ *  one-to-one connections yet (so the full first-run hero would be wrong). */
+function EmptyDm({ onInvite }: { onInvite: () => void }) {
+  return (
+    <section className="grid gap-3">
+      <SectionLabel>You share with · 0</SectionLabel>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[16px] border border-dashed border-[var(--border-strong,var(--border))] bg-[var(--surface)] px-5 py-5">
+        <div className="min-w-0">
+          <p className="text-[15px] font-semibold text-foreground">No one-to-one shares yet</p>
+          <p className="mt-1 max-w-[440px] text-[13px] leading-[1.5] text-muted-foreground">
+            Invite someone to share specific recipes and plans with — one at a time, without adding
+            them to your kitchen.
+          </p>
+        </div>
+        <Button variant="default" className="min-h-[40px] shrink-0" onClick={onInvite}>
+          <UserPlus className="h-3.5 w-3.5" />
+          Invite someone
+        </Button>
+      </div>
+    </section>
+  );
+}
+
 function PersonCard({
   person,
   onShareSomething,
-  onUnshare
+  onUnshare,
+  isKitchenMate = false
 }: {
   person: PersonOverview;
   onShareSomething: () => void;
   onUnshare: (item: ItemChip) => void;
+  isKitchenMate?: boolean;
 }) {
   const label = person.name?.trim() || person.email;
   return (
@@ -216,8 +280,18 @@ function PersonCard({
         >
           {initial(label)}
         </span>
-        <div className="min-w-0">
-          <p className="truncate text-[17px] font-semibold text-foreground">{label}</p>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="truncate text-[17px] font-semibold text-foreground">{label}</p>
+            {isKitchenMate ? (
+              <span
+                className="shrink-0 rounded-full bg-[color:var(--sage-soft)] px-2 py-0.5 font-mono text-[9.5px] font-semibold uppercase text-[color:var(--sage-fg)]"
+                style={{ letterSpacing: "0.1em" }}
+              >
+                Kitchen
+              </span>
+            ) : null}
+          </div>
           <p
             className="truncate font-mono text-[11px] text-muted-foreground"
             style={{ letterSpacing: "0.02em" }}
@@ -225,6 +299,14 @@ function PersonCard({
             {person.email}
           </p>
         </div>
+        {isKitchenMate ? (
+          <Button asChild variant="ghost" className="min-h-[34px] shrink-0">
+            <Link href={"/household" as Route}>
+              Manage in Kitchen
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+        ) : null}
       </div>
       <div className="grid border-t border-[var(--border-soft,var(--border))] md:grid-cols-2">
         {/* You share with them */}

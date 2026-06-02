@@ -5,6 +5,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/lib/db/client";
 import {
   connections,
+  householdMembers,
   itemGrants,
   itemRequests,
   mealIngredients,
@@ -262,6 +263,74 @@ export async function ensureConnection(a: string, b: string): Promise<void> {
     .onConflictDoNothing({ target: [connections.userLowId, connections.userHighId] });
 }
 
+/** The household ids a user belongs to (≤1 under the one-kitchen invariant). */
+async function householdIdsForUser(userId: string): Promise<string[]> {
+  const rows = await db
+    .select({ householdId: householdMembers.householdId })
+    .from(householdMembers)
+    .where(eq(householdMembers.userId, userId));
+  return rows.map((r) => r.householdId);
+}
+
+/** True if the two users are co-members of the same kitchen (household). */
+async function sameHousehold(a: string, b: string): Promise<boolean> {
+  if (a === b) return false;
+  const [aHouseholds, bHouseholds] = await Promise.all([
+    householdIdsForUser(a),
+    householdIdsForUser(b)
+  ]);
+  const set = new Set(aHouseholds);
+  return bHouseholds.some((id) => set.has(id));
+}
+
+/**
+ * True if `a` may share an item with `b`: they're either in each other's
+ * sharing circle (a connection) OR co-members of the same kitchen. Both are
+ * per-item eligibility — kitchen co-membership makes someone a valid target,
+ * it does NOT auto-grant visibility (recipes stay private until shared).
+ */
+export async function canShareWith(a: string, b: string): Promise<boolean> {
+  if (a === b) return false;
+  if (await areConnected(a, b)) return true;
+  return sameHousehold(a, b);
+}
+
+/** Kitchen co-members as shareable people (excludes self; deduped). */
+async function listKitchenMates(userId: string): Promise<ConnectionPerson[]> {
+  const myHouseholds = await householdIdsForUser(userId);
+  if (myHouseholds.length === 0) return [];
+  const rows = await db
+    .select({ memberId: householdMembers.userId, name: users.name, email: users.email })
+    .from(householdMembers)
+    .innerJoin(users, eq(users.id, householdMembers.userId))
+    .where(inArray(householdMembers.householdId, myHouseholds));
+  const seen = new Set<string>([userId]);
+  const out: ConnectionPerson[] = [];
+  for (const r of rows) {
+    if (seen.has(r.memberId)) continue;
+    seen.add(r.memberId);
+    out.push({ userId: r.memberId, name: r.name, email: r.email });
+  }
+  return out;
+}
+
+/**
+ * Everyone the user can share an item with — their 1:1 connections PLUS their
+ * kitchen co-members, deduped. Powers the Share sheet's people list so a
+ * recipe can be shared with a kitchen-mate without a separate invite.
+ */
+export async function listShareTargets(userId: string): Promise<ConnectionPerson[]> {
+  const [circle, mates] = await Promise.all([
+    listConnections(userId),
+    listKitchenMates(userId)
+  ]);
+  const byId = new Map<string, ConnectionPerson>();
+  for (const p of [...circle, ...mates]) {
+    if (!byId.has(p.userId)) byId.set(p.userId, p);
+  }
+  return [...byId.values()];
+}
+
 export type ConnectionPerson = {
   userId: string;
   name: string | null;
@@ -414,8 +483,8 @@ export async function grantItem(args: {
   if (role === "edit" || role === "admin") {
     await requireFeatureAccess(realOwner, "co_editing");
   }
-  if (!(await areConnected(granter, args.granteeUserId))) {
-    throw new Error("You can only share with people in your circle.");
+  if (!(await canShareWith(granter, args.granteeUserId))) {
+    throw new Error("You can only share with people in your circle or kitchen.");
   }
 
   const [grant] = await db

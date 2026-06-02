@@ -182,7 +182,7 @@ export function getCrumbs(pathname: string): Crumb[] {
 
   if (pathname === "/household") {
     return [
-      { label: "Kitchen", href: "/dashboard" as Route },
+      { label: "Kitchen", href: "/household" as Route },
       { label: "Members" }
     ];
   }

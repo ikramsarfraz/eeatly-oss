@@ -9,8 +9,8 @@ import {
   forkRecipe,
   grantItem,
   listActiveShareLinks,
-  listConnections,
   listGrantsForItem,
+  listShareTargets,
   listSharedWithMe,
   listTombstones,
   requestItem,
@@ -72,8 +72,8 @@ export const sharingRouter = router({
     }
   }),
 
-  /** The viewer's sharing circle (people they can share with). */
-  connections: protectedProcedure.query(({ ctx }) => listConnections(ctx.user.id)),
+  /** Everyone the viewer can share with — their circle plus kitchen co-members. */
+  connections: protectedProcedure.query(({ ctx }) => listShareTargets(ctx.user.id)),
 
   /** Can the viewer re-share this item (granted + owner allows reshare)? */
   canReshare: protectedProcedure

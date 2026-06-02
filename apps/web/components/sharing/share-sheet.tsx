@@ -111,7 +111,7 @@ export function ShareSheet({
             </p>
             {people.length === 0 ? (
               <p className="py-3 text-[13px] text-muted-foreground">
-                No one in your circle yet. Invite people from the{" "}
+                No one to share with yet. Add people — or invite someone to your kitchen — from the{" "}
                 <span className="font-medium text-foreground">People</span> page first.
               </p>
             ) : (

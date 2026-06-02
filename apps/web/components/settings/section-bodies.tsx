@@ -236,12 +236,10 @@ export function KitchenSection({
     <Card className="overflow-hidden p-0">
       <SettingRow
         label="Members & invitations"
-        sub={
-          <>
-            {memberCount === 1 ? "Just you" : `${memberCount} members`} · {pendingInviteCount}{" "}
-            {pendingInviteCount === 1 ? "pending invite" : "pending invites"}.
-          </>
-        }
+        sub="The people who share this kitchen and see everything in it."
+        value={`${memberCount} ${memberCount === 1 ? "member" : "members"}${
+          pendingInviteCount > 0 ? ` · ${pendingInviteCount} pending` : ""
+        }`}
         suffix={
           <Button asChild variant="ghost" size="sm" className="h-9">
             <Link href={"/household" as Route}>
