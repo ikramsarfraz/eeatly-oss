@@ -364,6 +364,37 @@
 .mkt .hero-lead .hero-ctas {
   justify-content: center;
 }
+/* Availability note under the hero CTAs — "On the web" pill + coming-soon line. */
+.mkt .hero-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 22px;
+  padding: 7px 14px 7px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink2);
+  text-align: left;
+}
+.mkt .hero-note .hero-note-pill {
+  flex: 0 0 auto;
+  font-family: var(--font-mono-loaded), "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  background: var(--sage-bg);
+  color: var(--forest);
+  padding: 3px 8px;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+.mkt .hero-note strong {
+  color: var(--ink);
+  font-weight: 600;
+}
 
 /* Full-width walkthrough band under the hero. */
 .mkt .hero-demo {

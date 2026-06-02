@@ -31,15 +31,6 @@ const sparkle = (
 const users = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" /></svg>
 );
-const phoneI = (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="2" width="12" height="20" rx="3" /><path d="M11 18h2" /></svg>
-);
-const laptopI = (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="13" rx="2" /><path d="M8 21h8M12 17v4" /></svg>
-);
-const globe = (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1018 0 9 9 0 00-18 0z" /><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18" /></svg>
-);
 const camera = (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="6" width="18" height="14" rx="2" /><circle cx="12" cy="13" r="3.5" /><path d="M8 6l1.5-2h5L16 6" /></svg>
 );
@@ -289,50 +280,6 @@ function WebRecipe() {
   );
 }
 
-// Refine with AI — chat composer + pending-changes diff + heads-up,
-// matching the real Refine flow's shape.
-function WebRefine() {
-  const diffs: Array<[string, string, "add" | "edit"]> = [
-    ["+", "Add 2 green chillies", "add"],
-    ["~", "Halve all quantities", "edit"],
-    ["~", "Servings 4 → 2", "edit"]
-  ];
-  return (
-    <div className="browser-app" style={{ display: "flex", fontFamily: "var(--font-geist), system-ui, sans-serif", color: "var(--ink)" }}>
-      <WebSidebar active="Library" />
-      <div style={{ flex: 1, padding: "18px 22px", overflow: "hidden", display: "flex", flexDirection: "column", gap: 11 }}>
-        <div>
-          <div style={{ fontFamily: "var(--font-serif-loaded), 'Instrument Serif', serif", fontSize: 23, letterSpacing: "-0.02em" }}>Refine with AI</div>
-          <div style={{ ...monoLabel, marginTop: 4 }}>Refining · Nani&apos;s Chicken Biryani</div>
-        </div>
-        <div style={{ alignSelf: "flex-end", maxWidth: "60%", background: "var(--forest)", color: "var(--forest-text)", padding: "9px 13px", borderRadius: "14px 14px 4px 14px", fontSize: 12.5 }}>Add more heat and halve the recipe</div>
-        <div style={{ maxWidth: "82%", background: "var(--surface)", border: "1px solid var(--border-soft)", borderRadius: "14px 14px 14px 4px", overflow: "hidden" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 13px", borderBottom: "1px solid var(--border-soft)" }}>
-            <span style={monoLabel}>Pending changes</span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--forest)" }}>Accept all</span>
-          </div>
-          {diffs.map(([sign, text, kind]) => (
-            <div key={text} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 13px", borderBottom: "1px solid var(--border-soft)" }}>
-              <span style={{ width: 18, height: 18, flexShrink: 0, borderRadius: 6, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, background: kind === "add" ? "var(--sage-bg)" : "color-mix(in srgb, var(--wheat) 38%, transparent)", color: kind === "add" ? "var(--forest)" : "color-mix(in srgb, var(--wheat) 30%, var(--ink))" }}>{sign}</span>
-              <span style={{ fontSize: 12.5, color: "var(--ink)" }}>{text}</span>
-            </div>
-          ))}
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "flex-start", background: "color-mix(in srgb, var(--wheat) 22%, transparent)", border: "1px solid color-mix(in srgb, var(--wheat) 45%, transparent)", borderRadius: 10, padding: "9px 12px", fontSize: 11.5, color: "var(--ink2)", lineHeight: 1.45 }}>
-          <span style={{ color: "var(--terra)" }}>⚠</span> Heads up — halving leaves an odd egg count. Round up to 2?
-        </div>
-        <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 8, border: "1px solid var(--border)", borderRadius: 99, padding: "6px 6px 6px 14px", background: "var(--surface)" }}>
-          <span style={{ flex: 1, fontSize: 12, color: "var(--ink3)" }}>Ask for another change…</span>
-          <span style={{ color: "var(--ink3)", display: "inline-flex" }}>{mic}</span>
-          <span style={{ width: 28, height: 28, borderRadius: 99, background: "var(--forest)", color: "var(--forest-text)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 5l7 7-7 7" /></svg>
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function BrowserWindow({ width, height, path, children }: { width: number | string; height: number; path: string; children: React.ReactNode }) {
   return (
     <div style={{ width, height, borderRadius: 14, overflow: "hidden", background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "0 34px 70px -30px rgba(20,20,15,0.4), inset 0 0 0 1px rgba(255,255,255,0.04)", display: "flex", flexDirection: "column" }}>
@@ -351,9 +298,8 @@ function BrowserWindow({ width, height, path, children }: { width: number | stri
 }
 
 const WEB_SCREENS = [
-  { key: "kitchen", label: "Home", path: "/dashboard", node: <WebKitchen />, enter: "hp-enter-fade" },
-  { key: "recipe", label: "Recipe", path: "/meal/biryani", node: <WebRecipe />, enter: "hp-enter-lift" },
-  { key: "refine", label: "Refine", path: "/meal/biryani/refine", node: <WebRefine />, enter: "hp-enter-morph" }
+  { key: "kitchen", label: "Home", path: "/home", node: <WebHome />, enter: "hp-enter-fade" },
+  { key: "recipe", label: "Recipe", path: "/library/chowmein-noodles", node: <WebRecipe />, enter: "hp-enter-lift" }
 ];
 
 function HeroWebDemo() {
@@ -361,13 +307,13 @@ function HeroWebDemo() {
   const [paused, setPaused] = React.useState(false);
   React.useEffect(() => {
     if (paused) return;
-    const t = setTimeout(() => setI((n) => (n + 1) % WEB_SCREENS.length), 3600);
+    const t = setTimeout(() => setI((n) => (n + 1) % WEB_SCREENS.length), 8000);
     return () => clearTimeout(t);
   }, [i, paused]);
   const s = WEB_SCREENS[i];
   return (
     <div className="hero-demo-wrap">
-      <span className="mobile-eyebrow">A walk through the web app</span>
+      <span className="mobile-eyebrow">eeatly on the web</span>
       <div className="hero-demo-frame" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
         <div className="hero-demo-glow" />
         <div style={{ position: "relative", zIndex: 1 }}>
@@ -376,14 +322,6 @@ function HeroWebDemo() {
               <div key={s.key} className={`hp-screen ${s.enter} hp-morph-ready`}>{s.node}</div>
             </div>
           </BrowserWindow>
-        </div>
-        <div className="callout" style={{ top: 54, right: "calc(100% - 34px)", left: "auto", bottom: "auto", transform: "none", width: 200 }}>
-          <div className="callout-head"><span className="callout-icon terra">{mic}</span><span className="callout-kicker">Voice capture</span></div>
-          <div className="callout-body">A voice note becomes a recipe — <em>structured</em>, searchable.</div>
-        </div>
-        <div className="callout" style={{ bottom: 54, left: "calc(100% - 34px)", right: "auto", top: "auto", transform: "none", width: 200 }}>
-          <div className="callout-head"><span className="callout-icon forest">{sparkle}</span><span className="callout-kicker">Refine with AI</span></div>
-          <div className="callout-body">Change a recipe by <em>asking</em> — “add more heat”.</div>
         </div>
       </div>
       <div className="hero-progress" role="tablist" aria-label="Web app walkthrough">
@@ -401,13 +339,13 @@ function HeroWebDemo() {
 /* ─── Web kitchen dashboard (rendered in the laptop + hero) ────── */
 // Home — mirrors the real dashboard: editorial hero (kicker + first name
 // + date + week summary), 4-up stat cards, and a "Recently cooked" row.
-function WebKitchen() {
+function WebHome() {
   const recents = [
-    { name: "Shakshuka", date: "MAY 28" },
-    { name: "Dal tadka", date: "MAY 27" },
-    { name: "Tacos al pastor", date: "MAY 25" },
-    { name: "Khichdi", date: "MAY 24" },
-    { name: "Ramen", date: "MAY 22" }
+    { name: "Chowmein Noodles", date: "4D AGO" },
+    { name: "Margherita Pizza", date: "6D AGO" },
+    { name: "Shakshuka", date: "9D AGO" },
+    { name: "Pad Thai", date: "12D AGO" },
+    { name: "Beef Tacos", date: "2W AGO" }
   ];
   const stats: Array<[string, string, "sage" | "wheat"]> = [
     ["Logged this week", "3", "sage"],
@@ -446,28 +384,6 @@ function WebKitchen() {
         </div>
       </div>
     </div>
-  );
-}
-
-/* ─── Cross-device pair (laptop + phone) ───────────────────────── */
-function DevicePair() {
-  return (
-    <>
-      <div className="laptop-wrap">
-        <div className="laptop-screen">
-          <div className="laptop-camera" />
-          <div className="laptop-viewport">
-            <div className="browser-chrome">
-              <div className="browser-dots"><span className="browser-dot red" /><span className="browser-dot yellow" /><span className="browser-dot green" /></div>
-              <div className="browser-url"><span className="url-host">app.eeatly.com</span><span className="url-path">/kitchen</span></div>
-            </div>
-            <div className="browser-content"><WebKitchen /></div>
-          </div>
-        </div>
-        <div className="laptop-base" />
-      </div>
-      <div className="device-phone"><IOSDevice width={158} height={336}><RecipeScreen /></IOSDevice></div>
-    </>
   );
 }
 
@@ -529,6 +445,13 @@ export default function MarketingPage() {
               <Link className="btn btn-primary" href={"/sign-up" as Route}>Start your kitchen {arrow}</Link>
               <a className="link" href="#pricing">See pricing</a>
             </div>
+            <span className="hero-note">
+              <span className="hero-note-pill">On the web</span>
+              <span>
+                Use eeatly free in any browser today.{" "}
+                <strong>The iPhone app is coming soon.</strong>
+              </span>
+            </span>
           </div>
         </div>
       </section>
@@ -561,21 +484,6 @@ export default function MarketingPage() {
               <p>Your sister texts you a photo of the spice ratio — your camera roll eats it. You cook something amazing for a holiday dinner, and by next year, you can&apos;t remember exactly what you did.</p>
               <p>Family recipes shouldn&apos;t be this fragile. eeatly keeps them — across phones, across chats, across continents.</p>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Cross-device band */}
-      <section className="devices">
-        <div className="wrap">
-          <span className="section-eyebrow">Works on every device</span>
-          <h2 className="section-title">Wherever your family cooks from</h2>
-          <p className="section-sub">Open it on your laptop on Sunday, or on your phone&apos;s browser at the stove. Same kitchen, same recipes — your family&apos;s library follows you everywhere, no install needed.</p>
-          <div className="device-stage"><DevicePair /></div>
-          <div className="device-callouts">
-            <div className="device-callout"><div className="dc-icon">{laptopI}</div><div><div className="dc-title">On the web</div><div className="dc-body">Open your kitchen at <span className="dc-mono">app.eeatly.com</span> in any browser — nothing to download.</div></div></div>
-            <div className="device-callout"><div className="dc-icon">{phoneI}</div><div><div className="dc-title">On your phone <span className="dc-soon">Coming soon</span></div><div className="dc-body">Works beautifully in your phone&apos;s browser today. Dedicated iOS &amp; Android apps are coming soon.</div></div></div>
-            <div className="device-callout"><div className="dc-icon">{globe}</div><div><div className="dc-title">One library</div><div className="dc-body">Sign in once, see the same recipes everywhere — every change syncs in real time.</div></div></div>
           </div>
         </div>
       </section>
@@ -632,8 +540,8 @@ export default function MarketingPage() {
       <section className="showcase">
         <div className="wrap">
           <span className="section-eyebrow">Coming soon</span>
-          <h2 className="section-title">A mobile app, in your pocket</h2>
-          <p className="section-sub">The eeatly mobile app is on its way. Here&apos;s a preview of the experience — the same kitchen, built for cooking with your phone in hand. Until then, everything works in your phone&apos;s browser.</p>
+          <h2 className="section-title">An eeatly app for your iPhone</h2>
+          <p className="section-sub">eeatly works in any browser today. We&apos;re building a native iPhone app for capturing recipes the moment they arrive and cooking with your phone in hand — here&apos;s a preview of what&apos;s on the way.</p>
           <ShowcaseGallery />
         </div>
       </section>
@@ -686,11 +594,11 @@ export default function MarketingPage() {
           <span className="section-eyebrow">Questions</span>
           <h2 className="section-title" style={{ marginBottom: 48 }}>Common questions</h2>
           <div className="faq">
-            <details className="faq-item"><summary>Who is eeatly for?</summary><div className="faq-body">Anyone who cooks at home and wants a better place than camera roll, Notes app, or scattered chat threads. We see kitchens across every cuisine — the patterns are universal: recipes get lost, voice notes from a grandparent get buried, the dish someone always brings has no proper home.</div></details>
+            <details className="faq-item"><summary>Who is eeatly for?</summary><div className="faq-body">Anyone who cooks at home and wants a better place than camera roll, Notes app, or scattered chat threads. It&apos;s built for every cuisine — the patterns are universal: recipes get lost, voice notes from a grandparent get buried, the dish someone always brings has no proper home.</div></details>
             <details className="faq-item"><summary>What about family members who aren&apos;t tech-comfortable?</summary><div className="faq-body">They can send you a voice note over WhatsApp and you save it on their behalf, credited to them. Or join with magic-link sign-in: no passwords, just an email.</div></details>
             <details className="faq-item"><summary>What happens to recipes if someone leaves the kitchen?</summary><div className="faq-body">Recipes stay with the kitchen. The person who added them is still credited; their access can be revoked at any time without losing the recipes themselves.</div></details>
             <details className="faq-item"><summary>What is the AI actually doing with my photos and voice notes?</summary><div className="faq-body">It transcribes voice notes, extracts text from photos, and helps structure free-form notes into ingredients and steps. We don&apos;t train on your content, and you can always edit or remove what AI suggested.</div></details>
-            <details className="faq-item"><summary>My &ldquo;kitchen&rdquo; is just me. Does eeatly still help?</summary><div className="faq-body">Absolutely. The free tier is built for solo cooks who want their own recipe library that doesn&apos;t live in screenshots and Notes app. Most of our early users started solo.</div></details>
+            <details className="faq-item"><summary>My &ldquo;kitchen&rdquo; is just me. Does eeatly still help?</summary><div className="faq-body">Absolutely. The free tier is built for solo cooks who want their own recipe library that doesn&apos;t live in screenshots and Notes app.</div></details>
           </div>
           <div className="faq-foot">More questions? <Link href={"/help" as Route}>Visit our help center</Link></div>
         </div>
