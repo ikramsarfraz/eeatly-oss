@@ -26,12 +26,17 @@ type AddDishPickerProps = {
   planId: string;
   library: MealLibraryItem[];
   existingMealIds: string[];
+  /** Override the trigger button's label + classes (e.g. a full-width row). */
+  triggerLabel?: string;
+  triggerClassName?: string;
 };
 
 export function AddDishPicker({
   planId,
   library,
-  existingMealIds
+  existingMealIds,
+  triggerLabel,
+  triggerClassName
 }: AddDishPickerProps) {
   const router = useRouter();
   const { showToast } = useToast();
@@ -72,9 +77,9 @@ export function AddDishPicker({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button type="button" variant="outline">
+        <Button type="button" variant="outline" className={triggerClassName}>
           <Plus className="h-4 w-4" />
-          Add dish
+          {triggerLabel ?? "Add dish"}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg">

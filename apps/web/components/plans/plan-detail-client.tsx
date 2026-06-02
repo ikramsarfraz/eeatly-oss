@@ -7,13 +7,25 @@ import type { Route } from "next";
 import { format, parseISO } from "date-fns";
 import {
   ArchiveRestore,
+  CalendarDays,
   Check,
   Edit3,
   GripVertical,
-  Lock,
-  Sparkles
+  Loader2,
+  Lock
 } from "lucide-react";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -32,9 +44,11 @@ import { cn } from "@/lib/utils";
  * Round 28 — editorial Plan Detail.
  *
  * Stack (top to bottom):
- *   1. Hero — left: "Plan" eyebrow + 64–80px display name + chip row
- *      (date / dish count). Right: sage-tinted "Cook plan" card with
- *      annotation/notes prompt.
+ *   1. Hero — single editorial column: "Plan" eyebrow + 64–80px display
+ *      name + chip row (date / dish count / effort) + Edit/Archive
+ *      actions. (The old right-hand "Cook plan" box held a broken
+ *      empty-state; the design's cook-rhythm card that replaces it needs
+ *      a steps model that doesn't exist yet, so it's deferred.)
  *   2. Dishes section — sectionLabel + decorative "Drag to reorder"
  *      hint + Card with dish rows. Each row has a `::` drag handle
  *      (decorative — reorder logic deferred), 56×56 MealTile, name,
@@ -50,10 +64,9 @@ import { cn } from "@/lib/utils";
  * procedure stays unused on both platforms until the drag-and-drop
  * implementation lands.
  *
- * Combined shopping deferral: the card renders a placeholder. A real
- * aggregation needs either N+1 dish-ingredient queries or a new
- * `plans.combinedShopping(planId)` procedure — both out of R28's
- * client-only scope. Flagged.
+ * Combined shopping: aggregated from the dishes' structured
+ * `meal_ingredients` (with a legacy `ingredients[]` fallback) via
+ * `getPlanShoppingList`; locked dishes are excluded.
  *
  * Cooks invited: read members from `households.current`. Generic
  * "Owner" / "Cook" role labels — per-plan role assignment is not a
@@ -70,6 +83,8 @@ export type PlanDetailDish = {
   timeTakenMinutes: number | null;
   verdict: "repeat" | "modify" | "do_not_repeat" | null;
   annotationNotes: string | null;
+  /** Who added the dish to the plan — the dish's "lead" cook in the meta. */
+  addedByName: string | null;
   /** Co-cook lacks this dish's recipe → render a locked, requestable row. */
   locked: boolean;
 };
@@ -113,6 +128,7 @@ export function PlanDetailClient({
   dishes,
   hiddenDishCount,
   members,
+  shoppingList,
   library
 }: {
   plan: PlanDetailPlan;
@@ -137,6 +153,8 @@ export function PlanDetailClient({
    */
   hiddenDishCount: number;
   members: PlanDetailMember[];
+  /** Deduped ingredient names across the plan's accessible dishes. */
+  shoppingList: string[];
   library: PlanDetailLibraryRow[];
 }) {
   const router = useRouter();
@@ -174,6 +192,42 @@ export function PlanDetailClient({
     () => sortedDishes.map((d) => d.mealId),
     [sortedDishes]
   );
+
+  // Drag-to-reorder. `items` is the local optimistic order; it mirrors the
+  // server order on every dishes change (add/remove/refresh) and is persisted
+  // via plans.reorderDishes on drop.
+  const [items, setItems] = React.useState(sortedDishes);
+  React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mirror server order when dishes change
+    setItems(sortedDishes);
+  }, [sortedDishes]);
+  const dragIndex = React.useRef<number | null>(null);
+  const [draggingId, setDraggingId] = React.useState<string | null>(null);
+  const [overIndex, setOverIndex] = React.useState<number | null>(null);
+
+  const reorderMut = trpc.plans.reorderDishes.useMutation({
+    onSuccess: () => router.refresh(),
+    onError: (e) => {
+      setItems(sortedDishes); // revert optimistic order
+      showToast({ variant: "error", title: "Couldn't reorder", description: e.message });
+    }
+  });
+
+  function handleDishDrop(targetIndex: number) {
+    const from = dragIndex.current;
+    dragIndex.current = null;
+    setDraggingId(null);
+    setOverIndex(null);
+    if (from === null || from === targetIndex) return;
+    const next = items.slice();
+    const [moved] = next.splice(from, 1);
+    next.splice(targetIndex, 0, moved);
+    setItems(next);
+    reorderMut.mutate({
+      planId: plan.id,
+      order: { dishIdsInOrder: next.map((d) => d.id) }
+    });
+  }
 
   // Effort modal — used in the hero chip row when at least one dish
   // has actual effort recorded.
@@ -218,84 +272,87 @@ export function PlanDetailClient({
 
   return (
     <div className="grid gap-7">
-      {/* Hero — 1fr 320px at lg+, stacked below */}
-      <section className="grid gap-5 lg:grid-cols-[1fr_320px] lg:items-start">
-        <div className="grid gap-3">
-          <p
-            className="font-mono text-[10.5px] uppercase text-muted-foreground"
-            style={{ letterSpacing: "0.14em" }}
-          >
-            Plan · {dateLabel}
-          </p>
-          <h1
-            className="font-serif text-[52px] leading-[0.98] text-foreground sm:text-[64px] lg:text-[80px]"
-            style={{ letterSpacing: "-0.025em" }}
-          >
-            {plan.name}.
-          </h1>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <Badge variant="sage">
-              {sortedDishes.length}{" "}
-              {sortedDishes.length === 1 ? "dish" : "dishes"}
-            </Badge>
-            {effortChip ? (
-              <Badge variant="wheat">{effortChip}</Badge>
-            ) : null}
-            {isArchived ? (
-              <Badge variant="ghost" className="font-mono">
-                Archived
-              </Badge>
-            ) : null}
-          </div>
-          {/* Primary action lives in the hero (not the top bar). */}
-          <div className="mt-1">
-            <Button
-              variant="outline"
-              className="min-h-[40px]"
-              onClick={() => setEditingPlan((prev) => !prev)}
-            >
-              <Edit3 className="h-3.5 w-3.5" />
-              {editingPlan ? "Done editing" : "Edit plan"}
-            </Button>
-          </div>
-        </div>
-
-        <Card
-          className="border-[color:var(--sage)] bg-[color:var(--sage-soft)] p-5"
-          style={{ boxShadow: "var(--shadow-sm)" }}
+      {/* Hero — single editorial column. (The old right-hand "Cook plan"
+          box held a broken empty-state; the cook-rhythm card that replaces
+          it in the design needs a steps model we don't have yet.) */}
+      <section className="grid gap-3">
+        <p
+          className="font-mono text-[10.5px] uppercase text-muted-foreground"
+          style={{ letterSpacing: "0.14em" }}
         >
-          <p
-            className="font-mono text-[10.5px] uppercase text-muted-foreground"
-            style={{ letterSpacing: "0.14em" }}
-          >
-            Cook plan
+          Plan
+        </p>
+        <h1
+          className="font-serif text-[52px] leading-[0.98] text-foreground sm:text-[64px] lg:text-[80px]"
+          style={{ letterSpacing: "-0.025em" }}
+        >
+          {plan.name}.
+        </h1>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <Badge variant="sage" className="gap-1.5">
+            <CalendarDays className="h-3.5 w-3.5" />
+            {dateLabel}
+          </Badge>
+          <Badge variant="sage">
+            {sortedDishes.length} {sortedDishes.length === 1 ? "dish" : "dishes"}
+          </Badge>
+          {effortChip ? <Badge variant="wheat">{effortChip} overall</Badge> : null}
+          {isArchived ? (
+            <Badge variant="ghost" className="font-mono">
+              Archived
+            </Badge>
+          ) : null}
+        </div>
+        {plan.notes ? (
+          <p className="mt-1 max-w-[640px] text-[14px] leading-[1.55] text-muted-foreground">
+            {plan.notes}
           </p>
-          {plan.notes ? (
-            <p className="mt-2 text-[14px] leading-[1.55] text-foreground">
-              {plan.notes}
-            </p>
-          ) : (
-            <p className="mt-2 text-[13px] italic text-muted-foreground">
-              No cook notes yet. Click <em>Edit plan</em> above to add a
-              rhythm — who&apos;s starting prep when, what to brief the
-              cooks on.
-            </p>
-          )}
-          <div className="mt-3 flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="min-h-[36px] bg-transparent"
-              onClick={handleArchiveToggle}
-              disabled={
-                archiveMutation.isPending || unarchiveMutation.isPending
-              }
-            >
-              <ArchiveRestore className="h-3.5 w-3.5" />
-              {isArchived ? "Restore" : "Archive"}
-            </Button>
-          </div>
-        </Card>
+        ) : null}
+        {/* Primary actions live in the hero (not the top bar). */}
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            className="min-h-[40px]"
+            onClick={() => setEditingPlan((prev) => !prev)}
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+            {editingPlan ? "Done editing" : "Edit plan"}
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                className="min-h-[40px] text-muted-foreground"
+                disabled={archiveMutation.isPending || unarchiveMutation.isPending}
+              >
+                {archiveMutation.isPending || unarchiveMutation.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ArchiveRestore className="h-3.5 w-3.5" />
+                )}
+                {isArchived ? "Restore" : "Archive"}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  {isArchived ? "Restore this plan?" : "Archive this plan?"}
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  {isArchived
+                    ? `${plan.name} moves back into your scheduled plans.`
+                    : `${plan.name} moves to drafts. You can restore it anytime.`}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleArchiveToggle}>
+                  {isArchived ? "Restore" : "Archive"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </section>
 
       {/* Inline plan-edit form — surfaces under the hero when the
@@ -327,7 +384,7 @@ export function PlanDetailClient({
       <section className="grid gap-3">
         <SectionLabel
           action={
-            sortedDishes.length > 1 ? (
+            canEdit && sortedDishes.length > 1 ? (
               <span
                 className="font-mono text-[10.5px] uppercase text-muted-foreground opacity-70"
                 style={{ letterSpacing: "0.14em" }}
@@ -341,13 +398,55 @@ export function PlanDetailClient({
           Dishes
         </SectionLabel>
         <Card className="overflow-hidden p-0">
-          {sortedDishes.length > 0 ? (
+          {items.length > 0 ? (
             <ul className="grid divide-y divide-[var(--border-soft,var(--border))]">
-              {sortedDishes.map((dish) => (
-                <li key={dish.id}>
-                  <DishRow planDishId={dish.id} dish={dish} canEdit={canEdit} />
-                </li>
-              ))}
+              {items.map((dish, i) => {
+                const draggable = canEdit && items.length > 1;
+                return (
+                  <li
+                    key={dish.id}
+                    onDragOver={(e) => {
+                      if (dragIndex.current !== null) {
+                        e.preventDefault();
+                        setOverIndex(i);
+                      }
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      handleDishDrop(i);
+                    }}
+                    className={cn(
+                      "transition-colors",
+                      draggingId === dish.id && "opacity-50",
+                      overIndex === i &&
+                        draggingId &&
+                        draggingId !== dish.id &&
+                        "bg-[var(--surface-2)]"
+                    )}
+                  >
+                    <DishRow
+                      planDishId={dish.id}
+                      dish={dish}
+                      canEdit={canEdit}
+                      dragHandle={
+                        draggable
+                          ? {
+                              onDragStart: () => {
+                                dragIndex.current = i;
+                                setDraggingId(dish.id);
+                              },
+                              onDragEnd: () => {
+                                dragIndex.current = null;
+                                setDraggingId(null);
+                                setOverIndex(null);
+                              }
+                            }
+                          : undefined
+                      }
+                    />
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <div className="px-[18px] py-6 text-center">
@@ -376,15 +475,15 @@ export function PlanDetailClient({
           ) : null}
           {/* Add-dish is an edit affordance — owner/admin/editor only. */}
           {canEdit ? (
-            <div className="flex items-center justify-center border-t border-dashed border-[var(--border-strong,var(--border))] px-[18px] py-3">
-              {/* AddDishPicker exports its own trigger button (Dialog
-                  from shadcn). Rendering it inline gives us the picker
-                  + the trigger in one place; the dashed-bottom row is
-                  its native UX. */}
+            <div className="border-t border-[var(--border-soft,var(--border))] p-3">
+              {/* Full-width dashed "add a dish" row — the AddDishPicker's
+                  trigger styled to span the card. */}
               <AddDishPicker
                 planId={plan.id}
                 library={library}
                 existingMealIds={existingMealIds}
+                triggerLabel="Add a dish from your library"
+                triggerClassName="h-11 w-full justify-center rounded-[10px] border-dashed border-[var(--border-strong,var(--border))] bg-transparent text-[13.5px] font-medium text-muted-foreground hover:bg-[var(--surface-2)] hover:text-foreground"
               />
             </div>
           ) : null}
@@ -396,24 +495,32 @@ export function PlanDetailClient({
         <Card className="p-5" style={{ boxShadow: "var(--shadow-sm)" }}>
           <div className="flex items-start justify-between gap-3">
             <SectionLabel>Combined shopping</SectionLabel>
-            {sortedDishes.length > 0 ? (
-              <Badge variant="sage">Across {sortedDishes.length} dishes</Badge>
-            ) : null}
+            {(() => {
+              const n = sortedDishes.filter((d) => !d.locked).length;
+              return n > 0 ? (
+                <Badge variant="sage">
+                  Across {n} {n === 1 ? "dish" : "dishes"}
+                </Badge>
+              ) : null;
+            })()}
           </div>
-          <p className="mt-3 text-[13px] italic text-muted-foreground">
-            Shopping-list aggregation across the plan&apos;s dishes is
-            coming soon. For now, open each dish individually and use its
-            ingredient checklist.
-          </p>
-          <div className="mt-3 flex items-center gap-2">
-            <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
-            <span
-              className="font-mono text-[10.5px] uppercase text-muted-foreground"
-              style={{ letterSpacing: "0.14em" }}
-            >
-              Aggregation pending
-            </span>
-          </div>
+          {shoppingList.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {shoppingList.map((item) => (
+                <span
+                  key={item}
+                  className="rounded-full border border-[var(--border-soft,var(--border))] bg-[var(--paper,var(--surface-2))] px-[11px] py-[6px] text-[12.5px] text-[color:var(--ink-2,var(--muted-foreground))]"
+                >
+                  {item}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-[13px] italic text-muted-foreground">
+              Add ingredients to this plan&apos;s dishes and they&apos;ll aggregate into one
+              shopping list here.
+            </p>
+          )}
         </Card>
 
         <Card className="p-5" style={{ boxShadow: "var(--shadow-sm)" }}>
@@ -445,12 +552,15 @@ export function PlanDetailClient({
 function DishRow({
   planDishId,
   dish,
-  canEdit
+  canEdit,
+  dragHandle
 }: {
   planDishId: string;
   dish: PlanDetailDish;
   /** Owner/admin/editor — gates the annotation (cook's-notes) editor. */
   canEdit: boolean;
+  /** When set, the grip becomes a native drag handle for reordering. */
+  dragHandle?: { onDragStart: () => void; onDragEnd: () => void };
 }) {
   const { showToast } = useToast();
   const [editingNotes, setEditingNotes] = React.useState(false);
@@ -514,15 +624,22 @@ function DishRow({
     }[dish.verdict];
     metaParts.push(verdictLabel);
   }
+  // The dish "lead" — who added it to the plan.
+  if (dish.addedByName?.trim()) metaParts.push(dish.addedByName.trim());
   const meta = metaParts.length > 0 ? metaParts.join(" · ") : null;
 
   return (
     <div className="grid gap-2 px-[18px] py-3">
       <div className="flex items-center gap-3">
         <span
-          aria-hidden
-          className="cursor-grab font-mono text-[18px] text-[var(--ink-4,var(--border-strong))] opacity-70"
-          title="Reorder coming soon"
+          draggable={!!dragHandle}
+          onDragStart={dragHandle?.onDragStart}
+          onDragEnd={dragHandle?.onDragEnd}
+          className={cn(
+            "text-[var(--ink-4,var(--border-strong))] opacity-70",
+            dragHandle && "cursor-grab active:cursor-grabbing"
+          )}
+          title={dragHandle ? "Drag to reorder" : undefined}
         >
           <GripVertical className="h-4 w-4" />
         </span>

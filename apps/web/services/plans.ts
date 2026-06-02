@@ -8,6 +8,7 @@ import { logger } from "@/lib/observability/logger";
 import { mealVisibilityFilter, planVisibilityFilter } from "@/lib/meals/visibility";
 import {
   dishImages,
+  mealIngredients,
   mealLogs,
   meals,
   planDishes,
@@ -124,6 +125,46 @@ export async function createPlan(args: CreatePlanArgs): Promise<PlanRow> {
     planId: created.id
   });
   return created;
+}
+
+/**
+ * Combined shopping list for a plan — the deduped ingredient names across the
+ * given dish meals. Prefers each meal's structured `meal_ingredients`; falls
+ * back to the legacy `meals.ingredients` text[] for meals that have no
+ * structured rows yet. Read-only aggregation; no schema. Caller passes only
+ * the meal ids the viewer can access (locked dishes are excluded).
+ */
+export async function getPlanShoppingList(mealIds: string[]): Promise<string[]> {
+  if (mealIds.length === 0) return [];
+
+  const structured = await db
+    .select({ mealId: mealIngredients.mealId, name: mealIngredients.name })
+    .from(mealIngredients)
+    .where(inArray(mealIngredients.mealId, mealIds))
+    .orderBy(asc(mealIngredients.position));
+
+  const withStructured = new Set(structured.map((r) => r.mealId));
+  const legacyIds = mealIds.filter((id) => !withStructured.has(id));
+  const legacy = legacyIds.length
+    ? await db
+        .select({ ingredients: meals.ingredients })
+        .from(meals)
+        .where(inArray(meals.id, legacyIds))
+    : [];
+
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const add = (raw: string | null | undefined) => {
+    const name = raw?.trim();
+    if (!name) return;
+    const key = name.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(name);
+  };
+  for (const r of structured) add(r.name);
+  for (const r of legacy) for (const ing of r.ingredients ?? []) add(ing);
+  return out;
 }
 
 export async function getPlan(args: { planId: string; userId: string }): Promise<PlanWithDishes> {

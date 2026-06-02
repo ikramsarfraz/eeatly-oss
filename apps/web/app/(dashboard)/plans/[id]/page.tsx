@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
 import {
   getPlan,
+  getPlanShoppingList,
   listMealLibrary
 } from "@/services/plans";
 import { listHouseholdMembers } from "@/services/households";
@@ -40,9 +41,13 @@ export default async function PlanDetailPage(props: {
     notFound();
   }
 
-  const [library, members] = await Promise.all([
+  // Combined shopping aggregates only the dishes the viewer can actually
+  // open (locked co-cook rows are excluded).
+  const accessibleMealIds = plan.dishes.filter((d) => !d.locked).map((d) => d.mealId);
+  const [library, members, shoppingList] = await Promise.all([
     listMealLibrary({ userId: user.id, householdId: household.id }),
-    listHouseholdMembers(user.id, household.id)
+    listHouseholdMembers(user.id, household.id),
+    getPlanShoppingList(accessibleMealIds)
   ]);
 
   return (
@@ -68,6 +73,7 @@ export default async function PlanDetailPage(props: {
         timeTakenMinutes: d.timeTakenMinutes,
         verdict: d.verdict,
         annotationNotes: d.annotationNotes,
+        addedByName: d.addedByName,
         locked: d.locked
       }))}
       hiddenDishCount={plan.hiddenDishCount}
@@ -77,6 +83,7 @@ export default async function PlanDetailPage(props: {
         email: m.email,
         role: m.role
       }))}
+      shoppingList={shoppingList}
       library={library.map((r) => ({
         id: r.id,
         name: r.name,
