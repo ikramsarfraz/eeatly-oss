@@ -220,7 +220,7 @@ export default async function PublicSharePage(props: {
           href={`/sign-up?next=/share/${encodeURIComponent(token)}/save` as Route}
           className="inline-flex shrink-0 items-center justify-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         >
-          Start free
+          Try eeatly
         </Link>
       </aside>
 
@@ -307,7 +307,7 @@ function PlanShareView({ plan, token }: { plan: PublicPlanView; token: string })
           href={`/sign-up?next=/share/${encodeURIComponent(token)}` as Route}
           className="inline-flex shrink-0 items-center justify-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         >
-          Start free
+          Try eeatly
         </Link>
       </aside>
 

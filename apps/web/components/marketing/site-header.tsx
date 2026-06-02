@@ -66,7 +66,7 @@ export function SiteHeader({ variant }: { variant?: "landing" }) {
         <div className="topnav-actions">
           <Link href={"/sign-in" as Route}>Sign in</Link>
           <Link href={"/sign-up" as Route} className="btn btn-primary">
-            Get started
+            Try eeatly
           </Link>
           <ThemeToggle />
         </div>

@@ -252,7 +252,7 @@ function CardCta({
     return (
       <Button asChild variant={variant} className={className}>
         <Link href={(authState.kind === "anonymous" ? "/sign-up" : "/dashboard") as Route}>
-          Start free
+          Try eeatly
         </Link>
       </Button>
     );
@@ -292,7 +292,7 @@ function CardCta({
   if (authState.kind === "anonymous") {
     return (
       <Button asChild variant={variant} className={className}>
-        <Link href={"/sign-in?next=/pricing" as Route}>Sign in to upgrade</Link>
+        <Link href={"/sign-up" as Route}>Try eeatly</Link>
       </Button>
     );
   }

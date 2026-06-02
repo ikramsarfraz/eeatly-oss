@@ -546,11 +546,6 @@ export default function MarketingPage() {
           <span className="trust-item">{check} Your data stays yours</span>
           <span className="trust-item">{check} Private by default</span>
         </div>
-        <div className="trust-row">
-          <span className="trust-item">Families across 15+ countries</span>
-          <span className="trust-item">2,500+ recipes saved</span>
-          <span className="trust-item">No recipes lost. Ever.</span>
-        </div>
       </div>
 
       {/* Editorial band */}
@@ -643,19 +638,6 @@ export default function MarketingPage() {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section>
-        <div className="wrap">
-          <span className="section-eyebrow">From real kitchens</span>
-          <h2 className="section-title">Stories from families like yours</h2>
-          <div className="quotes" style={{ marginTop: 56 }}>
-            <div className="quote-card"><p className="quote-body">&ldquo;My mom finally stopped asking me to screenshot her WhatsApp messages. Now she just adds recipes directly and I can actually find them.&rdquo;</p><div className="quote-meta"><div className="quote-name">Fatima K.</div><div className="quote-where">Toronto, Canada</div><div className="quote-where-2">Family kitchen with 4 members</div></div></div>
-            <div className="quote-card"><p className="quote-body">&ldquo;We almost lost Nani&apos;s biryani recipe when she passed. Now everything she ever taught us is saved in one place — her voice notes and all.&rdquo;</p><div className="quote-meta"><div className="quote-name">Arjun S.</div><div className="quote-where">London, UK</div><div className="quote-where-2">3 generations sharing recipes</div></div></div>
-            <div className="quote-card"><p className="quote-body">&ldquo;I used to have recipes in Notes, photos, bookmarks, and 12 different WhatsApp chats. This finally fixed that chaos.&rdquo;</p><div className="quote-meta"><div className="quote-name">Maryam T.</div><div className="quote-where">Dubai, UAE</div><div className="quote-where-2">Solo cook, 200+ recipes saved</div></div></div>
-          </div>
-        </div>
-      </section>
-
       {/* CTA band */}
       <section className="cta-band">
         <div className="wrap">
@@ -691,7 +673,7 @@ export default function MarketingPage() {
               </table>
             </div>
             <div className="pricing-cta">
-              <Link className="btn btn-primary" href={"/sign-up" as Route}>Start free {arrow}</Link>
+              <Link className="btn btn-primary" href={"/sign-up" as Route}>Try eeatly {arrow}</Link>
               <Link className="link" href={"/pricing" as Route} style={{ color: "var(--ink2)", textDecoration: "none", fontSize: 14 }}>See full pricing</Link>
             </div>
           </div>

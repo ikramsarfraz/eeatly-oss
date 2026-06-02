@@ -1491,6 +1491,13 @@
   font-weight: 600;
   color: var(--ink);
 }
+/* Every value cell stays centered regardless of column (belt-and-suspenders
+   alongside the nth-child rule above). */
+.mkt .pricing-table td.check,
+.mkt .pricing-table td.cross,
+.mkt .pricing-table td.tier-num {
+  text-align: center;
+}
 .mkt .pricing-table tr:last-child td {
   border-bottom: none;
 }
