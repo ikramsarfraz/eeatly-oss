@@ -90,9 +90,9 @@ export const onboardingRouter = router({
       metadata: { source: "multi_step_flow" }
     });
 
-    revalidatePath("/dashboard");
+    revalidatePath("/home");
     // Client navigates to this URL — procedures don't redirect.
-    return { redirectTo: "/dashboard" };
+    return { redirectTo: "/home" };
   }),
 
   updatePreferences: protectedProcedure

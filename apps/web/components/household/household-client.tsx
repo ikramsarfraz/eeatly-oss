@@ -47,7 +47,7 @@ import { isUpgradeRequired } from "@/lib/trpc/errors";
  *
  * The R23/R24 `<HouseholdCard>` lived inside Settings as one of many
  * cards on a long stack. R31 promotes Kitchen to its own surface at
- * `/household` so the editorial hero + Members + Pending invitations
+ * `/kitchen` so the editorial hero + Members + Pending invitations
  * have space to breathe, and the Settings page can collapse its
  * household section into a single "Manage →" row.
  *

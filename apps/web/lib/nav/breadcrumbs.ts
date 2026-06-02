@@ -33,14 +33,14 @@ export type Crumb = {
  * AppSidebar and any future surface that needs active-state checking
  * (e.g. a mobile tab bar) all read the same logic.
  *
- *   - Home (`/dashboard`) only matches an exact pathname so deep
+ *   - Home (`/home`) only matches an exact pathname so deep
  *     routes don't all light Home up.
  *   - Other routes match if the current pathname equals the href OR
  *     starts with `href + '/'`. The trailing-slash guard prevents
  *     `/plans-archive` (hypothetical) from matching `/plans`.
  */
 export function isActiveRoute(pathname: string, href: string): boolean {
-  if (href === "/dashboard") return pathname === href;
+  if (href === "/home") return pathname === href;
   if (pathname === href) return true;
   return pathname.startsWith(href + "/");
 }
@@ -52,19 +52,19 @@ export function isActiveRoute(pathname: string, href: string): boolean {
  * change and dynamic-segment labels stay obvious.
  *
  * Patterns covered:
- *   `/dashboard`                                  → Home
+ *   `/home`                                  → Home
  *   `/ideas`                                      → Cook / Ideas
  *   `/plans`                                      → Cook / Plans
  *   `/plans/new`                                  → Cook / Plans / New
  *   `/plans/[id]`                                 → Cook / Plans / Plan
- *   `/history`                                    → Cook / Library
+ *   `/library`                                    → Cook / Library
  *   `/meal/[id]`                                  → Cook / Library / Recipe
  *   `/meal/[id]/refine`                           → Cook / Library / Recipe / Refine
  *   `/meal/[id]/refine/review`                    → Cook / Library / Recipe / Refine / Review
  *   `/add`                                        → Capture / Add a meal
  *   `/add/log`                                    → Capture / Add a meal / Log a meal
  *   `/add/ai`                                     → Capture / Capture with AI
- *   `/household`                                  → Kitchen / Members
+ *   `/kitchen`                                  → Kitchen / Members
  *   `/settings`                                   → Kitchen / Settings
  *   `/notifications`                              → Inbox (route doesn't exist yet but we leave the map entry so the bell's link target works when added)
  */
@@ -74,27 +74,27 @@ export function getCrumbs(pathname: string): Crumb[] {
   // dashboard itself. On deeper routes we lead with the group label
   // ("Cook" / "Kitchen") rather than "Home" so the trail reads as a
   // location, not a journey back to the start.
-  if (pathname === "/dashboard" || pathname === "/") {
+  if (pathname === "/home" || pathname === "/") {
     return [{ label: "Home" }];
   }
 
   if (pathname === "/ideas") {
     return [
-      { label: "Cook", href: "/dashboard" as Route },
+      { label: "Cook", href: "/home" as Route },
       { label: "Ideas" }
     ];
   }
 
   if (pathname === "/plans") {
     return [
-      { label: "Cook", href: "/dashboard" as Route },
+      { label: "Cook", href: "/home" as Route },
       { label: "Plans" }
     ];
   }
 
   if (pathname === "/plans/new") {
     return [
-      { label: "Cook", href: "/dashboard" as Route },
+      { label: "Cook", href: "/home" as Route },
       { label: "Plans", href: "/plans" as Route },
       { label: "New" }
     ];
@@ -102,23 +102,23 @@ export function getCrumbs(pathname: string): Crumb[] {
 
   if (/^\/plans\/[^/]+$/.test(pathname)) {
     return [
-      { label: "Cook", href: "/dashboard" as Route },
+      { label: "Cook", href: "/home" as Route },
       { label: "Plans", href: "/plans" as Route },
       { label: "Plan" }
     ];
   }
 
-  if (pathname === "/history") {
+  if (pathname === "/library") {
     return [
-      { label: "Cook", href: "/dashboard" as Route },
+      { label: "Cook", href: "/home" as Route },
       { label: "Library" }
     ];
   }
 
   if (/^\/meal\/[^/]+$/.test(pathname)) {
     return [
-      { label: "Cook", href: "/dashboard" as Route },
-      { label: "Library", href: "/history" as Route },
+      { label: "Cook", href: "/home" as Route },
+      { label: "Library", href: "/library" as Route },
       { label: "Recipe" }
     ];
   }
@@ -127,8 +127,8 @@ export function getCrumbs(pathname: string): Crumb[] {
     const mealMatch = pathname.match(/^\/meal\/([^/]+)\/refine$/);
     const mealId = mealMatch?.[1] ?? "";
     return [
-      { label: "Cook", href: "/dashboard" as Route },
-      { label: "Library", href: "/history" as Route },
+      { label: "Cook", href: "/home" as Route },
+      { label: "Library", href: "/library" as Route },
       { label: "Recipe", href: `/meal/${mealId}` as Route },
       { label: "Refine" }
     ];
@@ -138,8 +138,8 @@ export function getCrumbs(pathname: string): Crumb[] {
     const mealMatch = pathname.match(/^\/meal\/([^/]+)\/refine\/review$/);
     const mealId = mealMatch?.[1] ?? "";
     return [
-      { label: "Cook", href: "/dashboard" as Route },
-      { label: "Library", href: "/history" as Route },
+      { label: "Cook", href: "/home" as Route },
+      { label: "Library", href: "/library" as Route },
       { label: "Recipe", href: `/meal/${mealId}` as Route },
       { label: "Refine", href: `/meal/${mealId}/refine` as Route },
       { label: "Review" }
@@ -153,14 +153,14 @@ export function getCrumbs(pathname: string): Crumb[] {
   // sidebar has it as its own destination.
   if (pathname === "/add") {
     return [
-      { label: "Capture", href: "/dashboard" as Route },
+      { label: "Capture", href: "/home" as Route },
       { label: "Add a meal" }
     ];
   }
 
   if (pathname === "/add/log") {
     return [
-      { label: "Capture", href: "/dashboard" as Route },
+      { label: "Capture", href: "/home" as Route },
       { label: "Add a meal", href: "/add" as Route },
       { label: "Log a meal" }
     ];
@@ -168,28 +168,28 @@ export function getCrumbs(pathname: string): Crumb[] {
 
   if (pathname === "/add/ai") {
     return [
-      { label: "Capture", href: "/dashboard" as Route },
+      { label: "Capture", href: "/home" as Route },
       { label: "Capture with AI" }
     ];
   }
 
   if (pathname === "/people") {
     return [
-      { label: "Sharing", href: "/dashboard" as Route },
+      { label: "Sharing", href: "/home" as Route },
       { label: "People" }
     ];
   }
 
-  if (pathname === "/household") {
+  if (pathname === "/kitchen") {
     return [
-      { label: "Kitchen", href: "/household" as Route },
+      { label: "Kitchen", href: "/kitchen" as Route },
       { label: "Members" }
     ];
   }
 
   if (pathname === "/settings") {
     return [
-      { label: "Sharing", href: "/dashboard" as Route },
+      { label: "Sharing", href: "/home" as Route },
       { label: "Settings" }
     ];
   }
@@ -210,7 +210,7 @@ export function getCrumbs(pathname: string): Crumb[] {
       danger: "Danger zone"
     };
     return [
-      { label: "Sharing", href: "/dashboard" as Route },
+      { label: "Sharing", href: "/home" as Route },
       { label: "Settings", href: "/settings" as Route },
       { label: labels[section] ?? "Settings" }
     ];

@@ -51,6 +51,17 @@ const nextConfig: NextConfig = {
       { source: "/ingest/:path*", destination: `${posthogHost}/:path*` }
     ];
   },
+  // Routes renamed to match their sidebar labels (dashboard→home,
+  // history→library, household→kitchen). Temporary (307) redirects keep
+  // existing bookmarks + in-flight magic-link callbacks working without
+  // baking the old paths into browser caches.
+  async redirects() {
+    return [
+      { source: "/dashboard", destination: "/home", permanent: false },
+      { source: "/history", destination: "/library", permanent: false },
+      { source: "/household", destination: "/kitchen", permanent: false }
+    ];
+  },
   async headers() {
     return [
       {

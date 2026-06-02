@@ -28,7 +28,7 @@ import type { SharedWithMeItem, TombstoneView } from "@/services/sharing";
 /**
  * Round 28 — editorial Library.
  *
- * Repurposes the `/history` route from a per-cook-log surface to a
+ * Repurposes the `/library` route from a per-cook-log surface to a
  * recipe-library surface, matching the design. The old History UI
  * was a tabular log viewer; the new one is a 4-up MealTile grid with
  * filter chips and an editorial hero.
@@ -161,6 +161,16 @@ export function LibraryClient({
     return map;
   }, [stats]);
 
+  // The "Yours" surface is strictly recipes you OWN. `listMealLibrary` is
+  // household-scoped + visibility-filtered, so in a multi-member kitchen it
+  // also returns items a co-member granted you — those belong only in
+  // "Shared with you" (the `sharedWithMe` surface), not here. Partition them
+  // out so a shared recipe doesn't appear under both tabs.
+  const ownedRows = React.useMemo(
+    () => rows.filter((r) => r.createdByUserId === currentUserId),
+    [rows, currentUserId]
+  );
+
   // Capture "now" once at mount so re-renders don't move the
   // 30-day window under the user's feet (and so the memo body stays
   // pure — Date.now() inside useMemo trips the react-hooks/purity
@@ -177,7 +187,7 @@ export function LibraryClient({
     let never = 0;
     let personal = 0;
     let shared = 0;
-    for (const row of rows) {
+    for (const row of ownedRows) {
       // Per-item: a recipe is "Shared" once you've granted it to ≥1 person
       // (grant counts come from getRecipeShareCounts, owner-side). Everything
       // else you own is "Personal". Only your own recipes carry outbound
@@ -202,7 +212,7 @@ export function LibraryClient({
       }
     }
     return {
-      all: rows.length,
+      all: ownedRows.length,
       recent,
       most,
       personal,
@@ -211,17 +221,17 @@ export function LibraryClient({
       high: 0,
       never
     } as Record<FilterKey, number>;
-  }, [rows, statsByMealId, now, thirtyDays, currentUserId, shareCounts]);
+  }, [ownedRows, statsByMealId, now, thirtyDays, currentUserId, shareCounts]);
 
-  // Apply filter to rows.
+  // Apply filter to the owned rows.
   const filteredRows = React.useMemo(() => {
-    if (filter === "all") return rows;
+    if (filter === "all") return ownedRows;
     if (filter === "quick" || filter === "high") {
       // Decorative chips — no filter applied. Equivalent to "All"
       // visually but with the chip styled active. Flagged.
-      return rows;
+      return ownedRows;
     }
-    return rows.filter((row) => {
+    return ownedRows.filter((row) => {
       const stat = statsByMealId.get(row.id);
       if (filter === "never") return !stat;
       if (filter === "recent") {
@@ -239,7 +249,7 @@ export function LibraryClient({
       }
       return true;
     });
-  }, [rows, statsByMealId, filter, now, thirtyDays, currentUserId, shareCounts]);
+  }, [ownedRows, statsByMealId, filter, now, thirtyDays, currentUserId, shareCounts]);
 
   return (
     <div className="grid gap-7">
@@ -283,7 +293,7 @@ export function LibraryClient({
           tone="sage"
           icon={<BookOpen className="h-[17px] w-[17px]" />}
           label="Yours"
-          count={rows.length}
+          count={ownedRows.length}
           onClick={() => setSurface("yours")}
         />
         <SurfaceTab
@@ -369,7 +379,7 @@ export function LibraryClient({
         </ul>
       ) : (
         <p className="rounded-[14px] border border-dashed bg-[var(--surface-2)] px-6 py-10 text-center text-[13.5px] italic text-muted-foreground">
-          {rows.length === 0
+          {ownedRows.length === 0
             ? "No recipes in your library yet. Use the New recipe button to log your first meal."
             : "No recipes match this filter."}
         </p>

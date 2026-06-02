@@ -211,8 +211,8 @@ export const householdsRouter = router({
           mealsMoved: result.mealsMoved,
           logsMoved: result.logsMoved
         });
-        revalidatePath("/dashboard");
-        revalidatePath("/history");
+        revalidatePath("/home");
+        revalidatePath("/library");
         revalidatePath("/ideas");
         revalidatePath("/settings");
 
@@ -292,7 +292,7 @@ export const householdsRouter = router({
           ctx.household.id
         );
         revalidatePath("/settings");
-        revalidatePath("/dashboard");
+        revalidatePath("/home");
         return {
           householdId: result.householdId,
           householdName: result.householdName
@@ -333,7 +333,7 @@ export const householdsRouter = router({
           title: `You were removed from ${result.householdName}`,
           body:
             "You'll land in a fresh personal kitchen the next time you sign in.",
-          href: "/dashboard"
+          href: "/home"
         }).catch((error) => {
           logger.warn("removal_notification_failed", {
             actorId: ctx.user.id,
@@ -357,8 +357,8 @@ export const householdsRouter = router({
         });
 
         revalidatePath("/settings");
-        revalidatePath("/dashboard");
-        revalidatePath("/history");
+        revalidatePath("/home");
+        revalidatePath("/library");
         return { removedUserName: result.removedUserName };
       } catch (error) {
         if (error instanceof NotHouseholdOwnerError) {

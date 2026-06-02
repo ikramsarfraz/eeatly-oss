@@ -27,7 +27,7 @@ export function RecentHistoryList({
           </span>
         </h3>
         <Link
-          href="/history"
+          href="/library"
           className="text-[11.5px] text-muted-foreground hover:text-foreground"
           aria-label="View full meal history"
         >

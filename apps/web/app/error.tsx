@@ -52,7 +52,7 @@ export default function RootError({
           Try again
         </Button>
         <Button variant="ghost" asChild>
-          <Link href={"/dashboard" as Route}>Back to Tonight</Link>
+          <Link href={"/home" as Route}>Back to Tonight</Link>
         </Button>
       </div>
     </main>

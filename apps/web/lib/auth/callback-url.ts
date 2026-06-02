@@ -9,10 +9,10 @@
  *
  * Both helpers are pure and unit-testable. The `sanitize` helper is the
  * defense against open-redirect: only same-origin paths beginning with a
- * single `/` are accepted; everything else falls back to `/dashboard`.
+ * single `/` are accepted; everything else falls back to `/home`.
  */
 
-const DEFAULT_CALLBACK = "/dashboard";
+const DEFAULT_CALLBACK = "/home";
 
 /**
  * Sanitize a callbackURL from an untrusted source (query param or

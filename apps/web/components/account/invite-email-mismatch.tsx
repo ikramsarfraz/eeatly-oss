@@ -69,7 +69,7 @@ export function InviteEmailMismatch({
             : `Sign out and accept as ${invitedEmail}`}
         </Button>
         <Button asChild variant="outline">
-          <Link href={"/dashboard" as Route}>Cancel</Link>
+          <Link href={"/home" as Route}>Cancel</Link>
         </Button>
         {error && <p className="text-[12.5px] text-destructive">{error}</p>}
       </CardContent>

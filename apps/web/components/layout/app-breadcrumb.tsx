@@ -40,7 +40,7 @@ function buildCrumbs(pathname: string): Crumb[] {
   const segments = pathname.split("/").filter(Boolean);
 
   if (segments.length === 0) {
-    return [{ href: "/dashboard", label: "Tonight", isCurrent: true }];
+    return [{ href: "/home", label: "Tonight", isCurrent: true }];
   }
 
   const crumbs: Crumb[] = [];

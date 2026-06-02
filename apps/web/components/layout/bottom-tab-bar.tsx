@@ -19,16 +19,16 @@ type TabItem = {
 
 const tabs: TabItem[] = [
   {
-    href: "/dashboard",
+    href: "/home",
     label: "Tonight",
     icon: Moon,
-    match: (p) => p === "/dashboard",
+    match: (p) => p === "/home",
   },
   {
-    href: "/history",
+    href: "/library",
     label: "History",
     icon: Clock3,
-    match: (p) => p.startsWith("/history"),
+    match: (p) => p.startsWith("/library"),
   },
   {
     href: "/ideas",

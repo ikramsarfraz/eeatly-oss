@@ -59,7 +59,7 @@ import type { AppUser } from "@/lib/auth/session";
  *   - Capture with AI `/add/ai` → no route. Inline AI is in
  *     `AISuggestDialog`, opened from the meal log form.
  *   - Saved links `/saved` → no route.
- *   - History `/history` is the Library route; no separate page.
+ *   - History `/library` is the Library route; no separate page.
  */
 
 type NavItem = {
@@ -76,15 +76,23 @@ type NavItem = {
    * Capture items would light up at the same time.
    */
   matchPaths?: ReadonlyArray<string>;
+  /**
+   * Extra route subtrees that also activate this item, matched by prefix
+   * (`=== p` or `startsWith(p + '/')`). For nav whose detail pages live
+   * under a different path than the list — e.g. Library (`/library`)
+   * stays active on recipe pages at `/meal/[id]` and deeper.
+   */
+  activePrefixes?: ReadonlyArray<string>;
 };
 
 const cookNav: NavItem[] = [
-  { href: "/dashboard" as Route, label: "Home", icon: Home },
+  { href: "/home" as Route, label: "Home", icon: Home },
   { href: "/plans" as Route, label: "Plans", icon: CalendarDays },
-  // The existing `/history` route is the Library — same page, named
+  // The existing `/library` route is the Library — same page, named
   // for the dashboard nav. Don't add a second History item; one route,
-  // one nav entry.
-  { href: "/history" as Route, label: "Library", icon: BookOpen }
+  // one nav entry. Recipe detail lives at `/meal/[id]`, so keep Library
+  // active there too.
+  { href: "/library" as Route, label: "Library", icon: BookOpen, activePrefixes: ["/meal"] }
 ];
 
 /**
@@ -108,20 +116,31 @@ const captureNav: NavItem[] = [
 ];
 
 /**
- * Sharing group — Kitchen is the shared group (everyone sees everything);
- * People is one-to-one, per-item sharing. They're distinct surfaces, so
- * each gets its own nav item with a pinned active path to avoid the old
- * double-highlight where `/household` lit up "People".
+ * Sharing group — Kitchen is your household (a shared cooking space; recipes
+ * still stay private per-item), People is one-to-one per-item sharing. Both
+ * use the default prefix-based active rule, so they highlight on their own
+ * nested routes; `/kitchen` and `/people` don't overlap.
  */
 const sharingNav: NavItem[] = [
-  { href: "/household" as Route, label: "Kitchen", icon: ChefHat, matchPaths: ["/household"] },
+  { href: "/kitchen" as Route, label: "Kitchen", icon: ChefHat },
   { href: "/people" as Route, label: "People", icon: Share2 },
   { href: "/settings" as Route, label: "Settings", icon: Settings }
 ];
 
 function itemActive(pathname: string, item: NavItem): boolean {
-  if (item.matchPaths) return item.matchPaths.includes(pathname);
-  return isActiveRoute(pathname, item.href);
+  // `matchPaths` (when set) is an exact-match allowlist used to keep sibling
+  // items from double-highlighting; otherwise fall back to the prefix-based
+  // `isActiveRoute`. Either way, `activePrefixes` can light the item up on
+  // additional subtrees (e.g. Library on `/meal/[id]`).
+  const base = item.matchPaths
+    ? item.matchPaths.includes(pathname)
+    : isActiveRoute(pathname, item.href);
+  if (base) return true;
+  return (
+    item.activePrefixes?.some(
+      (p) => pathname === p || pathname.startsWith(p + "/")
+    ) ?? false
+  );
 }
 
 type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
@@ -140,7 +159,7 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link href={"/dashboard" as Route}>
+              <Link href={"/home" as Route}>
                 <span
                   aria-hidden
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-primary font-serif italic text-[22px] leading-none text-primary-foreground"

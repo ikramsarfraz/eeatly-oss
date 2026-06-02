@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 /**
  * Round 28 — Library.
  *
- * Repurposes the `/history` route to surface the new editorial
+ * Repurposes the `/library` route to surface the new editorial
  * Library design. The previous History UI (per-log table with tabs +
  * filters) is retired in favor of a 4-up MealTile grid keyed off the
  * household's recipe catalog. The cook-log timeline still lives in

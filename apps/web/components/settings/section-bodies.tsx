@@ -242,7 +242,7 @@ export function KitchenSection({
         }`}
         suffix={
           <Button asChild variant="ghost" size="sm" className="h-9">
-            <Link href={"/household" as Route}>
+            <Link href={"/kitchen" as Route}>
               <Users className="h-3.5 w-3.5" />
               Manage
               <ChevronRight className="h-3.5 w-3.5" />

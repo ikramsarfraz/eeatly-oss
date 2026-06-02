@@ -94,7 +94,7 @@ function InvitationView({
         </CardHeader>
         <CardContent>
           <Button asChild>
-            <Link href={"/dashboard" as Route}>Open eeatly</Link>
+            <Link href={"/home" as Route}>Open eeatly</Link>
           </Button>
         </CardContent>
       </Card>

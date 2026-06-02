@@ -22,7 +22,7 @@ export function GoogleAuthButton({ mode, callbackURL }: GoogleAuthButtonProps) {
     try {
       await authClient.signIn.social({
         provider: "google",
-        callbackURL: callbackURL ?? "/dashboard"
+        callbackURL: callbackURL ?? "/home"
       });
     } catch {
       setError("Google sign-in is temporarily unavailable. Please try again.");

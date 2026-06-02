@@ -33,7 +33,7 @@ export default async function OnboardingPage() {
 
   // If they've already finished, don't make them redo it.
   if (onboarding?.onboardingCompletedAt) {
-    redirect("/dashboard");
+    redirect("/home");
   }
 
   return (

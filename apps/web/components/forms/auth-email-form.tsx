@@ -47,7 +47,7 @@ export function AuthEmailForm({ mode, initialEmail, callbackURL }: AuthEmailForm
         // through the multi-step onboarding first. When an invite link
         // forwarded a callbackURL, that wins — Better Auth honors the
         // parameter and returns the user to /invite/[token].
-        callbackURL: callbackURL ?? "/dashboard",
+        callbackURL: callbackURL ?? "/home",
         newUserCallbackURL: "/onboarding"
       });
 

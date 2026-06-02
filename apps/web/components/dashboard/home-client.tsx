@@ -276,7 +276,7 @@ export function HomeClient({
               id="recents-heading"
               action={
                 <Link
-                  href={"/history" as Route}
+                  href={"/library" as Route}
                   className="text-[11.5px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
                 >
                   See all →
@@ -306,7 +306,7 @@ export function HomeClient({
               id="most-cooked-heading"
               action={
                 <Link
-                  href={"/history" as Route}
+                  href={"/library" as Route}
                   className="text-[11.5px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
                 >
                   See all →

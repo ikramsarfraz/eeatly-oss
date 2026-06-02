@@ -50,7 +50,7 @@ type TopBarProps = {
 };
 
 export function TopBar({ onOpenSearch }: TopBarProps) {
-  const pathname = usePathname() ?? "/dashboard";
+  const pathname = usePathname() ?? "/home";
   // R30 — pages can register a runtime override for a placeholder
   // crumb label (e.g. Recipe Detail → meal name; Plan Detail → plan
   // name). When the override carries a `targetLabel`, the matching

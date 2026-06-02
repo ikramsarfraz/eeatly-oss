@@ -97,7 +97,7 @@ export function AcceptInvitationCard({
       const result = await acceptMutation.mutateAsync({ token });
       if (result.kind !== "accepted") return;
       setSuccess({ moved: result.mealsMoved + result.logsMoved });
-      setTimeout(() => router.push("/dashboard"), 900);
+      setTimeout(() => router.push("/home"), 900);
     } catch (e) {
       setError(toLocalError(e));
     } finally {

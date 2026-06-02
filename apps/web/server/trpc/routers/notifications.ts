@@ -29,13 +29,13 @@ export const notificationsRouter = router({
     .input(z.object({ notificationId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       await markNotificationRead(ctx.user.id, input.notificationId);
-      revalidatePath("/dashboard");
+      revalidatePath("/home");
       return { ok: true as const };
     }),
 
   markAllRead: protectedProcedure.mutation(async ({ ctx }) => {
     const updated = await markAllNotificationsRead(ctx.user.id);
-    revalidatePath("/dashboard");
+    revalidatePath("/home");
     return { updated };
   })
 });

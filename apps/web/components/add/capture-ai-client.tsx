@@ -258,7 +258,7 @@ export function CaptureAiClient() {
               hideSubmit
               initialMealName={suggestion.name}
               autoFocusRecipe
-              onSuccess={() => router.push("/dashboard" as Route)}
+              onSuccess={() => router.push("/home" as Route)}
             />
             {/* MealLogForm doesn't accept prefill for effort / notes /
                 recipeText via props today — the existing AI dialog

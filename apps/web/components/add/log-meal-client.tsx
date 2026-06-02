@@ -73,7 +73,7 @@ export function LogMealClient({
               // log. A future round can route to the freshly-created
               // meal's detail page once `createLog` returns the meal id
               // on the wire.
-              router.push("/dashboard" as Route);
+              router.push("/home" as Route);
             }}
           />
         </div>

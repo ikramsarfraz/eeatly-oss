@@ -111,7 +111,7 @@ export function PeopleClient({ initialOverview }: { initialOverview: PeopleOverv
           <p className="-mt-2 max-w-[560px] text-[13px] leading-[1.5] text-muted-foreground">
             People in your kitchen. They only see the recipes and plans you share with them, item
             by item — same as anyone else. Manage who&apos;s in the kitchen from{" "}
-            <Link href={"/household" as Route} className="text-foreground underline-offset-2 hover:underline">
+            <Link href={"/kitchen" as Route} className="text-foreground underline-offset-2 hover:underline">
               Kitchen
             </Link>
             .
@@ -301,7 +301,7 @@ function PersonCard({
         </div>
         {isKitchenMate ? (
           <Button asChild variant="ghost" className="min-h-[34px] shrink-0">
-            <Link href={"/household" as Route}>
+            <Link href={"/kitchen" as Route}>
               Manage in Kitchen
               <ChevronRight className="h-3.5 w-3.5" />
             </Link>
@@ -416,18 +416,23 @@ function InviteDialog({
   const { showToast } = useToast();
   const [email, setEmail] = React.useState("");
   const [link, setLink] = React.useState<string | null>(null);
+  // Inline error so a handled rejection (already invited, privacy block, …)
+  // is visible in the dialog rather than only flashing as a toast — the
+  // form stays open on failure, so "nothing happened" needs a reason here.
+  const [error, setError] = React.useState<string | null>(null);
 
   const invite = trpc.connections.invite.useMutation({
     onSuccess: (res) => {
       if (res.ok) {
+        setError(null);
         setLink(res.url);
         onInvited();
-        showToast({ variant: "success", title: "Invitation created" });
+        showToast({ variant: "success", title: "Invitation sent" });
       } else {
-        showToast({ variant: "error", title: res.message });
+        setError(res.message);
       }
     },
-    onError: (e) => showToast({ variant: "error", title: "Couldn't invite", description: e.message })
+    onError: (e) => setError(e.message || "Couldn't send the invite. Please try again.")
   });
 
   // Reset on close in the change handler (not an effect) to avoid a
@@ -436,6 +441,7 @@ function InviteDialog({
     if (!next) {
       setEmail("");
       setLink(null);
+      setError(null);
     }
     onOpenChange(next);
   };
@@ -468,7 +474,9 @@ function InviteDialog({
             className="grid gap-3"
             onSubmit={(e) => {
               e.preventDefault();
-              if (email.trim()) invite.mutate({ email: email.trim() });
+              if (!email.trim()) return;
+              setError(null);
+              invite.mutate({ email: email.trim() });
             }}
           >
             <Input
@@ -476,12 +484,20 @@ function InviteDialog({
               required
               placeholder="name@email.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (error) setError(null);
+              }}
               aria-label="Email"
             />
+            {error ? (
+              <p className="rounded-[10px] border border-[color:var(--danger,#b4472e)]/30 bg-[color:var(--danger-soft,#f2ded7)] px-3 py-2 text-[12.5px] text-[color:var(--danger,#b4472e)]">
+                {error}
+              </p>
+            ) : null}
             <Button type="submit" variant="default" disabled={invite.isPending}>
               <UserPlus className="h-3.5 w-3.5" />
-              Create invite
+              {invite.isPending ? "Sending…" : "Send invite"}
             </Button>
           </form>
         )}

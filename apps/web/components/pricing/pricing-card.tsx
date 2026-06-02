@@ -251,7 +251,7 @@ function CardCta({
   if (isFree) {
     return (
       <Button asChild variant={variant} className={className}>
-        <Link href={(authState.kind === "anonymous" ? "/sign-up" : "/dashboard") as Route}>
+        <Link href={(authState.kind === "anonymous" ? "/sign-up" : "/home") as Route}>
           Try eeatly
         </Link>
       </Button>
@@ -276,7 +276,7 @@ function CardCta({
     }
     return (
       <Button asChild variant={variant} className={className}>
-        <Link href={"/dashboard" as Route}>You&apos;re all set — Chef is unlocked</Link>
+        <Link href={"/home" as Route}>You&apos;re all set — Chef is unlocked</Link>
       </Button>
     );
   }

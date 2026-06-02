@@ -218,7 +218,7 @@ function buildPostOnboardingHref({
 }: {
   path: "fresh" | "invited";
   householdName: string | null;
-}): "/dashboard" | `/dashboard?${string}` {
+}): "/home" | `/home?${string}` {
   // Welcome toast surfaces on the dashboard. The query params are
   // stripped after the toast fires (see components/dashboard/welcome-toast.tsx)
   // so the URL stays clean for subsequent visits.
@@ -226,7 +226,7 @@ function buildPostOnboardingHref({
   if (path === "invited" && householdName) {
     params.set("kitchen", householdName);
   }
-  return `/dashboard?${params.toString()}` as `/dashboard?${string}`;
+  return `/home?${params.toString()}` as `/home?${string}`;
 }
 
 function StepIndicator({ current, total }: { current: number; total: number }) {

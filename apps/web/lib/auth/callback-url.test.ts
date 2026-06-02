@@ -4,17 +4,17 @@ import { buildAuthCallbackHref, sanitizeCallbackURL } from "./callback-url";
 describe("sanitizeCallbackURL", () => {
   it("accepts an internal path", () => {
     expect(sanitizeCallbackURL("/invite/abc123")).toBe("/invite/abc123");
-    expect(sanitizeCallbackURL("/dashboard")).toBe("/dashboard");
+    expect(sanitizeCallbackURL("/home")).toBe("/home");
   });
 
   it("rejects protocol-relative URLs (open-redirect guard)", () => {
     // `//attacker.com/path` is the classic open-redirect payload.
-    expect(sanitizeCallbackURL("//attacker.com/path")).toBe("/dashboard");
+    expect(sanitizeCallbackURL("//attacker.com/path")).toBe("/home");
   });
 
   it("rejects absolute URLs", () => {
-    expect(sanitizeCallbackURL("https://attacker.com/login")).toBe("/dashboard");
-    expect(sanitizeCallbackURL("http://example.com")).toBe("/dashboard");
+    expect(sanitizeCallbackURL("https://attacker.com/login")).toBe("/home");
+    expect(sanitizeCallbackURL("http://example.com")).toBe("/home");
   });
 
   it("allows /sign-in and /sign-up — the email-mismatch flow targets them", () => {
@@ -27,10 +27,10 @@ describe("sanitizeCallbackURL", () => {
   });
 
   it("returns the default for non-string, missing, or non-rooted values", () => {
-    expect(sanitizeCallbackURL(undefined)).toBe("/dashboard");
-    expect(sanitizeCallbackURL(null)).toBe("/dashboard");
-    expect(sanitizeCallbackURL(123)).toBe("/dashboard");
-    expect(sanitizeCallbackURL("dashboard")).toBe("/dashboard");
+    expect(sanitizeCallbackURL(undefined)).toBe("/home");
+    expect(sanitizeCallbackURL(null)).toBe("/home");
+    expect(sanitizeCallbackURL(123)).toBe("/home");
+    expect(sanitizeCallbackURL("dashboard")).toBe("/home");
   });
 
   it("preserves query strings on valid paths", () => {

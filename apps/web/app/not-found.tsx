@@ -23,10 +23,10 @@ export default function NotFound() {
       </div>
       <div className="flex flex-wrap items-center justify-center gap-3">
         <Button asChild>
-          <Link href={"/dashboard" as Route}>Back to Tonight</Link>
+          <Link href={"/home" as Route}>Back to Tonight</Link>
         </Button>
         <Button variant="ghost" asChild>
-          <Link href={"/history" as Route}>Open history</Link>
+          <Link href={"/library" as Route}>Open history</Link>
         </Button>
       </div>
     </main>

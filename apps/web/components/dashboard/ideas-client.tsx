@@ -57,7 +57,7 @@ export function IdeasClient({ initialData }: { initialData: DashboardMeals }) {
             </p>
             {!hasMeals ? (
               <Link
-                href="/dashboard"
+                href="/home"
                 className="mt-1 inline-flex w-fit items-center gap-1.5 text-[13px] font-medium text-primary hover:underline"
               >
                 Go to Tonight →

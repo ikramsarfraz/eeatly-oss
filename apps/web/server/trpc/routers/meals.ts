@@ -116,8 +116,8 @@ export const mealsRouter = router({
         input.log
       );
 
-      revalidatePath("/dashboard");
-      revalidatePath("/history");
+      revalidatePath("/home");
+      revalidatePath("/library");
       revalidatePath("/ideas");
       logger.info("meal_log_created", {
         userId: ctx.user.id,
@@ -139,7 +139,7 @@ export const mealsRouter = router({
             ? {
                 title: "First meal logged",
                 body: "eeatly will get more useful with every log. Tap to see your kitchen.",
-                href: "/dashboard"
+                href: "/home"
               }
             : {
                 title: "Two cooks logged",
@@ -179,8 +179,8 @@ export const mealsRouter = router({
           mealId: input.mealId,
           photoUrl: input.photoUrl
         });
-        revalidatePath("/dashboard");
-        revalidatePath("/history");
+        revalidatePath("/home");
+        revalidatePath("/library");
         revalidatePath("/ideas");
         revalidatePath(`/meal/${input.mealId}`);
         logger.info("meal_photo_set", {
@@ -216,8 +216,8 @@ export const mealsRouter = router({
         }
         throw error;
       }
-      revalidatePath("/dashboard");
-      revalidatePath("/history");
+      revalidatePath("/home");
+      revalidatePath("/library");
       revalidatePath("/ideas");
       logger.info("meal_log_deleted", {
         userId: ctx.user.id,
