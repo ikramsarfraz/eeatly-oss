@@ -12,7 +12,6 @@ import {
   Plus,
   Settings,
   Share2,
-  Sparkles,
   type LucideIcon
 } from "lucide-react";
 
@@ -95,25 +94,9 @@ const cookNav: NavItem[] = [
   { href: "/library" as Route, label: "Library", icon: BookOpen, activePrefixes: ["/meal"] }
 ];
 
-/**
- * R29 — Capture group reinstated. R26 omitted it because the routes
- * didn't exist; R29 builds `/add` + `/add/log` + `/add/ai` and brings
- * the group back. "Saved links" stays omitted (no `/saved` route).
- */
-const captureNav: NavItem[] = [
-  {
-    href: "/add" as Route,
-    label: "Add a meal",
-    icon: Plus,
-    matchPaths: ["/add", "/add/log"]
-  },
-  {
-    href: "/add/ai" as Route,
-    label: "Capture with AI",
-    icon: Sparkles,
-    matchPaths: ["/add/ai"]
-  }
-];
+// Capture consolidation: the old CAPTURE group (Add a meal hub + Capture with
+// AI) is gone — the single top "Add a meal" CTA is the only capture door, and
+// it opens the unified composer at /add.
 
 /**
  * Sharing group — Kitchen is your household (a shared cooking space; recipes
@@ -179,21 +162,17 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
           </SidebarMenuItem>
         </SidebarMenu>
 
-        {/* R29 — Log-a-meal CTA now routes to the dedicated
-            `/add/log` page. R26 had this opening the existing
-            `<QuickLogDialog>` because no route existed; that dialog
-            is kept in place (still callable via ⌘E via
-            QuickLogProvider) for in-context use, but the sidebar
-            primary entry is now the editorial page. */}
+        {/* The single capture door — opens the unified composer at /add
+            (the QuickLogDialog stays callable via ⌘E for in-context use). */}
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
               className="bg-foreground text-background hover:bg-[#2a3431] hover:text-background active:bg-[#2a3431] active:text-background dark:hover:bg-[color:var(--ink-2,#a8a28f)] dark:active:bg-[color:var(--ink-2,#a8a28f)]"
             >
-              <Link href={"/add/log" as Route}>
+              <Link href={"/add" as Route}>
                 <Plus className="h-4 w-4 shrink-0" />
-                <span>Log a meal</span>
+                <span>Add a meal</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -230,37 +209,6 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* R29 — Capture group reinstated. Routes built in this
-            round; matchPaths in NavItem disambiguates which item
-            highlights for which `/add/*` route. */}
-        <SidebarGroup className="py-1">
-          <SidebarGroupLabel
-            className="font-mono uppercase"
-            style={{ letterSpacing: "0.14em" }}
-          >
-            Capture
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {captureNav.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={itemActive(pathname, item)}
-                    >
-                      <Link href={item.href}>
-                        <Icon className="size-4" />
-                        <span>{item.label}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
 
         <SidebarGroup className="py-1">
           <SidebarGroupLabel

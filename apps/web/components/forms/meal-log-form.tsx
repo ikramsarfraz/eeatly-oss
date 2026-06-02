@@ -38,6 +38,18 @@ type MealLogFormProps = {
    * legacy consumers.
    */
   hideSubmit?: boolean;
+  /**
+   * Pre-fill the form from an AI extraction (the unified composer's AI
+   * methods). Seeds the form's default values so the review form opens
+   * fully populated — name, effort, notes, recipe text, ingredients.
+   */
+  initialSuggestion?: MealSuggestion;
+  /**
+   * Hide the inline "Fill from photo / text / voice" AI dialog. The unified
+   * composer surfaces those as separate method tabs, so the log tab's form
+   * doesn't need its own AI entry point.
+   */
+  hideAiSuggest?: boolean;
 };
 
 const effortOptions: Array<{ value: MealLogInput["effortLevel"]; label: string }> = [
@@ -52,15 +64,21 @@ export function MealLogForm({
   initialMealName,
   autoFocusRecipe,
   formId,
-  hideSubmit = false
+  hideSubmit = false,
+  initialSuggestion,
+  hideAiSuggest = false
 }: MealLogFormProps) {
   const datalistId = React.useId();
   const utils = trpc.useUtils();
   const [photoFile, setPhotoFile] = React.useState<File | null>(null);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
-  const [isRecipeOpen, setIsRecipeOpen] = React.useState(false);
-  const [aiNotice, setAiNotice] = React.useState<{ confidence: MealSuggestion["confidence"] } | null>(null);
+  const [isRecipeOpen, setIsRecipeOpen] = React.useState(
+    Boolean(initialSuggestion?.recipeText)
+  );
+  const [aiNotice, setAiNotice] = React.useState<{ confidence: MealSuggestion["confidence"] } | null>(
+    initialSuggestion ? { confidence: initialSuggestion.confidence } : null
+  );
   const aiNoticeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const recipeTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
 
@@ -107,15 +125,18 @@ export function MealLogForm({
   const form = useForm<MealLogInput>({
     resolver: zodResolver(mealLogInputSchema),
     defaultValues: {
-      mealName: "",
-      effortLevel: "easy",
-      notes: "",
+      mealName: initialSuggestion?.name ?? "",
+      effortLevel: initialSuggestion?.effortGuess ?? "easy",
+      notes: initialSuggestion?.notes ?? "",
       cookedDate: new Date().toISOString().slice(0, 10),
       photoUrl: "",
-      recipeText: "",
+      recipeText: initialSuggestion?.recipeText ?? "",
       recipeSourceUrl: "",
-      servings: "",
-      ingredients: undefined
+      servings: initialSuggestion?.servings ?? "",
+      ingredients:
+        initialSuggestion?.ingredients && initialSuggestion.ingredients.length > 0
+          ? initialSuggestion.ingredients
+          : undefined
     }
   });
 
@@ -230,8 +251,9 @@ export function MealLogForm({
 
   return (
     <form id={formId} className="grid gap-3" onSubmit={handlePersist}>
-      {/* AI prefill */}
-      <AiSuggestDialog onSuggestion={handleSuggestion} />
+      {/* AI prefill — hidden in the unified composer, where the AI methods
+          are their own tabs. */}
+      {hideAiSuggest ? null : <AiSuggestDialog onSuggestion={handleSuggestion} />}
 
       {/* AI notice */}
       {aiNotice && (

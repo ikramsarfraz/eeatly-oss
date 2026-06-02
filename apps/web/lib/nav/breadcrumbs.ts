@@ -146,30 +146,20 @@ export function getCrumbs(pathname: string): Crumb[] {
     ];
   }
 
-  // R29 — Capture group routes. The Add hub (`/add`) is the parent;
-  // `/add/log` reads as a deeper-than-hub trail since it's an
-  // editorial form surface. AI capture sits parallel to the hub
-  // (Capture / Capture with AI), not nested under it, because the
-  // sidebar has it as its own destination.
+  // Capture consolidation — the single unified composer at `/add`. The old
+  // `/add/log` + `/add/ai` routes now redirect here; their trails are kept
+  // only as a fallback in case a redirect is briefly in flight.
   if (pathname === "/add") {
     return [
       { label: "Capture", href: "/home" as Route },
-      { label: "Add a meal" }
+      { label: "Add" }
     ];
   }
 
-  if (pathname === "/add/log") {
+  if (pathname === "/add/log" || pathname === "/add/ai") {
     return [
       { label: "Capture", href: "/home" as Route },
-      { label: "Add a meal", href: "/add" as Route },
-      { label: "Log a meal" }
-    ];
-  }
-
-  if (pathname === "/add/ai") {
-    return [
-      { label: "Capture", href: "/home" as Route },
-      { label: "Capture with AI" }
+      { label: "Add" }
     ];
   }
 

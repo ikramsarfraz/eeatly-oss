@@ -1,25 +1,18 @@
-import type { Metadata } from "next";
-import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
-import { LogMealClient } from "@/components/add/log-meal-client";
-
-export const metadata: Metadata = {
-  title: "Log a meal"
-};
+import { redirect } from "next/navigation";
+import type { Route } from "next";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Round 29 — Log a meal page. Server shell.
- *
- * Reads optional `?name=...` for prefill (Home's Quick log card uses
- * this) and hands off to the client. Auth check matches every other
- * dashboard route.
+ * Retired — the standalone Log page is now the `log` tab of the unified
+ * composer at /add. Redirect (preserving the `?name=` prefill).
  */
-export default async function LogMealPage(props: {
+export default async function LogMealRedirect(props: {
   searchParams: Promise<{ name?: string }>;
 }) {
-  await requireCurrentUserWithHousehold();
-  const sp = await props.searchParams;
-  const initialMealName = sp.name?.trim() || undefined;
-  return <LogMealClient initialMealName={initialMealName} />;
+  const { name } = await props.searchParams;
+  const target = name?.trim()
+    ? `/add?method=log&name=${encodeURIComponent(name.trim())}`
+    : "/add?method=log";
+  redirect(target as Route);
 }
