@@ -3,12 +3,12 @@
 import * as React from "react";
 import Link from "next/link";
 import type { Route } from "next";
-import { Check, Loader2, Sparkles } from "lucide-react";
+import { Check, ChefHat, Crown, Loader2, Users, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/providers/toast-provider";
 import { trpc } from "@/lib/trpc/client";
-import { LAUNCH_BADGE, TIERS } from "@/lib/pricing";
+import { TIER_FEATURES, TIERS, type BillingInterval, type Tier } from "@/lib/pricing";
 
 type AuthState =
   | { kind: "anonymous" }
@@ -16,58 +16,66 @@ type AuthState =
   | { kind: "signed_in_free" };
 
 /** Live display prices for this tier, sourced from the Stripe catalog. */
-type TierPriceDisplay = {
+export type TierPriceDisplay = {
   monthly: { display: string } | null;
   annual: { display: string; perMonthDisplay: string } | null;
 };
 
 type PricingCardProps = {
-  /** Which paid tier this card represents. */
-  tier: "plus" | "pro";
-  /** Live prices from the Stripe catalog (null when that interval isn't sold). */
-  prices: TierPriceDisplay;
-  /** Launch promo (Plus-era) — only meaningful for the Plus card. */
+  /** Which tier this card represents. */
+  tier: Tier;
+  /** Live prices from the Stripe catalog (null for the free tier / unsold). */
+  prices: TierPriceDisplay | null;
+  /** Launch promo (Chef-era) — only meaningful for the Chef card. */
   launchMode: boolean;
   authState: AuthState;
-  features: string[];
+  /** Billing period — lifted to the page-level grid so all cards agree. */
+  interval: BillingInterval;
 };
 
-export function PricingCard({
-  tier,
-  prices,
-  launchMode,
-  authState,
-  features
-}: PricingCardProps) {
+const TIER_ICON: Record<Tier, LucideIcon> = { free: ChefHat, plus: Users, pro: Crown };
+const FEAT_LABEL: Record<Tier, string> = {
+  free: "What's included",
+  plus: "Everything in Cook, and",
+  pro: "Everything in Chef, and"
+};
+const RANK = { free: 0, plus: 1, pro: 2 } as const;
+
+export function PricingCard({ tier, prices, launchMode, authState, interval }: PricingCardProps) {
   const { showToast } = useToast();
-  const [priceType, setPriceType] = React.useState<"monthly" | "annual">("annual");
   const checkoutMutation = trpc.billing.createCheckoutSession.useMutation();
   const pending = checkoutMutation.isPending;
 
   const tierConfig = TIERS[tier];
   const tierName = tierConfig.name;
+  const features = TIER_FEATURES[tier];
+  const Icon = TIER_ICON[tier];
+  const isFree = tier === "free";
+  const isFeatured = tier === "pro";
+
   // This tier is sellable when the catalog has at least one interval price.
-  const billingConfigured = Boolean(prices.monthly || prices.annual);
-  // Both intervals show a per-MONTH headline; annual just shows the (lower)
-  // effective monthly + a "billed yearly" sub-line.
-  const headline =
-    priceType === "monthly"
-      ? (prices.monthly?.display ?? "—")
-      : (prices.annual?.perMonthDisplay ?? "—");
-  const annualNote =
-    priceType === "annual" && prices.annual
-      ? `Billed ${prices.annual.display} yearly · 2 months free`
-      : null;
+  const billingConfigured = isFree || Boolean(prices?.monthly || prices?.annual);
+
+  // Headline: free is always $0; paid tiers show the per-month figure for
+  // the selected interval (annual shows the lower effective monthly).
+  const headline = isFree
+    ? "$0"
+    : interval === "monthly"
+      ? (prices?.monthly?.display ?? "—")
+      : (prices?.annual?.perMonthDisplay ?? "—");
+
   // Already subscribed AT or ABOVE this card's tier?
-  const RANK = { plus: 1, pro: 2 } as const;
   const subscribedHere =
     authState.kind === "active_subscriber" && RANK[authState.tier] >= RANK[tier];
 
   async function handleUpgrade() {
-    if (pending) return;
+    if (pending || isFree) return;
     try {
-      const result = await checkoutMutation.mutateAsync({ tier, interval: priceType });
-      window.location.href = result.url;
+      const result = await checkoutMutation.mutateAsync({
+        tier: tier as "plus" | "pro",
+        interval
+      });
+      window.location.assign(result.url);
     } catch (error) {
       showToast({
         variant: "error",
@@ -80,151 +88,214 @@ export function PricingCard({
   return (
     <section
       className={cn(
-        "flex flex-col gap-4 rounded-2xl border bg-background/70 p-6",
-        tier === "pro" ? "border-primary shadow-[var(--shadow-sm)]" : "border-border"
+        "group flex flex-col rounded-[22px] border bg-[var(--surface)] p-7 shadow-[var(--shadow-sm)]",
+        "transition-[transform,box-shadow,border-color] duration-200",
+        "hover:shadow-[var(--shadow-md)] lg:hover:-translate-y-[3px] motion-reduce:transform-none",
+        isFeatured
+          ? "border-primary shadow-[var(--shadow-md)] ring-1 ring-primary/40 dark:bg-[color-mix(in_srgb,var(--surface)_88%,var(--primary))]"
+          : "border-[color:var(--border)]"
       )}
     >
-      <header className="grid gap-2">
-        <div className="flex items-center justify-between">
-          <span className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-primary">
-            <Sparkles className="h-3.5 w-3.5" aria-hidden />
-            eeatly {tierName}
-          </span>
-          {tier === "pro" ? (
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-              Most powerful
-            </span>
-          ) : null}
-        </div>
-        <p className="font-serif text-[24px] leading-tight text-foreground">
-          {tierConfig.monthlyCredits.toLocaleString()} AI credits
-          <span className="text-muted-foreground"> / month</span>
-        </p>
-        <p className="text-[13px] text-muted-foreground">{tierConfig.blurb}</p>
-      </header>
-
-      <div
-        className="inline-flex w-fit gap-1 rounded-full border bg-[var(--surface-2)] p-1"
-        role="tablist"
-        aria-label="Billing period"
-      >
-        <button
-          type="button"
-          role="tab"
-          aria-selected={priceType === "annual"}
-          onClick={() => setPriceType("annual")}
+      {/* Head row */}
+      <div className="mb-4 flex min-h-[22px] items-center justify-between">
+        <span
           className={cn(
-            "rounded-full px-3 py-1 text-[12.5px] font-medium transition-colors",
-            priceType === "annual"
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
+            "inline-flex items-center gap-2 font-mono text-[11.5px] font-semibold uppercase tracking-[1.4px]",
+            isFeatured ? "text-primary" : "text-muted-foreground"
           )}
         >
-          Annual
-          <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-semibold text-primary">
-            best value
+          <span className="inline-flex h-[22px] w-[22px] items-center justify-center rounded-[7px] bg-[var(--primary-soft)] text-primary">
+            <Icon className="h-3 w-3" strokeWidth={2.2} aria-hidden />
           </span>
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={priceType === "monthly"}
-          onClick={() => setPriceType("monthly")}
-          className={cn(
-            "rounded-full px-3 py-1 text-[12.5px] font-medium transition-colors",
-            priceType === "monthly"
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          Monthly
-        </button>
+          {tierName}
+        </span>
+        {isFree ? (
+          <span className="rounded-full border border-[color:var(--border)] px-2.5 py-1 font-mono text-[9.5px] font-semibold uppercase tracking-[1px] text-muted-foreground">
+            Free forever
+          </span>
+        ) : isFeatured ? (
+          <span className="rounded-full bg-primary px-2.5 py-1 font-mono text-[9.5px] font-semibold uppercase tracking-[1px] text-primary-foreground">
+            Most powerful
+          </span>
+        ) : null}
       </div>
 
-      <div className="grid gap-1">
-        <div className="flex items-baseline gap-2">
-          {launchMode && tier === "plus" ? (
+      {/* Price block */}
+      <div className="mb-1.5">
+        <span className="inline-flex items-baseline font-serif text-[54px] leading-none tracking-[-0.02em] text-foreground">
+          {headline}
+          <span className="ml-2 text-[14px] font-medium text-muted-foreground">/ month</span>
+        </span>
+        <p className="mt-2 min-h-[18px] text-[12.5px] text-muted-foreground">
+          {isFree ? (
+            "No card, no expiry."
+          ) : interval === "annual" && prices?.annual ? (
             <>
-              <span className="text-3xl font-semibold tracking-normal text-muted-foreground line-through decoration-2">
-                {headline}
-              </span>
-              <span className="text-3xl font-semibold tracking-normal text-primary">
-                $0
-              </span>
-              <span className="text-sm font-normal text-muted-foreground">today</span>
+              Billed {prices.annual.display} yearly
+              <span className="font-semibold text-primary"> · 2 months free</span>
             </>
           ) : (
-            <div className="text-3xl font-semibold tracking-normal">
-              {headline}
-              <span className="ml-1 text-sm font-normal text-muted-foreground">/ month</span>
-            </div>
+            "Billed monthly"
           )}
-        </div>
-        {annualNote ? (
-          <p className="text-xs font-medium text-primary">{annualNote}</p>
-        ) : null}
-        <p className="text-xs text-muted-foreground">
-          {launchMode && tier === "plus"
-            ? LAUNCH_BADGE
-            : "Cancel anytime from Settings."}
+        </p>
+        <p className="mt-0.5 text-[12px] text-muted-foreground">
+          {isFree ? "Your library stays yours." : "Cancel anytime from Settings."}
         </p>
       </div>
 
-      {/* CTA: launch promo (Plus only) → app, else auth/billing state. */}
-      {launchMode && tier === "plus" ? (
-        authState.kind === "anonymous" ? (
-          <Button asChild className="w-full">
-            <Link href={"/sign-up" as Route}>Start free during launch</Link>
-          </Button>
-        ) : subscribedHere ? (
-          <Button asChild variant="outline" className="w-full">
-            <Link href={"/settings" as Route}>Manage billing</Link>
-          </Button>
-        ) : (
-          <Button asChild className="w-full">
-            <Link href={"/dashboard" as Route}>You&apos;re all set — Chef is unlocked</Link>
-          </Button>
-        )
-      ) : !billingConfigured ? (
-        <Button type="button" disabled className="w-full">
-          Coming soon
-        </Button>
-      ) : authState.kind === "anonymous" ? (
-        <Button asChild className="w-full">
-          <Link href={"/sign-in?next=/pricing" as Route}>Sign in to upgrade</Link>
-        </Button>
-      ) : subscribedHere ? (
-        <Button asChild variant="outline" className="w-full">
-          <Link href={"/settings" as Route}>
-            Your plan — manage billing
-          </Link>
-        </Button>
-      ) : (
-        <Button
-          type="button"
-          onClick={handleUpgrade}
-          disabled={pending}
-          className="w-full"
-          variant={tier === "pro" ? "default" : "default"}
+      {/* Credits pill */}
+      <div
+        className={cn(
+          "mb-1 mt-[18px] flex items-baseline gap-2 rounded-[13px] border px-3.5 py-3",
+          isFeatured
+            ? "border-primary/25 bg-[var(--primary-soft)]"
+            : "border-[var(--border-soft,var(--border))] bg-[var(--surface-2)]"
+        )}
+      >
+        <span
+          className={cn(
+            "font-serif text-[26px] leading-none tracking-[-0.01em]",
+            isFeatured ? "text-primary" : "text-foreground"
+          )}
         >
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          {authState.kind === "active_subscriber" ? `Switch to ${tierName}` : `Upgrade to ${tierName}`}
-        </Button>
-      )}
+          {tierConfig.monthlyCredits.toLocaleString()}
+        </span>
+        <span className="whitespace-nowrap text-[12.5px] text-muted-foreground">
+          AI credits / month
+        </span>
+      </div>
 
-      <div className="mt-1 border-t border-[var(--border-soft,var(--border))] pt-4">
-        <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          {tier === "pro" ? "Everything in Chef, and" : "What's included"}
+      {/* Blurb */}
+      <p className="mb-[22px] mt-3.5 min-h-10 text-pretty text-[13.5px] leading-snug text-muted-foreground">
+        {tierConfig.blurb}
+      </p>
+
+      {/* CTA */}
+      <CardCta
+        tier={tier}
+        tierName={tierName}
+        isFree={isFree}
+        isFeatured={isFeatured}
+        launchMode={launchMode}
+        billingConfigured={billingConfigured}
+        authState={authState}
+        subscribedHere={subscribedHere}
+        pending={pending}
+        onUpgrade={handleUpgrade}
+      />
+
+      {/* Feature list */}
+      <div className="mt-6 border-t border-[var(--border-soft,var(--border))] pt-5">
+        <p className="mb-3.5 font-mono text-[10px] font-medium uppercase tracking-[1.2px] text-muted-foreground">
+          {FEAT_LABEL[tier]}
         </p>
-        <ul className="grid gap-2">
+        <ul className="grid gap-2.5">
           {features.map((f) => (
-            <li key={f} className="flex items-start gap-2 text-[13.5px]">
-              <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+            <li key={f} className="flex items-start gap-2.5 text-pretty text-[13.5px] leading-snug">
+              <span className="mt-px inline-flex h-[17px] w-[17px] shrink-0 items-center justify-center rounded-full bg-[var(--primary-soft)] text-primary">
+                <Check className="h-2.5 w-2.5" strokeWidth={3.5} aria-hidden />
+              </span>
               <span className="text-foreground">{f}</span>
             </li>
           ))}
         </ul>
       </div>
     </section>
+  );
+}
+
+type CardCtaProps = {
+  tier: Tier;
+  tierName: string;
+  isFree: boolean;
+  isFeatured: boolean;
+  launchMode: boolean;
+  billingConfigured: boolean;
+  authState: AuthState;
+  subscribedHere: boolean;
+  pending: boolean;
+  onUpgrade: () => void;
+};
+
+/** The bottom-aligned CTA. Free links out; paid tiers carry the full
+ *  auth / billing / launch-promo branching the page relied on before. */
+function CardCta({
+  tier,
+  tierName,
+  isFree,
+  isFeatured,
+  launchMode,
+  billingConfigured,
+  authState,
+  subscribedHere,
+  pending,
+  onUpgrade
+}: CardCtaProps) {
+  const ctaClass = "mt-auto w-full rounded-[13px] py-[13px]";
+  const variant = isFeatured ? "default" : "outline";
+
+  // Cook — non-purchasing. Anonymous → sign up; signed in → straight to app.
+  if (isFree) {
+    return (
+      <Button asChild variant="outline" className={ctaClass}>
+        <Link href={(authState.kind === "anonymous" ? "/sign-up" : "/dashboard") as Route}>
+          Start free
+        </Link>
+      </Button>
+    );
+  }
+
+  // Launch promo (Chef only) → straight into the app, no checkout.
+  if (launchMode && tier === "plus") {
+    if (authState.kind === "anonymous") {
+      return (
+        <Button asChild variant={variant} className={ctaClass}>
+          <Link href={"/sign-up" as Route}>Start free during launch</Link>
+        </Button>
+      );
+    }
+    if (subscribedHere) {
+      return (
+        <Button asChild variant="outline" className={ctaClass}>
+          <Link href={"/settings" as Route}>Manage billing</Link>
+        </Button>
+      );
+    }
+    return (
+      <Button asChild variant={variant} className={ctaClass}>
+        <Link href={"/dashboard" as Route}>You&apos;re all set — Chef is unlocked</Link>
+      </Button>
+    );
+  }
+
+  if (!billingConfigured) {
+    return (
+      <Button type="button" disabled variant={variant} className={ctaClass}>
+        Coming soon
+      </Button>
+    );
+  }
+
+  if (authState.kind === "anonymous") {
+    return (
+      <Button asChild variant={variant} className={ctaClass}>
+        <Link href={"/sign-in?next=/pricing" as Route}>Sign in to upgrade</Link>
+      </Button>
+    );
+  }
+
+  if (subscribedHere) {
+    return (
+      <Button asChild variant="outline" className={ctaClass}>
+        <Link href={"/settings" as Route}>Your plan — manage billing</Link>
+      </Button>
+    );
+  }
+
+  return (
+    <Button type="button" onClick={onUpgrade} disabled={pending} variant={variant} className={ctaClass}>
+      {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+      {authState.kind === "active_subscriber" ? `Switch to ${tierName}` : `Choose ${tierName}`}
+    </Button>
   );
 }

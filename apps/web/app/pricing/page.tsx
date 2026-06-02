@@ -1,12 +1,14 @@
 import Link from "next/link";
 import type { Metadata, Route } from "next";
+import { Sparkles } from "lucide-react";
 import { Wordmark } from "@/components/brand/logo";
+import { ThemeToggle } from "@/components/settings/theme-toggle";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getServerEnv, hasStripeEnv, isLaunchFreeAccess } from "@/lib/env/server";
-import { TIER_FEATURES } from "@/lib/pricing";
+import { TIERS, type Tier } from "@/lib/pricing";
 import { getSubscriptionState } from "@/services/billing";
 import { getStripeCatalog, perMonthDisplay } from "@/services/stripe-catalog";
-import { PricingCard } from "@/components/pricing/pricing-card";
+import { PricingGrid } from "@/components/pricing/pricing-grid";
 import "../marketing.css";
 
 export const metadata: Metadata = {
@@ -17,20 +19,26 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
+const GRANT_PIP: Record<Tier, string> = {
+  free: "bg-[var(--border-strong)]",
+  plus: "bg-primary/60",
+  pro: "bg-primary"
+};
+
 export default async function PricingPage() {
   const env = getServerEnv();
   const billingConfigured = hasStripeEnv(env);
   const launchMode = isLaunchFreeAccess(env);
   const user = await getCurrentUser();
 
-  // Subscription lookup only matters when a user is signed in AND
-  // billing is configured — otherwise no upgrade state to surface.
+  // Subscription lookup only matters when a user is signed in AND billing is
+  // configured — otherwise there's no upgrade state to surface.
   const subscription =
     user && billingConfigured ? await getSubscriptionState({ userId: user.id }) : null;
   const isActiveSubscriber =
     subscription?.status === "active" || subscription?.status === "trialing";
 
-  const authState: React.ComponentProps<typeof PricingCard>["authState"] = !user
+  const authState: React.ComponentProps<typeof PricingGrid>["authState"] = !user
     ? { kind: "anonymous" }
     : isActiveSubscriber
       ? { kind: "active_subscriber", tier: subscription?.tier ?? "plus" }
@@ -48,107 +56,176 @@ export default async function PricingPage() {
   const proPrices = tierPrices(catalog.tiers.pro);
 
   return (
-    <div className="mkt min-h-screen">
-    <main
-      id="main"
-      tabIndex={-1}
-      className="mkt-doc mx-auto max-w-3xl px-4 py-10 pb-20 sm:px-6 sm:py-12"
-    >
-      <header className="mb-8 grid gap-3">
-        <Link href="/" className="flex w-fit items-center text-foreground">
-          <Wordmark size={30} />
-        </Link>
-        <h1 className="font-serif text-[36px] font-normal leading-tight tracking-[-0.005em] sm:text-[42px]">
-          A kitchen that remembers what worked
-        </h1>
-        <p className="max-w-xl text-base text-muted-foreground">
-          Cook keeps your personal cooking library forever, free. Chef shares
-          your kitchen with family and adds meal planning + public recipe
-          links. Master Chef is for cooking together — co-editing, shareable
-          plans, and priority AI. Every new account starts with a 14-day
-          Master Chef trial, no card needed.
-        </p>
-      </header>
+    <div className="mkt relative min-h-screen">
+      {/* Decorative dot grid bleeding out of the top of the page. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-[620px] opacity-20 dark:opacity-[0.38]"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle, color-mix(in srgb, var(--border-strong) 70%, transparent) 1px, transparent 1.5px)",
+          backgroundSize: "24px 24px",
+          maskImage: "linear-gradient(180deg, #000 0%, transparent 100%)",
+          WebkitMaskImage: "linear-gradient(180deg, #000 0%, transparent 100%)"
+        }}
+      />
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <PricingCard
-          tier="plus"
-          prices={plusPrices}
+      <main
+        id="main"
+        tabIndex={-1}
+        className="mkt-doc relative z-[1] mx-auto max-w-[1120px] px-7 pb-12"
+      >
+        {/* Top bar */}
+        <div className="flex items-center justify-between py-6">
+          <Link href="/" className="flex w-fit items-center text-foreground">
+            <Wordmark size={28} />
+          </Link>
+          <div className="flex items-center gap-4">
+            <Link
+              href={"#faq" as Route}
+              className="text-[13.5px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Questions
+            </Link>
+            <ThemeToggle />
+          </div>
+        </div>
+
+        {/* Header */}
+        <header className="pb-11 pt-10">
+          <span className="mb-5 inline-flex items-center gap-2.5 font-mono text-[11px] uppercase tracking-[1.8px] text-primary">
+            <span aria-hidden className="h-px w-[26px] bg-primary/55" />
+            Plans &amp; pricing
+          </span>
+          <h1 className="mb-5 max-w-[14ch] font-serif text-[clamp(40px,6vw,62px)] font-normal leading-[1.02] tracking-[-0.025em] text-foreground">
+            A kitchen that remembers what worked
+          </h1>
+          <p className="max-w-[56ch] text-pretty text-[17px] leading-relaxed text-muted-foreground">
+            <strong className="font-semibold text-foreground">Cook</strong> keeps your personal
+            cooking library forever, free. <strong className="font-semibold text-foreground">Chef</strong>{" "}
+            shares your kitchen with family and adds meal planning plus public recipe links.{" "}
+            <strong className="font-semibold text-foreground">Master&nbsp;Chef</strong> is for cooking
+            together — co-editing, shareable plans, and priority AI.
+          </p>
+          <span className="mt-6 inline-flex items-center gap-2.5 rounded-full border bg-[var(--primary-soft)] py-1.5 pl-3 pr-3.5 text-[13px] font-medium text-primary">
+            <Sparkles className="h-3.5 w-3.5" aria-hidden />
+            Every new account starts with a 14-day Master Chef trial — no card needed.
+          </span>
+        </header>
+
+        {/* Billing toggle + three-card grid */}
+        <PricingGrid
+          authState={authState}
           launchMode={launchMode}
-          authState={authState}
-          features={TIER_FEATURES.plus}
+          plusPrices={plusPrices}
+          proPrices={proPrices}
         />
-        <PricingCard
-          tier="pro"
-          prices={proPrices}
-          launchMode={false}
-          authState={authState}
-          features={TIER_FEATURES.pro}
-        />
-      </div>
 
-      <section className="mt-10 grid gap-3 rounded-2xl border bg-background/60 p-6">
-        <h2 className="text-lg font-semibold tracking-normal">Out of credits? Top up anytime</h2>
-        <p className="text-sm text-muted-foreground">
-          AI features (photo / text / voice prefill, Refine, ingredient
-          extraction) run on credits. Every plan includes a monthly grant —
-          15 on Cook, 300 on Chef, 1,500 on Master Chef — and you can buy one-time top-up
-          packs that never expire from <Link href={"/settings" as Route} className="text-primary underline-offset-2 hover:underline">Settings</Link>.
-        </p>
-      </section>
-
-      <section className="mt-10 grid gap-3">
-        <h2 className="text-lg font-semibold tracking-normal">What&apos;s on the free plan</h2>
-        <ul className="grid gap-2 text-sm text-muted-foreground">
-          {TIER_FEATURES.free.map((f) => (
-            <li key={f}>· {f}</li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="mt-10 grid gap-4">
-        <h2 className="text-lg font-semibold tracking-normal">Common questions</h2>
-        <dl className="grid gap-4 text-sm">
-          <div className="grid gap-1">
-            <dt className="font-medium text-foreground">How does the free Master Chef trial work?</dt>
-            <dd className="text-muted-foreground">
-              Every new account gets 14 days of Master Chef automatically — no
-              card needed. You&apos;ll have the full set of features, including
-              co-editing and priority AI. Near the end we&apos;ll prompt you to
-              pick a plan; if you don&apos;t, your account simply drops to the
-              free Cook tier and your library stays exactly as it is.
-            </dd>
+        {/* Top up */}
+        <section className="mt-14 overflow-hidden rounded-[20px] border bg-[var(--surface)]">
+          <div className="grid md:grid-cols-[1.1fr_1fr]">
+            <div className="border-b border-[var(--border-soft,var(--border))] p-[30px] md:border-b-0 md:border-r">
+              <h2 className="mb-3 font-serif text-[28px] font-normal tracking-[-0.015em] text-foreground">
+                Out of credits? Top up anytime
+              </h2>
+              <p className="text-pretty text-[14px] leading-relaxed text-muted-foreground">
+                AI features — photo / text / voice prefill, Refine, ingredient extraction — run on
+                credits. Every plan includes a monthly grant, and you can buy one-time top-up packs
+                that never expire from{" "}
+                <Link
+                  href={"/settings" as Route}
+                  className="font-semibold text-primary underline-offset-2 hover:underline"
+                >
+                  Settings
+                </Link>
+                .
+              </p>
+            </div>
+            <div className="grid content-center gap-0.5 bg-[var(--surface-2)] p-[26px_30px]">
+              {(["free", "plus", "pro"] as Tier[]).map((tier, i, arr) => (
+                <div
+                  key={tier}
+                  className={i < arr.length - 1 ? "flex items-baseline justify-between gap-4 border-b border-dashed border-[color:var(--border)] py-2.5" : "flex items-baseline justify-between gap-4 py-2.5"}
+                >
+                  <span className="inline-flex items-center gap-2.5 text-[13.5px] font-semibold text-foreground">
+                    <span aria-hidden className={`h-2 w-2 rounded-full ${GRANT_PIP[tier]}`} />
+                    {TIERS[tier].name}
+                  </span>
+                  <span className="font-mono text-[13px] text-muted-foreground">
+                    <b className="font-semibold text-foreground">
+                      {TIERS[tier].monthlyCredits.toLocaleString()}
+                    </b>{" "}
+                    credits / mo
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="grid gap-1">
-            <dt className="font-medium text-foreground">What&apos;s the difference between Chef and Master Chef?</dt>
-            <dd className="text-muted-foreground">
-              Chef shares your kitchen with family — invites, meal plans, and
-              public recipe links — with 300 AI credits a month. Master Chef is
-              for cooking together: family can edit your recipes and plans in
-              place, you can share meal plans as public pages, you get 1,500
-              credits, and AI runs without burst limits.
-            </dd>
-          </div>
-          <div className="grid gap-1">
-            <dt className="font-medium text-foreground">Can I cancel anytime?</dt>
-            <dd className="text-muted-foreground">
-              When paid plans begin you&apos;ll be able to cancel from the Settings
-              page, and access stays through the end of the period you paid for.
-              Annual is billed yearly and works out to two months free.
-            </dd>
-          </div>
-        </dl>
-      </section>
+        </section>
 
-      <footer className="mt-12 flex flex-wrap gap-4 text-xs text-muted-foreground">
-        <Link href={"/privacy" as Route} className="hover:text-foreground">
-          Privacy
-        </Link>
-        <Link href={"/help" as Route} className="hover:text-foreground">
-          Help
-        </Link>
-      </footer>
-    </main>
+        {/* FAQ */}
+        <section id="faq" className="mt-16 scroll-mt-24">
+          <h2 className="mb-1.5 font-serif text-[34px] font-normal tracking-[-0.02em] text-foreground">
+            Common questions
+          </h2>
+          <p className="mb-7 text-[15px] text-muted-foreground">
+            Everything about trials, tiers, and billing.
+          </p>
+          <dl className="grid gap-3.5 sm:grid-cols-2">
+            {FAQ_ITEMS.map((item) => (
+              <div
+                key={item.q}
+                className="rounded-[16px] border bg-[var(--surface)] p-6"
+              >
+                <dt className="mb-2 text-[15px] font-semibold text-foreground">{item.q}</dt>
+                <dd className="text-pretty text-[13.5px] leading-relaxed text-muted-foreground">
+                  {item.a}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+
+        {/* Footer */}
+        <footer className="mt-[72px] flex flex-wrap items-center justify-between gap-4 border-t border-[var(--border-soft,var(--border))] py-7">
+          <div className="flex gap-6">
+            {[
+              { href: "/privacy", label: "Privacy" },
+              { href: "/help", label: "Help" }
+            ].map((l) => (
+              <Link
+                key={l.href}
+                href={l.href as Route}
+                className="text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {l.label}
+              </Link>
+            ))}
+          </div>
+          <span className="text-[12.5px] text-muted-foreground">
+            A kitchen that remembers what worked.
+          </span>
+        </footer>
+      </main>
     </div>
   );
 }
+
+const FAQ_ITEMS: { q: string; a: string }[] = [
+  {
+    q: "How does the free Master Chef trial work?",
+    a: "Every new account gets 14 days of Master Chef automatically — no card needed. You'll have the full set of features, including co-editing and priority AI. Near the end we'll prompt you to pick a plan; if you don't, your account simply drops to Cook and your library stays exactly as it is."
+  },
+  {
+    q: "What's the difference between Chef and Master Chef?",
+    a: "Chef shares your kitchen with family — invites, meal plans, and public recipe links — with 300 AI credits a month. Master Chef is for cooking together: family can edit your recipes and plans in place, you can share meal plans as public pages, you get 1,500 credits, and AI runs without burst limits."
+  },
+  {
+    q: "Can I cancel anytime?",
+    a: "Yes. Cancel from the Settings page and access stays through the end of the period you paid for. Annual is billed yearly and works out to two months free versus monthly."
+  },
+  {
+    q: "What can I do on the free Cook plan?",
+    a: "Keep your personal recipe library forever, log every cook with notes & photos, search your full cooking history, get rediscovery suggestions, and use 15 AI credits a month. No sharing or meal plans — those start at Chef."
+  }
+];
