@@ -28,6 +28,34 @@ const CONFIRMATION_PHRASE = "delete my account";
  * procedures don't redirect.
  */
 export const authRouter = router({
+  /**
+   * R32 — update the user's display name (Settings → Account edit form).
+   * Email is intentionally NOT editable here: it's the sign-in + recovery
+   * identity and must change through a deliberate, verified flow.
+   */
+  updateName: protectedProcedure
+    .use(rateLimit("mutation"))
+    .input(z.object({ name: z.string().trim().min(1, "Name can't be empty.").max(80) }))
+    .mutation(async ({ ctx, input }) => {
+      // Go through Better Auth's own API (not a raw Drizzle update) so the
+      // write lands in the user table AND the cached session cookie is
+      // refreshed — otherwise the 5-minute cookieCache keeps serving the old
+      // name on reload, making the change look like it didn't persist.
+      try {
+        await auth.api.updateUser({ body: { name: input.name }, headers: ctx.headers });
+      } catch (error) {
+        logger.warn("account_update_name_failed", {
+          userId: ctx.user.id,
+          error: error instanceof Error ? error.message : String(error)
+        });
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Couldn't update your name. Please try again."
+        });
+      }
+      return { name: input.name };
+    }),
+
   signOutAndRedirect: publicProcedure
     .input(z.object({ redirectTo: z.string().min(1).max(2048) }))
     .mutation(async ({ ctx, input }) => {

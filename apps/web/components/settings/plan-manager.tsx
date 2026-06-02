@@ -96,7 +96,7 @@ export function PlanManager() {
 
   return (
     <section id="plan" className="grid gap-3 scroll-mt-24">
-      <SectionLabel>Plan</SectionLabel>
+      <SectionLabel>Subscription</SectionLabel>
       <Card className="overflow-hidden p-5">
         {/* Current plan + manage billing */}
         <div className="flex items-start justify-between gap-3">

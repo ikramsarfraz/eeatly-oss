@@ -194,6 +194,28 @@ export function getCrumbs(pathname: string): Crumb[] {
     ];
   }
 
+  // R32 — Settings became nested routes. Trail is
+  // `Sharing › Settings › <Section>`; the Settings crumb links back to
+  // the default (`/settings` → redirects to `/settings/account`).
+  if (/^\/settings\/[^/]+$/.test(pathname)) {
+    const section = pathname.split("/")[2] ?? "";
+    const labels: Record<string, string> = {
+      account: "Account",
+      plan: "Plan",
+      sharing: "Sharing & privacy",
+      kitchen: "Kitchen",
+      notifications: "Notifications",
+      appearance: "Appearance",
+      advanced: "Advanced",
+      danger: "Danger zone"
+    };
+    return [
+      { label: "Sharing", href: "/dashboard" as Route },
+      { label: "Settings", href: "/settings" as Route },
+      { label: labels[section] ?? "Settings" }
+    ];
+  }
+
   if (pathname === "/notifications") {
     return [{ label: "Inbox" }];
   }

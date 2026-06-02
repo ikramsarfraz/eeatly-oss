@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import { BadgeCheck, ChevronsUpDown, LogOut, Settings } from "lucide-react";
+import { CreditCard, EllipsisVertical, LogOut, Settings, User } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -72,14 +73,14 @@ export function UserMenu({ user }: UserMenuProps) {
             <span className="truncate font-semibold">{user.name}</span>
             <span className="truncate text-xs text-muted-foreground">{user.email}</span>
           </div>
-          <ChevronsUpDown className="ml-auto size-4" />
+          <EllipsisVertical className="ml-auto size-4" />
         </SidebarMenuButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
-        side="top"
-        align="start"
-        sideOffset={4}
+        className="min-w-56 rounded-lg"
+        side="right"
+        align="end"
+        sideOffset={8}
       >
         <DropdownMenuLabel className="p-0 font-normal">
           <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
@@ -98,14 +99,22 @@ export function UserMenu({ user }: UserMenuProps) {
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
-            <Link href="/settings">
+            <Link href={"/settings/account" as Route}>
+              <User className="size-4" />
+              Account
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href={"/settings/plan" as Route}>
+              <CreditCard className="size-4" />
+              Billing
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href={"/settings" as Route}>
               <Settings className="size-4" />
               Settings
             </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem disabled>
-            <BadgeCheck className="size-4" />
-            Profile
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />

@@ -281,3 +281,23 @@ select {
     font-size: 16px;
   }
 }
+
+/* R32 — Settings nested-route entrance. Transform-only slide so opacity
+   rests at 1 (content stays visible in hidden tabs, print, and export).
+   Disabled under reduced-motion. */
+@keyframes settingsRouteIn {
+  from {
+    transform: translateY(8px);
+  }
+  to {
+    transform: none;
+  }
+}
+.settings-route-in {
+  animation: settingsRouteIn 0.26s ease both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-route-in {
+    animation: none;
+  }
+}
