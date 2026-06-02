@@ -31,7 +31,7 @@ export const userSettings = pgTable("user_settings", {
     .references(() => users.id, { onDelete: "cascade" }),
   allowLinkShares: boolean("allow_link_shares").notNull().default(true),
   cooksCanReshare: boolean("cooks_can_reshare").notNull().default(false),
-  whoCanAddYou: text("who_can_add_you").notNull().default("connections"),
+  whoCanAddYou: text("who_can_add_you").notNull().default("anyone"),
   findByEmail: boolean("find_by_email").notNull().default(true),
   measurementSystem: text("measurement_system").notNull().default("metric"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()

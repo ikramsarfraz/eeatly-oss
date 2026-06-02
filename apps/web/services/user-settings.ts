@@ -29,13 +29,19 @@ export type UserSettings = {
 const DEFAULTS: UserSettings = {
   allowLinkShares: true,
   cooksCanReshare: false,
-  whoCanAddYou: "connections",
+  // "anyone" is the permissive default so people can actually be invited.
+  // A stricter "connections" default is a chicken-and-egg: you can't share
+  // without connecting and can't connect without first sharing. Users who
+  // want to lock down inbound requests opt into "connections"/"no_one".
+  whoCanAddYou: "anyone",
   findByEmail: true,
   measurementSystem: "metric"
 };
 
 function normalizeWhoCanAddYou(value: string): WhoCanAddYou {
-  return value === "anyone" || value === "no_one" ? value : "connections";
+  return value === "anyone" || value === "connections" || value === "no_one"
+    ? (value as WhoCanAddYou)
+    : "anyone";
 }
 
 export async function getUserSettings(userId: string): Promise<UserSettings> {
