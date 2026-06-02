@@ -55,12 +55,37 @@ export function OnboardingFlow({
   const totalSteps = isInvited ? 3 : 4;
 
   const [step, setStep] = React.useState<FreshStep | InvitedStep>(1);
+  // Magic-link sign-up is email-only, so the server name is a derived
+  // placeholder ("john.doe") or the "eeatly user" fallback. Seed the field
+  // empty when it's the fallback so the user is forced to enter a real name.
+  const [nameValue, setNameValue] = React.useState(() =>
+    name.startsWith("eeatly") ? "" : name
+  );
   const [habits, setHabits] = React.useState<Habits>(initialHabits);
   const [firstMealName, setFirstMealName] = React.useState("");
   const [pending, setPending] = React.useState(false);
   const createLogMutation = trpc.meals.createLog.useMutation();
+  const updateNameMutation = trpc.auth.updateName.useMutation();
   const saveHabitsMutation = trpc.onboarding.saveHabits.useMutation();
   const completeMutation = trpc.onboarding.complete.useMutation();
+
+  async function handleWelcomeContinue() {
+    const trimmed = nameValue.trim();
+    if (trimmed.length === 0) return;
+    setPending(true);
+    try {
+      await updateNameMutation.mutateAsync({ name: trimmed });
+      setStep(2);
+    } catch (error) {
+      showToast({
+        variant: "error",
+        title: "Couldn't save your name",
+        description: error instanceof Error ? error.message : "Please try again."
+      });
+    } finally {
+      setPending(false);
+    }
+  }
 
   async function handleHabitsContinue() {
     if (habits.cooksPerWeek === null || habits.weeknightEffort === null) return;
@@ -135,10 +160,11 @@ export function OnboardingFlow({
 
         {step === 1 ? (
           <StepWelcome
-            name={name}
+            name={nameValue}
+            onName={setNameValue}
             path={path}
             householdName={householdName}
-            onContinue={() => setStep(2)}
+            onContinue={handleWelcomeContinue}
             pending={pending}
           />
         ) : null}
@@ -228,53 +254,82 @@ function StepIndicator({ current, total }: { current: number; total: number }) {
 
 function StepWelcome({
   name,
+  onName,
   path,
   householdName,
   onContinue,
   pending
 }: {
   name: string;
+  onName: (v: string) => void;
   path: "fresh" | "invited";
   householdName: string | null;
   onContinue: () => void;
   pending: boolean;
 }) {
-  // Trim long names and avoid the awkward "eeatly user" greeting when no
-  // name was inferable.
-  const greeting = name && !name.startsWith("eeatly") ? `Hi ${name.split(" ")[0]},` : "Welcome,";
   const isInvited = path === "invited";
+  const canContinue = name.trim().length > 0 && !pending;
 
   return (
-    <div className="grid gap-4">
+    <form
+      className="grid gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (canContinue) onContinue();
+      }}
+    >
       <span className="inline-flex w-fit items-center gap-[7px] rounded-full bg-[var(--primary-soft)] px-[10px] py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-primary">
         <Sparkles className="h-3 w-3" />
         {isInvited ? "You're in" : "Welcome"}
       </span>
       <h1 className="font-serif text-[36px] font-normal leading-[1.1] tracking-[-0.01em]">
-        {greeting}
-        <br />
         {isInvited && householdName ? (
           <>
-            welcome to{" "}
+            Welcome to{" "}
             <em className="italic text-primary">{householdName}.</em>
           </>
         ) : (
           <>
-            let&apos;s set up your{" "}
+            Let&apos;s set up your{" "}
             <em className="italic text-primary">cooking memory.</em>
           </>
         )}
       </h1>
       <p className="text-[14px] leading-[1.55] text-muted-foreground">
         {isInvited
-          ? "Your family's kitchen is already full of meals. A couple of quick questions and you're in."
-          : "eeatly remembers what you cook and surfaces the right meal when you're tired of deciding. A couple of quick questions, then you're in."}
+          ? "Your family's kitchen is already full of meals. First, what should we call you?"
+          : "eeatly remembers what you cook and surfaces the right meal when you're tired of deciding. First, what should we call you?"}
       </p>
-      <Button type="button" onClick={onContinue} disabled={pending} className="w-full">
+
+      <div className="grid gap-2">
+        <label
+          htmlFor="yourName"
+          className="text-[12px] font-medium uppercase tracking-[0.06em] text-muted-foreground"
+        >
+          Your name
+        </label>
+        <Input
+          id="yourName"
+          placeholder="Alex Rivera"
+          value={name}
+          onChange={(e) => onName(e.target.value)}
+          disabled={pending}
+          maxLength={80}
+          autoFocus
+          required
+          autoComplete="name"
+        />
+        <p className="text-[12px] leading-[1.5] text-muted-foreground">
+          This is how your kitchen-mates and people you share with will see you.
+        </p>
+      </div>
+
+      <Button type="submit" disabled={!canContinue} className="w-full">
+        {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         Let&apos;s go
-        <ArrowRight className="h-4 w-4" />
+        {!pending ? <ArrowRight className="h-4 w-4" /> : null}
       </Button>
-    </div>
+    </form>
   );
 }
 

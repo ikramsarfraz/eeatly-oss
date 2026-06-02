@@ -3,6 +3,7 @@ import { HomeClient } from "@/components/dashboard/home-client";
 import { WelcomeToast } from "@/components/dashboard/welcome-toast";
 import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
 import { getDashboardMeals } from "@/services/meals";
+import { isHouseholdOwner } from "@/services/households";
 
 /**
  * Round 26 — Home (dashboard) page.
@@ -23,7 +24,10 @@ export default async function DashboardPage() {
   // Run the household-scoped meals query — the household lookup
   // doubles as the auth gate (`requireHouseholdMember` runs inside
   // `getDashboardMeals`).
-  const meals = await getDashboardMeals(user.id, household.id);
+  const [meals, ownsHousehold] = await Promise.all([
+    getDashboardMeals(user.id, household.id),
+    isHouseholdOwner(user.id, household.id)
+  ]);
 
   return (
     <>
@@ -36,6 +40,7 @@ export default async function DashboardPage() {
         initialData={meals}
         currentUserId={user.id}
         currentUserName={user.name ?? null}
+        isHouseholdOwner={ownsHousehold}
       />
     </>
   );

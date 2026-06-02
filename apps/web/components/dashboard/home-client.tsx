@@ -45,10 +45,10 @@ import type {
  *     plan list is cheap; SSR-shipping it would couple this client to
  *     the page wrapper for a single section. Loading + empty are
  *     handled inline.
- *   - `households.pendingInvitations` — owner-only. Errors silently;
- *     non-owners see the 4th stat drop to "—" rather than the section
- *     collapsing. (Per R26 spec's "Drop the fourth if no count query
- *     exists" — we attempt the query and degrade gracefully.)
+ *   - `households.pendingInvitations` — owner-only; fired only when
+ *     `isHouseholdOwner` so members don't 403. Non-owners see the 4th
+ *     stat as "—" rather than the section collapsing. (Per R26 spec's
+ *     "Drop the fourth if no count query exists.")
  *
  * TopBar action registered via `useSetTopBarActions`: a single
  * "New plan" CTA that routes to /plans/new. The provider unmounts the
@@ -97,13 +97,16 @@ function approximateLibrarySize(meals: DashboardMeals): number {
 
 export function HomeClient({
   initialData,
-  currentUserName
+  currentUserName,
+  isHouseholdOwner = false
 }: {
   initialData: DashboardMeals;
   /** Unused for v1 — kept on the prop surface so future personalisation
    *  (e.g. owner-vs-member chips) doesn't need a layout refactor. */
   currentUserId?: string;
   currentUserName: string | null;
+  /** Owner of the current household — gates the owner-only invites stat. */
+  isHouseholdOwner?: boolean;
 }) {
   const { showToast } = useToast();
   const { data } = useDashboardMeals(initialData);
@@ -138,15 +141,16 @@ export function HomeClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plansQuery.data]);
 
-  // Pending invitations stat — owner-only procedure. We attempt the
-  // query and degrade to a "—" placeholder on FORBIDDEN. The stat
-  // section stays 4-up either way; users just see one card showing
-  // an em-dash rather than the column shifting under them.
+  // Pending invitations stat — owner-only procedure. Gated to owners so
+  // members never fire it (a member call would 403 and log a spurious
+  // `unauthorized_household_owner_access` error). Members get a "—"
+  // placeholder; the stat section stays 4-up either way.
   const pendingInvitesQuery = trpc.households.pendingInvitations.useQuery(
     undefined,
     {
       staleTime: 60_000,
-      // Non-owners get FORBIDDEN; don't burn retries on it.
+      enabled: isHouseholdOwner,
+      // Belt-and-suspenders: don't burn retries if it ever 403s.
       retry: false
     }
   );

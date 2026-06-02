@@ -84,8 +84,14 @@ export function AcceptInvitationCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  // Synchronous re-entry lock: `isPending` flips a tick after mutateAsync
+  // starts, so a fast double-click could fire two accepts before the button
+  // disables. The ref blocks the second call immediately.
+  const submittingRef = React.useRef(false);
+
   async function handleAccept() {
-    if (pending) return;
+    if (pending || submittingRef.current) return;
+    submittingRef.current = true;
     setError(null);
     try {
       const result = await acceptMutation.mutateAsync({ token });
@@ -94,6 +100,8 @@ export function AcceptInvitationCard({
       setTimeout(() => router.push("/dashboard"), 900);
     } catch (e) {
       setError(toLocalError(e));
+    } finally {
+      submittingRef.current = false;
     }
   }
 
@@ -127,8 +135,9 @@ export function AcceptInvitationCard({
           {inviterName} invited you to {householdName}
         </CardTitle>
         <CardDescription>
-          Your existing meals and cooking history will be merged into this kitchen.
-          Everyone here will see all logs together.
+          Join {householdName} to plan and cook together. Your recipes and history move
+          with you, but stay private — kitchen members only see the meals and plans you
+          choose to share.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
@@ -162,11 +171,7 @@ export function AcceptInvitationCard({
         {error ? <ErrorPanel error={error} /> : null}
         <Button type="button" onClick={handleAccept} disabled={pending || previewing}>
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          {pending
-            ? "Joining…"
-            : hasMergeContent
-              ? "Accept and merge"
-              : "Join this kitchen"}
+          {pending ? "Joining…" : "Accept & join"}
         </Button>
       </CardContent>
     </Card>

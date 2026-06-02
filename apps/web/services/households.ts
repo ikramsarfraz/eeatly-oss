@@ -845,6 +845,23 @@ export async function userOwnsMultiMemberHousehold(userId: string): Promise<bool
 }
 
 /**
+ * True iff the user owns the given household. Cheap single-row read — used to
+ * gate owner-only UI (e.g. the dashboard's pending-invitations stat) so
+ * members never fire an owner-only query that would log a forbidden access.
+ */
+export async function isHouseholdOwner(
+  userId: string,
+  householdId: string
+): Promise<boolean> {
+  const [row] = await db
+    .select({ ownerId: households.ownerId })
+    .from(households)
+    .where(eq(households.id, householdId))
+    .limit(1);
+  return row?.ownerId === userId;
+}
+
+/**
  * Idempotent setup of the user's solo household. Used by:
  *   - Better Auth's user.create.after hook (new sign-ups)
  *   - getCurrentHousehold's self-heal path (existing users predating the
