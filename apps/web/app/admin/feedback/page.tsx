@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { listBetaFeedback } from "@/services/feedback";
+import { FeedbackReplyDialog } from "@/components/admin/feedback-reply-dialog";
 
 const typeLabels = {
   bug: "Bug",
@@ -54,6 +55,7 @@ export default async function AdminFeedbackPage() {
                   <TableHead>Message</TableHead>
                   <TableHead>Context</TableHead>
                   <TableHead>Created</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -69,6 +71,13 @@ export default async function AdminFeedbackPage() {
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-muted-foreground">
                       {format(item.createdAt, "MMM d, yyyy h:mm a")}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-right">
+                      <FeedbackReplyDialog
+                        feedbackId={item.id}
+                        recipientEmail={item.userEmail}
+                        originalMessage={item.message}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}

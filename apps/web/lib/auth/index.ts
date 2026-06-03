@@ -5,7 +5,7 @@ import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { bearer, magicLink } from "better-auth/plugins";
 import { db } from "@/lib/db/client";
 import * as schema from "@/db/schema";
-import { pickMagicLinkUrl } from "@/lib/auth/deep-links";
+import { isMobileOrigin, pickMagicLinkUrl } from "@/lib/auth/deep-links";
 import { getServerEnv, hasGoogleAuthEnv } from "@/lib/env/server";
 import { sendMagicLinkEmail } from "@/lib/email/resend";
 import { logger } from "@/lib/observability/logger";
@@ -167,18 +167,29 @@ function buildAuth() {
               error: error instanceof Error ? error.message : String(error)
             });
           }
+          // The signup (magic-link verify / OAuth callback) request is the
+          // only point we have request headers tied to the new user. We read
+          // them once here and reuse for two signals: measurement-system
+          // inference and signup-platform attribution.
+          const headers = (
+            ctx as { request?: Request; headers?: Headers } | undefined
+          )?.request?.headers ??
+            (ctx as { headers?: Headers } | undefined)?.headers ??
+            null;
+          // Web vs mobile signup. The mobile app sets `Origin: eeatly://` on
+          // every auth request (apps/mobile/lib/auth/client.ts), so the verify
+          // call that creates the row carries it; web callbacks don't. Defaults
+          // to "web" when the header is absent.
+          const signupPlatform = isMobileOrigin(headers?.get("origin"))
+            ? "mobile"
+            : "web";
+
           // Infer the cook's measurement system ONCE, from the signup
           // request's geo (Vercel `x-vercel-ip-country`) + Accept-Language.
-          // This is the only point we have request headers tied to the new
-          // user. Flippable later in Settings → Kitchen. Failure-isolated:
+          // Flippable later in Settings → Kitchen. Failure-isolated:
           // a missing header or a write hiccup falls back to the column
           // default ('metric') and never blocks account creation.
           try {
-            const headers = (
-              ctx as { request?: Request; headers?: Headers } | undefined
-            )?.request?.headers ??
-              (ctx as { headers?: Headers } | undefined)?.headers ??
-              null;
             const system = inferMeasurementSystem({
               country:
                 headers?.get("x-vercel-ip-country") ??
@@ -198,11 +209,15 @@ function buildAuth() {
           // requested. Both the in-house event log and PostHog get it
           // here so the two stay consistent. Each is failure-isolated so
           // analytics can never block account creation.
-          trackEvent({ name: "signed_up", userId: user.id });
+          trackEvent({
+            name: "signed_up",
+            userId: user.id,
+            metadata: { platform: signupPlatform }
+          });
           await capturePostHogServerEvent({
             distinctId: user.id,
             event: "signed_up",
-            properties: { email: user.email }
+            properties: { email: user.email, platform: signupPlatform }
           });
         }
       }

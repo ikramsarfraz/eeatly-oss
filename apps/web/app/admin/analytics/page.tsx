@@ -111,6 +111,11 @@ export default async function AdminAnalyticsPage() {
     count: row.count
   }));
 
+  const signupPlatformChart = analytics.totals.signupPlatformBars.map((row) => ({
+    name: row.name,
+    count: row.count
+  }));
+
   return (
     <main id="main" tabIndex={-1} className="mx-auto grid min-h-screen w-full max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:px-8">
       <div>
@@ -262,6 +267,24 @@ export default async function AdminAnalyticsPage() {
             ) : (
               <div className="rounded-lg border border-dashed bg-background/60 p-4 text-xs text-muted-foreground">
                 No rediscovery confirmations yet.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-lg">Signups by platform</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Web vs mobile, stamped at account creation. Signups before tracking show as Unknown.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {signupPlatformChart.length ? (
+              <EventBarChart data={signupPlatformChart} heightClass="h-64" />
+            ) : (
+              <div className="rounded-lg border border-dashed bg-background/60 p-4 text-xs text-muted-foreground">
+                No signups recorded yet.
               </div>
             )}
           </CardContent>

@@ -249,6 +249,19 @@ export async function getAdminAnalyticsSummary() {
     .groupBy(mealLogs.effortLevel)
     .orderBy(desc(count(mealLogs.id)));
 
+  // Web vs mobile signup split. Every `signed_up` event carries a
+  // `metadata.platform` ("web" | "mobile") stamped at account creation
+  // (lib/auth/index.ts). Rows predating that stamp coalesce to "(unknown)".
+  const signupPlatformRows = await db
+    .select({
+      platform: sql<string>`coalesce(${analyticsEvents.metadata} ->> 'platform', '(unknown)')`,
+      count: count(analyticsEvents.id)
+    })
+    .from(analyticsEvents)
+    .where(eq(analyticsEvents.name, "signed_up"))
+    .groupBy(sql`coalesce(${analyticsEvents.metadata} ->> 'platform', '(unknown)')`)
+    .orderBy(desc(count(analyticsEvents.id)));
+
   let dayOneRetentionPct = 0;
   let daySevenRetentionPct = 0;
 
@@ -344,6 +357,13 @@ export async function getAdminAnalyticsSummary() {
       })),
       insightRediscoveryReasons: rediscoveryReasonRows.map((row) => ({
         name: row.reason || "(unknown)",
+        count: Number(row.count ?? 0)
+      })),
+      signupPlatformBars: signupPlatformRows.map((row) => ({
+        name:
+          row.platform === "(unknown)"
+            ? "Unknown"
+            : row.platform.charAt(0).toUpperCase() + row.platform.slice(1),
         count: Number(row.count ?? 0)
       }))
     },

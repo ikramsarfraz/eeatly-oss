@@ -9,6 +9,7 @@ import {
   CalendarDays,
   ChefHat,
   Home,
+  MessageSquare,
   Plus,
   Settings,
   Share2,
@@ -29,6 +30,7 @@ import {
   SidebarRail
 } from "@/components/ui/sidebar";
 import { UserMenu } from "@/components/layout/user-menu";
+import { FeedbackDialog } from "@/components/feedback/feedback-dialog";
 import { isActiveRoute } from "@/lib/nav/breadcrumbs";
 import type { AppUser } from "@/lib/auth/session";
 
@@ -242,6 +244,21 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
 
       <SidebarFooter>
         <SidebarMenu>
+          {/* The single front-facing feedback door — present on every
+              dashboard route. Renders the shared FeedbackDialog with a
+              sidebar-styled trigger so the dialog stays self-contained
+              (not nested inside the user-menu dropdown, which would unmount
+              it on close). */}
+          <SidebarMenuItem>
+            <FeedbackDialog
+              trigger={
+                <SidebarMenuButton>
+                  <MessageSquare className="size-4" />
+                  <span>Send feedback</span>
+                </SidebarMenuButton>
+              }
+            />
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <UserMenu user={user} />
           </SidebarMenuItem>
