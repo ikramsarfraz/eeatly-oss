@@ -86,12 +86,14 @@ if (r2Count === 0) {
 // checkout goes live and launch free-access auto-disables. A PARTIAL
 // config is a hard failure: a half-wired Stripe is the one state that
 // silently breaks checkout, so we block the deploy on it.
+//
+// Price IDs are NOT env vars anymore — the sellable catalog is synced live
+// from Stripe (no STRIPE_PRICE_MONTHLY/ANNUAL), so the keys here are just
+// the API credentials + webhook secret.
 const stripeKeys = [
   "STRIPE_SECRET_KEY",
   "STRIPE_PUBLISHABLE_KEY",
-  "STRIPE_WEBHOOK_SECRET",
-  "STRIPE_PRICE_MONTHLY",
-  "STRIPE_PRICE_ANNUAL"
+  "STRIPE_WEBHOOK_SECRET"
 ];
 const stripeCount = stripeKeys.filter((k) => setAndNonEmpty(k)).length;
 if (stripeCount === 0) {
