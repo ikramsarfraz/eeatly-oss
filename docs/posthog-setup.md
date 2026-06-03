@@ -2,7 +2,7 @@
 
 PostHog tracks **visits** (pageviews + unique visitors) and **new users**
 (person profiles, created when a signed-in user is identified). It's
-**inert until `NEXT_PUBLIC_POSTHOG_KEY` is set** — no local/dev friction.
+**inert until `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` is set** — no local/dev friction.
 
 This is additive to the existing in-house analytics (`analytics_events`
 table + `/admin/analytics`), which logs server-side product events
@@ -31,11 +31,11 @@ doesn't have. Both can run together.
 
 ## Enabling it
 
-1. Create a PostHog project → copy the **Project API key** (starts with
-   `phc_`).
-2. Set env vars (Vercel Production / Preview). The key is public:
+1. Create a PostHog project → copy the **Project API key / token** (starts
+   with `phc_`).
+2. Set env vars (Vercel Production / Preview). The token is public:
    ```
-   NEXT_PUBLIC_POSTHOG_KEY=phc_…
+   NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN=phc_…
    NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com   # or https://eu.i.posthog.com
    ```
 3. Verify: `pnpm check:deploy` → `PostHog: enabled — analytics on; …`.

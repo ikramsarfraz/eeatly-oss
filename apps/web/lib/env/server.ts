@@ -45,6 +45,11 @@ const serverEnvSchema = z.object({
   PLATFORM_ADMIN_HOST: optionalString,
   RESEND_API_KEY: optionalString,
   EMAIL_FROM: optionalString,
+  // Verified sending domain (e.g. "eeatly.com"). When set, transactional
+  // mail is sent from per-category aliases on this domain (hello@, billing@,
+  // security@, …) with matching Reply-To. When unset, mail falls back to the
+  // single EMAIL_FROM address — see lib/email/senders.ts.
+  EMAIL_DOMAIN: optionalString,
   RESEND_WEBHOOK_SECRET: optionalString,
   R2_ACCOUNT_ID: optionalString,
   R2_ACCESS_KEY_ID: optionalString,
@@ -84,7 +89,7 @@ const serverEnvSchema = z.object({
   SENTRY_ENVIRONMENT: optionalString,
   // PostHog product analytics — public, client-side. Inert without the
   // key. See also `lib/env/public.ts` (where the client reads them).
-  NEXT_PUBLIC_POSTHOG_KEY: optionalString,
+  NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN: optionalString,
   NEXT_PUBLIC_POSTHOG_HOST: optionalString
 });
 

@@ -9,7 +9,7 @@ import { authClient } from "@/lib/auth/client";
  * PostHog client analytics — tracks visits (pageviews / unique visitors)
  * and new users (person profiles created on identify after auth).
  *
- * Inert without `NEXT_PUBLIC_POSTHOG_KEY`: the SDK never initializes, so
+ * Inert without `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN`: the SDK never initializes, so
  * local/dev/preview ship no analytics behaviour and need no env vars.
  *
  * Events ride through the `/ingest` reverse proxy (next.config rewrites)
@@ -18,7 +18,7 @@ import { authClient } from "@/lib/auth/client";
  * automatic `$pageview` doesn't see.
  */
 
-const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
 
 let initialized = false;
 

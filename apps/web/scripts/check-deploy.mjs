@@ -69,6 +69,14 @@ lines.push(
   `RESEND_WEBHOOK_SECRET: ${webhook ? "set (webhook ingestion enabled)" : "not set (POST /api/webhooks/resend returns 503 until configured)"}`
 );
 
+// EMAIL_DOMAIN turns on per-category sender aliases (hello@, billing@,
+// security@, …) with matching Reply-To. Without it, all mail sends from the
+// single EMAIL_FROM address. Optional, but recommended once the domain is
+// verified in Resend — see lib/email/senders.ts.
+lines.push(
+  `EMAIL_DOMAIN: ${setAndNonEmpty("EMAIL_DOMAIN") ? `set (${process.env.EMAIL_DOMAIN}) — per-category From/Reply-To aliases active` : "not set — all mail sends from the single EMAIL_FROM address"}`
+);
+
 const r2Present = r2Keys.map((k) => setAndNonEmpty(k));
 const r2Count = r2Present.filter(Boolean).length;
 if (r2Count === 0) {
@@ -130,8 +138,8 @@ if (!sentryDsn) {
 }
 
 // PostHog — optional client analytics; inert without the key.
-if (!setAndNonEmpty("NEXT_PUBLIC_POSTHOG_KEY")) {
-  lines.push("PostHog: not configured — pageview/visit + user analytics disabled (set NEXT_PUBLIC_POSTHOG_KEY).");
+if (!setAndNonEmpty("NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN")) {
+  lines.push("PostHog: not configured — pageview/visit + user analytics disabled (set NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN).");
 } else {
   const host = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com (default)";
   lines.push(`PostHog: enabled — analytics on; host ${host}.`);

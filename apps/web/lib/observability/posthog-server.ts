@@ -8,7 +8,7 @@ import { logger } from "@/lib/observability/logger";
  * server code rather than the client (e.g. `signed_up` at true account
  * creation in the Better Auth `user.create` hook).
  *
- * Inert without `NEXT_PUBLIC_POSTHOG_KEY` (same key the client uses; it's
+ * Inert without `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` (same token the client uses; it's
  * public). Sends straight to the PostHog ingestion host — the `/ingest`
  * reverse proxy is a browser-origin concern and doesn't apply here.
  *
@@ -16,7 +16,7 @@ import { logger } from "@/lib/observability/logger";
  * which matters in serverless: the function may freeze right after the
  * request, so we can't rely on a background flush interval.
  */
-const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
 
 let client: PostHog | null = null;
 
