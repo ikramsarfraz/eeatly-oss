@@ -6,11 +6,9 @@
 // a random PR preview never mutates a real schema.
 //
 // Vercel sets VERCEL_ENV + VERCEL_GIT_COMMIT_REF during the build, and the
-// environment's DATABASE_MIGRATE_URL is injected from Vercel's env vars. We use
-// the Neon DIRECT (unpooled) connection here on purpose: drizzle-kit runs DDL
-// in a session and the pooled (`-pooler`) endpoint is unreliable for that. The
-// app build/runtime keeps using the pooled DATABASE_URL — we only override it
-// for the migration child process below.
+// environment's DATABASE_URL is injected from Vercel's env vars — the same
+// connection the app uses. (Neon's pooled endpoint handles Drizzle's DDL fine,
+// confirmed against the dev database, so no separate migration URL is needed.)
 
 import { execSync } from "node:child_process";
 
@@ -28,21 +26,17 @@ if (!isProd && !isUat) {
 }
 
 const target = isProd ? "production" : "uat";
-const url = process.env.DATABASE_MIGRATE_URL;
 
-if (!url) {
+if (!process.env.DATABASE_URL) {
   console.error(
-    `[migrate] DATABASE_MIGRATE_URL is not set for ${target}. Add the Neon DIRECT ` +
-      `(unpooled, no "-pooler" in the host) connection string to this environment in Vercel.`
+    `[migrate] DATABASE_URL is not set for ${target}. Add the Neon connection ` +
+      `string to this environment in Vercel.`
   );
   process.exit(1);
 }
 
 console.log(`[migrate] applying pending migrations to ${target} database…`);
-execSync("pnpm exec drizzle-kit migrate", {
-  stdio: "inherit",
-  // drizzle.config.ts reads DATABASE_URL — point it at the direct URL just for
-  // this run. The app's pooled DATABASE_URL is untouched for build + runtime.
-  env: { ...process.env, DATABASE_URL: url }
-});
+// drizzle.config.ts reads DATABASE_URL directly, so the migration runs against
+// the same connection the app uses.
+execSync("pnpm exec drizzle-kit migrate", { stdio: "inherit" });
 console.log(`[migrate] ${target} is up to date.`);
