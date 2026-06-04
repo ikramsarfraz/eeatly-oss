@@ -1,8 +1,10 @@
 import "server-only";
 
+import * as React from "react";
 import { getServerEnv } from "@/lib/env/server";
 import { getResendClient } from "@/lib/email/resend-client";
 import { getMailSender } from "@/lib/email/senders";
+import { MagicLinkEmail } from "@/lib/email/templates/magic-link-email";
 import { trackEvent } from "@/lib/observability/analytics";
 import { eeatlyEmailTags, recordOutboundEmailFromApiSend } from "@/services/email-delivery";
 
@@ -26,12 +28,11 @@ export async function sendMagicLinkEmail(email: string, url: string) {
     replyTo: sender.replyTo,
     to: email,
     subject: "Sign in to eeatly",
-    text: `Use this link to sign in to eeatly: ${url}`,
-    html: `
-      <p>Use this link to sign in to eeatly:</p>
-      <p><a href="${url}">Sign in to eeatly</a></p>
-      <p>This link expires soon. If you did not request it, you can ignore this email.</p>
-    `,
+    text: `Sign in to eeatly using this link (expires soon, one-time use): ${url}\n\nIf you didn't request it, you can ignore this email.`,
+    react: React.createElement(MagicLinkEmail, {
+      url,
+      contactEmail: sender.replyTo
+    }),
     tags: eeatlyEmailTags({ template: "magic_link" })
   });
 
