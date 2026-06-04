@@ -28,7 +28,7 @@ export function HouseholdInvitationEmail({
         </Heading>
         <Text style={emailText}>
           eeatly is a shared cooking memory. Accept the invitation to merge your
-          meals into <strong>{householdName}</strong> — recipes you&apos;ve
+          meals into <strong>{householdName}</strong>. Recipes you&apos;ve
           already logged will move with you.
         </Text>
         <Section style={{ margin: "24px 0" }}>

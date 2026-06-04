@@ -51,7 +51,7 @@ export function InactiveReminderEmail({
           </>
         ) : (
           <Text style={emailText}>
-            Even a quick one-line log keeps the thread going — weeknight repeats
+            Even a quick one-line log keeps the thread going. Weeknight repeats
             count.
           </Text>
         )}

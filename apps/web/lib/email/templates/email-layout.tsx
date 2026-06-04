@@ -45,7 +45,13 @@ export function EmailLayout({
       <Body style={emailBody}>
         <Container style={emailContainer}>
           <Section style={headerSection}>
-            <Text style={wordmark}>eeatly</Text>
+            {/* Matches the in-product Wordmark: "ee" italic forest, "atly"
+                roman ink (components/brand/logo.tsx). Email-safe serif fallback
+                since Instrument Serif won't load in mail clients. */}
+            <Text style={wordmark}>
+              <span style={wordmarkEe}>ee</span>
+              <span style={wordmarkAtly}>atly</span>
+            </Text>
           </Section>
 
           {children}
@@ -61,7 +67,7 @@ export function EmailLayout({
             </Text>
             {footerNote ? <Text style={footerMuted}>{footerNote}</Text> : null}
             <Text style={footerMuted}>
-              eeatly — your family&apos;s food memory.
+              eeatly, your family&apos;s food memory.
             </Text>
           </Section>
         </Container>
@@ -76,12 +82,20 @@ const headerSection = {
 
 const wordmark = {
   fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif",
-  fontStyle: "italic" as const,
   fontSize: "30px",
   lineHeight: "1",
-  color: BRAND.green,
   margin: "0",
-  letterSpacing: "-0.01em"
+  letterSpacing: "-0.03em"
+};
+
+// "ee" — italic forest green; "atly" — roman ink (the brand lockup).
+const wordmarkEe = {
+  fontStyle: "italic" as const,
+  color: "#2e5739"
+};
+
+const wordmarkAtly = {
+  color: "#1a1f1a"
 };
 
 const footerRule = {

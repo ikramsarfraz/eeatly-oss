@@ -23,7 +23,7 @@ export function WeeklyRecapEmail({ name, teaserLine, contactEmail }: WeeklyRecap
         </Text>
         <Text style={{ ...emailText, fontWeight: 600 }}>{teaserLine}</Text>
         <Text style={emailText}>
-          For now open the dashboard to review recent logs — the recap email
+          For now open the dashboard to review recent logs. The recap email
           will reuse that same data once scheduling ships.
         </Text>
       </Section>

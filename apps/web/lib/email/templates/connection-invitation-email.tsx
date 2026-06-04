@@ -33,7 +33,7 @@ export function ConnectionInvitationEmail({
         <Text style={emailText}>
           On eeatly, sharing is private by design. Connecting lets{" "}
           <strong>{inviterName}</strong> share specific recipes and plans with
-          you — never their whole library — and anything you share back appears
+          you (never their whole library), and anything you share back appears
           in their &ldquo;Shared with you.&rdquo;
         </Text>
         <Section style={{ margin: "24px 0" }}>

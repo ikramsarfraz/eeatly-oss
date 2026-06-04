@@ -14,7 +14,7 @@ export function MagicLinkEmail({ url, contactEmail }: MagicLinkEmailProps) {
       <Section>
         <Heading style={emailHeading}>Sign in to eeatly</Heading>
         <Text style={emailText}>
-          Tap the button below to sign in. No password needed — this link signs
+          Tap the button below to sign in. No password needed. This link signs
           you straight in.
         </Text>
         <Section style={{ marginTop: "24px" }}>

@@ -62,14 +62,14 @@ export async function sendFeedbackReplyEmail(params: {
     subject: "Re: your eeatly feedback",
     text: `${greeting}\n\n${params.replyMessage}${
       params.originalMessage?.trim()
-        ? `\n\n— You wrote:\n${params.originalMessage.trim()}`
+        ? `\n\nYou wrote:\n${params.originalMessage.trim()}`
         : ""
-    }\n\n— The eeatly team`,
+    }\n\nThe eeatly team`,
     html: `
       <p>${escapeHtml(greeting)}</p>
       <p style="white-space:pre-wrap">${replyHtml}</p>
       ${quotedBlock}
-      <p style="color:#6b6a63;font-size:13px;margin-top:20px">— The eeatly team</p>
+      <p style="color:#6b6a63;font-size:13px;margin-top:20px">The eeatly team</p>
     `,
     tags: eeatlyEmailTags({
       template: "feedback_reply",

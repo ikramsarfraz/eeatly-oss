@@ -15,13 +15,13 @@ export function FirstMealEncouragementEmail({
 }: FirstMealEncouragementEmailProps) {
   return (
     <EmailLayout
-      preview="That's one meal saved — here's what to try next"
+      preview="That's one meal saved, here's what to try next"
       contactEmail={contactEmail}
     >
       <Section>
         <Heading style={emailHeading}>That&apos;s one to remember, {name}</Heading>
         <Text style={emailText}>
-          Your first meal is in. That&apos;s the hard part — eeatly gets more
+          Your first meal is in. That&apos;s the hard part, and eeatly gets more
           useful the more you add.
         </Text>
         <Text style={emailText}>
@@ -35,8 +35,8 @@ export function FirstMealEncouragementEmail({
           </Button>
         </Section>
         <Text style={{ ...emailText, marginTop: "20px" }}>
-          When you&apos;re ready to share with family — your mom, your partner,
-          the cousins in another time zone — you can invite them to your
+          When you&apos;re ready to share with family (your mom, your partner,
+          the cousins in another time zone), you can invite them to your
           kitchen. Their meals show up alongside yours.
         </Text>
         <Text style={{ ...emailSmall, marginTop: "16px" }}>

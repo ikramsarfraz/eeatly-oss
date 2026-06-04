@@ -123,7 +123,7 @@ export async function dispatchTransactionalEmail(
 
   switch (input.template) {
     case "welcome":
-      subject = "Welcome to eeatly — your family's food memory";
+      subject = "Welcome to eeatly, your family's food memory";
       element = React.createElement(WelcomeEmail, {
         name: input.toName,
         dashboardUrl: href,
@@ -132,7 +132,7 @@ export async function dispatchTransactionalEmail(
       break;
 
     case "first_meal_encouragement":
-      subject = "That's one meal saved — here's what to try next";
+      subject = "That's one meal saved, here's what to try next";
       element = React.createElement(FirstMealEncouragementEmail, {
         name: input.toName,
         dashboardUrl: href,

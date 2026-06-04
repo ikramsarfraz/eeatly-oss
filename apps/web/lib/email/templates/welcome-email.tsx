@@ -11,13 +11,13 @@ export type WelcomeEmailProps = {
 export function WelcomeEmail({ name, dashboardUrl, contactEmail }: WelcomeEmailProps) {
   return (
     <EmailLayout
-      preview="Welcome to eeatly — your family's food memory"
+      preview="Welcome to eeatly, your family's food memory"
       contactEmail={contactEmail}
     >
       <Section>
         <Heading style={emailHeading}>Welcome, {name}</Heading>
         <Text style={emailText}>
-          eeatly is a quiet place to keep your family&apos;s food memory — the
+          eeatly is a quiet place to keep your family&apos;s food memory: the
           meals worth making again, the recipes worth passing down.
         </Text>
         <Text style={emailText}>
@@ -32,7 +32,7 @@ export function WelcomeEmail({ name, dashboardUrl, contactEmail }: WelcomeEmailP
         </Section>
         <Text style={{ ...emailText, marginTop: "20px" }}>
           When you&apos;re ready, you can invite family to share a kitchen. No
-          rush — eeatly works well solo too.
+          rush; eeatly works well solo too.
         </Text>
         <Text style={{ ...emailSmall, marginTop: "16px" }}>
           Direct link if the button doesn&apos;t open:{" "}

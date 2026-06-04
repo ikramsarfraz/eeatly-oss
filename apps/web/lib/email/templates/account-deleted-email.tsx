@@ -26,7 +26,7 @@ export function AccountDeletedEmail({ name, contactEmail }: AccountDeletedEmailP
         </Text>
         <Text style={emailText}>
           If you were part of a shared kitchen, the meals you logged there stay
-          with the household as &ldquo;Former member&rdquo; — your name and email
+          with the household as &ldquo;Former member&rdquo;, your name and email
           are no longer attached.
         </Text>
         <Text style={emailText}>
@@ -40,7 +40,7 @@ export function AccountDeletedEmail({ name, contactEmail }: AccountDeletedEmailP
           and we&apos;ll look into it.
         </Text>
         <Text style={{ ...emailSmall, marginTop: "20px" }}>
-          Thanks for trying eeatly — we hope your kitchen stayed warm while you
+          Thanks for trying eeatly. We hope your kitchen stayed warm while you
           were here.
         </Text>
       </Section>
