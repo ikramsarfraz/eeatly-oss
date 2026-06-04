@@ -80,7 +80,8 @@ const aiServiceMock = vi.hoisted(() => ({
   suggestMealFromAudio: vi.fn(),
   extractIngredientsForMeal: vi.fn(),
   generateShareableRecipe: vi.fn(),
-  generateDishImageForMeal: vi.fn()
+  generateDishImageForMeal: vi.fn(),
+  getExistingMealImage: vi.fn()
 }));
 vi.mock("@/services/ai", () => aiServiceMock);
 
@@ -534,14 +535,23 @@ describe("aiRouter.generateDishImage", () => {
     ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
 
-  it("returns the generated image URL from the service", async () => {
+  it("generates + charges (charged: true) when no image exists yet", async () => {
+    aiServiceMock.getExistingMealImage.mockResolvedValueOnce({ imageUrl: null });
     aiServiceMock.generateDishImageForMeal.mockResolvedValueOnce({
       imageUrl: "https://r2.example/dish-images/abc.png"
     });
     const result = await call(makeUser()).ai.generateDishImage({
       mealId: "33333333-3333-4333-8333-333333333333"
     });
-    expect(result.imageUrl).toBe("https://r2.example/dish-images/abc.png");
+    expect(result).toEqual({
+      imageUrl: "https://r2.example/dish-images/abc.png",
+      charged: true
+    });
+    expect(aiCreditsMock.withAiCredits).toHaveBeenCalledWith(
+      "u-1",
+      "dish_image",
+      expect.any(Function)
+    );
     expect(aiServiceMock.generateDishImageForMeal).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: "u-1",
@@ -551,14 +561,30 @@ describe("aiRouter.generateDishImage", () => {
     );
   });
 
-  it("degrades to { imageUrl: null } when the service throws", async () => {
+  it("returns an existing image for free (charged: false), no generation", async () => {
+    aiServiceMock.getExistingMealImage.mockResolvedValueOnce({
+      imageUrl: "https://r2.example/existing.png"
+    });
+    const result = await call(makeUser()).ai.generateDishImage({
+      mealId: "33333333-3333-4333-8333-333333333333"
+    });
+    expect(result).toEqual({
+      imageUrl: "https://r2.example/existing.png",
+      charged: false
+    });
+    expect(aiServiceMock.generateDishImageForMeal).not.toHaveBeenCalled();
+    expect(aiCreditsMock.withAiCredits).not.toHaveBeenCalled();
+  });
+
+  it("degrades to { imageUrl: null, charged: false } when generation fails", async () => {
+    aiServiceMock.getExistingMealImage.mockResolvedValueOnce({ imageUrl: null });
     aiServiceMock.generateDishImageForMeal.mockRejectedValueOnce(
       new Error("provider down")
     );
     const result = await call(makeUser()).ai.generateDishImage({
       mealId: "33333333-3333-4333-8333-333333333333"
     });
-    expect(result).toEqual({ imageUrl: null });
+    expect(result).toEqual({ imageUrl: null, charged: false });
   });
 });
 

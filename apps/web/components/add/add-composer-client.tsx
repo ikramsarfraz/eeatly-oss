@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { MealLogForm } from "@/components/forms/meal-log-form";
+import { CreditUsageBar } from "@/components/credits/credit-usage-bar";
 import { useToast } from "@/components/providers/toast-provider";
 import { trpc } from "@/lib/trpc/client";
 import { getCause } from "@/lib/trpc/errors";
@@ -113,6 +114,7 @@ export function AddComposerClient({
     };
   }, [photoPreviewUrl]);
 
+  const utils = trpc.useUtils();
   const photoMutation = trpc.ai.suggestFromPhoto.useMutation();
   const textMutation = trpc.ai.suggestFromText.useMutation();
   const voiceMutation = trpc.ai.suggestFromVoice.useMutation();
@@ -175,6 +177,8 @@ export function AddComposerClient({
       if (result) {
         setSuggestion(result);
         setReviewNonce((n) => n + 1);
+        // Reflect the spend in the credit bar (server is source of truth).
+        void utils.credits.balance.invalidate();
       }
     } catch (err) {
       const reason = getCause(err)?.reason;
@@ -271,7 +275,9 @@ export function AddComposerClient({
             />
           </Card>
         ) : (
-          <AiSurface
+          <div className="grid gap-3">
+            <CreditUsageBar />
+            <AiSurface
             method={method as "photo" | "text" | "voice" | "link"}
             photoFile={photoFile}
             photoPreviewUrl={photoPreviewUrl}
@@ -295,7 +301,8 @@ export function AddComposerClient({
             isPending={isPending}
             onExtract={handleExtract}
             onSwitchToText={() => switchMethod("text")}
-          />
+            />
+          </div>
         )}
 
         {/* Right: tip card (changes with method) */}

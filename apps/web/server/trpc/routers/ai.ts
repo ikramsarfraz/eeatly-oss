@@ -19,6 +19,7 @@ import {
   extractIngredientsForMeal,
   generateDishImageForMeal,
   generateShareableRecipe,
+  getExistingMealImage,
   suggestMealFromAudio,
   suggestMealFromImage,
   suggestMealFromText
@@ -248,36 +249,62 @@ export const aiRouter = router({
     }),
 
   /**
-   * Resolve the app-wide AI image for a meal with no photo of its own.
-   * Cache-first in the service: the first viewer of a never-seen dish
-   * pays for the OpenAI + R2 round-trip, everyone after reuses the URL.
+   * Generate the app-wide AI image for a meal with no photo of its own.
+   * On-demand (user taps "Generate image"), not auto — and metered at
+   * `dish_image` (10 credits), the priciest op.
    *
-   * Open to all users (no feature gate) — images are generated once per
-   * dish app-wide and shared across households, so free users benefit and
-   * the cost ceiling is the distinct-dish count. The `ai` rate-limit
-   * bucket (20/day) is the only abuse guard. The trigger is the recipe
-   * view firing this once on mount when `photoUrl` is null. Returns
-   * `{ imageUrl: null }` (UI keeps the monogram) when generation is
-   * unavailable or fails rather than surfacing an error.
+   * Free vs charged:
+   *   - If an image already exists (the user's own photo OR an app-wide
+   *     cached dish image), return it for free — `charged: false`. This
+   *     keeps cache reuse and the rare concurrent-generation race from
+   *     spending credits on an image that already exists.
+   *   - Otherwise it's a real generation: charge 10 via `withAiCredits`.
+   *     A generation that yields no image throws inside the metered fn so
+   *     `withAiCredits` refunds the cost; the procedure then returns
+   *     `{ imageUrl: null }` and the UI keeps the monogram.
+   *
+   * `InsufficientCreditsError` propagates as a typed cause so the button
+   * can show a "buy credits / upgrade" prompt. The `ai` rate-limit bucket
+   * (20/day) is the burst guard.
    */
   generateDishImage: householdMemberProcedure
     .use(rateLimit("ai"))
     .input(mealIdInput)
     .mutation(async ({ ctx, input }) => {
+      // Free path: a photo or app-wide cached image already exists.
+      const existing = await getExistingMealImage({
+        userId: ctx.user.id,
+        householdId: ctx.household.id,
+        mealId: input.mealId
+      });
+      if (existing.imageUrl) {
+        return { imageUrl: existing.imageUrl, charged: false };
+      }
+
+      // Paid path: a real generation, metered at 10 credits.
       try {
-        return await generateDishImageForMeal({
-          userId: ctx.user.id,
-          householdId: ctx.household.id,
-          mealId: input.mealId
+        const result = await withAiCredits(ctx.user.id, "dish_image", async () => {
+          const generated = await generateDishImageForMeal({
+            userId: ctx.user.id,
+            householdId: ctx.household.id,
+            mealId: input.mealId
+          });
+          // No image → throw so withAiCredits refunds; we don't charge for
+          // a failed/unavailable generation.
+          if (!generated.imageUrl) throw new Error("dish_image_unavailable");
+          return generated;
         });
+        return { imageUrl: result.imageUrl, charged: true };
       } catch (error) {
+        const credit = mapCreditError(error);
+        if (credit) throw credit;
         logger.warn("trpc_ai_dish_image_failed", {
           userId: ctx.user.id,
           mealId: input.mealId,
           error: error instanceof Error ? error.message : String(error)
         });
-        // Non-fatal: the recipe view degrades to the monogram tile.
-        return { imageUrl: null };
+        // Non-fatal: the recipe view degrades to the monogram tile (refunded).
+        return { imageUrl: null, charged: false };
       }
     }),
 

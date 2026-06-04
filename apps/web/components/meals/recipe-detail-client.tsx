@@ -16,6 +16,7 @@ import { IngredientChecklist } from "@/components/meals/ingredient-checklist";
 import { StepCard, type StepCardData } from "@/components/meals/step-card";
 import { StructuredIngredientList } from "@/components/meals/structured-ingredient-list";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
+import { GenerateImageButton } from "@/components/credits/generate-image-button";
 import { SourceUrlEmbed } from "@/components/embeds/source-url-embed";
 
 import { useToast } from "@/components/providers/toast-provider";
@@ -344,32 +345,10 @@ export function RecipeDetailClient({
   const { showToast } = useToast();
   const [photoUrl, setPhotoUrl] = React.useState<string | null>(meal.photoUrl);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const autoGenFired = React.useRef(false);
 
-  const generateImage = trpc.ai.generateDishImage.useMutation();
+  // Dish-image generation is now on-demand + metered (10 credits) via
+  // `GenerateImageButton` in the hero actions — no longer auto-fired on mount.
   const setMealPhoto = trpc.meals.setPhoto.useMutation();
-
-  // Auto-generate the app-wide fallback on first view of a dish that has
-  // no image at all. Cache-first on the server: a viewer of an
-  // already-generated dish never lands here (photoUrl is non-null). The
-  // ref guard fires the mutation exactly once per mount.
-  React.useEffect(() => {
-    if (photoUrl || autoGenFired.current) return;
-    autoGenFired.current = true;
-    generateImage.mutate(
-      { mealId: meal.id },
-      {
-        onSuccess: (res) => {
-          if (res.imageUrl) setPhotoUrl(res.imageUrl);
-        }
-      }
-    );
-    // `generateImage.mutate` is stable; meal.id keys the call. Re-running
-    // on photoUrl changes is intentionally guarded by the ref.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meal.id, photoUrl]);
-
-  const isGeneratingImage = generateImage.isPending;
   const isUploadingPhoto = setMealPhoto.isPending;
 
   async function handlePhotoSelected(event: React.ChangeEvent<HTMLInputElement>) {
@@ -417,7 +396,7 @@ export function RecipeDetailClient({
           {/* While the app-wide image generates (or a device photo
               uploads), keep the monogram/old photo visible under a
               subtle spinner overlay rather than flashing a blank box. */}
-          {!photoUrl && (isGeneratingImage || isUploadingPhoto) ? (
+          {!photoUrl && isUploadingPhoto ? (
             <div className="absolute inset-0 flex items-center justify-center bg-black/10">
               <Loader2 className="h-5 w-5 animate-spin text-white drop-shadow" />
             </div>
@@ -529,6 +508,15 @@ export function RecipeDetailClient({
                   {photoUrl ? "Change photo" : "Add photo"}
                 </Button>
               </>
+            ) : null}
+            {/* On-demand AI dish image (10 credits) — only when this dish has
+                no image at all. A user photo or app-wide cached image wins and
+                hides this. */}
+            {canEdit && !photoUrl ? (
+              <GenerateImageButton
+                mealId={meal.id}
+                onGenerated={(url) => setPhotoUrl(url)}
+              />
             ) : null}
           </div>
         </div>

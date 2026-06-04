@@ -6,7 +6,7 @@ import { withFallback } from "@/lib/ai/providers";
 import * as anthropic from "@/lib/ai/providers/anthropic";
 import * as openai from "@/lib/ai/providers/openai";
 import { households, mealLogs, meals } from "@/db/schema";
-import { generateDishImageForName } from "@/services/dish-images";
+import { generateDishImageForName, getDishImage } from "@/services/dish-images";
 import { canEditItem, getGrantRole } from "@/services/sharing";
 import { mealVisibilityFilter } from "@/lib/meals/visibility";
 import { requireHouseholdMember } from "@/lib/auth/session";
@@ -261,6 +261,38 @@ export async function generateDishImageForMeal(args: {
 
   const imageUrl = await generateDishImageForName(mealRow.name);
   return { imageUrl };
+}
+
+/**
+ * Read-only: the image that already exists for a meal — the user's own photo
+ * if set, else the app-wide cached dish image — or null when none exists yet.
+ * Never generates and never charges. The dish-image procedure calls this first
+ * so reusing an existing/cached image stays free; only a real generation is
+ * metered.
+ */
+export async function getExistingMealImage(args: {
+  userId: string;
+  householdId: string;
+  mealId: string;
+}): Promise<{ imageUrl: string | null }> {
+  await requireHouseholdMember(args.userId, args.householdId);
+
+  const [mealRow] = await db
+    .select({ name: meals.name, photoUrl: meals.photoUrl })
+    .from(meals)
+    .where(
+      and(
+        eq(meals.id, args.mealId),
+        eq(meals.householdId, args.householdId),
+        isNull(meals.archivedAt),
+        mealVisibilityFilter(args.userId, args.householdId)
+      )
+    )
+    .limit(1);
+
+  if (!mealRow) return { imageUrl: null };
+  if (mealRow.photoUrl) return { imageUrl: mealRow.photoUrl };
+  return { imageUrl: await getDishImage(mealRow.name) };
 }
 
 // Round 8 — voice notes.

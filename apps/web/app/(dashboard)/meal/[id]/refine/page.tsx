@@ -36,6 +36,7 @@ import {
 import { useToastShortcuts } from "@/components/ui/toast";
 import { useSetBreadcrumb } from "@/components/layout/breadcrumb-context";
 import { HeadsUpCard } from "@/components/refine/heads-up-card";
+import { CreditUsageBar } from "@/components/credits/credit-usage-bar";
 import { RefineDiff } from "@/components/refine/refine-diff";
 import { getDeviceId } from "@/lib/refine/device-id";
 import {
@@ -201,6 +202,7 @@ export default function RefineComposerPage() {
     onSuccess: (data) => {
       if (!data || !sessionId) return;
       utils.refine.getPendingChanges.setData({ sessionId }, data);
+      void utils.credits.balance.invalidate();
     },
     onError: (err) => {
       setDraft((prev) => prev || lastDraftRef.current);
@@ -212,6 +214,7 @@ export default function RefineComposerPage() {
     onSuccess: (data) => {
       if (!data || !sessionId) return;
       utils.refine.getPendingChanges.setData({ sessionId }, data);
+      void utils.credits.balance.invalidate();
       recorder.reset();
       setAudioFile(null);
     },
@@ -222,6 +225,7 @@ export default function RefineComposerPage() {
     onSuccess: (data) => {
       if (!data || !sessionId) return;
       utils.refine.getPendingChanges.setData({ sessionId }, data);
+      void utils.credits.balance.invalidate();
       if (photoPreview) URL.revokeObjectURL(photoPreview);
       setPhotoFile(null);
       setPhotoPreview(null);
@@ -663,6 +667,7 @@ function RefineBody({
                 Send a prompt, voice note, or photo.
               </h2>
               <ModeTabs mode={mode} onChange={setMode} />
+              <CreditUsageBar hideDisclosure className="bg-[color:var(--card)]" />
               {mode === "text" ? (
                 <TextSurface
                   draft={draft}
