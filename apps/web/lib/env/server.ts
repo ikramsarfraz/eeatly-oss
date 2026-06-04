@@ -56,8 +56,16 @@ const serverEnvSchema = z.object({
   R2_SECRET_ACCESS_KEY: optionalString,
   R2_BUCKET: optionalString,
   R2_PUBLIC_BASE_URL: r2PublicBaseUrl,
-  UPSTASH_REDIS_REST_URL: z.string().url("UPSTASH_REDIS_REST_URL must be a valid URL."),
-  UPSTASH_REDIS_REST_TOKEN: z.string().min(1, "UPSTASH_REDIS_REST_TOKEN is required."),
+  // Upstash Redis backs rate limiting. Optional: when unset (e.g. local dev)
+  // the limiters no-op and requests aren't throttled — see lib/security/
+  // rate-limit.ts. Set both in uat/prod (each environment its own database)
+  // so abuse guards are enforced. Validated only when present — partial
+  // config (one without the other) is rejected below via hasRedisEnv usage.
+  UPSTASH_REDIS_REST_URL: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.string().url("UPSTASH_REDIS_REST_URL must be a valid URL.").optional()
+  ),
+  UPSTASH_REDIS_REST_TOKEN: optionalString,
   ANTHROPIC_API_KEY: z.string().min(1, "ANTHROPIC_API_KEY is required."),
   OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required."),
   GOOGLE_CLIENT_ID: optionalString,
@@ -87,6 +95,10 @@ const serverEnvSchema = z.object({
   NEXT_PUBLIC_SENTRY_DSN: optionalString,
   SENTRY_AUTH_TOKEN: optionalString,
   SENTRY_ENVIRONMENT: optionalString,
+  // Browser-exposed env tag — the non-public `SENTRY_ENVIRONMENT` doesn't
+  // reach the client bundle, so set this to tag UAT *client* errors. Omit
+  // in prod (the NODE_ENV fallback already yields "production").
+  NEXT_PUBLIC_SENTRY_ENVIRONMENT: optionalString,
   // PostHog product analytics — public, client-side. Inert without the
   // key. See also `lib/env/public.ts` (where the client reads them).
   NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN: optionalString,
@@ -129,6 +141,16 @@ export function hasR2Env(env = getServerEnv()) {
 
 export function hasGoogleAuthEnv(env = getServerEnv()) {
   return Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
+}
+
+/**
+ * All-or-none guard for Upstash Redis (rate limiting). Returns true only
+ * when both halves are present — partial config would build a broken client.
+ * When false (e.g. local dev), the limiters in lib/security/rate-limit.ts
+ * no-op rather than throttle.
+ */
+export function hasRedisEnv(env = getServerEnv()) {
+  return Boolean(env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN);
 }
 
 /**

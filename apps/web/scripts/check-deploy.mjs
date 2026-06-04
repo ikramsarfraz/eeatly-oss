@@ -145,6 +145,22 @@ if (!setAndNonEmpty("NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN")) {
   lines.push(`PostHog: enabled — analytics on; host ${host}.`);
 }
 
+// Upstash Redis — backs rate limiting; optional (limiters no-op when unset).
+const redisKeys = ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"];
+const redisCount = redisKeys.filter((k) => setAndNonEmpty(k)).length;
+if (redisCount === 0) {
+  lines.push(
+    "Redis: not configured — rate limiting disabled (fine for dev; set both UPSTASH_REDIS_REST_* in uat/prod to enforce abuse guards)."
+  );
+} else if (redisCount === redisKeys.length) {
+  lines.push("Redis: configured — rate limiting enforced.");
+} else {
+  const missing = redisKeys.filter((k) => !setAndNonEmpty(k));
+  lines.push(
+    `Redis: partially configured (${redisCount}/${redisKeys.length}) — missing: ${missing.join(", ")} (rate limiting no-ops until both are set).`
+  );
+}
+
 lines.push(
   `PLATFORM_ADMIN_HOST: ${setAndNonEmpty("PLATFORM_ADMIN_HOST") ? "set (admin routes additionally gated by host)" : "not set (admin uses session + role only)"}`
 );
