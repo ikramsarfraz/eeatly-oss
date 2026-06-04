@@ -6,6 +6,10 @@ import { bearer, magicLink } from "better-auth/plugins";
 import { db } from "@/lib/db/client";
 import * as schema from "@/db/schema";
 import { isMobileOrigin, pickMagicLinkUrl } from "@/lib/auth/deep-links";
+import {
+  crossSubdomainCookiesEnabled,
+  getRootDomain
+} from "@/lib/auth/admin-host";
 import { getServerEnv, hasGoogleAuthEnv } from "@/lib/env/server";
 import { sendMagicLinkEmail } from "@/lib/email/resend";
 import { logger } from "@/lib/observability/logger";
@@ -71,12 +75,32 @@ function mobileTrustedOrigins(): string[] {
   ];
 }
 
+/**
+ * When ROOT_DOMAIN is configured, trust every subdomain of it so the
+ * `admin.<root>` surface can make credentialed auth requests (sign-in). Better
+ * Auth's `matchesOriginPattern` supports glob wildcards, so one `*.<root>`
+ * entry covers all subdomains without enumeration. Dev ports are added because
+ * the local Host carries `:3003` (e.g. `http://admin.localtest.me:3003`).
+ */
+function subdomainWildcardOrigins(): string[] {
+  const root = getRootDomain();
+  if (!root) return [];
+  const out = [`https://*.${root}`, `http://*.${root}`];
+  if (process.env.NODE_ENV !== "production") {
+    for (const port of ["3000", "3001", "3002", "3003", "5173"]) {
+      out.push(`http://*.${root}:${port}`, `https://*.${root}:${port}`);
+    }
+  }
+  return out;
+}
+
 function trustedOriginsList(env: ReturnType<typeof getServerEnv>): string[] {
   const fromEnv = [env.NEXT_PUBLIC_APP_URL, env.BETTER_AUTH_URL].filter(Boolean);
   return [
     ...new Set([
       ...fromEnv,
       ...developmentLocalhostOrigins(),
+      ...subdomainWildcardOrigins(),
       ...mobileTrustedOrigins()
     ])
   ];
@@ -241,7 +265,21 @@ function buildAuth() {
       maxAge: 5 * 60
     }
   },
-    trustedOrigins: trustedOriginsList(env)
+    trustedOrigins: trustedOriginsList(env),
+    // Share the session cookie across `eeatly.com` and its `admin.` subdomain
+    // (and `localtest.me` locally) so signing in on any host carries to the
+    // admin surface. Off for localhost/unset ROOT_DOMAIN — browsers reject a
+    // shared cookie Domain there, and single-origin needs no sharing.
+    ...(crossSubdomainCookiesEnabled()
+      ? {
+          advanced: {
+            crossSubDomainCookies: {
+              enabled: true,
+              domain: getRootDomain() as string
+            }
+          }
+        }
+      : {})
   });
 }
 

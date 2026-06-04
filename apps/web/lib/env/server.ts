@@ -43,6 +43,12 @@ const serverEnvSchema = z.object({
   BETTER_AUTH_URL: z.string().url("BETTER_AUTH_URL must be a valid app origin."),
   NEXT_PUBLIC_APP_URL: z.string().url("NEXT_PUBLIC_APP_URL must be a valid app origin."),
   PLATFORM_ADMIN_HOST: optionalString,
+  // Registrable domain the product is served on (e.g. "eeatly.com", or
+  // "localtest.me" locally — it resolves *.localtest.me → 127.0.0.1). When
+  // set, the platform-admin surface is reachable on the `admin.` subdomain
+  // and the session cookie is shared across subdomains. Unset = single-origin
+  // (no admin subdomain). See lib/auth/admin-host.ts.
+  ROOT_DOMAIN: optionalString,
   RESEND_API_KEY: optionalString,
   EMAIL_FROM: optionalString,
   // Verified sending domain (e.g. "eeatly.com"). When set, transactional
