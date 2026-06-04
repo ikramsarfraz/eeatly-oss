@@ -24,7 +24,10 @@ export function AdminShell({
     <TooltipProvider>
       <SidebarProvider defaultOpen>
         <AdminSidebar user={user} />
-        <div className="relative flex w-full flex-1 flex-col bg-background">
+        {/* `min-w-0` lets this flex child shrink below its content width — without
+            it, responsive charts (recharts ResponsiveContainer on /admin/analytics)
+            measure width(-1) and warn/collapse on first render. */}
+        <div className="relative flex w-full min-w-0 flex-1 flex-col bg-background">
           {/* Narrow-viewport top strip: the sidebar collapses off-canvas, so
               expose a trigger to bring it back. Hidden at md+ where the rail
               is permanent. */}

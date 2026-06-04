@@ -2,7 +2,7 @@ import "server-only";
 
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { aiCreditLedger, subscriptions, users } from "@/db/schema";
+import { aiCreditLedger, dishImages, subscriptions, users } from "@/db/schema";
 import {
   AI_OP_COGS_USD,
   TIERS,
@@ -70,7 +70,18 @@ export type AiUsageSummary = {
     monthlyRevenueUsd: number;
     marginUsd: number;
   }>;
+  /** Which model actually produced the cached dish images (all-time). */
+  imageModels: Array<{ model: string; count: number; lastAt: Date | null }>;
 };
+
+const IMAGE_MODEL_LABEL: Record<string, string> = {
+  "gemini-2.5-flash-image": "Gemini 2.5 Flash Image",
+  "gpt-image-1": "OpenAI gpt-image-1"
+};
+
+export function imageModelLabel(model: string): string {
+  return IMAGE_MODEL_LABEL[model] ?? model;
+}
 
 export async function getAiUsageSummary(): Promise<AiUsageSummary> {
   const now = new Date();
@@ -207,8 +218,27 @@ export async function getAiUsageSummary(): Promise<AiUsageSummary> {
   const creditsSpent = [...opCredits.values()].reduce((a, b) => a + b, 0);
   const estCogsUsd = byOperation.reduce((a, b) => a + b.estCogsUsd, 0);
 
+  // Which model produced the cached dish images (all-time; the row records the
+  // model that actually succeeded after the Gemini → gpt-image-1 fallback).
+  const imageModelRows = await db
+    .select({
+      model: dishImages.model,
+      count: sql<number>`count(*)::int`,
+      lastAt: sql<Date | null>`max(${dishImages.generatedAt})`
+    })
+    .from(dishImages)
+    .where(eq(dishImages.status, "ready"))
+    .groupBy(dishImages.model)
+    .orderBy(sql`count(*) desc`);
+  const imageModels = imageModelRows.map((r) => ({
+    model: r.model ?? "unknown",
+    count: r.count,
+    lastAt: r.lastAt
+  }));
+
   return {
     windowDays: WINDOW_DAYS,
+    imageModels,
     totals: {
       creditsSpent,
       estCogsUsd,

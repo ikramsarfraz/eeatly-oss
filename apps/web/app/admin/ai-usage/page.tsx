@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Layers, Users as UsersIcon } from "lucide-react";
+import { Activity, BarChart3, ImageIcon, Layers, Users as UsersIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -9,7 +9,7 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { requirePlatformAdmin } from "@/lib/auth/session";
-import { getAiUsageSummary } from "@/services/ai-usage";
+import { getAiUsageSummary, imageModelLabel } from "@/services/ai-usage";
 import { TIERS, type Tier } from "@/lib/pricing";
 
 const usd = (n: number) =>
@@ -93,6 +93,49 @@ export default async function AdminAiUsagePage() {
                       {op.creditsSpent.toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{usd(op.estCogsUsd)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Dish image models — which provider actually rendered the images. */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <ImageIcon className="h-5 w-5 text-primary" /> Dish image models
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {data.imageModels.length === 0 ? (
+            <Empty>No dish images generated yet.</Empty>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Model</TableHead>
+                  <TableHead className="text-right">Images</TableHead>
+                  <TableHead className="text-right">Last used</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.imageModels.map((m) => (
+                  <TableRow key={m.model}>
+                    <TableCell className="whitespace-nowrap">{imageModelLabel(m.model)}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {m.count.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap text-muted-foreground">
+                      {m.lastAt
+                        ? new Date(m.lastAt).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric"
+                          })
+                        : "—"}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
