@@ -21,8 +21,6 @@ import {
  * price; the window keeps spend (a flow) comparable to MRR (monthly).
  */
 
-const WINDOW_DAYS = 30;
-
 const OP_LABEL: Record<string, string> = {
   suggest_text: "Capture · text",
   suggest_voice: "Capture · voice",
@@ -41,7 +39,8 @@ function surchargeFor(op: string): number {
 }
 
 export type AiUsageSummary = {
-  windowDays: number;
+  /** Trailing window in days, or null for all-time (lifetime). */
+  windowDays: number | null;
   totals: {
     creditsSpent: number;
     estCogsUsd: number;
@@ -64,7 +63,7 @@ export type AiUsageSummary = {
     estCogsUsd: number;
     revenueUsd: number;
   }>;
-  topUsers: Array<{
+  users: Array<{
     userId: string;
     email: string;
     tier: Tier;
@@ -86,9 +85,12 @@ export function imageModelLabel(model: string): string {
   return IMAGE_MODEL_LABEL[model] ?? model;
 }
 
-export async function getAiUsageSummary(): Promise<AiUsageSummary> {
+export async function getAiUsageSummary(
+  windowDays: number | null = null
+): Promise<AiUsageSummary> {
   const now = new Date();
-  const since = new Date(now.getTime() - WINDOW_DAYS * 86_400_000);
+  // null window = all-time (lifetime). Otherwise a trailing N-day window.
+  const since = windowDays ? new Date(now.getTime() - windowDays * 86_400_000) : null;
 
   // 1. Per (user, op, reason) consume/refund aggregates in the window.
   const rows = await db
@@ -102,7 +104,7 @@ export async function getAiUsageSummary(): Promise<AiUsageSummary> {
     .from(aiCreditLedger)
     .where(
       and(
-        gte(aiCreditLedger.createdAt, since),
+        since ? gte(aiCreditLedger.createdAt, since) : undefined,
         inArray(aiCreditLedger.reason, ["consume", "refund"])
       )
     )
@@ -135,7 +137,7 @@ export async function getAiUsageSummary(): Promise<AiUsageSummary> {
   const tokenCostByUser = new Map<string, number>();
   const tokenCostByOp = new Map<string, number>();
   try {
-    const tokenRows = await db
+    const tokenQuery = db
       .select({
         userId: aiUsageEvents.userId,
         operation: aiUsageEvents.operation,
@@ -144,8 +146,11 @@ export async function getAiUsageSummary(): Promise<AiUsageSummary> {
         outTok: sql<number>`coalesce(sum(${aiUsageEvents.outputTokens}), 0)::int`
       })
       .from(aiUsageEvents)
-      .where(gte(aiUsageEvents.createdAt, since))
-      .groupBy(aiUsageEvents.userId, aiUsageEvents.operation, aiUsageEvents.model);
+      .$dynamic();
+    const tokenRows = await (since
+      ? tokenQuery.where(gte(aiUsageEvents.createdAt, since))
+      : tokenQuery
+    ).groupBy(aiUsageEvents.userId, aiUsageEvents.operation, aiUsageEvents.model);
     for (const r of tokenRows) {
       const cost = tokenCostUsd(r.model, Number(r.inTok), Number(r.outTok));
       const op = r.operation ?? "unknown";
@@ -199,7 +204,9 @@ export async function getAiUsageSummary(): Promise<AiUsageSummary> {
       marginUsd: meta.revenue - cogs
     };
   });
-  const topUsers = [...perUser].sort((a, b) => b.estCogsUsd - a.estCogsUsd).slice(0, 25);
+  // ALL users with activity in the window, sorted by AI cost (top spenders
+  // first) — no cap.
+  const usersByCost = [...perUser].sort((a, b) => b.estCogsUsd - a.estCogsUsd);
 
   // By-operation (union of ledger ops + any op that recorded token cost).
   const byOperation = [...new Set([...opInv.keys(), ...tokenCostByOp.keys()])]
@@ -267,7 +274,7 @@ export async function getAiUsageSummary(): Promise<AiUsageSummary> {
   }));
 
   return {
-    windowDays: WINDOW_DAYS,
+    windowDays,
     imageModels,
     totals: {
       creditsSpent,
@@ -279,6 +286,6 @@ export async function getAiUsageSummary(): Promise<AiUsageSummary> {
     },
     byOperation,
     byTier,
-    topUsers
+    users: usersByCost
   };
 }

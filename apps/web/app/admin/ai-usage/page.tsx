@@ -8,9 +8,12 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
+import type { Route } from "next";
+import Link from "next/link";
 import { requirePlatformAdmin } from "@/lib/auth/session";
 import { getAiUsageSummary, imageModelLabel } from "@/services/ai-usage";
 import { TIERS, type Tier } from "@/lib/pricing";
+import { cn } from "@/lib/utils";
 
 const usd = (n: number) =>
   `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -18,17 +21,34 @@ const tierName = (t: Tier) => TIERS[t].name;
 const marginClass = (n: number) =>
   n >= 0 ? "text-[color:var(--primary)]" : "text-[color:var(--destructive,#c0392b)]";
 
-export default async function AdminAiUsagePage() {
+const RANGES: Array<{ value: string; label: string; days: number | null }> = [
+  { value: "30d", label: "30 days", days: 30 },
+  { value: "90d", label: "90 days", days: 90 },
+  { value: "1y", label: "1 year", days: 365 },
+  { value: "all", label: "All time", days: null }
+];
+
+const windowLabel = (days: number | null) => (days === null ? "all time" : `last ${days}d`);
+
+export default async function AdminAiUsagePage({
+  searchParams
+}: {
+  searchParams: Promise<{ range?: string }>;
+}) {
   await requirePlatformAdmin();
-  const data = await getAiUsageSummary();
+  const { range } = await searchParams;
+  // Default to all-time (lifetime); the filter narrows it.
+  const selected = RANGES.find((r) => r.value === range) ?? RANGES[3];
+  const data = await getAiUsageSummary(selected.days);
   const { totals } = data;
+  const wl = windowLabel(data.windowDays);
 
   const stats: Array<[string, string, string?]> = [
-    ["Credits spent", totals.creditsSpent.toLocaleString(), `last ${data.windowDays}d`],
-    ["Est. AI cost (COGS)", usd(totals.estCogsUsd), `last ${data.windowDays}d`],
+    ["Credits spent", totals.creditsSpent.toLocaleString(), wl],
+    ["Est. AI cost (COGS)", usd(totals.estCogsUsd), wl],
     ["MRR", usd(totals.mrrUsd), `${totals.activePaidSubs} active paid`],
-    ["Gross margin", usd(totals.grossMarginUsd), "MRR − COGS"],
-    ["Spending users", totals.spendingUsers.toLocaleString(), `last ${data.windowDays}d`]
+    ["Gross margin", usd(totals.grossMarginUsd), `MRR − cost (${wl})`],
+    ["Active users", totals.spendingUsers.toLocaleString(), wl]
   ];
 
   return (
@@ -41,11 +61,31 @@ export default async function AdminAiUsagePage() {
         <p className="text-sm font-medium text-muted-foreground">Platform admin</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-normal">AI usage &amp; cost</h1>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Credits spent vs. provider cost vs. revenue, trailing {data.windowDays}{" "}
-          days. LLM cost is computed from <strong>real tokens × model price</strong>{" "}
-          (recorded per call); voice transcription and image generation are flat
-          model-priced add-ons.
+          Usage, credits, and provider cost across <strong>all users</strong> ({wl}),
+          sorted by AI cost. LLM cost is from <strong>real tokens × model price</strong>;
+          voice transcription and image generation are flat model-priced add-ons.
+          MRR is current; pick <em>30 days</em> for a monthly-comparable margin.
         </p>
+        {/* Window filter — all-time by default. */}
+        <div className="mt-3 inline-flex flex-wrap gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-1">
+          {RANGES.map((r) => {
+            const active = r.value === selected.value;
+            return (
+              <Link
+                key={r.value}
+                href={`/admin/ai-usage?range=${r.value}` as Route}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-colors",
+                  active
+                    ? "bg-[var(--surface)] text-foreground shadow-[var(--shadow-sm)]"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {r.label}
+              </Link>
+            );
+          })}
+        </div>
       </div>
 
       {/* Headline stats */}
@@ -194,12 +234,12 @@ export default async function AdminAiUsagePage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
-            <UsersIcon className="h-5 w-5 text-primary" /> Top spenders ({data.windowDays}d)
+            <UsersIcon className="h-5 w-5 text-primary" /> All users · by AI cost ({wl})
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {data.topUsers.length === 0 ? (
-            <Empty>No spending users in the window.</Empty>
+          {data.users.length === 0 ? (
+            <Empty>No AI usage in this window yet.</Empty>
           ) : (
             <Table>
               <TableHeader>
@@ -213,7 +253,7 @@ export default async function AdminAiUsagePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.topUsers.map((u) => (
+                {data.users.map((u) => (
                   <TableRow key={u.userId}>
                     <TableCell className="whitespace-nowrap">{u.email}</TableCell>
                     <TableCell className="whitespace-nowrap text-muted-foreground">
@@ -239,8 +279,9 @@ export default async function AdminAiUsagePage() {
 
       <p className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
         <Activity className="h-3.5 w-3.5" />
-        Margin compares a user&apos;s monthly subscription revenue against their{" "}
-        {data.windowDays}-day estimated AI cost — negative means they spent more in AI than they pay.
+        Margin compares a user&apos;s monthly subscription revenue against their estimated
+        AI cost ({wl}) — negative means they spent more in AI than they pay. Use the 30-day
+        window for a monthly-comparable figure.
       </p>
     </main>
   );
