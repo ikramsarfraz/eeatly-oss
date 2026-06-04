@@ -47,12 +47,12 @@ describe("resolveTier", () => {
 });
 
 describe("PRICING", () => {
-  it("annual is 10× monthly — i.e. two months free", () => {
-    expect(PRICING.annual.amount).toBe(PRICING.monthly.amount * 10);
-    // The "2 months free" promise: annual costs 10 months at the monthly
-    // rate, so 12 − 10 = 2 months are free.
-    const monthsCharged = PRICING.annual.amount / PRICING.monthly.amount;
-    expect(12 - monthsCharged).toBe(PRICING.annual.monthsFree);
+  it("annual is ~10× monthly — i.e. about two months free", () => {
+    // "2 months free": annual costs ~10 months at the monthly rate. With
+    // sub-dollar monthly prices ($6.99) the annual is rounded to a clean
+    // figure ($69 vs the exact $69.90), so allow up to a dollar of rounding.
+    const exactTenMonths = PRICING.monthly.amount * 10;
+    expect(Math.abs(PRICING.annual.amount - exactTenMonths)).toBeLessThanOrEqual(1);
     expect(PRICING.annual.monthsFree).toBe(2);
   });
 

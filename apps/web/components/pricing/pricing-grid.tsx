@@ -7,13 +7,14 @@ import { PricingCard, type TierPriceDisplay } from "./pricing-card";
 
 type AuthState =
   | { kind: "anonymous" }
-  | { kind: "active_subscriber"; tier: "plus" | "pro" }
+  | { kind: "active_subscriber"; tier: "plus" | "premium" | "pro" }
   | { kind: "signed_in_free" };
 
 type PricingGridProps = {
   authState: AuthState;
   launchMode: boolean;
   plusPrices: TierPriceDisplay;
+  premiumPrices: TierPriceDisplay;
   proPrices: TierPriceDisplay;
 };
 
@@ -22,7 +23,13 @@ type PricingGridProps = {
  * and feeds it to all three cards so they never disagree. The server
  * component fetches the catalog prices + auth state and passes them in.
  */
-export function PricingGrid({ authState, launchMode, plusPrices, proPrices }: PricingGridProps) {
+export function PricingGrid({
+  authState,
+  launchMode,
+  plusPrices,
+  premiumPrices,
+  proPrices
+}: PricingGridProps) {
   const [interval, setInterval] = React.useState<BillingInterval>("annual");
 
   return (
@@ -68,8 +75,8 @@ export function PricingGrid({ authState, launchMode, plusPrices, proPrices }: Pr
         </div>
       </div>
 
-      {/* Three-tier grid — Cook → Chef → Master Chef. */}
-      <div className="mx-auto grid max-w-[460px] grid-cols-1 items-stretch gap-5 lg:max-w-none lg:grid-cols-3">
+      {/* Four-tier grid — Cook → Chef → Head Chef → Master Chef. */}
+      <div className="mx-auto grid max-w-[460px] grid-cols-1 items-stretch gap-5 lg:max-w-none lg:grid-cols-4">
         <PricingCard
           tier="free"
           prices={null}
@@ -81,6 +88,13 @@ export function PricingGrid({ authState, launchMode, plusPrices, proPrices }: Pr
           tier="plus"
           prices={plusPrices}
           launchMode={launchMode}
+          authState={authState}
+          interval={interval}
+        />
+        <PricingCard
+          tier="premium"
+          prices={premiumPrices}
+          launchMode={false}
           authState={authState}
           interval={interval}
         />

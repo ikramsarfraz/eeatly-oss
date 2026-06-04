@@ -19,6 +19,7 @@ export const dynamic = "force-dynamic";
 const GRANT_PIP: Record<Tier, string> = {
   free: "bg-[var(--border-strong)]",
   plus: "bg-primary/60",
+  premium: "bg-primary/80",
   pro: "bg-primary"
 };
 
@@ -50,6 +51,7 @@ export default async function PricingPage() {
       : null
   });
   const plusPrices = tierPrices(catalog.tiers.plus);
+  const premiumPrices = tierPrices(catalog.tiers.premium);
   const proPrices = tierPrices(catalog.tiers.pro);
 
   return (
@@ -95,6 +97,7 @@ export default async function PricingPage() {
           authState={authState}
           launchMode={launchMode}
           plusPrices={plusPrices}
+          premiumPrices={premiumPrices}
           proPrices={proPrices}
         />
 

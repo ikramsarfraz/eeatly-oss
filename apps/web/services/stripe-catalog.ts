@@ -13,7 +13,7 @@ import type { BillingInterval } from "@/lib/pricing";
  * per-op costs) stays in `lib/pricing.ts` — Stripe has no concept of those.
  *
  * Price metadata contract (set on each Stripe Price):
- *   - tier prices (recurring): metadata.plan = "plus" | "pro",
+ *   - tier prices (recurring): metadata.plan = "plus" | "premium" | "pro",
  *     metadata.interval = "month" | "year"
  *   - credit packs (one-time):  metadata.kind = "credits",
  *     metadata.credits = "<integer>"
@@ -34,19 +34,28 @@ export type TierPrices = {
 
 export type CreditPack = CatalogPrice & { credits: number };
 
+/** The sellable paid plans, keyed by their `metadata.plan` value. */
+export type CatalogPlan = "plus" | "premium" | "pro";
+
 export type StripeCatalog = {
-  tiers: { plus: TierPrices; pro: TierPrices };
+  tiers: Record<CatalogPlan, TierPrices>;
   packs: CreditPack[];
   /** priceId → its identity, for webhook tier resolution + validation. */
   byPriceId: Record<
     string,
-    | { kind: "tier"; plan: "plus" | "pro"; interval: BillingInterval }
+    | { kind: "tier"; plan: CatalogPlan; interval: BillingInterval }
     | { kind: "credits"; credits: number }
   >;
 };
 
+const emptyTiers = (): Record<CatalogPlan, TierPrices> => ({
+  plus: { monthly: null, annual: null },
+  premium: { monthly: null, annual: null },
+  pro: { monthly: null, annual: null }
+});
+
 const EMPTY: StripeCatalog = {
-  tiers: { plus: { monthly: null, annual: null }, pro: { monthly: null, annual: null } },
+  tiers: emptyTiers(),
   packs: [],
   byPriceId: {}
 };
@@ -94,7 +103,7 @@ export async function getStripeCatalog(opts?: { force?: boolean }): Promise<Stri
     const prices = await stripe.prices.list({ active: true, limit: 100 });
 
     const catalog: StripeCatalog = {
-      tiers: { plus: { monthly: null, annual: null }, pro: { monthly: null, annual: null } },
+      tiers: emptyTiers(),
       packs: [],
       byPriceId: {}
     };
@@ -104,7 +113,10 @@ export async function getStripeCatalog(opts?: { force?: boolean }): Promise<Stri
       const meta = price.metadata ?? {};
       const cp = toCatalogPrice(price.id, price.unit_amount, price.currency);
 
-      if (price.type === "recurring" && (meta.plan === "plus" || meta.plan === "pro")) {
+      if (
+        price.type === "recurring" &&
+        (meta.plan === "plus" || meta.plan === "premium" || meta.plan === "pro")
+      ) {
         const interval: BillingInterval =
           meta.interval === "year" || price.recurring?.interval === "year" ? "annual" : "monthly";
         catalog.tiers[meta.plan][interval] = cp;
@@ -133,7 +145,7 @@ export async function getStripeCatalog(opts?: { force?: boolean }): Promise<Stri
 
 /** Resolve the Stripe price id for a (tier, interval) from the live catalog. */
 export async function priceIdForTier(
-  tier: "plus" | "pro",
+  tier: CatalogPlan,
   interval: BillingInterval
 ): Promise<string | null> {
   const catalog = await getStripeCatalog();

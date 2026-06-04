@@ -45,7 +45,7 @@ export type GateContext = {
    * `lib/pricing.ts#resolveTier`). This, not `subscriptionStatus`, is what
    * the paid/pro rule evaluators key off so a trial user is treated as Pro.
    */
-  tier: "free" | "plus" | "pro";
+  tier: "free" | "plus" | "premium" | "pro";
   /** Allowlist user ids supplied per-feature via overrides. */
   allowlistedUserIds: string[];
   /** Env-flag rule consults this — feature key → boolean. */
@@ -66,10 +66,13 @@ export type GateContext = {
  * overrides bypass this layer.
  */
 export const ruleEvaluators: Record<GateRule, (ctx: GateContext, feature: string) => boolean> = {
-  // Plus OR Pro (the trial counts as Pro). Keyed off the resolved tier so
-  // the no-card trial unlocks paid features without a Stripe subscription.
-  paid_only: (ctx) => ctx.tier === "plus" || ctx.tier === "pro",
-  // Pro only — co-editing, plan sharing, and other top-tier perks.
+  // Any paid tier (the no-card trial counts as Pro). Keyed off the resolved
+  // tier so the trial unlocks paid features without a Stripe subscription.
+  // Covers Chef / Head Chef / Master Chef.
+  paid_only: (ctx) => ctx.tier !== "free",
+  // Master Chef only — co-editing, plan sharing, and other top-tier perks.
+  // (Priority AI is Head-Chef-and-up, enforced in the AI rate limiter, not a
+  // gate rule.)
   pro_only: (ctx) => ctx.tier === "pro",
   beta_or_paid: (ctx) => ctx.betaCohort !== null || ctx.tier !== "free",
   admin_only: (ctx) => ctx.role === "platform_admin",

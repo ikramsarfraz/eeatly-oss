@@ -33,7 +33,7 @@ async function tierForPrice(price: {
   metadata?: Record<string, string> | null;
 }): Promise<Tier | null> {
   const planMeta = price.metadata?.plan;
-  if (planMeta === "plus" || planMeta === "pro") return planMeta;
+  if (planMeta === "plus" || planMeta === "premium" || planMeta === "pro") return planMeta;
   if (price.id) {
     const catalog = await getStripeCatalog();
     const entry = catalog.byPriceId[price.id];
@@ -77,7 +77,7 @@ export type SubscriptionState = {
   currentPeriodEnd: Date | null;
   cancelAtPeriodEnd: boolean;
   priceId: string | null;
-  tier: "plus" | "pro";
+  tier: "plus" | "premium" | "pro";
 };
 
 /**
@@ -117,7 +117,8 @@ export async function getSubscriptionState(args: {
     cancelAtPeriodEnd: sub?.cancelAtPeriodEnd ?? false,
     priceId: sub?.priceId ?? null,
     // Null tier on an active sub = legacy single-tier era → Plus.
-    tier: sub?.tier === "pro" ? "pro" : "plus"
+    tier:
+      sub?.tier === "pro" ? "pro" : sub?.tier === "premium" ? "premium" : "plus"
   };
 }
 
@@ -160,7 +161,7 @@ export async function createCheckoutSession(args: {
   userId: string;
   userEmail: string;
   userName: string;
-  tier: "plus" | "pro";
+  tier: "plus" | "premium" | "pro";
   interval: BillingInterval;
 }): Promise<{ url: string }> {
   const env = getServerEnv();

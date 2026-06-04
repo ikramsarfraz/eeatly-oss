@@ -61,6 +61,10 @@ export const billingRouter = router({
         ...tierDisplay(catalog.tiers.plus),
         monthlyCredits: MONTHLY_CREDIT_GRANT.plus
       },
+      premium: {
+        ...tierDisplay(catalog.tiers.premium),
+        monthlyCredits: MONTHLY_CREDIT_GRANT.premium
+      },
       pro: {
         ...tierDisplay(catalog.tiers.pro),
         monthlyCredits: MONTHLY_CREDIT_GRANT.pro
@@ -72,7 +76,7 @@ export const billingRouter = router({
     .use(rateLimit("mutation"))
     .input(
       z.object({
-        tier: z.enum(["plus", "pro"]).default("plus"),
+        tier: z.enum(["plus", "premium", "pro"]).default("plus"),
         interval: z.enum(["monthly", "annual"])
       })
     )

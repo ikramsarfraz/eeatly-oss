@@ -23,7 +23,7 @@ import {
  * idempotent or safe to retry.
  */
 
-const TIER_RANK: Record<Tier, number> = { free: 0, plus: 1, pro: 2 };
+const TIER_RANK: Record<Tier, number> = { free: 0, plus: 1, premium: 2, pro: 3 };
 
 /**
  * The user's effective tier — their active subscription if any, otherwise

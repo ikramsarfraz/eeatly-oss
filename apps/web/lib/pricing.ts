@@ -22,7 +22,7 @@
  * extra column and a real subscription always supersedes it.
  */
 
-export type Tier = "free" | "plus" | "pro";
+export type Tier = "free" | "plus" | "premium" | "pro";
 export type BillingInterval = "monthly" | "annual";
 
 /** Length of the automatic first-time Pro trial, in days. */
@@ -50,7 +50,12 @@ export function resolveTier(input: {
   if (active) {
     // Null tier on an active sub = legacy single-tier era → Plus.
     return {
-      tier: input.subscriptionTier === "pro" ? "pro" : "plus",
+      tier:
+        input.subscriptionTier === "pro"
+          ? "pro"
+          : input.subscriptionTier === "premium"
+            ? "premium"
+            : "plus",
       onTrial: false,
       trialDaysLeft: 0,
       trialEndsAt: null
@@ -71,29 +76,39 @@ export function resolveTier(input: {
   return { tier: "free", onTrial: false, trialDaysLeft: 0, trialEndsAt: null };
 }
 
-/** Subscription tiers — display + the monthly AI credit grant each includes. */
+/** Subscription tiers — display + the monthly AI credit grant each includes.
+ *  Annual = pay for 10 months (≈ "2 months free"). Per-credit cost falls as
+ *  tiers climb (~$0.023 → $0.016 → $0.012), rewarding the upgrade. */
 export const TIERS = {
   free: {
     name: "Cook",
     monthly: { amount: 0, display: "$0" },
     annual: { amount: 0, display: "$0" },
-    monthlyCredits: 15,
+    monthlyCredits: 40,
     blurb: "Your personal cooking library, plus a taste of AI."
   },
   plus: {
     name: "Chef",
-    monthly: { amount: 5, display: "$5", suffix: "/ month" },
-    annual: { amount: 50, display: "$50", suffix: "/ year", monthsFree: 2, note: "2 months free" },
+    monthly: { amount: 6.99, display: "$6.99", suffix: "/ month" },
+    annual: { amount: 69, display: "$69", suffix: "/ year", monthsFree: 2, note: "2 months free" },
     monthlyCredits: 300,
-    blurb: "Share your kitchen & plan together + 300 AI credits a month."
+    blurb: "Share your kitchen & cook with AI — 300 credits a month."
+  },
+  premium: {
+    name: "Head Chef",
+    monthly: { amount: 11.99, display: "$11.99", suffix: "/ month" },
+    annual: { amount: 119, display: "$119", suffix: "/ year", monthsFree: 2, note: "2 months free" },
+    monthlyCredits: 750,
+    blurb: "More AI room + priority — 750 credits, no burst limits.",
+    highlight: true,
+    badge: "Most popular"
   },
   pro: {
     name: "Master Chef",
-    monthly: { amount: 12, display: "$12", suffix: "/ month" },
-    annual: { amount: 120, display: "$120", suffix: "/ year", monthsFree: 2, note: "2 months free" },
+    monthly: { amount: 17.99, display: "$17.99", suffix: "/ month" },
+    annual: { amount: 179, display: "$179", suffix: "/ year", monthsFree: 2, note: "2 months free" },
     monthlyCredits: 1500,
-    blurb: "Collaborate & cook at scale — 1,500 AI credits, co-editing + priority AI.",
-    highlight: true
+    blurb: "Cook at scale — 1,500 credits, co-editing + shareable plan pages."
   }
 } as const satisfies Record<
   Tier,
@@ -110,16 +125,18 @@ export const TIERS = {
     monthlyCredits: number;
     blurb: string;
     highlight?: boolean;
+    badge?: string;
   }
 >;
 
-/** The two paid tiers, in display order. */
-export const PAID_TIERS = ["plus", "pro"] as const;
+/** The paid tiers, in display order (entry → most popular → top). */
+export const PAID_TIERS = ["plus", "premium", "pro"] as const;
 
 /** Monthly included credit grant per tier. */
 export const MONTHLY_CREDIT_GRANT: Record<Tier, number> = {
   free: TIERS.free.monthlyCredits,
   plus: TIERS.plus.monthlyCredits,
+  premium: TIERS.premium.monthlyCredits,
   pro: TIERS.pro.monthlyCredits
 };
 
@@ -182,19 +199,24 @@ export const TIER_FEATURES: Record<Tier, string[]> = {
     "Log every cook with notes & photos",
     "Search your full cooking history",
     "Rediscovery suggestions",
-    "15 AI credits / month"
+    "40 AI credits / month"
   ],
   plus: [
     "300 AI credits / month",
     "Shared household — invite your family",
     "Meal plans for occasions (+ clone past plans)",
     "Public recipe share links",
-    "AI prefill from photo, text & voice"
+    "AI capture from photo, text & voice"
+  ],
+  premium: [
+    "Everything in Chef",
+    "750 AI credits / month",
+    "Priority AI — no burst limits"
   ],
   pro: [
+    "Everything in Head Chef",
     "1,500 AI credits / month",
     "Co-editing — let family Edit & Admin your recipes and plans",
-    "Shareable meal plans with public plan pages",
-    "Priority AI — no burst limits"
+    "Shareable meal plans with public plan pages"
   ]
 };

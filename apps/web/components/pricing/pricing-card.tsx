@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import type { Route } from "next";
-import { Check, ChefHat, Crown, Loader2, Users, type LucideIcon } from "lucide-react";
+import { Check, ChefHat, Crown, Loader2, Star, Users, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/providers/toast-provider";
@@ -12,7 +12,7 @@ import { TIER_FEATURES, TIERS, type BillingInterval, type Tier } from "@/lib/pri
 
 type AuthState =
   | { kind: "anonymous" }
-  | { kind: "active_subscriber"; tier: "plus" | "pro" }
+  | { kind: "active_subscriber"; tier: "plus" | "premium" | "pro" }
   | { kind: "signed_in_free" };
 
 /** Live display prices for this tier, sourced from the Stripe catalog. */
@@ -33,13 +33,19 @@ type PricingCardProps = {
   interval: BillingInterval;
 };
 
-const TIER_ICON: Record<Tier, LucideIcon> = { free: ChefHat, plus: Users, pro: Crown };
+const TIER_ICON: Record<Tier, LucideIcon> = {
+  free: ChefHat,
+  plus: Users,
+  premium: Star,
+  pro: Crown
+};
 const FEAT_LABEL: Record<Tier, string> = {
   free: "What's included",
   plus: "Everything in Cook, and",
-  pro: "Everything in Chef, and"
+  premium: "Everything in Chef, and",
+  pro: "Everything in Head Chef, and"
 };
-const RANK = { free: 0, plus: 1, pro: 2 } as const;
+const RANK = { free: 0, plus: 1, premium: 2, pro: 3 } as const;
 
 export function PricingCard({ tier, prices, launchMode, authState, interval }: PricingCardProps) {
   const { showToast } = useToast();
@@ -51,7 +57,8 @@ export function PricingCard({ tier, prices, launchMode, authState, interval }: P
   const features = TIER_FEATURES[tier];
   const Icon = TIER_ICON[tier];
   const isFree = tier === "free";
-  const isFeatured = tier === "pro";
+  // "Most popular" highlight now sits on the middle Head Chef tier.
+  const isFeatured = tier === "premium";
 
   // This tier is sellable when the catalog has at least one interval price.
   const billingConfigured = isFree || Boolean(prices?.monthly || prices?.annual);
@@ -72,7 +79,7 @@ export function PricingCard({ tier, prices, launchMode, authState, interval }: P
     if (pending || isFree) return;
     try {
       const result = await checkoutMutation.mutateAsync({
-        tier: tier as "plus" | "pro",
+        tier: tier as "plus" | "premium" | "pro",
         interval
       });
       window.location.assign(result.url);

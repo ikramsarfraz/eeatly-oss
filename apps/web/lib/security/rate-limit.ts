@@ -116,9 +116,11 @@ export async function checkMealMutationLimit(userId: string): Promise<void> {
 export async function checkAiCallLimit(userId: string): Promise<void> {
   // Skip the tier lookup entirely when rate limiting is disabled.
   if (!getRedis()) return;
-  // Pro (incl. the no-card trial) gets priority AI — a wider burst window.
+  // Priority AI — a wider burst window — for Head Chef + Master Chef (and the
+  // no-card Pro trial). Chef and Free use the standard guard.
   const tier = await getUserTier(userId);
-  const limiter = tier === "pro" ? getAiCallLimiterPro() : getAiCallLimiter();
+  const limiter =
+    tier === "premium" || tier === "pro" ? getAiCallLimiterPro() : getAiCallLimiter();
   if (!limiter) return;
   const { success } = await limiter.limit(userId);
   if (!success) {
