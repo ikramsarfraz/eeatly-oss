@@ -11,9 +11,14 @@ import { useToast } from "@/components/providers/toast-provider";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 
-type PaidTier = "plus" | "pro";
-const TIER_NAME: Record<string, string> = { free: "Cook", plus: "Chef", pro: "Master Chef" };
-const RANK: Record<string, number> = { free: 0, plus: 1, pro: 2 };
+type PaidTier = "plus" | "premium" | "pro";
+const TIER_NAME: Record<string, string> = {
+  free: "Cook",
+  plus: "Chef",
+  premium: "Head Chef",
+  pro: "Master Chef"
+};
+const RANK: Record<string, number> = { free: 0, plus: 1, premium: 2, pro: 3 };
 
 function formatDate(iso: string | Date | null): string {
   if (!iso) return "";
@@ -167,8 +172,8 @@ export function PlanManager() {
         </div>
 
         {/* Tier cards */}
-        <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
-          {(["plus", "pro"] as const).map((tier) => {
+        <div className="mt-3 grid gap-2.5 sm:grid-cols-3">
+          {(["plus", "premium", "pro"] as const).map((tier) => {
             const t = catalog?.[tier];
             const price = interval === "monthly" ? t?.monthly : t?.annual;
             const perMonth =
@@ -211,7 +216,7 @@ export function PlanManager() {
                     <Check className="h-3.5 w-3.5" />
                     Your plan
                   </Button>
-                ) : !price ? (
+                ) : !t?.sellable ? (
                   <Button type="button" variant="outline" size="sm" disabled className="h-9">
                     Coming soon
                   </Button>

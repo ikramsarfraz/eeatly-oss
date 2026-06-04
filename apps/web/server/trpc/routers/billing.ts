@@ -14,15 +14,25 @@ import {
 } from "@/services/billing";
 import { getStripeCatalog, perMonthDisplay } from "@/services/stripe-catalog";
 import { getTierStatus } from "@/services/ai-credits";
-import { MONTHLY_CREDIT_GRANT } from "@/lib/pricing";
+import { MONTHLY_CREDIT_GRANT, TIERS } from "@/lib/pricing";
 import { protectedProcedure, rateLimit, router } from "../trpc";
 
-function tierDisplay(tp: import("@/services/stripe-catalog").TierPrices) {
+function tierDisplay(
+  tier: "plus" | "premium" | "pro",
+  tp: import("@/services/stripe-catalog").TierPrices
+) {
+  const t = TIERS[tier];
   return {
-    monthly: tp.monthly ? { display: tp.monthly.display } : null,
-    annual: tp.annual
-      ? { display: tp.annual.display, perMonthDisplay: perMonthDisplay(tp.annual) }
-      : null
+    // `sellable` = a real Stripe price exists (checkout works). Display always
+    // falls back to the TIERS amounts so prices never render blank pre-Stripe.
+    sellable: Boolean(tp.monthly || tp.annual),
+    monthly: { display: tp.monthly?.display ?? t.monthly.display },
+    annual: {
+      display: tp.annual?.display ?? t.annual.display,
+      perMonthDisplay: tp.annual
+        ? perMonthDisplay(tp.annual)
+        : `$${(t.annual.amount / 12).toFixed(2)}`
+    }
   };
 }
 
@@ -58,15 +68,15 @@ export const billingRouter = router({
     const catalog = await getStripeCatalog();
     return {
       plus: {
-        ...tierDisplay(catalog.tiers.plus),
+        ...tierDisplay("plus", catalog.tiers.plus),
         monthlyCredits: MONTHLY_CREDIT_GRANT.plus
       },
       premium: {
-        ...tierDisplay(catalog.tiers.premium),
+        ...tierDisplay("premium", catalog.tiers.premium),
         monthlyCredits: MONTHLY_CREDIT_GRANT.premium
       },
       pro: {
-        ...tierDisplay(catalog.tiers.pro),
+        ...tierDisplay("pro", catalog.tiers.pro),
         monthlyCredits: MONTHLY_CREDIT_GRANT.pro
       }
     };

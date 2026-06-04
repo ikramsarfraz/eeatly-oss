@@ -25,6 +25,15 @@
 export type Tier = "free" | "plus" | "premium" | "pro";
 export type BillingInterval = "monthly" | "annual";
 
+/** Resolved display prices for one tier (live Stripe price, or TIERS fallback). */
+export type TierDisplay = {
+  monthly: string; // e.g. "$6.99"
+  annualPerMonth: string; // e.g. "$5.75"
+  annualTotal: string; // e.g. "$69"
+  credits: number;
+};
+export type TierDisplayMap = Record<Tier, TierDisplay>;
+
 /** Length of the automatic first-time Pro trial, in days. */
 export const TRIAL_DAYS = 14;
 /** Tier granted during the trial window. */

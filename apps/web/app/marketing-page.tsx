@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
+import type { TierDisplayMap } from "@/lib/pricing";
 import "./marketing.css";
 
 /**
@@ -428,7 +429,7 @@ function ShowcaseGallery() {
   );
 }
 
-export default function MarketingPage() {
+export default function MarketingPage({ prices }: { prices: TierDisplayMap }) {
   return (
     <div className="mkt" id="top">
       {/* Header — shared marketing chrome (landing variant uses in-page anchors). */}
@@ -566,7 +567,7 @@ export default function MarketingPage() {
               <table>
                 <thead><tr><th>Feature</th><th>Cook</th><th>Chef</th><th>Head Chef</th><th>Master Chef</th></tr></thead>
                 <tbody>
-                  <tr><td>Price / month</td><td className="tier-num">$0</td><td className="tier-num">$6.99</td><td className="tier-num">$11.99</td><td className="tier-num">$17.99</td></tr>
+                  <tr><td>Price / month</td><td className="tier-num">{prices.free.monthly}</td><td className="tier-num">{prices.plus.monthly}</td><td className="tier-num">{prices.premium.monthly}</td><td className="tier-num">{prices.pro.monthly}</td></tr>
                   <tr><td>Save unlimited recipes</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
                   <tr><td>Search your recipes</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
                   <tr><td>Log meals you cook</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
@@ -577,7 +578,7 @@ export default function MarketingPage() {
                   <tr><td>Priority AI — no burst limits</td><td className="cross">×</td><td className="cross">×</td><td className="check">✓</td><td className="check">✓</td></tr>
                   <tr><td>Co-editing — family edits your recipes &amp; plans</td><td className="cross">×</td><td className="cross">×</td><td className="cross">×</td><td className="check">✓</td></tr>
                   <tr><td>Shareable meal plans (public plan pages)</td><td className="cross">×</td><td className="cross">×</td><td className="cross">×</td><td className="check">✓</td></tr>
-                  <tr><td>AI credits / month</td><td className="tier-num">40</td><td className="tier-num">300</td><td className="tier-num">750</td><td className="tier-num">1,500</td></tr>
+                  <tr><td>AI credits / month</td><td className="tier-num">{prices.free.credits.toLocaleString()}</td><td className="tier-num">{prices.plus.credits.toLocaleString()}</td><td className="tier-num">{prices.premium.credits.toLocaleString()}</td><td className="tier-num">{prices.pro.credits.toLocaleString()}</td></tr>
                 </tbody>
               </table>
             </div>

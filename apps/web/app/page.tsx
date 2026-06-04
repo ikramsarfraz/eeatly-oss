@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getServerEnv } from "@/lib/env/server";
+import { getTierDisplayPrices } from "@/services/pricing-display";
 import MarketingPage from "./marketing-page";
 
 const META_DESCRIPTION =
@@ -33,6 +34,7 @@ export default async function HomePage() {
   }
 
   const env = getServerEnv();
+  const prices = await getTierDisplayPrices();
 
   const structuredData = {
     "@context": "https://schema.org",
@@ -48,7 +50,7 @@ export default async function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
-      <MarketingPage />
+      <MarketingPage prices={prices} />
     </>
   );
 }
