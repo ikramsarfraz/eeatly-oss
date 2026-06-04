@@ -14,7 +14,8 @@ import {
 } from "@/services/billing";
 import { getStripeCatalog, perMonthDisplay } from "@/services/stripe-catalog";
 import { getTierStatus } from "@/services/ai-credits";
-import { MONTHLY_CREDIT_GRANT, TIERS } from "@/lib/pricing";
+import { isLaunchFreeAccess } from "@/lib/env/server";
+import { displayedMonthlyCredits, TIERS } from "@/lib/pricing";
 import { protectedProcedure, rateLimit, router } from "../trpc";
 
 function tierDisplay(
@@ -61,21 +62,26 @@ export const billingRouter = router({
    */
   tierStatus: protectedProcedure.query(({ ctx }) => getTierStatus(ctx.user.id)),
 
-  /** Live tier prices (from the Stripe catalog) + included monthly credits. */
+  /** Live tier prices (from the Stripe catalog) + included monthly credits.
+   *  `monthlyCredits` is the number the user actually receives: floored at the
+   *  launch grant while the launch promo is on, so settings matches the engine.
+   *  `launchFreeAccess` lets the client floor the free-tier card the same way. */
   catalog: protectedProcedure.query(async () => {
     const catalog = await getStripeCatalog();
+    const launchFreeAccess = isLaunchFreeAccess();
     return {
+      launchFreeAccess,
       plus: {
         ...tierDisplay("plus", catalog.tiers.plus),
-        monthlyCredits: MONTHLY_CREDIT_GRANT.plus
+        monthlyCredits: displayedMonthlyCredits("plus", launchFreeAccess)
       },
       premium: {
         ...tierDisplay("premium", catalog.tiers.premium),
-        monthlyCredits: MONTHLY_CREDIT_GRANT.premium
+        monthlyCredits: displayedMonthlyCredits("premium", launchFreeAccess)
       },
       pro: {
         ...tierDisplay("pro", catalog.tiers.pro),
-        monthlyCredits: MONTHLY_CREDIT_GRANT.pro
+        monthlyCredits: displayedMonthlyCredits("pro", launchFreeAccess)
       }
     };
   }),

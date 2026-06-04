@@ -8,7 +8,13 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/providers/toast-provider";
 import { trpc } from "@/lib/trpc/client";
-import { TIER_FEATURES, TIERS, type BillingInterval, type Tier } from "@/lib/pricing";
+import {
+  displayedMonthlyCredits,
+  TIER_FEATURES,
+  TIERS,
+  type BillingInterval,
+  type Tier
+} from "@/lib/pricing";
 
 type AuthState =
   | { kind: "anonymous" }
@@ -28,6 +34,9 @@ type PricingCardProps = {
   prices: TierPriceDisplay | null;
   /** Launch promo (Chef-era) — only meaningful for the Chef card. */
   launchMode: boolean;
+  /** Launch free-access on → floor every card's shown credits at the launch
+   *  grant so the number matches what users actually receive. */
+  launchFreeAccess: boolean;
   authState: AuthState;
   /** Billing period — lifted to the page-level grid so all cards agree. */
   interval: BillingInterval;
@@ -47,14 +56,24 @@ const FEAT_LABEL: Record<Tier, string> = {
 };
 const RANK = { free: 0, plus: 1, premium: 2, pro: 3 } as const;
 
-export function PricingCard({ tier, prices, launchMode, authState, interval }: PricingCardProps) {
+export function PricingCard({
+  tier,
+  prices,
+  launchMode,
+  launchFreeAccess,
+  authState,
+  interval
+}: PricingCardProps) {
   const { showToast } = useToast();
   const checkoutMutation = trpc.billing.createCheckoutSession.useMutation();
   const pending = checkoutMutation.isPending;
 
   const tierConfig = TIERS[tier];
   const tierName = tierConfig.name;
-  const features = TIER_FEATURES[tier];
+  // The credits pill already states the monthly grant (and floors it during
+  // the launch promo), so drop the redundant "N credits / month" feature
+  // bullet to avoid showing a stale base number next to the floored pill.
+  const features = TIER_FEATURES[tier].filter((f) => !/credits?\s*\/\s*month/i.test(f));
   const Icon = TIER_ICON[tier];
   const isFree = tier === "free";
   // "Most popular" highlight now sits on the middle Head Chef tier.
@@ -168,7 +187,7 @@ export function PricingCard({ tier, prices, launchMode, authState, interval }: P
             isFeatured ? "text-primary" : "text-foreground"
           )}
         >
-          {tierConfig.monthlyCredits.toLocaleString()}
+          {displayedMonthlyCredits(tier, launchFreeAccess).toLocaleString()}
         </span>
         <span className="whitespace-nowrap text-[12.5px] text-muted-foreground">
           AI credits / month

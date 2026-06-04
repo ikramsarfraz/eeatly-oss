@@ -81,6 +81,7 @@ export function PricingGrid({
           tier="free"
           prices={null}
           launchMode={false}
+          launchFreeAccess={launchMode}
           authState={authState}
           interval={interval}
         />
@@ -88,6 +89,7 @@ export function PricingGrid({
           tier="plus"
           prices={plusPrices}
           launchMode={launchMode}
+          launchFreeAccess={launchMode}
           authState={authState}
           interval={interval}
         />
@@ -95,6 +97,7 @@ export function PricingGrid({
           tier="premium"
           prices={premiumPrices}
           launchMode={false}
+          launchFreeAccess={launchMode}
           authState={authState}
           interval={interval}
         />
@@ -102,6 +105,7 @@ export function PricingGrid({
           tier="pro"
           prices={proPrices}
           launchMode={false}
+          launchFreeAccess={launchMode}
           authState={authState}
           interval={interval}
         />

@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
 import { useToast } from "@/components/providers/toast-provider";
 import { trpc } from "@/lib/trpc/client";
-import { TIERS, TIER_FEATURES } from "@/lib/pricing";
+import { displayedMonthlyCredits, TIERS, TIER_FEATURES } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
 
 type PaidTier = "plus" | "premium" | "pro";
@@ -71,6 +71,9 @@ export function PlanManager() {
   // trial user hasn't subscribed, so both cards stay purchasable.
   const subscribedTier: string = active ? sub!.tier : "free";
   const catalog = catalogQuery.data;
+  // Launch promo floors every tier's shown credits at the launch grant, so the
+  // numbers here match what users actually receive (see services/ai-credits).
+  const launchFreeAccess = catalog?.launchFreeAccess ?? false;
 
   async function upgradeTo(tier: PaidTier) {
     if (busy) return;
@@ -192,7 +195,7 @@ export function PlanManager() {
               : interval === "monthly"
                 ? price?.display
                 : (t?.annual && "perMonthDisplay" in t.annual ? t.annual.perMonthDisplay : undefined);
-            const credits = isFreeTier ? TIERS.free.monthlyCredits : (t?.monthlyCredits ?? 0);
+            const credits = displayedMonthlyCredits(tier, launchFreeAccess);
             const sellable = isFreeTier ? false : Boolean(t?.sellable);
             const isCurrent = subscribedTier === tier;
             const isUpgrade = RANK[tier] > RANK[subscribedTier];

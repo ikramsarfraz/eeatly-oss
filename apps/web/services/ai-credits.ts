@@ -6,13 +6,26 @@ import { aiCredits, aiCreditLedger, subscriptions, users } from "@/db/schema";
 import { InsufficientCreditsError } from "@/lib/errors/credits";
 import { runWithAiUsageContext } from "@/lib/ai/usage-context";
 import { logger } from "@/lib/observability/logger";
+import { isLaunchFreeAccess } from "@/lib/env/server";
 import {
   creditCost,
-  MONTHLY_CREDIT_GRANT,
+  displayedMonthlyCredits,
   resolveTier,
   type AiOperation,
   type Tier
 } from "@/lib/pricing";
+
+/**
+ * The monthly grant a user actually receives for a tier. While the launch
+ * promo is on (`isLaunchFreeAccess`), it's floored at `LAUNCH_CREDIT_GRANT`
+ * so post-trial free users aren't dropped to 40 credits while every paid
+ * feature is unlocked. Reverts to the plain per-tier grant once Stripe is
+ * wired (the flag flips off). Same math as the display helper, so the number
+ * shown on pricing/settings matches what's seeded here.
+ */
+function effectiveMonthlyGrant(tier: Tier): number {
+  return displayedMonthlyCredits(tier, isLaunchFreeAccess());
+}
 
 /**
  * AI credit metering. Two buckets per user (see db/schema/ai-credits.ts):
@@ -74,7 +87,7 @@ function sameCalendarMonth(a: Date, b: Date): boolean {
  * month has begun. Returns the up-to-date row.
  */
 async function ensureCurrentRow(userId: string, tier: Tier) {
-  const grant = MONTHLY_CREDIT_GRANT[tier];
+  const grant = effectiveMonthlyGrant(tier);
   const now = new Date();
 
   // First touch — seed a full monthly grant.
@@ -129,7 +142,7 @@ export async function getCreditBalance(userId: string): Promise<CreditBalance> {
   return {
     tier,
     monthlyRemaining: row.monthlyRemaining,
-    monthlyGrant: MONTHLY_CREDIT_GRANT[tier],
+    monthlyGrant: effectiveMonthlyGrant(tier),
     topupRemaining: row.topupRemaining,
     total: row.monthlyRemaining + row.topupRemaining
   };
@@ -296,7 +309,7 @@ export async function applyTierGrant(args: {
   newTier: Tier;
 }): Promise<void> {
   if (TIER_RANK[args.newTier] <= TIER_RANK[args.oldTier]) return;
-  const grant = MONTHLY_CREDIT_GRANT[args.newTier];
+  const grant = effectiveMonthlyGrant(args.newTier);
 
   const [row] = await db
     .insert(aiCredits)

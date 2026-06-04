@@ -150,6 +150,29 @@ export const MONTHLY_CREDIT_GRANT: Record<Tier, number> = {
 };
 
 /**
+ * Launch-promo credit floor. While `isLaunchFreeAccess()` is on (Stripe not
+ * yet wired, or forced via `LAUNCH_FREE_ACCESS=true`), every user's monthly
+ * grant is floored at this amount regardless of their resolved tier, so the
+ * "all plans open, free during launch" experience isn't undercut by the
+ * 40-credit free bucket once the 14-day trial ends. Set to the Chef grant:
+ * generous for normal use, bounded for COGS. Auto-reverts to plain per-tier
+ * grants the moment the launch flag flips off. Keep `creditFloorForDisplay`
+ * (below) and the credit engine's grant logic reading this same constant.
+ */
+export const LAUNCH_CREDIT_GRANT = TIERS.plus.monthlyCredits; // 300
+
+/**
+ * The credits to SHOW for a tier given the launch flag: floored at the launch
+ * grant while the promo is on, so pricing/settings numbers match what users
+ * actually receive. Pure (no env read) so client components can call it; the
+ * caller passes whether launch access is on.
+ */
+export function displayedMonthlyCredits(tier: Tier, launchFreeAccess: boolean): number {
+  const base = MONTHLY_CREDIT_GRANT[tier];
+  return launchFreeAccess ? Math.max(base, LAUNCH_CREDIT_GRANT) : base;
+}
+
+/**
  * Back-compat alias — the old single-tier `PRICING.monthly/annual` shape
  * pointed at Plus. Kept so any remaining importers (and pricing.test) keep
  * resolving real numbers; new code should read `TIERS`.

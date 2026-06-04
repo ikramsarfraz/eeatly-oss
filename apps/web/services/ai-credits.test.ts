@@ -37,6 +37,15 @@ const dbState = vi.hoisted(() => {
 
 vi.mock("@/lib/db/client", () => ({ db: dbState.chain }));
 
+// The grant engine reads `isLaunchFreeAccess()` to floor grants during the
+// launch promo. These tests assert the plain per-tier grants, so pin the flag
+// off (and stub the rest of the env module so no real env validation runs).
+vi.mock("@/lib/env/server", () => ({
+  isLaunchFreeAccess: () => false,
+  hasStripeEnv: () => false,
+  getServerEnv: () => ({})
+}));
+
 import {
   applyTierGrant,
   getUserTier,
