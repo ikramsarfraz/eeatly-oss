@@ -63,13 +63,18 @@ export function PricingCard({ tier, prices, launchMode, authState, interval }: P
   // This tier is sellable when the catalog has at least one interval price.
   const billingConfigured = isFree || Boolean(prices?.monthly || prices?.annual);
 
+  // Display prices fall back to the lib/pricing TIERS amounts when the live
+  // Stripe catalog has no price yet (before Stripe is wired / during launch),
+  // so /pricing always shows the real numbers. Checkout availability is a
+  // separate concern (billingConfigured) — the CTA still reflects no-Stripe.
+  const monthlyHeadline = prices?.monthly?.display ?? tierConfig.monthly.display;
+  const annualPerMonth =
+    prices?.annual?.perMonthDisplay ?? `$${(tierConfig.annual.amount / 12).toFixed(2)}`;
+  const annualBilledDisplay = prices?.annual?.display ?? tierConfig.annual.display;
+
   // Headline: free is always $0; paid tiers show the per-month figure for
   // the selected interval (annual shows the lower effective monthly).
-  const headline = isFree
-    ? "$0"
-    : interval === "monthly"
-      ? (prices?.monthly?.display ?? "—")
-      : (prices?.annual?.perMonthDisplay ?? "—");
+  const headline = isFree ? "$0" : interval === "monthly" ? monthlyHeadline : annualPerMonth;
 
   // Already subscribed AT or ABOVE this card's tier?
   const subscribedHere =
@@ -136,9 +141,9 @@ export function PricingCard({ tier, prices, launchMode, authState, interval }: P
         <p className="mt-2 min-h-[18px] text-[12.5px] text-muted-foreground">
           {isFree ? (
             "No card, no expiry."
-          ) : interval === "annual" && prices?.annual ? (
+          ) : interval === "annual" ? (
             <>
-              Billed {prices.annual.display} yearly
+              Billed {annualBilledDisplay} yearly
               <span className="font-semibold text-primary"> · 2 months free</span>
             </>
           ) : (
