@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
-import { getServerEnv } from "@/lib/env/server";
+import { getServerEnv, isLaunchFreeAccess } from "@/lib/env/server";
 import { getTierDisplayPrices } from "@/services/pricing-display";
 import MarketingPage from "./marketing-page";
 
@@ -50,7 +50,7 @@ export default async function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
-      <MarketingPage prices={prices} />
+      <MarketingPage prices={prices} launchFreeAccess={isLaunchFreeAccess(env)} />
     </>
   );
 }

@@ -395,6 +395,28 @@
   color: var(--ink);
   font-weight: 600;
 }
+/* Launch-promo badge — only rendered while launch free-access is on. */
+.mkt .launch-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 20px;
+  padding: 6px 14px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  background: var(--sage-bg);
+  color: var(--forest);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.mkt .launch-badge .launch-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 99px;
+  background: var(--forest);
+}
 
 /* Full-width walkthrough band under the hero. */
 .mkt .hero-demo {

@@ -429,7 +429,13 @@ function ShowcaseGallery() {
   );
 }
 
-export default function MarketingPage({ prices }: { prices: TierDisplayMap }) {
+export default function MarketingPage({
+  prices,
+  launchFreeAccess = false
+}: {
+  prices: TierDisplayMap;
+  launchFreeAccess?: boolean;
+}) {
   return (
     <div className="mkt" id="top">
       {/* Header — shared marketing chrome (landing variant uses in-page anchors). */}
@@ -442,6 +448,12 @@ export default function MarketingPage({ prices }: { prices: TierDisplayMap }) {
             <span className="eyebrow">For families who cook from far apart</span>
             <h1>One kitchen.<br />Your whole family.<br />Any distance.</h1>
             <p className="hero-sub">Save the recipes your family actually cooks, from voice notes, WhatsApp photos, recipe links, however they reach you. Everyone in your kitchen can see them, even when you&apos;re not in the same one.</p>
+            {launchFreeAccess ? (
+              <span className="launch-badge">
+                <span aria-hidden className="launch-dot" />
+                Every plan free during launch, no card needed
+              </span>
+            ) : null}
             <div className="hero-ctas">
               <Link className="btn btn-primary" href={"/sign-up" as Route}>Start your kitchen {arrow}</Link>
               <a className="link" href="#pricing">See pricing</a>

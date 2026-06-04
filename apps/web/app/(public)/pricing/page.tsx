@@ -92,6 +92,19 @@ export default async function PricingPage() {
           </span>
         </header>
 
+        {/* Launch promo banner — understated + honest. Only while launch
+            free-access is on; auto-hides once Stripe is wired. */}
+        {launchMode ? (
+          <div className="mb-8 flex items-start gap-3 rounded-[14px] border bg-[var(--sage-soft,var(--primary-soft))] px-5 py-3.5 text-[13.5px] leading-relaxed text-foreground">
+            <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+            <p>
+              <strong className="font-semibold">Every plan is free during launch, no card needed.</strong>{" "}
+              Pick whichever plan fits. When paid plans go live you&apos;ll keep your library and simply
+              choose how to continue.
+            </p>
+          </div>
+        ) : null}
+
         {/* Billing toggle + three-card grid */}
         <PricingGrid
           authState={authState}
