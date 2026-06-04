@@ -106,8 +106,22 @@ export function PricingCard({ tier, prices, launchMode, authState, interval }: P
           : "border-[color:var(--border)]"
       )}
     >
-      {/* Head row */}
-      <div className="mb-4 flex min-h-[22px] items-center justify-between">
+      {/* Top badge strip — sits above the tier name. Reserved min-height keeps
+          all four cards' headers aligned even when a card has no badge. */}
+      <div className="mb-3 flex min-h-[24px] items-start">
+        {isFree ? (
+          <span className="rounded-full border border-[color:var(--border)] px-2.5 py-1 font-mono text-[9.5px] font-semibold uppercase tracking-[1px] text-muted-foreground">
+            Free forever
+          </span>
+        ) : isFeatured ? (
+          <span className="rounded-full bg-primary px-2.5 py-1 font-mono text-[9.5px] font-semibold uppercase tracking-[1px] text-primary-foreground">
+            Most popular
+          </span>
+        ) : null}
+      </div>
+
+      {/* Head row — tier name */}
+      <div className="mb-4 flex min-h-[22px] items-center">
         <span
           className={cn(
             "inline-flex items-center gap-2 font-mono text-[11.5px] font-semibold uppercase tracking-[1.4px]",
@@ -119,15 +133,6 @@ export function PricingCard({ tier, prices, launchMode, authState, interval }: P
           </span>
           {tierName}
         </span>
-        {isFree ? (
-          <span className="rounded-full border border-[color:var(--border)] px-2.5 py-1 font-mono text-[9.5px] font-semibold uppercase tracking-[1px] text-muted-foreground">
-            Free forever
-          </span>
-        ) : isFeatured ? (
-          <span className="rounded-full bg-primary px-2.5 py-1 font-mono text-[9.5px] font-semibold uppercase tracking-[1px] text-primary-foreground">
-            Most powerful
-          </span>
-        ) : null}
       </div>
 
       {/* Price block */}
