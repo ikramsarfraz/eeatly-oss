@@ -4,6 +4,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { aiCredits, aiCreditLedger, subscriptions, users } from "@/db/schema";
 import { InsufficientCreditsError } from "@/lib/errors/credits";
+import { runWithAiUsageContext } from "@/lib/ai/usage-context";
 import { logger } from "@/lib/observability/logger";
 import {
   creditCost,
@@ -184,7 +185,9 @@ export async function withAiCredits<T>(
   });
 
   try {
-    return await fn();
+    // Run inside the usage context so provider calls can attribute their token
+    // usage to this user + operation (see lib/ai/usage-context.ts).
+    return await runWithAiUsageContext({ userId, operation }, fn);
   } catch (error) {
     // Refund the op cost (to the monthly bucket) so a provider failure
     // doesn't cost the user credits.

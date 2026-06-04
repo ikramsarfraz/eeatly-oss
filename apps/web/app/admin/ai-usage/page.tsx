@@ -41,9 +41,10 @@ export default async function AdminAiUsagePage() {
         <p className="text-sm font-medium text-muted-foreground">Platform admin</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-normal">AI usage &amp; cost</h1>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Credits spent vs. estimated provider cost vs. revenue, trailing{" "}
-          {data.windowDays} days. COGS is an estimate (see AI_OP_COGS_USD); image
-          cost assumes Gemini 2.5 Flash Image.
+          Credits spent vs. provider cost vs. revenue, trailing {data.windowDays}{" "}
+          days. LLM cost is computed from <strong>real tokens × model price</strong>{" "}
+          (recorded per call); voice transcription and image generation are flat
+          model-priced add-ons.
         </p>
       </div>
 

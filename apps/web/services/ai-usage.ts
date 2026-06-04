@@ -2,21 +2,23 @@ import "server-only";
 
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { aiCreditLedger, dishImages, subscriptions, users } from "@/db/schema";
+import { aiCreditLedger, aiUsageEvents, dishImages, subscriptions, users } from "@/db/schema";
 import {
-  AI_OP_COGS_USD,
+  AI_OP_SURCHARGE_USD,
   TIERS,
   resolveTier,
+  tokenCostUsd,
   type AiOperation,
   type Tier
 } from "@/lib/pricing";
 
 /**
- * Admin AI-usage analytics — credits spent vs. estimated provider COGS vs.
- * revenue, over a trailing window. Reads the append-only `ai_credit_ledger`
- * (every consume/refund move) and folds it per operation, per tier, and per
- * user. COGS is an estimate from `AI_OP_COGS_USD`; revenue is the user's tier
- * monthly price; the window keeps spend (a flow) comparable to MRR (monthly).
+ * Admin AI-usage analytics — credits spent vs. provider COGS vs. revenue over a
+ * trailing window. Invocations/credits come from the append-only
+ * `ai_credit_ledger`. COGS is the REAL LLM token cost (`ai_usage_events`,
+ * tokens × model price) PLUS a flat surcharge for the non-token parts (Whisper
+ * on voice ops, per-image generation). Revenue is the user's tier monthly
+ * price; the window keeps spend (a flow) comparable to MRR (monthly).
  */
 
 const WINDOW_DAYS = 30;
@@ -33,8 +35,9 @@ const OP_LABEL: Record<string, string> = {
   dish_image: "Dish image"
 };
 
-function cogsFor(op: string): number {
-  return op in AI_OP_COGS_USD ? AI_OP_COGS_USD[op as AiOperation] : 0;
+/** Flat non-token surcharge per invocation (Whisper / image gen). */
+function surchargeFor(op: string): number {
+  return AI_OP_SURCHARGE_USD[op as AiOperation] ?? 0;
 }
 
 export type AiUsageSummary = {
@@ -126,6 +129,33 @@ export async function getAiUsageSummary(): Promise<AiUsageSummary> {
 
   const userIds = [...userCredits.keys()];
 
+  // 1b. Real LLM token cost from ai_usage_events (window), per user + per op,
+  // priced per model. Wrapped in try/catch so an env without the table yet just
+  // degrades to surcharge-only cost rather than 500ing.
+  const tokenCostByUser = new Map<string, number>();
+  const tokenCostByOp = new Map<string, number>();
+  try {
+    const tokenRows = await db
+      .select({
+        userId: aiUsageEvents.userId,
+        operation: aiUsageEvents.operation,
+        model: aiUsageEvents.model,
+        inTok: sql<number>`coalesce(sum(${aiUsageEvents.inputTokens}), 0)::int`,
+        outTok: sql<number>`coalesce(sum(${aiUsageEvents.outputTokens}), 0)::int`
+      })
+      .from(aiUsageEvents)
+      .where(gte(aiUsageEvents.createdAt, since))
+      .groupBy(aiUsageEvents.userId, aiUsageEvents.operation, aiUsageEvents.model);
+    for (const r of tokenRows) {
+      const cost = tokenCostUsd(r.model, Number(r.inTok), Number(r.outTok));
+      const op = r.operation ?? "unknown";
+      tokenCostByOp.set(op, (tokenCostByOp.get(op) ?? 0) + cost);
+      if (r.userId) tokenCostByUser.set(r.userId, (tokenCostByUser.get(r.userId) ?? 0) + cost);
+    }
+  } catch {
+    // ai_usage_events not migrated on this env — token cost stays empty.
+  }
+
   // 2. Resolve each spending user's tier + monthly revenue.
   const userMeta = new Map<string, { email: string; tier: Tier; revenue: number }>();
   if (userIds.length) {
@@ -156,8 +186,8 @@ export async function getAiUsageSummary(): Promise<AiUsageSummary> {
   // 3. Per-user COGS = Σ (op invocations × op cost). Build the top-spender list.
   const perUser = userIds.map((uid) => {
     const invByOp = userInvByOp.get(uid) ?? new Map<string, number>();
-    let cogs = 0;
-    for (const [op, inv] of invByOp) cogs += inv * cogsFor(op);
+    let cogs = tokenCostByUser.get(uid) ?? 0;
+    for (const [op, inv] of invByOp) cogs += inv * surchargeFor(op);
     const meta = userMeta.get(uid) ?? { email: "(unknown)", tier: "free" as Tier, revenue: 0 };
     return {
       userId: uid,
@@ -171,8 +201,8 @@ export async function getAiUsageSummary(): Promise<AiUsageSummary> {
   });
   const topUsers = [...perUser].sort((a, b) => b.estCogsUsd - a.estCogsUsd).slice(0, 25);
 
-  // By-operation.
-  const byOperation = [...opInv.keys()]
+  // By-operation (union of ledger ops + any op that recorded token cost).
+  const byOperation = [...new Set([...opInv.keys(), ...tokenCostByOp.keys()])]
     .map((op) => {
       const invocations = opInv.get(op) ?? 0;
       return {
@@ -180,7 +210,7 @@ export async function getAiUsageSummary(): Promise<AiUsageSummary> {
         label: OP_LABEL[op] ?? op,
         invocations,
         creditsSpent: opCredits.get(op) ?? 0,
-        estCogsUsd: invocations * cogsFor(op)
+        estCogsUsd: (tokenCostByOp.get(op) ?? 0) + invocations * surchargeFor(op)
       };
     })
     .sort((a, b) => b.estCogsUsd - a.estCogsUsd);

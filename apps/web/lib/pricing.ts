@@ -181,22 +181,34 @@ export function creditCost(op: AiOperation): number {
 }
 
 /**
- * Estimated provider COGS per AI operation, in USD — for admin cost analysis
- * only (never billed). Rough list-price estimates: text/extract/share are
- * gpt-4o-mini calls (sub-cent), voice adds Whisper, and dish_image is the
- * Gemini 2.5 Flash Image flat rate (~$0.039). Update if you swap models.
+ * Token list-prices per model, USD per 1M tokens — for admin COGS analysis
+ * (never billed). LLM calls record real token counts (ai_usage_events), so
+ * the chat/vision part of cost is exact; update these when prices change.
  */
-export const AI_OP_COGS_USD: Record<AiOperation, number> = {
-  suggest_text: 0.002,
-  suggest_voice: 0.015,
-  suggest_image: 0.004,
-  refine_text: 0.002,
-  refine_voice: 0.015,
-  refine_photo: 0.004,
-  extract_ingredients: 0.002,
-  share_recipe: 0.002,
-  dish_image: 0.039
+export const MODEL_TOKEN_PRICING_USD: Record<string, { inPer1M: number; outPer1M: number }> = {
+  "gpt-4o-mini": { inPer1M: 0.15, outPer1M: 0.6 },
+  "claude-sonnet-4-6": { inPer1M: 3, outPer1M: 15 }
 };
+/** Fallback when a recorded model isn't in the table above. */
+export const DEFAULT_TOKEN_PRICING_USD = { inPer1M: 1, outPer1M: 3 };
+
+/**
+ * Flat per-invocation surcharge for the NON-token parts of an op, USD: the
+ * Whisper transcription on voice ops (the LLM parse is counted via tokens) and
+ * the per-image generation cost (Gemini 2.5 Flash Image flat rate; the model
+ * mix is shown separately on the admin page). Ops not listed have no non-token
+ * surcharge — their cost is fully token-based.
+ */
+export const AI_OP_SURCHARGE_USD: Partial<Record<AiOperation, number>> = {
+  dish_image: 0.039,
+  suggest_voice: 0.012,
+  refine_voice: 0.012
+};
+
+export function tokenCostUsd(model: string, inputTokens: number, outputTokens: number): number {
+  const p = MODEL_TOKEN_PRICING_USD[model] ?? DEFAULT_TOKEN_PRICING_USD;
+  return (inputTokens * p.inPer1M + outputTokens * p.outPer1M) / 1_000_000;
+}
 
 // Credit top-up packs are NOT configured here — they're synced from Stripe
 // (one-time Prices tagged `metadata.kind=credits` + `metadata.credits`), read

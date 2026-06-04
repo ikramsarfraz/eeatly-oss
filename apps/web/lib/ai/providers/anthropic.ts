@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getAnthropicClient } from "@/lib/ai/client";
+import { recordAiTokens } from "@/lib/ai/usage-context";
 import {
   buildSharePrompt,
   EXTRACT_INGREDIENTS_FROM_TEXT_PROMPT,
@@ -11,7 +12,6 @@ import {
   unitsDirective
 } from "@/lib/ai/prompts";
 import type { MeasurementSystem } from "@/lib/units/detect";
-import { logger } from "@/lib/observability/logger";
 import type { MealSuggestion } from "@/types";
 import {
   proposeChangesResponseSchema,
@@ -124,7 +124,8 @@ export async function suggestMealFromImage(
     { signal: AbortSignal.timeout(FALLBACK_TIMEOUT_MS) }
   );
 
-  logger.info("ai_provider_tokens", {
+  recordAiTokens({
+    model: "claude-sonnet-4-6",
     provider: "anthropic",
     operation: "suggest_meal_from_image",
     input_tokens: response.usage.input_tokens,
@@ -152,7 +153,8 @@ export async function suggestMealFromText(
     { signal: AbortSignal.timeout(FALLBACK_TIMEOUT_MS) }
   );
 
-  logger.info("ai_provider_tokens", {
+  recordAiTokens({
+    model: "claude-sonnet-4-6",
     provider: "anthropic",
     operation: "suggest_meal_from_text",
     input_tokens: response.usage.input_tokens,
@@ -182,7 +184,8 @@ export async function suggestMealFromVoiceTranscript(
     { signal: AbortSignal.timeout(FALLBACK_TIMEOUT_MS) }
   );
 
-  logger.info("ai_provider_tokens", {
+  recordAiTokens({
+    model: "claude-sonnet-4-6",
     provider: "anthropic",
     operation: "suggest_meal_from_voice",
     input_tokens: response.usage.input_tokens,
@@ -234,7 +237,8 @@ export async function extractIngredientsFromText(recipeText: string): Promise<st
     { signal: AbortSignal.timeout(FALLBACK_TIMEOUT_MS) }
   );
 
-  logger.info("ai_provider_tokens", {
+  recordAiTokens({
+    model: "claude-sonnet-4-6",
     provider: "anthropic",
     operation: "extract_ingredients_from_text",
     input_tokens: response.usage.input_tokens,
@@ -269,7 +273,8 @@ export async function generateShareText(
     { signal: AbortSignal.timeout(FALLBACK_TIMEOUT_MS) }
   );
 
-  logger.info("ai_provider_tokens", {
+  recordAiTokens({
+    model: "claude-sonnet-4-6",
     provider: "anthropic",
     operation: "generate_share_text",
     input_tokens: response.usage.input_tokens,
@@ -325,7 +330,8 @@ export async function proposeRefineChanges(args: {
     { signal: AbortSignal.timeout(REFINE_FALLBACK_TIMEOUT_MS) }
   );
 
-  logger.info("ai_provider_tokens", {
+  recordAiTokens({
+    model: "claude-sonnet-4-6",
     provider: "anthropic",
     operation: "refine_propose_changes",
     input_tokens: response.usage.input_tokens,

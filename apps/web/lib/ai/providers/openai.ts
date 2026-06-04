@@ -1,6 +1,7 @@
 import "server-only";
 
 import OpenAI, { toFile } from "openai";
+import { recordAiTokens } from "@/lib/ai/usage-context";
 import {
   buildDishImagePrompt,
   buildSharePrompt,
@@ -128,7 +129,8 @@ export async function suggestMealFromImage(
   );
 
   const usage = response.usage;
-  logger.info("ai_provider_tokens", {
+  recordAiTokens({
+    model: MODEL,
     provider: "openai",
     operation: "suggest_meal_from_image",
     input_tokens: usage?.prompt_tokens ?? null,
@@ -161,7 +163,8 @@ export async function suggestMealFromText(
   );
 
   const usage = response.usage;
-  logger.info("ai_provider_tokens", {
+  recordAiTokens({
+    model: MODEL,
     provider: "openai",
     operation: "suggest_meal_from_text",
     input_tokens: usage?.prompt_tokens ?? null,
@@ -197,7 +200,8 @@ export async function suggestMealFromVoiceTranscript(
   );
 
   const usage = response.usage;
-  logger.info("ai_provider_tokens", {
+  recordAiTokens({
+    model: MODEL,
     provider: "openai",
     operation: "suggest_meal_from_voice",
     input_tokens: usage?.prompt_tokens ?? null,
@@ -246,7 +250,8 @@ export async function extractIngredientsFromText(recipeText: string): Promise<st
   );
 
   const usage = response.usage;
-  logger.info("ai_provider_tokens", {
+  recordAiTokens({
+    model: MODEL,
     provider: "openai",
     operation: "extract_ingredients_from_text",
     input_tokens: usage?.prompt_tokens ?? null,
@@ -366,7 +371,8 @@ export async function generateShareText(
   );
 
   const usage = response.usage;
-  logger.info("ai_provider_tokens", {
+  recordAiTokens({
+    model: MODEL,
     provider: "openai",
     operation: "generate_share_text",
     input_tokens: usage?.prompt_tokens ?? null,
@@ -430,7 +436,8 @@ export async function proposeRefineChanges(args: {
   );
 
   const usage = response.usage;
-  logger.info("ai_provider_tokens", {
+  recordAiTokens({
+    model: MODEL,
     provider: "openai",
     operation: "refine_propose_changes",
     input_tokens: usage?.prompt_tokens ?? null,
