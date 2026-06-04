@@ -180,6 +180,24 @@ export function creditCost(op: AiOperation): number {
   return AI_CREDIT_COSTS[op];
 }
 
+/**
+ * Estimated provider COGS per AI operation, in USD — for admin cost analysis
+ * only (never billed). Rough list-price estimates: text/extract/share are
+ * gpt-4o-mini calls (sub-cent), voice adds Whisper, and dish_image is the
+ * Gemini 2.5 Flash Image flat rate (~$0.039). Update if you swap models.
+ */
+export const AI_OP_COGS_USD: Record<AiOperation, number> = {
+  suggest_text: 0.002,
+  suggest_voice: 0.015,
+  suggest_image: 0.004,
+  refine_text: 0.002,
+  refine_voice: 0.015,
+  refine_photo: 0.004,
+  extract_ingredients: 0.002,
+  share_recipe: 0.002,
+  dish_image: 0.039
+};
+
 // Credit top-up packs are NOT configured here — they're synced from Stripe
 // (one-time Prices tagged `metadata.kind=credits` + `metadata.credits`), read
 // via `services/stripe-catalog.ts`. Add/retire a pack in Stripe, no code change.

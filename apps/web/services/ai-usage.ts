@@ -1,0 +1,224 @@
+import "server-only";
+
+import { and, eq, gte, inArray, sql } from "drizzle-orm";
+import { db } from "@/lib/db/client";
+import { aiCreditLedger, subscriptions, users } from "@/db/schema";
+import {
+  AI_OP_COGS_USD,
+  TIERS,
+  resolveTier,
+  type AiOperation,
+  type Tier
+} from "@/lib/pricing";
+
+/**
+ * Admin AI-usage analytics — credits spent vs. estimated provider COGS vs.
+ * revenue, over a trailing window. Reads the append-only `ai_credit_ledger`
+ * (every consume/refund move) and folds it per operation, per tier, and per
+ * user. COGS is an estimate from `AI_OP_COGS_USD`; revenue is the user's tier
+ * monthly price; the window keeps spend (a flow) comparable to MRR (monthly).
+ */
+
+const WINDOW_DAYS = 30;
+
+const OP_LABEL: Record<string, string> = {
+  suggest_text: "Capture · text",
+  suggest_voice: "Capture · voice",
+  suggest_image: "Capture · photo",
+  refine_text: "Refine · text",
+  refine_voice: "Refine · voice",
+  refine_photo: "Refine · photo",
+  extract_ingredients: "Extract ingredients",
+  share_recipe: "Share link",
+  dish_image: "Dish image"
+};
+
+function cogsFor(op: string): number {
+  return op in AI_OP_COGS_USD ? AI_OP_COGS_USD[op as AiOperation] : 0;
+}
+
+export type AiUsageSummary = {
+  windowDays: number;
+  totals: {
+    creditsSpent: number;
+    estCogsUsd: number;
+    mrrUsd: number;
+    grossMarginUsd: number;
+    activePaidSubs: number;
+    spendingUsers: number;
+  };
+  byOperation: Array<{
+    operation: string;
+    label: string;
+    invocations: number;
+    creditsSpent: number;
+    estCogsUsd: number;
+  }>;
+  byTier: Array<{
+    tier: Tier;
+    users: number;
+    creditsSpent: number;
+    estCogsUsd: number;
+    revenueUsd: number;
+  }>;
+  topUsers: Array<{
+    userId: string;
+    email: string;
+    tier: Tier;
+    creditsSpent: number;
+    estCogsUsd: number;
+    monthlyRevenueUsd: number;
+    marginUsd: number;
+  }>;
+};
+
+export async function getAiUsageSummary(): Promise<AiUsageSummary> {
+  const now = new Date();
+  const since = new Date(now.getTime() - WINDOW_DAYS * 86_400_000);
+
+  // 1. Per (user, op, reason) consume/refund aggregates in the window.
+  const rows = await db
+    .select({
+      userId: aiCreditLedger.userId,
+      operation: aiCreditLedger.operation,
+      reason: aiCreditLedger.reason,
+      events: sql<number>`count(*)::int`,
+      creditsDelta: sql<number>`coalesce(sum(${aiCreditLedger.delta}), 0)::int`
+    })
+    .from(aiCreditLedger)
+    .where(
+      and(
+        gte(aiCreditLedger.createdAt, since),
+        inArray(aiCreditLedger.reason, ["consume", "refund"])
+      )
+    )
+    .groupBy(aiCreditLedger.userId, aiCreditLedger.operation, aiCreditLedger.reason);
+
+  // Fold: net invocations (consume − refund) and net credits spent (−delta,
+  // since consume deltas are negative and refunds positive).
+  const opInv = new Map<string, number>();
+  const opCredits = new Map<string, number>();
+  const userCredits = new Map<string, number>();
+  const userInvByOp = new Map<string, Map<string, number>>();
+
+  for (const r of rows) {
+    const op = r.operation ?? "unknown";
+    const inv = (r.reason === "consume" ? 1 : -1) * r.events;
+    const credits = -r.creditsDelta;
+    opInv.set(op, (opInv.get(op) ?? 0) + inv);
+    opCredits.set(op, (opCredits.get(op) ?? 0) + credits);
+    userCredits.set(r.userId, (userCredits.get(r.userId) ?? 0) + credits);
+    const m = userInvByOp.get(r.userId) ?? new Map<string, number>();
+    m.set(op, (m.get(op) ?? 0) + inv);
+    userInvByOp.set(r.userId, m);
+  }
+
+  const userIds = [...userCredits.keys()];
+
+  // 2. Resolve each spending user's tier + monthly revenue.
+  const userMeta = new Map<string, { email: string; tier: Tier; revenue: number }>();
+  if (userIds.length) {
+    const metaRows = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        createdAt: users.createdAt,
+        subStatus: subscriptions.status,
+        subTier: subscriptions.tier
+      })
+      .from(users)
+      .leftJoin(subscriptions, eq(subscriptions.userId, users.id))
+      .where(inArray(users.id, userIds));
+    for (const u of metaRows) {
+      const { tier } = resolveTier({
+        subscriptionStatus: u.subStatus,
+        subscriptionTier: u.subTier,
+        createdAt: u.createdAt,
+        now
+      });
+      // Only an *active* paid sub is revenue; trials (Stripe or no-card) are $0.
+      const revenue = u.subStatus === "active" && tier !== "free" ? TIERS[tier].monthly.amount : 0;
+      userMeta.set(u.id, { email: u.email, tier, revenue });
+    }
+  }
+
+  // 3. Per-user COGS = Σ (op invocations × op cost). Build the top-spender list.
+  const perUser = userIds.map((uid) => {
+    const invByOp = userInvByOp.get(uid) ?? new Map<string, number>();
+    let cogs = 0;
+    for (const [op, inv] of invByOp) cogs += inv * cogsFor(op);
+    const meta = userMeta.get(uid) ?? { email: "(unknown)", tier: "free" as Tier, revenue: 0 };
+    return {
+      userId: uid,
+      email: meta.email,
+      tier: meta.tier,
+      creditsSpent: userCredits.get(uid) ?? 0,
+      estCogsUsd: cogs,
+      monthlyRevenueUsd: meta.revenue,
+      marginUsd: meta.revenue - cogs
+    };
+  });
+  const topUsers = [...perUser].sort((a, b) => b.estCogsUsd - a.estCogsUsd).slice(0, 25);
+
+  // By-operation.
+  const byOperation = [...opInv.keys()]
+    .map((op) => {
+      const invocations = opInv.get(op) ?? 0;
+      return {
+        operation: op,
+        label: OP_LABEL[op] ?? op,
+        invocations,
+        creditsSpent: opCredits.get(op) ?? 0,
+        estCogsUsd: invocations * cogsFor(op)
+      };
+    })
+    .sort((a, b) => b.estCogsUsd - a.estCogsUsd);
+
+  // By-tier (over spending users).
+  const tierAgg = new Map<Tier, { users: number; creditsSpent: number; estCogsUsd: number; revenueUsd: number }>();
+  for (const u of perUser) {
+    const a = tierAgg.get(u.tier) ?? { users: 0, creditsSpent: 0, estCogsUsd: 0, revenueUsd: 0 };
+    a.users += 1;
+    a.creditsSpent += u.creditsSpent;
+    a.estCogsUsd += u.estCogsUsd;
+    a.revenueUsd += u.monthlyRevenueUsd;
+    tierAgg.set(u.tier, a);
+  }
+  const tierOrder: Tier[] = ["free", "plus", "premium", "pro"];
+  const byTier = tierOrder.flatMap((t) => {
+    const a = tierAgg.get(t);
+    return a ? [{ tier: t, ...a }] : [];
+  });
+
+  // 4. MRR over ALL active paid subs (not just spenders).
+  const mrrRows = await db
+    .select({ tier: subscriptions.tier, count: sql<number>`count(*)::int` })
+    .from(subscriptions)
+    .where(eq(subscriptions.status, "active"))
+    .groupBy(subscriptions.tier);
+  let mrrUsd = 0;
+  let activePaidSubs = 0;
+  for (const r of mrrRows) {
+    const t: Tier = r.tier === "pro" ? "pro" : r.tier === "premium" ? "premium" : "plus";
+    mrrUsd += r.count * TIERS[t].monthly.amount;
+    activePaidSubs += r.count;
+  }
+
+  const creditsSpent = [...opCredits.values()].reduce((a, b) => a + b, 0);
+  const estCogsUsd = byOperation.reduce((a, b) => a + b.estCogsUsd, 0);
+
+  return {
+    windowDays: WINDOW_DAYS,
+    totals: {
+      creditsSpent,
+      estCogsUsd,
+      mrrUsd,
+      grossMarginUsd: mrrUsd - estCogsUsd,
+      activePaidSubs,
+      spendingUsers: userIds.length
+    },
+    byOperation,
+    byTier,
+    topUsers
+  };
+}

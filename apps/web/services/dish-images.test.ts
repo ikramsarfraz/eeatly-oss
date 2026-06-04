@@ -43,7 +43,10 @@ const dbState = vi.hoisted(() => {
 vi.mock("@/lib/db/client", () => ({ db: dbState.chain }));
 
 const envMock = vi.hoisted(() => ({
-  hasR2Env: vi.fn<() => boolean>()
+  hasR2Env: vi.fn<() => boolean>(),
+  // gemini.hasGeminiKey() reads this; an empty env → no GEMINI_API_KEY → the
+  // generation falls through to the mocked openai provider (the prior path).
+  getServerEnv: vi.fn<() => { GEMINI_API_KEY?: string }>(() => ({}))
 }));
 vi.mock("@/lib/env/server", () => envMock);
 

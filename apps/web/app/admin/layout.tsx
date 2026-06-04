@@ -1,29 +1,15 @@
-import Link from "next/link";
-import type { Route } from "next";
+import { AdminShell } from "@/components/admin/admin-shell";
+import { requirePlatformAdmin } from "@/lib/auth/session";
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="border-b bg-card/60">
-      <nav className="mx-auto flex max-w-7xl flex-wrap gap-x-6 gap-y-2 px-4 py-3 text-sm text-muted-foreground sm:px-6 lg:px-8">
-        <Link className="font-medium text-foreground" href="/admin/analytics">
-          Analytics
-        </Link>
-        <a className="hover:text-foreground" href="/admin/users">
-          Users
-        </a>
-        <a className="hover:text-foreground" href="/admin/emails">
-          Email
-        </a>
-        <a className="hover:text-foreground" href="/admin/feedback">
-          Feedback
-        </a>
-        {/* `as Route` cast — Next typed-routes hasn't regenerated for
-            this route yet. Same convention as /plans in app-sidebar. */}
-        <Link className="hover:text-foreground" href={"/admin/features" as Route}>
-          Features
-        </Link>
-      </nav>
-      {children}
-    </div>
-  );
+export const dynamic = "force-dynamic";
+
+/**
+ * Admin layout — gates the whole `/admin/*` subtree on the platform-admin role
+ * (+ optional host) and wraps it in the shared sidebar shell. Each page still
+ * calls `requirePlatformAdmin` too; the lookup is request-cached, so the
+ * double-check is free and keeps pages safe if rendered outside this layout.
+ */
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const user = await requirePlatformAdmin();
+  return <AdminShell user={user}>{children}</AdminShell>;
 }
