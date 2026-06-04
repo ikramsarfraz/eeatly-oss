@@ -19,9 +19,7 @@ export async function getTierDisplayPrices(): Promise<TierDisplayMap> {
     const cp = catalog.tiers[tier];
     return {
       monthly: cp.monthly?.display ?? t.monthly.display,
-      annualPerMonth: cp.annual
-        ? perMonthDisplay(cp.annual)
-        : `$${(t.annual.amount / 12).toFixed(2)}`,
+      annualPerMonth: cp.annual ? perMonthDisplay(cp.annual) : t.annual.perMonthDisplay,
       annualTotal: cp.annual?.display ?? t.annual.display,
       credits: MONTHLY_CREDIT_GRANT[tier]
     };

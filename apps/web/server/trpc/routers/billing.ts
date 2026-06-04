@@ -29,9 +29,7 @@ function tierDisplay(
     monthly: { display: tp.monthly?.display ?? t.monthly.display },
     annual: {
       display: tp.annual?.display ?? t.annual.display,
-      perMonthDisplay: tp.annual
-        ? perMonthDisplay(tp.annual)
-        : `$${(t.annual.amount / 12).toFixed(2)}`
+      perMonthDisplay: tp.annual ? perMonthDisplay(tp.annual) : t.annual.perMonthDisplay
     }
   };
 }

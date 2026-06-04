@@ -55,7 +55,7 @@ export function PricingGrid({
           >
             Annual
             <span className="rounded-full bg-primary/10 px-1.5 py-0.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.5px] text-primary">
-              2 months free
+              Save
             </span>
           </button>
           <button

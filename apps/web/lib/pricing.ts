@@ -86,27 +86,27 @@ export function resolveTier(input: {
 }
 
 /** Subscription tiers — display + the monthly AI credit grant each includes.
- *  Annual = pay for 10 months (≈ "2 months free"). Per-credit cost falls as
- *  tiers climb (~$0.023 → $0.016 → $0.012), rewarding the upgrade. */
+ *  Annual is a fixed discounted per-month rate (annual.perMonthDisplay),
+ *  billed yearly. Per-credit cost falls as tiers climb, rewarding the upgrade. */
 export const TIERS = {
   free: {
     name: "Cook",
     monthly: { amount: 0, display: "$0" },
-    annual: { amount: 0, display: "$0" },
+    annual: { amount: 0, display: "$0", perMonthDisplay: "$0" },
     monthlyCredits: 40,
     blurb: "Your personal cooking library, plus a taste of AI."
   },
   plus: {
     name: "Chef",
     monthly: { amount: 6.99, display: "$6.99", suffix: "/ month" },
-    annual: { amount: 69, display: "$69", suffix: "/ year", monthsFree: 2, note: "2 months free" },
+    annual: { amount: 71.88, display: "$71.88", suffix: "/ year", perMonthDisplay: "$5.99" },
     monthlyCredits: 300,
     blurb: "Share your kitchen & cook with AI — 300 credits a month."
   },
   premium: {
     name: "Head Chef",
     monthly: { amount: 11.99, display: "$11.99", suffix: "/ month" },
-    annual: { amount: 119, display: "$119", suffix: "/ year", monthsFree: 2, note: "2 months free" },
+    annual: { amount: 119.88, display: "$119.88", suffix: "/ year", perMonthDisplay: "$9.99" },
     monthlyCredits: 750,
     blurb: "More AI room + priority — 750 credits, no burst limits.",
     highlight: true,
@@ -115,7 +115,7 @@ export const TIERS = {
   pro: {
     name: "Master Chef",
     monthly: { amount: 17.99, display: "$17.99", suffix: "/ month" },
-    annual: { amount: 179, display: "$179", suffix: "/ year", monthsFree: 2, note: "2 months free" },
+    annual: { amount: 179.88, display: "$179.88", suffix: "/ year", perMonthDisplay: "$14.99" },
     monthlyCredits: 1500,
     blurb: "Cook at scale — 1,500 credits, co-editing + shareable plan pages."
   }
@@ -128,8 +128,8 @@ export const TIERS = {
       amount: number;
       display: string;
       suffix?: string;
-      monthsFree?: number;
-      note?: string;
+      /** Fixed discounted per-month rate when billed annually, e.g. "$5.99". */
+      perMonthDisplay?: string;
     };
     monthlyCredits: number;
     blurb: string;
@@ -160,8 +160,7 @@ export const PRICING = {
     amount: TIERS.plus.annual.amount,
     display: TIERS.plus.annual.display,
     suffix: "/ year",
-    monthsFree: 2,
-    note: "2 months free"
+    perMonthDisplay: TIERS.plus.annual.perMonthDisplay
   }
 } as const;
 

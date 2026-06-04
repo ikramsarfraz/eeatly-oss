@@ -68,12 +68,10 @@ export function PricingCard({ tier, prices, launchMode, authState, interval }: P
   // so /pricing always shows the real numbers. Checkout availability is a
   // separate concern (billingConfigured) — the CTA still reflects no-Stripe.
   const monthlyHeadline = prices?.monthly?.display ?? tierConfig.monthly.display;
-  const annualPerMonth =
-    prices?.annual?.perMonthDisplay ?? `$${(tierConfig.annual.amount / 12).toFixed(2)}`;
-  const annualBilledDisplay = prices?.annual?.display ?? tierConfig.annual.display;
+  const annualPerMonth = prices?.annual?.perMonthDisplay ?? tierConfig.annual.perMonthDisplay;
 
   // Headline: free is always $0; paid tiers show the per-month figure for
-  // the selected interval (annual shows the lower effective monthly).
+  // the selected interval (annual shows the lower fixed discounted monthly).
   const headline = isFree ? "$0" : interval === "monthly" ? monthlyHeadline : annualPerMonth;
 
   // Already subscribed AT or ABOVE this card's tier?
@@ -139,16 +137,11 @@ export function PricingCard({ tier, prices, launchMode, authState, interval }: P
           <span className="ml-2 text-[14px] font-medium text-muted-foreground">/ month</span>
         </span>
         <p className="mt-2 min-h-[18px] text-[12.5px] text-muted-foreground">
-          {isFree ? (
-            "No card, no expiry."
-          ) : interval === "annual" ? (
-            <>
-              Billed {annualBilledDisplay} yearly
-              <span className="font-semibold text-primary"> · 2 months free</span>
-            </>
-          ) : (
-            "Billed monthly"
-          )}
+          {isFree
+            ? "No card, no expiry."
+            : interval === "annual"
+              ? "Billed annually"
+              : "Billed monthly"}
         </p>
         <p className="mt-[3px] text-[12px] text-muted-foreground">
           {isFree ? "Your library stays yours." : "Cancel anytime from Settings."}

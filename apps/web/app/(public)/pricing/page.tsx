@@ -182,7 +182,7 @@ const FAQ_ITEMS: { q: string; a: string }[] = [
   },
   {
     q: "Can I cancel anytime?",
-    a: "Yes. Cancel from the Settings page and access stays through the end of the period you paid for. Annual is billed yearly and works out to two months free versus monthly."
+    a: "Yes. Cancel from the Settings page and access stays through the end of the period you paid for. Annual is billed yearly at a lower monthly rate than paying month to month."
   },
   {
     q: "What can I do on the free Cook plan?",

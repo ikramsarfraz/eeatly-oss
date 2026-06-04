@@ -164,7 +164,7 @@ export function PlanManager() {
               {opt}
               {opt === "annual" ? (
                 <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-px text-[9.5px] font-semibold text-primary">
-                  2 mo free
+                  Save
                 </span>
               ) : null}
             </button>
@@ -204,8 +204,8 @@ export function PlanManager() {
                 <div>
                   <span className="font-serif text-[24px] text-foreground">{perMonth ?? "—"}</span>
                   <span className="ml-1 text-[12px] text-muted-foreground">/ mo</span>
-                  {interval === "annual" && price ? (
-                    <p className="text-[11px] text-muted-foreground">billed {price.display} yearly</p>
+                  {interval === "annual" ? (
+                    <p className="text-[11px] text-muted-foreground">billed annually</p>
                   ) : null}
                 </div>
                 <p className="text-[12px] text-muted-foreground">

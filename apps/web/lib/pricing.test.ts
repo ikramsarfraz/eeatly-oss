@@ -47,13 +47,11 @@ describe("resolveTier", () => {
 });
 
 describe("PRICING", () => {
-  it("annual is ~10× monthly — i.e. about two months free", () => {
-    // "2 months free": annual costs ~10 months at the monthly rate. With
-    // sub-dollar monthly prices ($6.99) the annual is rounded to a clean
-    // figure ($69 vs the exact $69.90), so allow up to a dollar of rounding.
-    const exactTenMonths = PRICING.monthly.amount * 10;
-    expect(Math.abs(PRICING.annual.amount - exactTenMonths)).toBeLessThanOrEqual(1);
-    expect(PRICING.annual.monthsFree).toBe(2);
+  it("annual is a discount on twelve monthly payments", () => {
+    // Annual is billed at a fixed discounted per-month rate, so the yearly
+    // total comes in under 12 monthly payments.
+    expect(PRICING.annual.amount).toBeLessThan(PRICING.monthly.amount * 12);
+    expect(PRICING.annual.perMonthDisplay).toBeTruthy();
   });
 
   it("display strings match the numeric amounts", () => {
