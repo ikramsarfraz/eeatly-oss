@@ -49,11 +49,14 @@ export async function listOperationalUserRows(
   const limit = options.limit ?? 500;
   const onboarded = await onboardingUserIds();
 
+  // Raw SQL fields referenced from these subqueries in the outer select MUST
+  // carry an explicit `.as(alias)` — otherwise Drizzle can't generate a stable
+  // column reference and throws "raw SQL field … doesn't have an alias".
   const mealAgg = db
     .select({
       userId: mealLogs.cookedByUserId,
-      mealCount: sql<number>`count(${mealLogs.id})::int`,
-      lastMealAt: sql<Date | null>`max(${mealLogs.createdAt})`
+      mealCount: sql<number>`count(${mealLogs.id})::int`.as("meal_count"),
+      lastMealAt: sql<Date | null>`max(${mealLogs.createdAt})`.as("last_meal_at")
     })
     .from(mealLogs)
     .groupBy(mealLogs.cookedByUserId)
@@ -62,7 +65,7 @@ export async function listOperationalUserRows(
   const feedbackAgg = db
     .select({
       userId: betaFeedback.userId,
-      feedbackCount: sql<number>`count(${betaFeedback.id})::int`
+      feedbackCount: sql<number>`count(${betaFeedback.id})::int`.as("feedback_count")
     })
     .from(betaFeedback)
     .groupBy(betaFeedback.userId)
