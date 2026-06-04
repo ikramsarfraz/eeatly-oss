@@ -1,16 +1,6 @@
-import {
-  Body,
-  Button,
-  Container,
-  Head,
-  Heading,
-  Html,
-  Link,
-  Preview,
-  Section,
-  Text
-} from "react-email";
-import { emailBody, emailButton, emailContainer, emailHeading, emailText } from "./base-styles";
+import { Button, Heading, Link, Section, Text } from "react-email";
+import { EmailLayout } from "./email-layout";
+import { emailButton, emailHeading, emailLink, emailSmall, emailText } from "./base-styles";
 
 export type InactiveReminderEmailProps = {
   name: string;
@@ -20,13 +10,15 @@ export type InactiveReminderEmailProps = {
    *  meals. Empty array = the user has logs but we have nothing fresh to
    *  surface (rare); we still send the email but skip the list. */
   neglectedMealNames?: readonly string[];
+  contactEmail?: string;
 };
 
 export function InactiveReminderEmail({
   name,
   dashboardUrl,
   daysQuiet,
-  neglectedMealNames = []
+  neglectedMealNames = [],
+  contactEmail
 }: InactiveReminderEmailProps) {
   const quietLine =
     typeof daysQuiet === "number" && daysQuiet > 0
@@ -36,51 +28,45 @@ export function InactiveReminderEmail({
   const hasSuggestions = neglectedMealNames.length > 0;
 
   return (
-    <Html>
-      <Head />
-      <Preview>A few dishes worth bringing back</Preview>
-      <Body style={emailBody}>
-        <Container style={emailContainer}>
-          <Section>
-            <Heading style={emailHeading}>Anything good cooking, {name}?</Heading>
-            <Text style={emailText}>{quietLine}</Text>
-            {hasSuggestions ? (
-              <>
-                <Text style={emailText}>
-                  Here are a few dishes from your kitchen that might be worth
-                  bringing back:
-                </Text>
-                <Section style={{ margin: "8px 0 12px", paddingLeft: "4px" }}>
-                  {neglectedMealNames.map((mealName) => (
-                    <Text
-                      key={mealName}
-                      style={{ ...emailText, margin: "2px 0", fontWeight: 500 }}
-                    >
-                      · {mealName}
-                    </Text>
-                  ))}
-                </Section>
-              </>
-            ) : (
-              <Text style={emailText}>
-                Even a quick one-line log keeps the thread going — weeknight
-                repeats count.
-              </Text>
-            )}
-            <Section style={{ marginTop: "20px" }}>
-              <Button href={dashboardUrl} style={emailButton}>
-                Open your kitchen
-              </Button>
-            </Section>
-            <Text style={{ ...emailText, fontSize: "13px", color: "#4a5246", marginTop: "20px" }}>
-              Direct link:{" "}
-              <Link href={dashboardUrl} style={{ color: "#3d4f3a" }}>
-                {dashboardUrl}
-              </Link>
+    <EmailLayout preview="A few dishes worth bringing back" contactEmail={contactEmail}>
+      <Section>
+        <Heading style={emailHeading}>Anything good cooking, {name}?</Heading>
+        <Text style={emailText}>{quietLine}</Text>
+        {hasSuggestions ? (
+          <>
+            <Text style={emailText}>
+              Here are a few dishes from your kitchen that might be worth
+              bringing back:
             </Text>
-          </Section>
-        </Container>
-      </Body>
-    </Html>
+            <Section style={{ margin: "8px 0 12px", paddingLeft: "4px" }}>
+              {neglectedMealNames.map((mealName) => (
+                <Text
+                  key={mealName}
+                  style={{ ...emailText, margin: "2px 0", fontWeight: 500 }}
+                >
+                  · {mealName}
+                </Text>
+              ))}
+            </Section>
+          </>
+        ) : (
+          <Text style={emailText}>
+            Even a quick one-line log keeps the thread going — weeknight repeats
+            count.
+          </Text>
+        )}
+        <Section style={{ marginTop: "20px" }}>
+          <Button href={dashboardUrl} style={emailButton}>
+            Open your kitchen
+          </Button>
+        </Section>
+        <Text style={{ ...emailSmall, marginTop: "20px" }}>
+          Direct link:{" "}
+          <Link href={dashboardUrl} style={emailLink}>
+            {dashboardUrl}
+          </Link>
+        </Text>
+      </Section>
+    </EmailLayout>
   );
 }

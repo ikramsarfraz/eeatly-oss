@@ -67,13 +67,17 @@ describe("dispatchTransactionalEmail — Round 9 templates", () => {
       react: { type: unknown; props: { name: string; contactEmail: string } };
       to: string;
       from: string;
+      replyTo: string;
     };
     expect(call.subject).toBe("Your eeatly account has been deleted");
     expect(call.to).toBe("mom@example.com");
-    expect(call.from).toBe("no-reply@eeatly.test");
+    // account_deleted ships under the "notification" identity: no-reply@ From
+    // (branded "eeatly"), support@ Reply-To — both on the EMAIL_FROM domain.
+    expect(call.from).toBe("eeatly <no-reply@eeatly.test>");
+    expect(call.replyTo).toBe("support@eeatly.test");
     expect(call.react.type).toBe(AccountDeletedEmail);
     expect(call.react.props.name).toBe("Sara");
-    expect(call.react.props.contactEmail).toBe("no-reply@eeatly.test");
+    expect(call.react.props.contactEmail).toBe("support@eeatly.test");
   });
 
   it("welcome template now receives dashboardUrl from NEXT_PUBLIC_APP_URL", async () => {

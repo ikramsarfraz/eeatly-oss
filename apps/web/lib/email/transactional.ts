@@ -5,6 +5,7 @@ import { getServerEnv } from "@/lib/env/server";
 import { logEmailDelivery } from "@/lib/email/delivery-log";
 import { eeatlyEmailTags, recordOutboundEmailFromApiSend } from "@/services/email-delivery";
 import { getResendClient } from "@/lib/email/resend-client";
+import { getMailSender, type MailIdentity } from "@/lib/email/senders";
 import { AccountDeletedEmail } from "@/lib/email/templates/account-deleted-email";
 import { FirstMealEncouragementEmail } from "@/lib/email/templates/first-meal-encouragement-email";
 import { HouseholdInvitationEmail } from "@/lib/email/templates/household-invitation-email";
@@ -25,6 +26,24 @@ export type TransactionalTemplate =
   | "connection_invitation"
   | "household_member_removed"
   | "account_deleted";
+
+/**
+ * Which sender identity (From + Reply-To) each template ships under. Welcome
+ * is the warm first touch; invitations come from hello@; everything else is an
+ * automated activity notification (no-reply@ From, support@ Reply-To). Billing
+ * / security / marketing identities exist in the registry for flows we haven't
+ * built yet.
+ */
+const TEMPLATE_IDENTITY: Record<TransactionalTemplate, MailIdentity> = {
+  welcome: "welcome",
+  first_meal_encouragement: "notification",
+  inactive_reminder: "notification",
+  weekly_recap_placeholder: "notification",
+  household_invitation: "invitation",
+  connection_invitation: "invitation",
+  household_member_removed: "notification",
+  account_deleted: "notification"
+};
 
 export type TransactionalEmailResult = {
   skipped: boolean;
@@ -79,11 +98,13 @@ export async function dispatchTransactionalEmail(
   input: DispatchTransactionalEmailInput
 ): Promise<TransactionalEmailResult> {
   const resend = getResendClient();
-  const { EMAIL_FROM } = getServerEnv();
+  const { EMAIL_FROM, EMAIL_DOMAIN } = getServerEnv();
   const baseUrl = input.appUrl ?? getServerEnv().NEXT_PUBLIC_APP_URL;
   const trackDispatch = input.trackDispatch !== false;
+  const sender = getMailSender(TEMPLATE_IDENTITY[input.template]);
+  const contactEmail = sender.replyTo;
 
-  if (!resend || !EMAIL_FROM) {
+  if (!resend || (!EMAIL_FROM && !EMAIL_DOMAIN)) {
     logEmailDelivery({
       template: input.template,
       toEmail: input.toEmail,
@@ -105,7 +126,8 @@ export async function dispatchTransactionalEmail(
       subject = "Welcome to eeatly — your family's food memory";
       element = React.createElement(WelcomeEmail, {
         name: input.toName,
-        dashboardUrl: href
+        dashboardUrl: href,
+        contactEmail
       });
       break;
 
@@ -113,7 +135,8 @@ export async function dispatchTransactionalEmail(
       subject = "That's one meal saved — here's what to try next";
       element = React.createElement(FirstMealEncouragementEmail, {
         name: input.toName,
-        dashboardUrl: href
+        dashboardUrl: href,
+        contactEmail
       });
       break;
 
@@ -123,7 +146,8 @@ export async function dispatchTransactionalEmail(
         name: input.toName,
         dashboardUrl: href,
         daysQuiet: input.daysQuiet ?? null,
-        neglectedMealNames: input.neglectedMealNames ?? []
+        neglectedMealNames: input.neglectedMealNames ?? [],
+        contactEmail
       });
       break;
 
@@ -131,7 +155,7 @@ export async function dispatchTransactionalEmail(
       subject = "Your eeatly account has been deleted";
       element = React.createElement(AccountDeletedEmail, {
         name: input.toName,
-        contactEmail: EMAIL_FROM
+        contactEmail
       });
       break;
 
@@ -140,7 +164,8 @@ export async function dispatchTransactionalEmail(
       element = React.createElement(WeeklyRecapEmail, {
         name: input.toName,
         teaserLine:
-          input.recapTeaser ?? "Your personalized recap stitches together recent logs automatically."
+          input.recapTeaser ?? "Your personalized recap stitches together recent logs automatically.",
+        contactEmail
       });
       break;
 
@@ -156,7 +181,10 @@ export async function dispatchTransactionalEmail(
         return { skipped: true, detail: "Invitation payload missing" };
       }
       subject = `${input.invitation.inviterName} invited you to ${input.invitation.householdName} on eeatly`;
-      element = React.createElement(HouseholdInvitationEmail, input.invitation);
+      element = React.createElement(HouseholdInvitationEmail, {
+        ...input.invitation,
+        contactEmail
+      });
       break;
     }
 
@@ -168,10 +196,10 @@ export async function dispatchTransactionalEmail(
         return { skipped: true, detail: "Connection invitation payload missing" };
       }
       subject = `${input.connectionInvitation.inviterName} wants to share recipes with you on eeatly`;
-      element = React.createElement(
-        ConnectionInvitationEmail,
-        input.connectionInvitation
-      );
+      element = React.createElement(ConnectionInvitationEmail, {
+        ...input.connectionInvitation,
+        contactEmail
+      });
       break;
     }
 
@@ -185,7 +213,8 @@ export async function dispatchTransactionalEmail(
       subject = `You've been removed from ${input.removal.householdName} on eeatly`;
       element = React.createElement(HouseholdMemberRemovedEmail, {
         name: input.toName,
-        householdName: input.removal.householdName
+        householdName: input.removal.householdName,
+        contactEmail
       });
       break;
     }
@@ -196,7 +225,8 @@ export async function dispatchTransactionalEmail(
 
   try {
     const sendResult = await resend.emails.send({
-      from: EMAIL_FROM,
+      from: sender.from,
+      replyTo: sender.replyTo,
       to: input.toEmail,
       subject,
       react: element,

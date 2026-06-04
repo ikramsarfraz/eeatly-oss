@@ -2,6 +2,7 @@ import "server-only";
 
 import { getServerEnv } from "@/lib/env/server";
 import { getResendClient } from "@/lib/email/resend-client";
+import { getMailSender } from "@/lib/email/senders";
 import { trackEvent } from "@/lib/observability/analytics";
 import { eeatlyEmailTags, recordOutboundEmailFromApiSend } from "@/services/email-delivery";
 
@@ -29,18 +30,21 @@ export async function sendFeedbackReplyEmail(params: {
   userId?: string | null;
 }) {
   const resend = getResendClient();
-  const { EMAIL_FROM } = getServerEnv();
+  const { EMAIL_FROM, EMAIL_DOMAIN } = getServerEnv();
 
   const greeting = params.recipientName?.trim()
     ? `Hi ${params.recipientName.trim()},`
     : "Hi,";
 
-  if (!resend || !EMAIL_FROM) {
+  if (!resend || (!EMAIL_FROM && !EMAIL_DOMAIN)) {
     console.info(
       `eeatly feedback reply to ${params.to}:\n${params.replyMessage}`
     );
     return { skipped: true as const };
   }
+
+  // Feedback replies are support correspondence — support@ From + Reply-To.
+  const sender = getMailSender("support");
 
   const replyHtml = escapeHtml(params.replyMessage).replaceAll("\n", "<br />");
   const quotedBlock = params.originalMessage?.trim()
@@ -52,7 +56,8 @@ export async function sendFeedbackReplyEmail(params: {
     : "";
 
   const sendResult = await resend.emails.send({
-    from: EMAIL_FROM,
+    from: sender.from,
+    replyTo: sender.replyTo,
     to: params.to,
     subject: "Re: your eeatly feedback",
     text: `${greeting}\n\n${params.replyMessage}${

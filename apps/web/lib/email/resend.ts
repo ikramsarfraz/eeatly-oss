@@ -2,6 +2,7 @@ import "server-only";
 
 import { getServerEnv } from "@/lib/env/server";
 import { getResendClient } from "@/lib/email/resend-client";
+import { getMailSender } from "@/lib/email/senders";
 import { trackEvent } from "@/lib/observability/analytics";
 import { eeatlyEmailTags, recordOutboundEmailFromApiSend } from "@/services/email-delivery";
 
@@ -9,15 +10,20 @@ export { getResendClient } from "@/lib/email/resend-client";
 
 export async function sendMagicLinkEmail(email: string, url: string) {
   const resend = getResendClient();
-  const { EMAIL_FROM } = getServerEnv();
+  const { EMAIL_FROM, EMAIL_DOMAIN } = getServerEnv();
 
-  if (!resend || !EMAIL_FROM) {
+  if (!resend || (!EMAIL_FROM && !EMAIL_DOMAIN)) {
     console.info(`eeatly sign-in link for ${email}: ${url}`);
     return { skipped: true };
   }
 
+  // Magic link is the warm first touch (signup / sign-in) — hello@ From,
+  // support@ Reply-To.
+  const sender = getMailSender("welcome");
+
   const sendResult = await resend.emails.send({
-    from: EMAIL_FROM,
+    from: sender.from,
+    replyTo: sender.replyTo,
     to: email,
     subject: "Sign in to eeatly",
     text: `Use this link to sign in to eeatly: ${url}`,
