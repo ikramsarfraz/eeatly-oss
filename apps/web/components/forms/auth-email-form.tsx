@@ -39,16 +39,30 @@ export function AuthEmailForm({ mode, initialEmail, callbackURL }: AuthEmailForm
     const email = String(formData.get("email") ?? "").trim().toLowerCase();
     const name = email.split("@")[0] || "eeatly user";
 
+    // Build ABSOLUTE callback URLs from the current origin so the verified
+    // link returns the user to the host they signed in on. Without this, the
+    // callback path resolves against the server's BETTER_AUTH_URL (the root
+    // host), so signing in on `admin.<root>` would dump you on the root
+    // dashboard instead of the admin surface. The shared cross-subdomain
+    // cookie keeps the session valid across hosts; admin.<root> is a trusted
+    // origin, so Better Auth honors the absolute URL.
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const onAdminHost =
+      typeof window !== "undefined" &&
+      window.location.hostname.startsWith("admin.");
+    const toAbsolute = (path: string) =>
+      origin && path.startsWith("/") ? `${origin}${path}` : path;
+    // Invite links forward an explicit callbackURL — that wins. Otherwise the
+    // admin host lands on the admin home, everyone else on the dashboard.
+    const returningDest = callbackURL ?? (onAdminHost ? "/admin/analytics" : "/home");
+    const newUserDest = onAdminHost ? "/admin/analytics" : "/onboarding";
+
     try {
       const result = await authClient.signIn.magicLink({
         email,
         name,
-        // Returning users land on the dashboard by default. New users go
-        // through the multi-step onboarding first. When an invite link
-        // forwarded a callbackURL, that wins — Better Auth honors the
-        // parameter and returns the user to /invite/[token].
-        callbackURL: callbackURL ?? "/home",
-        newUserCallbackURL: "/onboarding"
+        callbackURL: toAbsolute(returningDest),
+        newUserCallbackURL: toAbsolute(newUserDest)
       });
 
       if (result.error) {
