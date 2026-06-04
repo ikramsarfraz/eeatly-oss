@@ -94,6 +94,86 @@ export function UserCohortPicker({
   );
 }
 
+export function UserGrantAccess({
+  userId,
+  accessUntil
+}: {
+  userId: string;
+  accessUntil: string | null;
+}) {
+  const { showToast } = useToast();
+  const router = useRouter();
+  const [days, setDays] = React.useState(7);
+  const [sendEmail, setSendEmail] = React.useState(true);
+  const grant = trpc.admin.grantComplimentaryAccess.useMutation();
+
+  const until = accessUntil ? new Date(accessUntil) : null;
+
+  async function handleGrant() {
+    try {
+      const res = await grant.mutateAsync({ userId, days, sendEmail });
+      showToast({
+        variant: "success",
+        title: `Granted ${days} day${days === 1 ? "" : "s"}`,
+        description: !sendEmail
+          ? "Access updated."
+          : res.emailSkipped
+            ? "Access updated (email not sent — Resend not configured)."
+            : "Access updated and user emailed."
+      });
+      router.refresh();
+    } catch (error) {
+      showToast({
+        variant: "error",
+        title: "Couldn't grant access",
+        description: error instanceof Error ? error.message : undefined
+      });
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[11px] text-muted-foreground">
+        {until
+          ? `Access until ${until.toLocaleDateString()}`
+          : "No complimentary access"}
+      </span>
+      <div className="flex items-center gap-1.5">
+        <input
+          type="number"
+          min={1}
+          max={365}
+          value={days}
+          onChange={(e) =>
+            setDays(Math.max(1, Math.min(365, Math.floor(Number(e.target.value) || 1))))
+          }
+          aria-label="Days of access"
+          className="h-9 w-16 rounded-md border bg-background px-2 text-xs"
+        />
+        <span className="text-[11px] text-muted-foreground">more days</span>
+      </div>
+      <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={sendEmail}
+          onChange={(e) => setSendEmail(e.target.checked)}
+        />
+        Email the user
+      </label>
+      <Button
+        size="sm"
+        type="button"
+        variant="outline"
+        onClick={handleGrant}
+        disabled={grant.isPending}
+      >
+        {grant.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+        Grant access
+      </Button>
+    </div>
+  );
+}
+
 export function UserLifecycleEmailButtons({ userId }: { userId: string }) {
   const { showToast } = useToast();
   const router = useRouter();

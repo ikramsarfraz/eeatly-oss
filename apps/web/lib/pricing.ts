@@ -17,9 +17,11 @@
  *              priority AI (no burst limit).
  * Everyone can buy one-time top-up packs that roll over.
  *
- * First-time sign-ups get a 14-day Pro trial automatically — no card. It's
+ * First-time sign-ups get a 7-day Pro trial automatically — no card. It's
  * tracked off the account's `createdAt` (see `resolveTier`), so it needs no
- * extra column and a real subscription always supersedes it.
+ * extra column and a real subscription always supersedes it. Admins can grant
+ * extra Pro days per user (`users.complimentaryAccessUntil`); that override
+ * outranks the account-age trial.
  */
 
 export type Tier = "free" | "plus" | "premium" | "pro";
@@ -35,7 +37,7 @@ export type TierDisplay = {
 export type TierDisplayMap = Record<Tier, TierDisplay>;
 
 /** Length of the automatic first-time Pro trial, in days. */
-export const TRIAL_DAYS = 14;
+export const TRIAL_DAYS = 7;
 /** Tier granted during the trial window. */
 export const TRIAL_TIER: Tier = "pro";
 
@@ -44,14 +46,21 @@ export const TRIAL_TIER: Tier = "pro";
  * age. Pure (no DB) so it's shared by the credit engine and the gate
  * resolver and is unit-testable.
  *
- * Precedence: an active/trialing Stripe subscription always wins; otherwise
- * an account still inside its first `TRIAL_DAYS` is treated as Pro (the
+ * Precedence: an active/trialing Stripe subscription always wins; otherwise an
+ * admin-granted complimentary-access window (Pro, no card) wins; otherwise an
+ * account still inside its first `TRIAL_DAYS` is treated as Pro (the auto
  * no-card trial); otherwise Free.
+ *
+ * Both the complimentary grant and the auto trial surface as `onTrial: true`
+ * with `trialDaysLeft` / `trialEndsAt` set, so the UI's existing trial
+ * treatment covers them without new states.
  */
 export function resolveTier(input: {
   subscriptionStatus: string | null;
   subscriptionTier: string | null;
   createdAt: Date | null;
+  /** Admin-granted Pro access window end (null when none). Outranks the auto trial. */
+  complimentaryAccessUntil?: Date | null;
   now: Date;
 }): { tier: Tier; onTrial: boolean; trialDaysLeft: number; trialEndsAt: Date | null } {
   const active =
@@ -70,15 +79,27 @@ export function resolveTier(input: {
       trialEndsAt: null
     };
   }
-  if (input.createdAt) {
-    const trialEndsAt = new Date(input.createdAt.getTime() + TRIAL_DAYS * 86_400_000);
-    const msLeft = trialEndsAt.getTime() - input.now.getTime();
+  // Admin-granted complimentary Pro access — outranks the account-age trial so
+  // an admin can extend someone past their auto trial (e.g. before Stripe is
+  // wired). Whichever of (grant end, auto-trial end) is later is the window.
+  const autoTrialEndsAt = input.createdAt
+    ? new Date(input.createdAt.getTime() + TRIAL_DAYS * 86_400_000)
+    : null;
+  const candidates = [input.complimentaryAccessUntil ?? null, autoTrialEndsAt].filter(
+    (d): d is Date => d != null
+  );
+  const endsAt = candidates.reduce<Date | null>(
+    (latest, d) => (!latest || d.getTime() > latest.getTime() ? d : latest),
+    null
+  );
+  if (endsAt) {
+    const msLeft = endsAt.getTime() - input.now.getTime();
     if (msLeft > 0) {
       return {
         tier: TRIAL_TIER,
         onTrial: true,
         trialDaysLeft: Math.max(1, Math.ceil(msLeft / 86_400_000)),
-        trialEndsAt
+        trialEndsAt: endsAt
       };
     }
   }
@@ -154,7 +175,7 @@ export const MONTHLY_CREDIT_GRANT: Record<Tier, number> = {
  * yet wired, or forced via `LAUNCH_FREE_ACCESS=true`), every user's monthly
  * grant is floored at this amount regardless of their resolved tier, so the
  * "all plans open, free during launch" experience isn't undercut by the
- * 40-credit free bucket once the 14-day trial ends. Set to the Chef grant:
+ * 40-credit free bucket once the 7-day trial ends. Set to the Chef grant:
  * generous for normal use, bounded for COGS. Auto-reverts to plain per-tier
  * grants the moment the launch flag flips off. Keep `creditFloorForDisplay`
  * (below) and the credit engine's grant logic reading this same constant.

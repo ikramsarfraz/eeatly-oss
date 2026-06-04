@@ -3,6 +3,7 @@ import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   UserCohortPicker,
+  UserGrantAccess,
   UserLifecycleEmailButtons
 } from "@/components/admin/user-row-actions";
 import {
@@ -140,13 +141,14 @@ export default async function AdminUsersPage(props: PageProps) {
               <TableHead>Last meal</TableHead>
               <TableHead>Feedback</TableHead>
               <TableHead>Retention</TableHead>
+              <TableHead className="min-w-[170px]">Access</TableHead>
               <TableHead className="min-w-[200px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell className="text-sm text-muted-foreground" colSpan={9}>
+                <TableCell className="text-sm text-muted-foreground" colSpan={10}>
                   No users matched this slice.
                 </TableCell>
               </TableRow>
@@ -179,6 +181,12 @@ export default async function AdminUsersPage(props: PageProps) {
                   <Badge className={badge.className} variant={badge.variant}>
                     {RETENTION_STATUS_LABELS[row.retentionStatus]}
                   </Badge>
+                </TableCell>
+                <TableCell className="align-top text-xs">
+                  <UserGrantAccess
+                    userId={row.userId}
+                    accessUntil={row.complimentaryAccessUntil?.toISOString() ?? null}
+                  />
                 </TableCell>
                 <TableCell className="align-top text-xs">
                   <UserLifecycleEmailButtons userId={row.userId} />

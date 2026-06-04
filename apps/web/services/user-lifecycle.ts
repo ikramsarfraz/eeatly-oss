@@ -21,6 +21,8 @@ export type UserOperationalRow = {
   feedbackCount: number;
   onboardingCompleted: boolean;
   retentionStatus: RetentionStatus;
+  /** Admin-granted complimentary Pro access end (null when none). */
+  complimentaryAccessUntil: Date | null;
 };
 
 export type OperationalListOptions = {
@@ -78,6 +80,7 @@ export async function listOperationalUserRows(
       name: users.name,
       signupAt: users.createdAt,
       betaCohort: users.betaCohort,
+      complimentaryAccessUntil: users.complimentaryAccessUntil,
       onboardingCompletedAt: users.onboardingCompletedAt,
       mealCount: sql<number>`coalesce(${mealAgg.mealCount}, 0)::int`,
       lastMealAt: mealAgg.lastMealAt,
@@ -126,7 +129,8 @@ export async function listOperationalUserRows(
       // so users who completed onboarding before this column existed still
       // count as onboarded.
       onboardingCompleted: row.onboardingCompletedAt !== null || onboarded.has(row.userId),
-      retentionStatus
+      retentionStatus,
+      complimentaryAccessUntil: row.complimentaryAccessUntil ?? null
     };
   });
 

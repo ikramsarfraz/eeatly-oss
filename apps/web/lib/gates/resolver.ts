@@ -42,6 +42,7 @@ const loadGateContext = cache(async (userId: string): Promise<GateContext> => {
       betaCohort: users.betaCohort,
       subscriptionStatus: users.subscriptionStatus,
       createdAt: users.createdAt,
+      complimentaryAccessUntil: users.complimentaryAccessUntil,
       // Tier lives on the subscriptions row (the denormalized user column
       // only carries status). Left join so trial/free users with no row
       // still resolve.
@@ -73,6 +74,7 @@ const loadGateContext = cache(async (userId: string): Promise<GateContext> => {
     subscriptionStatus: user.subscriptionStatus,
     subscriptionTier: user.subscriptionTier,
     createdAt: user.createdAt,
+    complimentaryAccessUntil: user.complimentaryAccessUntil,
     now: new Date()
   });
 

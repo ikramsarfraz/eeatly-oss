@@ -88,7 +88,7 @@ export default async function PricingPage() {
           </p>
           <span className="mt-6 inline-flex items-center gap-2.5 rounded-full border bg-[var(--primary-soft)] py-1.5 pl-3 pr-3.5 text-[13px] font-medium text-primary">
             <Sparkles className="h-3.5 w-3.5" aria-hidden />
-            Every new account starts with a 14-day Master Chef trial, no card needed.
+            Every new account starts with a 7-day Master Chef trial, no card needed.
           </span>
         </header>
 
@@ -187,7 +187,7 @@ export default async function PricingPage() {
 const FAQ_ITEMS: { q: string; a: string }[] = [
   {
     q: "How does the free Master Chef trial work?",
-    a: "Every new account gets 14 days of Master Chef automatically, no card needed. You'll have the full set of features, including co-editing and priority AI. Near the end we'll prompt you to pick a plan; if you don't, your account simply drops to Cook and your library stays exactly as it is."
+    a: "Every new account gets 7 days of Master Chef automatically, no card needed. You'll have the full set of features, including co-editing and priority AI. Near the end we'll prompt you to pick a plan; if you don't, your account simply drops to Cook and your library stays exactly as it is."
   },
   {
     q: "What's the difference between Chef and Master Chef?",

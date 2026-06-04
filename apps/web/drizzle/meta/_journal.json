@@ -267,6 +267,13 @@
       "when": 1779580812000,
       "tag": "0038_ai_usage_events",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1779580813000,
+      "tag": "0039_user_complimentary_access",
+      "breakpoints": true
     }
   ]
 }
