@@ -1482,7 +1482,8 @@
   background: var(--surface);
   border: 1px solid var(--border-soft);
   border-radius: 12px;
-  overflow: hidden;
+  /* 4 tier columns can exceed a narrow viewport — scroll rather than clip. */
+  overflow-x: auto;
 }
 .mkt .pricing-table table {
   width: 100%;
@@ -1504,13 +1505,17 @@
 .mkt .pricing-table th:nth-child(2),
 .mkt .pricing-table th:nth-child(3),
 .mkt .pricing-table th:nth-child(4),
+.mkt .pricing-table th:nth-child(5),
 .mkt .pricing-table td:nth-child(2),
 .mkt .pricing-table td:nth-child(3),
-.mkt .pricing-table td:nth-child(4) {
+.mkt .pricing-table td:nth-child(4),
+.mkt .pricing-table td:nth-child(5) {
   text-align: center;
-  width: 112px;
+  width: 96px;
 }
-/* The featured tier column (Master Chef) gets a subtle wash + accent header. */
+/* The featured tier column gets a subtle wash + accent header. With four
+   tiers that's the 4th column — Head Chef ("Most popular"):
+   Feature · Cook · Chef · Head Chef · Master Chef. */
 .mkt .pricing-table th:nth-child(4),
 .mkt .pricing-table td:nth-child(4) {
   background: color-mix(in srgb, var(--forest) 6%, transparent);

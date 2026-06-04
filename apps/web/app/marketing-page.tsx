@@ -560,23 +560,24 @@ export default function MarketingPage() {
         <div className="wrap">
           <div className="pricing-card">
             <span className="section-eyebrow">Pricing</span>
-            <h2 className="section-title" style={{ marginBottom: 14 }}>Free to start. Chef to share. Master Chef to collaborate.</h2>
-            <p className="section-sub" style={{ marginBottom: 0 }}>Log meals, save photos, and search your own kitchen — free, forever. Chef unlocks AI capture and shared family kitchens; Master Chef adds co-editing, shareable plans, and priority AI.</p>
+            <h2 className="section-title" style={{ marginBottom: 14 }}>Free to start. Chef to share. Head Chef for more AI. Master Chef to collaborate.</h2>
+            <p className="section-sub" style={{ marginBottom: 0 }}>Log meals, save photos, and search your own kitchen — free, forever. Chef unlocks AI capture and shared family kitchens; Head Chef adds priority AI and more credits; Master Chef adds co-editing and shareable plans.</p>
             <div className="pricing-table">
               <table>
-                <thead><tr><th>Feature</th><th>Cook</th><th>Chef</th><th>Master Chef</th></tr></thead>
+                <thead><tr><th>Feature</th><th>Cook</th><th>Chef</th><th>Head Chef</th><th>Master Chef</th></tr></thead>
                 <tbody>
-                  <tr><td>Save unlimited recipes</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
-                  <tr><td>Search your recipes</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
-                  <tr><td>Log meals you cook</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
-                  <tr><td>AI capture (voice, photo, video)</td><td className="cross">×</td><td className="check">✓</td><td className="check">✓</td></tr>
-                  <tr><td>Shared family kitchens</td><td className="cross">×</td><td className="check">✓</td><td className="check">✓</td></tr>
-                  <tr><td>Occasion &amp; meal planning</td><td className="cross">×</td><td className="check">✓</td><td className="check">✓</td></tr>
-                  <tr><td>Public recipe share links</td><td className="cross">×</td><td className="check">✓</td><td className="check">✓</td></tr>
-                  <tr><td>Co-editing — family edits your recipes &amp; plans</td><td className="cross">×</td><td className="cross">×</td><td className="check">✓</td></tr>
-                  <tr><td>Shareable meal plans (public plan pages)</td><td className="cross">×</td><td className="cross">×</td><td className="check">✓</td></tr>
-                  <tr><td>Priority AI — no burst limits</td><td className="cross">×</td><td className="cross">×</td><td className="check">✓</td></tr>
-                  <tr><td>AI credits / month</td><td className="tier-num">15</td><td className="tier-num">300</td><td className="tier-num">1,500</td></tr>
+                  <tr><td>Price / month</td><td className="tier-num">$0</td><td className="tier-num">$6.99</td><td className="tier-num">$11.99</td><td className="tier-num">$17.99</td></tr>
+                  <tr><td>Save unlimited recipes</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
+                  <tr><td>Search your recipes</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
+                  <tr><td>Log meals you cook</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
+                  <tr><td>AI capture (voice, photo, video)</td><td className="cross">×</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
+                  <tr><td>Shared family kitchens</td><td className="cross">×</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
+                  <tr><td>Occasion &amp; meal planning</td><td className="cross">×</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
+                  <tr><td>Public recipe share links</td><td className="cross">×</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
+                  <tr><td>Priority AI — no burst limits</td><td className="cross">×</td><td className="cross">×</td><td className="check">✓</td><td className="check">✓</td></tr>
+                  <tr><td>Co-editing — family edits your recipes &amp; plans</td><td className="cross">×</td><td className="cross">×</td><td className="cross">×</td><td className="check">✓</td></tr>
+                  <tr><td>Shareable meal plans (public plan pages)</td><td className="cross">×</td><td className="cross">×</td><td className="cross">×</td><td className="check">✓</td></tr>
+                  <tr><td>AI credits / month</td><td className="tier-num">40</td><td className="tier-num">300</td><td className="tier-num">750</td><td className="tier-num">1,500</td></tr>
                 </tbody>
               </table>
             </div>
