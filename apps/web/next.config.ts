@@ -45,6 +45,14 @@ const nextConfig: NextConfig = {
   // requests to dev resources (/_next/webpack-hmr, etc.) by default, so the
   // subdomains must be allow-listed or HMR breaks. Dev-only; no prod effect.
   allowedDevOrigins: ["localtest.me", "*.localtest.me"],
+  // R2 assets are served from the Cloudflare custom domain `cdn.eeatly.com`
+  // (proxied, edge-cached). R2 images currently render via plain <img> to
+  // avoid Vercel Image Optimization billing (see components/dashboard/
+  // meal-thumb.tsx), so this is precautionary — it lets any future
+  // next/image usage load cdn assets without a config change.
+  images: {
+    remotePatterns: [{ protocol: "https", hostname: "cdn.eeatly.com" }]
+  },
   // Round 12: workspace packages live as .ts source (not pre-built .d.ts +
   // .js). Next needs to compile them through SWC alongside app code.
   transpilePackages: ["@eeatly/api", "@eeatly/shared"],

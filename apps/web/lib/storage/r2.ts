@@ -43,12 +43,19 @@ export async function createPresignedPhotoUpload(
   const extension = input.filename.split(".").pop()?.toLowerCase() ?? "jpg";
   const key = `users/${userId}/meal-photos/${randomUUID()}.${extension}`;
 
+  // Each upload gets a fresh UUID key (a "Change photo" writes a new object),
+  // so every object is immutable per URL — let Cloudflare edge-cache it hard.
+  // The client (lib/uploads/upload-photo.ts) forwards every returned field, so
+  // this Cache-Control rides along on the POST.
+  const cacheControl = "public, max-age=31536000, immutable";
   const { url, fields } = await createPresignedPost(getR2Client(), {
     Bucket: env.R2_BUCKET!,
     Key: key,
+    Fields: { "Cache-Control": cacheControl },
     Conditions: [
       ["content-length-range", 1, 10 * 1024 * 1024],
-      ["starts-with", "$Content-Type", "image/"]
+      ["starts-with", "$Content-Type", "image/"],
+      ["eq", "$Cache-Control", cacheControl]
     ],
     Expires: 60
   });
