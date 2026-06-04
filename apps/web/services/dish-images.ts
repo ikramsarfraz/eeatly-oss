@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { dishImages } from "@/db/schema";
 import * as openai from "@/lib/ai/providers/openai";
+import * as gemini from "@/lib/ai/providers/gemini";
+import { withFallback } from "@/lib/ai/providers";
 import { uploadDishImage } from "@/lib/storage/r2";
 import { hasR2Env } from "@/lib/env/server";
 import { normalizeMealName } from "@/lib/utils";
@@ -30,9 +32,33 @@ import { logger } from "@/lib/observability/logger";
  * to R2 (no temp file, no presign round-trip — see lib/storage/r2.ts).
  */
 
-const MODEL = "gpt-image-1";
 const FAILURE_TTL_MS = 60 * 60 * 1000;
 const IMAGE_CONTENT_TYPE = "image/png";
+
+/**
+ * Generate a dish image: Gemini 2.5 Flash Image first (flat ~$0.039, the
+ * cheaper + more predictable model), with gpt-image-1 as the fallback when
+ * Gemini errors. When Gemini isn't configured, go straight to gpt-image-1.
+ * Returns the bytes + which model actually produced them (recorded on the row).
+ */
+async function generateImageBytes(
+  normalizedName: string
+): Promise<{ base64: string; model: string }> {
+  if (gemini.hasGeminiKey()) {
+    return withFallback(
+      async () => ({
+        ...(await gemini.generateDishImage(normalizedName)),
+        model: gemini.GEMINI_IMAGE_MODEL
+      }),
+      async () => ({
+        ...(await openai.generateDishImage(normalizedName)),
+        model: "gpt-image-1"
+      }),
+      { operation: "generate_dish_image", primaryProvider: "gemini", fallbackProvider: "openai" }
+    );
+  }
+  return { ...(await openai.generateDishImage(normalizedName)), model: "gpt-image-1" };
+}
 
 /**
  * Read-only lookup. Returns the shared image URL when a `ready` row exists,
@@ -88,7 +114,7 @@ export async function generateDishImageForName(name: string): Promise<string | n
   }
 
   try {
-    const { base64 } = await openai.generateDishImage(normalizedName);
+    const { base64, model } = await generateImageBytes(normalizedName);
     const bytes = Buffer.from(base64, "base64");
     const imageUrl = await uploadDishImage(normalizedName, bytes, IMAGE_CONTENT_TYPE);
 
@@ -99,7 +125,7 @@ export async function generateDishImageForName(name: string): Promise<string | n
         imageUrl,
         status: "ready",
         errorCode: null,
-        model: MODEL,
+        model,
         generatedAt: new Date()
       })
       .onConflictDoUpdate({
@@ -108,7 +134,7 @@ export async function generateDishImageForName(name: string): Promise<string | n
           imageUrl,
           status: "ready",
           errorCode: null,
-          model: MODEL,
+          model,
           generatedAt: new Date()
         }
       });
@@ -126,7 +152,7 @@ export async function generateDishImageForName(name: string): Promise<string | n
         imageUrl: null,
         status: "failed",
         errorCode: "GENERATION_FAILED",
-        model: MODEL,
+        model: gemini.hasGeminiKey() ? gemini.GEMINI_IMAGE_MODEL : "gpt-image-1",
         generatedAt: new Date()
       })
       .onConflictDoUpdate({

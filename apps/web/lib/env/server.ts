@@ -74,6 +74,10 @@ const serverEnvSchema = z.object({
   UPSTASH_REDIS_REST_TOKEN: optionalString,
   ANTHROPIC_API_KEY: z.string().min(1, "ANTHROPIC_API_KEY is required."),
   OPENAI_API_KEY: z.string().min(1, "OPENAI_API_KEY is required."),
+  // Google Gemini — primary provider for dish-image generation (Gemini 2.5
+  // Flash Image: flat ~$0.039/image). Optional: when unset, dish images fall
+  // back to gpt-image-1. See lib/ai/providers/gemini.ts.
+  GEMINI_API_KEY: optionalString,
   GOOGLE_CLIENT_ID: optionalString,
   GOOGLE_CLIENT_SECRET: optionalString,
   CRON_SECRET: optionalString,
