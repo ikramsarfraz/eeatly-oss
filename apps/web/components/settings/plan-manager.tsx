@@ -74,6 +74,11 @@ export function PlanManager() {
   // Launch promo floors every tier's shown credits at the launch grant, so the
   // numbers here match what users actually receive (see services/ai-credits).
   const launchFreeAccess = catalog?.launchFreeAccess ?? false;
+  // During the launch promo, a non-subscriber has *every* plan unlocked free,
+  // so there's no single "current" tier to show and nothing to buy yet. We
+  // present a unified launch state and disable tier changes until launch
+  // pricing goes live. Real subscribers (active) keep their normal plan view.
+  const launchActive = launchFreeAccess && !active;
 
   async function upgradeTo(tier: PaidTier) {
     if (busy) return;
@@ -103,13 +108,15 @@ export function PlanManager() {
     }
   }
 
-  const statusLine = active
-    ? sub!.cancelAtPeriodEnd
-      ? `Cancels ${formatDate(sub!.currentPeriodEnd)}, access until then.`
-      : `Renews ${formatDate(sub!.currentPeriodEnd)}.`
-    : onTrial
-      ? `${trialDaysLeft} day${trialDaysLeft === 1 ? "" : "s"} left in your Master Chef trial. Pick a plan to keep these features.`
-      : "Free plan. AI runs on your monthly credit grant.";
+  const statusLine = launchActive
+    ? "Every plan is unlocked free during launch. You'll choose a plan when launch pricing goes live, and your library stays yours."
+    : active
+      ? sub!.cancelAtPeriodEnd
+        ? `Cancels ${formatDate(sub!.currentPeriodEnd)}, access until then.`
+        : `Renews ${formatDate(sub!.currentPeriodEnd)}.`
+      : onTrial
+        ? `${trialDaysLeft} day${trialDaysLeft === 1 ? "" : "s"} left in your Master Chef trial. Pick a plan to keep these features.`
+        : "Free plan. AI runs on your monthly credit grant.";
 
   return (
     <section id="plan" className="grid gap-3 scroll-mt-24">
@@ -120,11 +127,15 @@ export function PlanManager() {
           <div className="grid gap-0.5">
             <div className="flex items-center gap-2">
               <span className="font-serif text-[22px] text-foreground">
-                {TIER_NAME[currentTier] ?? currentTier}
+                {launchActive ? "Launch access" : (TIER_NAME[currentTier] ?? currentTier)}
               </span>
               {active ? (
                 <span className="rounded-full bg-[color:var(--sage-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--sage-fg)]">
                   Active
+                </span>
+              ) : launchActive ? (
+                <span className="rounded-full bg-[color:var(--sage-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--sage-fg)]">
+                  Launch
                 </span>
               ) : onTrial ? (
                 <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
@@ -197,7 +208,10 @@ export function PlanManager() {
                 : (t?.annual && "perMonthDisplay" in t.annual ? t.annual.perMonthDisplay : undefined);
             const credits = displayedMonthlyCredits(tier, launchFreeAccess);
             const sellable = isFreeTier ? false : Boolean(t?.sellable);
-            const isCurrent = subscribedTier === tier;
+            // During launch nothing is "current" (every plan is unlocked), so
+            // we don't mark a tier, which is what made the header + cards
+            // disagree (Master Chef trial vs Cook current).
+            const isCurrent = !launchActive && subscribedTier === tier;
             const isUpgrade = RANK[tier] > RANK[subscribedTier];
             return (
               <div
@@ -215,6 +229,10 @@ export function PlanManager() {
                   {isCurrent ? (
                     <span className="text-[10.5px] font-semibold uppercase tracking-wide text-[color:var(--sage-fg)]">
                       Current
+                    </span>
+                  ) : launchActive ? (
+                    <span className="text-[10.5px] font-semibold uppercase tracking-wide text-[color:var(--sage-fg)]">
+                      Unlocked
                     </span>
                   ) : null}
                 </div>
@@ -241,7 +259,11 @@ export function PlanManager() {
                     </li>
                   ))}
                 </ul>
-                {isCurrent ? (
+                {launchActive ? (
+                  <Button type="button" variant="outline" size="sm" disabled className="mt-1 h-9">
+                    {isFreeTier ? "Always free" : "Included during launch"}
+                  </Button>
+                ) : isCurrent ? (
                   <Button type="button" variant="outline" size="sm" disabled className="mt-1 h-9">
                     <Check className="h-3.5 w-3.5" />
                     Your plan

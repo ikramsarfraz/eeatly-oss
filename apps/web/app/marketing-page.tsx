@@ -579,7 +579,7 @@ export default function MarketingPage({
               <table>
                 <thead><tr><th>Feature</th><th>Cook</th><th>Chef</th><th>Head Chef</th><th>Master Chef</th></tr></thead>
                 <tbody>
-                  <tr><td>Price / month</td><td className="tier-num">{prices.free.monthly}</td><td className="tier-num">{prices.plus.monthly}</td><td className="tier-num">{prices.premium.monthly}</td><td className="tier-num">{prices.pro.monthly}</td></tr>
+                  <tr><td>Price / month</td><td className="tier-num">{prices.free.annualPerMonth}</td><td className="tier-num">{prices.plus.annualPerMonth}</td><td className="tier-num">{prices.premium.annualPerMonth}</td><td className="tier-num">{prices.pro.annualPerMonth}</td></tr>
                   <tr><td>Save unlimited recipes</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
                   <tr><td>Search your recipes</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
                   <tr><td>Log meals you cook</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>

@@ -95,6 +95,16 @@ export const billingRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // While the launch promo is on, every plan is unlocked free, so block
+      // checkout entirely (no charging during the free period, no matter which
+      // UI path calls in). Lifts the moment Stripe is wired / the flag flips.
+      if (isLaunchFreeAccess()) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Every plan is free during launch. Checkout opens when launch pricing goes live.",
+          cause: { reason: "LAUNCH_ACTIVE" }
+        });
+      }
       try {
         return await createCheckoutSession({
           userId: ctx.user.id,
