@@ -16,7 +16,7 @@ export function RouteSection({
   children: React.ReactNode;
 }) {
   return (
-    <div className="settings-route-in grid max-w-[740px] gap-7">
+    <div className="settings-route-in grid gap-7">
       <div className="grid gap-2">
         <h2
           className="font-serif text-[38px] leading-[1.05] text-foreground"

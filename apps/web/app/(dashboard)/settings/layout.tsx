@@ -13,7 +13,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
 
   return (
     <div className="pb-20 md:pb-0">
-      <div className="relative mx-auto grid max-w-[1120px] gap-10 lg:grid-cols-[220px_1fr] lg:gap-12">
+      <div className="relative grid gap-10 lg:grid-cols-[220px_1fr] lg:gap-12">
         {/* Version tag — top-right of the frame. */}
         <span
           className="pointer-events-none absolute right-0 top-0 hidden font-mono text-[10.5px] uppercase text-muted-foreground/70 lg:block"
