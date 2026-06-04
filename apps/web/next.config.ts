@@ -40,6 +40,11 @@ const posthogAssetHost = posthogHost.includes("eu.i.posthog.com")
 
 const nextConfig: NextConfig = {
   typedRoutes: true,
+  // Local dev runs the app + admin surface across subdomains of localtest.me
+  // (which resolves *.localtest.me → 127.0.0.1). Next 16 blocks cross-origin
+  // requests to dev resources (/_next/webpack-hmr, etc.) by default, so the
+  // subdomains must be allow-listed or HMR breaks. Dev-only; no prod effect.
+  allowedDevOrigins: ["localtest.me", "*.localtest.me"],
   // Round 12: workspace packages live as .ts source (not pre-built .d.ts +
   // .js). Next needs to compile them through SWC alongside app code.
   transpilePackages: ["@eeatly/api", "@eeatly/shared"],
