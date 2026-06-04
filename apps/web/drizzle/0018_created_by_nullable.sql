@@ -1,0 +1,30 @@
+-- =============================================================================
+-- 0018_created_by_nullable.sql — drop NOT NULL on meals.created_by_user_id
+-- =============================================================================
+-- Partner migration to 0017. Round 4 introduced `created_by_user_id` as
+-- nullable in 0014, then 0016 tightened it to NOT NULL. The FK was declared
+-- `ON DELETE SET NULL` (also in 0014) so the recipe survives when the
+-- creator's account is deleted. These two constraints contradict: when
+-- Postgres tries to honor SET NULL on a NOT NULL column, the entire DELETE
+-- rolls back. Net effect: account deletion silently fails for any user who
+-- ever created a recipe in a household they later left (members can leave
+-- households via Round 4.5 removal, but their `created_by_user_id` rows in
+-- the original household are still present).
+--
+-- 0017 fixed the same shape on meal_logs.cooked_by_user_id. 0018 closes the
+-- last instance. After both, account deletion for former members works,
+-- their recipes / logs stay with the household, and attribution drops to
+-- "Former member" in the UI (lib/meals/attribution.ts already handles
+-- null name + null id; no new helper needed).
+--
+-- 0017 + 0018 MUST SHIP TOGETHER. If 0017 is in production but 0018 isn't,
+-- former members who created recipes in a household they left can't delete
+-- their account — the DELETE silently rolls back and the user sees a
+-- generic "Couldn't delete your account" toast with no useful detail.
+--
+-- Rollback (don't):
+--   ALTER TABLE "meals" ALTER COLUMN "created_by_user_id" SET NOT NULL;
+-- ...which would re-introduce the same contradiction with the existing FK.
+-- =============================================================================
+
+ALTER TABLE "meals" ALTER COLUMN "created_by_user_id" DROP NOT NULL;

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-label="eeatly">
+  <rect width="180" height="180" rx="40.3" fill="#2E5739"/>
+  <text x="90" y="95" text-anchor="middle" dominant-baseline="central"
+        font-family="'Instrument Serif', Georgia, 'Times New Roman', serif"
+        font-style="italic" font-size="148" fill="#F5EFE2">e</text>
+  <circle cx="140" cy="128" r="8" fill="#D9C68C"/>
+</svg>

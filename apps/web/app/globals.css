@@ -1,0 +1,329 @@
+@import "tailwindcss";
+
+/*
+ * next-themes toggles `.dark` on <html> (attribute="class"). Make Tailwind's
+ * `dark:` variant follow that class instead of v4's default
+ * `prefers-color-scheme` media query — otherwise a user who picks Light while
+ * their OS is in Dark gets system-driven dark-mode colors on `dark:` utilities
+ * (e.g. the wordmark logo) while the class-based palette stays light.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  /* Responsive shell breakpoints from CookLoop Responsive handoff.
+     sm:600 (phablet boundary) / md:820 (sidebar↔sheet, tab bar)
+     / lg:1080 (hero & panels promote) / xl:1280 (desktop). */
+  --breakpoint-sm: 600px;
+  --breakpoint-md: 820px;
+  --breakpoint-lg: 1080px;
+  --breakpoint-xl: 1280px;
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-primary-soft: var(--primary-soft);
+  --color-accent-soft: var(--accent-soft);
+  --color-border-strong: var(--border-strong);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-sage: var(--sage);
+  --color-sage-soft: var(--sage-soft);
+  --color-wheat: var(--wheat);
+  --color-wheat-soft: var(--wheat-soft);
+  --color-terra: var(--terra);
+  --color-terra-soft: var(--terra-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: var(--font-sans-val);
+  --font-serif: var(--font-serif-val);
+  --font-mono: var(--font-mono-val);
+}
+
+:root {
+  color-scheme: light dark;
+
+  --background: #f7f5ee;
+  --foreground: #1b2220;
+  --card: #fdfcf7;
+  --card-foreground: #1b2220;
+  --popover: #fdfcf7;
+  --popover-foreground: #1b2220;
+  --primary: #2f6f58;
+  --primary-foreground: #f9fffb;
+  --secondary: #dde9e2;
+  --secondary-foreground: #1c4738;
+  --muted: #f1efe6;
+  --muted-foreground: #6b746e;
+  --accent: #d77a4a;
+  --accent-foreground: #25120b;
+  --destructive: #c44949;
+  --destructive-foreground: #fffafa;
+  --border: #e2dfd3;
+  --input: #e2dfd3;
+  --ring: rgba(47, 111, 88, 0.35);
+  --radius: 0.75rem;
+
+  /* R26 — sidebar tokens retuned to the design's warmer cream palette.
+     `--sidebar` is the panel background (a few shades warmer than the
+     main `--background` so the rail reads as a distinct surface);
+     `--sidebar-accent` is the active-item pill background. The other
+     tokens inherit the existing forest/foreground/border roles so the
+     shadcn `Sidebar` primitive continues to compose without surprises. */
+  --sidebar: #ebe2cc;
+  --sidebar-foreground: #1b2220;
+  --sidebar-border: #d9cfb7;
+  --sidebar-accent: #dfd3b7;
+  --sidebar-accent-foreground: #1c4738;
+  --sidebar-primary: #2f6f58;
+  --sidebar-primary-foreground: #f9fffb;
+  --sidebar-ring: rgba(47, 111, 88, 0.35);
+
+  /* Extended design tokens */
+  --surface: #fdfcf7;
+  --surface-2: #f1efe6;
+  --primary-soft: #dde9e2;
+  --accent-soft: #f5dccb;
+  --border-strong: #cfccc0;
+  /* Darkened from #8b948e (~3.2:1) to ~5.0:1 against --background. The
+     previous value failed WCAG AA for body text; small metadata copy
+     using this token now passes. */
+  --subtle-fg: #6f7872;
+  --warn: #c08a2a;
+  --warn-soft: #f3e8c8;
+
+  /* R23 — Badge tone palette promoted from inline hex (R22). Light
+     siblings mirror mobile's Chip primitive; dark siblings are tuned
+     for contrast on the warm near-black ground. `ghost` is semantic
+     (subtle neutral) and uses the muted family directly. */
+  --sage: #dde9e2;
+  --sage-soft: #eef3ef;
+  --wheat: #eddfb7;
+  --wheat-soft: #f5ecd4;
+  --terra: #efd5c9;
+  --terra-soft: #f7e5db;
+  --danger: #c44949;
+  --danger-soft: #f4dada;
+  --sage-fg: #1c4738;
+  --wheat-fg: #6f571e;
+  --terra-fg: #7a3a1b;
+  --danger-fg: #8a2424;
+
+  --shadow-sm: 0 1px 0 rgba(27,34,32,0.04), 0 1px 2px rgba(27,34,32,0.04);
+  --shadow-md: 0 1px 0 rgba(27,34,32,0.05), 0 8px 24px -12px rgba(27,34,32,0.16);
+  --sidebar-w: 256px;
+  --sidebar-w-collapsed: 68px;
+  --header-h: 60px;
+  /* Font tokens — sourced from next/font (variables defined on <html> in
+     app/layout.tsx) with conservative fallbacks. */
+  --font-sans-val: var(--font-sans-loaded), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-serif-val: var(--font-serif-loaded), "Cormorant Garamond", Georgia, serif;
+  --font-mono-val: var(--font-mono-loaded), ui-monospace, monospace;
+}
+
+/* R23 — dark-mode palette. Same hex values as before; R31 migrated
+   the selector from `@media (prefers-color-scheme: dark)` to
+   `.dark` so `next-themes` can toggle Light / Dark / System on a
+   class attribute. System mode delegates back to the OS preference
+   via `next-themes`' own resolver, which then applies the matching
+   class — so the OS-based default still works without a second
+   media-query rule here.
+   Hex values pulled from `apps/mobile/lib/design/tokens.ts` (the
+   `colorsDark` block) where the semantic role matches. Web-only
+   palettes (accent / warn / shadcn sidebar) get derivations in the
+   same hue family, darker / lower-saturation so they read against the
+   warm near-black `--background`. */
+.dark {
+    --background: #15140f;
+    --foreground: #f0e9d9;
+    --card: #1f1d17;
+    --card-foreground: #f0e9d9;
+    --popover: #1f1d17;
+    --popover-foreground: #f0e9d9;
+    /* Forest inverts to lighter sage-green so the primary CTA still
+       reads against the dark ground. `--primary-foreground` flips
+       accordingly so text on the CTA stays legible. */
+    --primary: #88b894;
+    --primary-foreground: #10180f;
+    --secondary: #2a3022;
+    --secondary-foreground: #a1cba9;
+    --muted: #1c1a14;
+    --muted-foreground: #a8a28f;
+    /* Burnt-orange accent: warm, lower saturation, sits between
+       light's #d77a4a and a dark-mode-readable mid-tone. */
+    --accent: #c4683c;
+    --accent-foreground: #15140f;
+    --destructive: #d88078;
+    --destructive-foreground: #15140f;
+    --border: #2d2b22;
+    --input: #2d2b22;
+    --ring: rgba(136, 184, 148, 0.45);
+
+    /* R26 — dark sidebar siblings of the R26 light cream palette. The
+       light values are `#ebe2cc` / `#dfd3b7`; the dark mirrors pick up
+       the mobile palette's `creamSoft` (`#1c1a14`) for the panel
+       background and a slightly warmer near-black for the active-item
+       pill so it reads against the panel without competing with the
+       primary CTA. */
+    --sidebar: #1c1a14;
+    --sidebar-foreground: #f0e9d9;
+    --sidebar-border: #2d2b22;
+    --sidebar-accent: #2a2419;
+    --sidebar-accent-foreground: #a1cba9;
+    --sidebar-primary: #88b894;
+    --sidebar-primary-foreground: #10180f;
+    --sidebar-ring: rgba(136, 184, 148, 0.45);
+
+    /* Extended tokens. `--surface` is the elevated card bg; `--surface-2`
+       is the slightly-darker neutral used for dashed input zones and
+       muted alt backgrounds. */
+    --surface: #1f1d17;
+    --surface-2: #1c1a14;
+    --primary-soft: #2a3022;
+    --accent-soft: #3a2820;
+    --border-strong: #3a382e;
+    --subtle-fg: #8e887a;
+    /* `--warn` (amber) — no mobile equivalent. Hue family preserved,
+       luminance dropped enough to sit on dark cream without screaming. */
+    --warn: #d4a247;
+    --warn-soft: #3a2f18;
+
+    /* Badge tone palette dark siblings. */
+    --sage: #2a3022;
+    --sage-soft: #1f2418;
+    --sage-fg: #a1cba9;
+    --wheat: #3a2f18;
+    --wheat-soft: #2a2210;
+    --wheat-fg: #c9b176;
+    --terra: #3a2a20;
+    --terra-soft: #281c14;
+    --terra-fg: #d88865;
+    --danger: #d88078;
+    --danger-soft: #3a211e;
+    --danger-fg: #f0b8b0;
+
+    --shadow-sm: 0 1px 0 rgba(0,0,0,0.45), 0 1px 2px rgba(0,0,0,0.55);
+    --shadow-md: 0 1px 0 rgba(0,0,0,0.5), 0 8px 24px -12px rgba(0,0,0,0.7);
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans-val);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+::selection {
+  background: rgba(47, 111, 88, 0.22);
+}
+
+.dark ::selection {
+  background: rgba(136, 184, 148, 0.28);
+}
+
+/* Serif utility */
+.font-serif {
+  font-family: var(--font-serif-val);
+}
+
+/* Mono utility */
+.font-mono-brand {
+  font-family: var(--font-mono-val);
+}
+
+/* Suppress iOS auto-zoom on input focus.
+   Safari zooms when a focused field is < 16px; force 16px on phone widths. */
+@media (max-width: 599px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* R32 — Settings nested-route entrance. Transform-only slide so opacity
+   rests at 1 (content stays visible in hidden tabs, print, and export).
+   Disabled under reduced-motion. */
+@keyframes settingsRouteIn {
+  from {
+    transform: translateY(8px);
+  }
+  to {
+    transform: none;
+  }
+}
+.settings-route-in {
+  animation: settingsRouteIn 0.26s ease both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-route-in {
+    animation: none;
+  }
+}
+
+/* Credit-spend flash — a transient "−N" that rises and fades when the
+   credit balance drops, so the bar's movement reads as a cost. */
+@keyframes creditSpendFlash {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+.credit-spend-flash {
+  animation: creditSpendFlash 1.1s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .credit-spend-flash {
+    animation: none;
+    opacity: 0;
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "name": "eeatly-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.33.2",
+  "engines": {
+    "node": "24.14.x",
+    "pnpm": "10.33.x"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @eeatly/web dev",
+    "build": "pnpm --filter @eeatly/web build",
+    "start": "pnpm --filter @eeatly/web start",
+    "lint": "pnpm --filter @eeatly/web lint",
+    "typecheck": "pnpm -r --parallel typecheck",
+    "test": "pnpm --filter @eeatly/web test",
+    "test:watch": "pnpm --filter @eeatly/web test:watch",
+    "test:coverage": "pnpm --filter @eeatly/web test:coverage",
+    "check:deploy": "pnpm --filter @eeatly/web check:deploy",
+    "smoke:prod": "pnpm --filter @eeatly/web smoke:prod",
+    "analyze": "pnpm --filter @eeatly/web analyze",
+    "db:generate": "pnpm --filter @eeatly/web db:generate",
+    "db:migrate": "pnpm --filter @eeatly/web db:migrate",
+    "db:backfill:beta-cohort": "pnpm --filter @eeatly/web db:backfill:beta-cohort",
+    "db:studio": "pnpm --filter @eeatly/web db:studio",
+    "auth:generate": "pnpm --filter @eeatly/web auth:generate"
+  },
+  "pnpm": {
+    "packageExtensions": {
+      "@hookform/resolvers": {
+        "peerDependencies": {
+          "zod": "*"
+        },
+        "peerDependenciesMeta": {
+          "zod": {
+            "optional": true
+          }
+        }
+      }
+    }
+  }
+}

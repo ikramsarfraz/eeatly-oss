@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>eeatly · Mobile Redesign</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #EFE6D2; font-family: 'Geist', system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  /* hide horizontal scrollbars on horizontal-scroll rows inside phones */
+  ::-webkit-scrollbar { width: 0; height: 0; }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="eeatly-shell.jsx"></script>
+<script type="text/babel" src="eeatly-screens.jsx"></script>
+
+<script type="text/babel">
+const W = 393, H = 852;
+
+function App() {
+  return (
+    <DesignCanvas>
+      <DCSection id="primary" title="eeatly · primary flow" subtitle="Home, plans, add a meal, library">
+        <DCArtboard id="home"        label="Home"           width={W} height={H} data-screen-label="01 Home">           <ScreenHome /></DCArtboard>
+        <DCArtboard id="plans"       label="Plans"          width={W} height={H} data-screen-label="02 Plans">          <ScreenPlans /></DCArtboard>
+        <DCArtboard id="plan-detail" label="Plan detail"    width={W} height={H} data-screen-label="03 Plan detail">    <ScreenPlanDetail /></DCArtboard>
+        <DCArtboard id="add"         label="Add hub"        width={W} height={H} data-screen-label="04 Add hub">        <ScreenAdd /></DCArtboard>
+        <DCArtboard id="library"     label="Library"        width={W} height={H} data-screen-label="05 Library">       <ScreenLibrary /></DCArtboard>
+      </DCSection>
+
+      <DCSection id="capture" title="Logging a meal" subtitle="Manual form + AI capture">
+        <DCArtboard id="log"         label="Log a meal"     width={W} height={H} data-screen-label="06 Log a meal">     <ScreenLogMeal /></DCArtboard>
+        <DCArtboard id="capture-ai"  label="Capture with AI" width={W} height={H} data-screen-label="07 Capture with AI"><ScreenCaptureAI /></DCArtboard>
+      </DCSection>
+
+      <DCSection id="plan-edit" title="Editing a plan" subtitle="Edit + add-dish bottom sheet">
+        <DCArtboard id="edit-plan"   label="Edit plan"      width={W} height={H} data-screen-label="08 Edit plan">      <ScreenEditPlan /></DCArtboard>
+        <DCArtboard id="add-dish"    label="Add a dish (sheet)" width={W} height={H} data-screen-label="09 Add dish sheet"><ScreenPlanDetail withSheet /></DCArtboard>
+      </DCSection>
+
+      <DCSection id="account" title="Account & kitchen" subtitle="Settings + sharing">
+        <DCArtboard id="settings"    label="Settings"       width={W} height={H} data-screen-label="10 Settings">      <ScreenSettings /></DCArtboard>
+        <DCArtboard id="kitchen"     label="Kitchen members" width={W} height={H} data-screen-label="11 Kitchen">      <ScreenKitchen /></DCArtboard>
+      </DCSection>
+
+      <DCSection id="dark" title="Dark mode" subtitle="Same screens, warm-black ground — late-night meal logging">
+        <DCArtboard id="d-home"     label="Home · dark"         width={W} height={H} data-screen-label="D01 Home · dark">         <ScreenHome dark /></DCArtboard>
+        <DCArtboard id="d-plans"    label="Plans · dark"        width={W} height={H} data-screen-label="D02 Plans · dark">        <ScreenPlans dark /></DCArtboard>
+        <DCArtboard id="d-detail"   label="Plan detail · dark"  width={W} height={H} data-screen-label="D03 Plan detail · dark">  <ScreenPlanDetail dark /></DCArtboard>
+        <DCArtboard id="d-add"      label="Add hub · dark"      width={W} height={H} data-screen-label="D04 Add hub · dark">      <ScreenAdd dark /></DCArtboard>
+        <DCArtboard id="d-log"      label="Log a meal · dark"   width={W} height={H} data-screen-label="D05 Log a meal · dark">   <ScreenLogMeal dark /></DCArtboard>
+        <DCArtboard id="d-capture"  label="Capture AI · dark"   width={W} height={H} data-screen-label="D06 Capture AI · dark">   <ScreenCaptureAI dark /></DCArtboard>
+        <DCArtboard id="d-library"  label="Library · dark"      width={W} height={H} data-screen-label="D07 Library · dark">      <ScreenLibrary dark /></DCArtboard>
+        <DCArtboard id="d-sheet"    label="Add dish sheet · dark" width={W} height={H} data-screen-label="D08 Add dish sheet · dark"><ScreenPlanDetail dark withSheet /></DCArtboard>
+        <DCArtboard id="d-settings" label="Settings · dark"     width={W} height={H} data-screen-label="D09 Settings · dark">     <ScreenSettings dark /></DCArtboard>
+        <DCArtboard id="d-kitchen"  label="Kitchen · dark"      width={W} height={H} data-screen-label="D10 Kitchen · dark">      <ScreenKitchen dark /></DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('app')).render(<App />);
+</script>
+
+</body>
+</html>

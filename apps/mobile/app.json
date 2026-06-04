@@ -1,0 +1,83 @@
+{
+  "expo": {
+    "name": "eeatly",
+    "slug": "eeatly",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "eeatly",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "backgroundColor": "#F5EFE2",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.eeatly.mobile",
+      "associatedDomains": [
+        "applinks:eeatly.app",
+        "webcredentials:eeatly.app"
+      ],
+      "infoPlist": {
+        "NSCameraUsageDescription": "eeatly uses your camera so you can snap a photo of a meal you cooked or a recipe card you want to save.",
+        "NSPhotoLibraryUsageDescription": "eeatly reads photos so you can attach a meal photo or have AI extract a recipe from a saved image.",
+        "NSMicrophoneUsageDescription": "eeatly uses the microphone so you can record a voice note describing a recipe."
+      }
+    },
+    "android": {
+      "package": "app.eeatly.mobile",
+      "edgeToEdgeEnabled": true,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "eeatly.app",
+              "pathPrefix": "/invite/"
+            },
+            {
+              "scheme": "https",
+              "host": "eeatly.app",
+              "pathPrefix": "/share/"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "eeatly reads photos so you can attach a meal photo or have AI extract a recipe from a saved image.",
+          "cameraPermission": "eeatly uses your camera so you can snap a photo of a meal you cooked or a recipe card you want to save."
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "eeatly uses the microphone so you can record a voice note describing a recipe."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F5EFE2",
+          "resizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#15140F"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
