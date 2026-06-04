@@ -208,10 +208,11 @@ export function PlanManager() {
                 : (t?.annual && "perMonthDisplay" in t.annual ? t.annual.perMonthDisplay : undefined);
             const credits = displayedMonthlyCredits(tier, launchFreeAccess);
             const sellable = isFreeTier ? false : Boolean(t?.sellable);
-            // During launch nothing is "current" (every plan is unlocked), so
-            // we don't mark a tier, which is what made the header + cards
-            // disagree (Master Chef trial vs Cook current).
-            const isCurrent = !launchActive && subscribedTier === tier;
+            // Highlight the EFFECTIVE current tier so the cards agree with the
+            // header: during the no-card trial that's Master Chef (badged
+            // "Trial"), not Cook. During launch nothing is marked (every plan
+            // is unlocked). `active` subscribers highlight their paid tier.
+            const isCurrent = !launchActive && tier === currentTier;
             const isUpgrade = RANK[tier] > RANK[subscribedTier];
             return (
               <div
@@ -227,8 +228,13 @@ export function PlanManager() {
                     {TIER_NAME[tier]}
                   </span>
                   {isCurrent ? (
-                    <span className="text-[10.5px] font-semibold uppercase tracking-wide text-[color:var(--sage-fg)]">
-                      Current
+                    <span
+                      className={cn(
+                        "text-[10.5px] font-semibold uppercase tracking-wide",
+                        onTrial ? "text-primary" : "text-[color:var(--sage-fg)]"
+                      )}
+                    >
+                      {onTrial ? "Trial" : "Current"}
                     </span>
                   ) : launchActive ? (
                     <span className="text-[10.5px] font-semibold uppercase tracking-wide text-[color:var(--sage-fg)]">
@@ -263,7 +269,9 @@ export function PlanManager() {
                   <Button type="button" variant="outline" size="sm" disabled className="mt-1 h-9">
                     {isFreeTier ? "Always free" : "Included during launch"}
                   </Button>
-                ) : isCurrent ? (
+                ) : active && isCurrent ? (
+                  // Only a real (paid) subscriber's tier is "Your plan". A trial
+                  // user hasn't subscribed, so the trial tier stays choosable.
                   <Button type="button" variant="outline" size="sm" disabled className="mt-1 h-9">
                     <Check className="h-3.5 w-3.5" />
                     Your plan
@@ -274,7 +282,7 @@ export function PlanManager() {
                   </Button>
                 ) : !sellable ? (
                   <Button type="button" variant="outline" size="sm" disabled className="mt-1 h-9">
-                    Included during launch
+                    Currently unavailable
                   </Button>
                 ) : (
                   <Button
@@ -285,7 +293,11 @@ export function PlanManager() {
                     onClick={() => upgradeTo(tier)}
                   >
                     {checkout.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                    {isUpgrade ? `Upgrade to ${TIER_NAME[tier]}` : `Switch to ${TIER_NAME[tier]}`}
+                    {active
+                      ? isUpgrade
+                        ? `Upgrade to ${TIER_NAME[tier]}`
+                        : `Switch to ${TIER_NAME[tier]}`
+                      : `Choose ${TIER_NAME[tier]}`}
                   </Button>
                 )}
               </div>
