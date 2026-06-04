@@ -1,6 +1,12 @@
 import { Button, Heading, Link, Section, Text } from "react-email";
 import { EmailLayout } from "./email-layout";
-import { emailButton, emailHeading, emailLink, emailSmall, emailText } from "./base-styles";
+import {
+  emailButton,
+  emailHeading,
+  emailLink,
+  emailSmall,
+  emailText,
+} from "./base-styles";
 
 export type FirstMealEncouragementEmailProps = {
   name: string;
@@ -11,7 +17,7 @@ export type FirstMealEncouragementEmailProps = {
 export function FirstMealEncouragementEmail({
   name,
   dashboardUrl,
-  contactEmail
+  contactEmail,
 }: FirstMealEncouragementEmailProps) {
   return (
     <EmailLayout
@@ -19,7 +25,9 @@ export function FirstMealEncouragementEmail({
       contactEmail={contactEmail}
     >
       <Section>
-        <Heading style={emailHeading}>That&apos;s one to remember, {name}</Heading>
+        <Heading style={emailHeading}>
+          That&apos;s one to remember, {name}
+        </Heading>
         <Text style={emailText}>
           Your first meal is in. That&apos;s the hard part, and eeatly gets more
           useful the more you add.
@@ -35,7 +43,7 @@ export function FirstMealEncouragementEmail({
           </Button>
         </Section>
         <Text style={{ ...emailText, marginTop: "20px" }}>
-          When you&apos;re ready to share with family (your mom, your partner,
+          When you&apos;re ready to share with family (your mom, your spouse,
           the cousins in another time zone), you can invite them to your
           kitchen. Their meals show up alongside yours.
         </Text>
