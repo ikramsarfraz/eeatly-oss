@@ -17,13 +17,17 @@
  * client-component module bodies without crashing during the SSR
  * pre-render.
  */
+import { randomUuid } from "@/lib/utils";
+
 const DEVICE_ID_KEY = "eeatly:device-id";
 
 export function getDeviceId(): string {
   if (typeof window === "undefined") return "";
   let id = window.localStorage.getItem(DEVICE_ID_KEY);
   if (!id) {
-    id = window.crypto.randomUUID();
+    // `randomUuid` (not crypto.randomUUID) so it also works on non-secure dev
+    // hosts like http://localtest.me, where crypto.randomUUID is undefined.
+    id = randomUuid();
     window.localStorage.setItem(DEVICE_ID_KEY, id);
   }
   return id;

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { CheckCircle2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, randomUuid } from "@/lib/utils";
 
 type ToastVariant = "success" | "error" | "info";
 
@@ -24,7 +24,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = React.useState<Toast[]>([]);
 
   const showToast = React.useCallback((toast: Omit<Toast, "id">) => {
-    const id = crypto.randomUUID();
+    const id = randomUuid();
     setToasts((current) => [...current, { ...toast, id }].slice(-3));
     window.setTimeout(() => {
       setToasts((current) => current.filter((item) => item.id !== id));

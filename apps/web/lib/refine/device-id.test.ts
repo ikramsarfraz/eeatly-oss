@@ -37,6 +37,11 @@ describe("getDeviceId", () => {
       localStorage: storage,
       crypto: { randomUUID: () => "11111111-2222-3333-4444-555555555555" }
     });
+    // getDeviceId now mints via lib/utils `randomUuid`, which reads
+    // globalThis.crypto (in a browser that's the same object as window.crypto).
+    vi.stubGlobal("crypto", {
+      randomUUID: () => "11111111-2222-3333-4444-555555555555"
+    });
   });
 
   afterEach(() => {
@@ -61,6 +66,7 @@ describe("getDeviceId", () => {
       localStorage: storage,
       crypto: { randomUUID }
     });
+    vi.stubGlobal("crypto", { randomUUID });
     vi.resetModules();
     const { getDeviceId } = await import("./device-id");
     const id = getDeviceId();
