@@ -228,6 +228,7 @@ export const TIER_FEATURES: Record<Tier, string[]> = {
     "Your personal recipe library, forever",
     "Log every cook with notes & photos",
     "Search your full cooking history",
+    "AI capture from photo, text & voice",
     "Rediscovery suggestions",
     "40 AI credits / month"
   ],
@@ -235,8 +236,7 @@ export const TIER_FEATURES: Record<Tier, string[]> = {
     "300 AI credits / month",
     "Shared household — invite your family",
     "Meal plans for occasions (+ clone past plans)",
-    "Public recipe share links",
-    "AI capture from photo, text & voice"
+    "Public recipe share links"
   ],
   premium: [
     "Everything in Chef",

@@ -561,7 +561,7 @@ export default function MarketingPage() {
           <div className="pricing-card">
             <span className="section-eyebrow">Pricing</span>
             <h2 className="section-title" style={{ marginBottom: 14 }}>Free to start. Chef to share. Head Chef for more AI. Master Chef to collaborate.</h2>
-            <p className="section-sub" style={{ marginBottom: 0 }}>Log meals, save photos, and search your own kitchen — free, forever. Chef unlocks AI capture and shared family kitchens; Head Chef adds priority AI and more credits; Master Chef adds co-editing and shareable plans.</p>
+            <p className="section-sub" style={{ marginBottom: 0 }}>Log meals, save photos, search your kitchen, and capture recipes with AI — free, forever (within a monthly credit grant). Chef adds shared family kitchens, meal planning, and public links; Head Chef adds priority AI and more credits; Master Chef adds co-editing and shareable plans.</p>
             <div className="pricing-table">
               <table>
                 <thead><tr><th>Feature</th><th>Cook</th><th>Chef</th><th>Head Chef</th><th>Master Chef</th></tr></thead>
@@ -570,7 +570,7 @@ export default function MarketingPage() {
                   <tr><td>Save unlimited recipes</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
                   <tr><td>Search your recipes</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
                   <tr><td>Log meals you cook</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
-                  <tr><td>AI capture (voice, photo, video)</td><td className="cross">×</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
+                  <tr><td>AI capture (photo, text, voice)</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
                   <tr><td>Shared family kitchens</td><td className="cross">×</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
                   <tr><td>Occasion &amp; meal planning</td><td className="cross">×</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
                   <tr><td>Public recipe share links</td><td className="cross">×</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
