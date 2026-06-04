@@ -7,6 +7,7 @@ import type { Route } from "next";
 import {
   ArrowLeftRight,
   BarChart3,
+  CreditCard,
   Flag,
   Mail,
   MessageSquare,
@@ -36,6 +37,7 @@ type NavItem = { href: Route; label: string; icon: LucideIcon };
 const adminNav: NavItem[] = [
   { href: "/admin/analytics" as Route, label: "Analytics", icon: BarChart3 },
   { href: "/admin/ai-usage" as Route, label: "AI usage", icon: Zap },
+  { href: "/admin/billing" as Route, label: "Billing", icon: CreditCard },
   { href: "/admin/users" as Route, label: "Users", icon: Users },
   { href: "/admin/feedback" as Route, label: "Feedback", icon: MessageSquare },
   { href: "/admin/emails" as Route, label: "Email", icon: Mail },

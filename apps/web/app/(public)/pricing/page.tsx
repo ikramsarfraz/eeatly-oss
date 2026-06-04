@@ -9,9 +9,9 @@ import { getStripeCatalog, perMonthDisplay } from "@/services/stripe-catalog";
 import { PricingGrid } from "@/components/pricing/pricing-grid";
 
 export const metadata: Metadata = {
-  title: "Pricing — eeatly",
+  title: "Pricing: eeatly",
   description:
-    "Cook is free forever. Chef shares your kitchen with family — household sharing, meal plans, and public recipe links. Master Chef adds co-editing, shareable plans, and priority AI."
+    "Cook is free forever. Chef shares your kitchen with family: household sharing, meal plans, and public recipe links. Master Chef adds co-editing, shareable plans, and priority AI."
 };
 
 export const dynamic = "force-dynamic";
@@ -84,11 +84,11 @@ export default async function PricingPage() {
             cooking library forever, free. <strong className="font-semibold text-foreground">Chef</strong>{" "}
             shares your kitchen with family and adds meal planning plus public recipe links.{" "}
             <strong className="font-semibold text-foreground">Master&nbsp;Chef</strong> is for cooking
-            together — co-editing, shareable plans, and priority AI.
+            together: co-editing, shareable plans, and priority AI.
           </p>
           <span className="mt-6 inline-flex items-center gap-2.5 rounded-full border bg-[var(--primary-soft)] py-1.5 pl-3 pr-3.5 text-[13px] font-medium text-primary">
             <Sparkles className="h-3.5 w-3.5" aria-hidden />
-            Every new account starts with a 14-day Master Chef trial — no card needed.
+            Every new account starts with a 14-day Master Chef trial, no card needed.
           </span>
         </header>
 
@@ -109,7 +109,7 @@ export default async function PricingPage() {
                 Out of credits? Top up anytime
               </h2>
               <p className="text-pretty text-[14px] leading-relaxed text-muted-foreground">
-                AI features — photo / text / voice prefill, Refine, ingredient extraction — run on
+                AI features (photo / text / voice prefill, Refine, ingredient extraction) run on
                 credits. Every plan includes a monthly grant, and you can buy one-time top-up packs
                 that never expire from{" "}
                 <Link
@@ -174,11 +174,11 @@ export default async function PricingPage() {
 const FAQ_ITEMS: { q: string; a: string }[] = [
   {
     q: "How does the free Master Chef trial work?",
-    a: "Every new account gets 14 days of Master Chef automatically — no card needed. You'll have the full set of features, including co-editing and priority AI. Near the end we'll prompt you to pick a plan; if you don't, your account simply drops to Cook and your library stays exactly as it is."
+    a: "Every new account gets 14 days of Master Chef automatically, no card needed. You'll have the full set of features, including co-editing and priority AI. Near the end we'll prompt you to pick a plan; if you don't, your account simply drops to Cook and your library stays exactly as it is."
   },
   {
     q: "What's the difference between Chef and Master Chef?",
-    a: "Chef shares your kitchen with family — invites, meal plans, and public recipe links — with 300 AI credits a month. Master Chef is for cooking together: family can edit your recipes and plans in place, you can share meal plans as public pages, you get 1,500 credits, and AI runs without burst limits."
+    a: "Chef shares your kitchen with family (invites, meal plans, and public recipe links) with 300 AI credits a month. Master Chef is for cooking together: family can edit your recipes and plans in place, you can share meal plans as public pages, you get 1,500 credits, and AI runs without burst limits."
   },
   {
     q: "Can I cancel anytime?",
@@ -186,6 +186,6 @@ const FAQ_ITEMS: { q: string; a: string }[] = [
   },
   {
     q: "What can I do on the free Cook plan?",
-    a: "Keep your personal recipe library forever, log every cook with notes & photos, search your full cooking history, get rediscovery suggestions, and use 15 AI credits a month. No sharing or meal plans — those start at Chef."
+    a: "Keep your personal recipe library forever, log every cook with notes & photos, search your full cooking history, get rediscovery suggestions, and use 40 AI credits a month. No sharing or meal plans; those start at Chef."
   }
 ];

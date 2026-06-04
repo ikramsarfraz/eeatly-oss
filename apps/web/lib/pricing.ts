@@ -8,7 +8,7 @@
  * tier/pack mapping also lives in the billing service.
  *
  * Three tiers, genuinely differentiated (R20):
- *   - Free   — personal cooking library + 15 AI credits/mo. No sharing,
+ *   - Free   — personal cooking library + 40 AI credits/mo. No sharing,
  *              no plans, no household.
  *   - Plus   — shared household + invites, meal plans (+clone), public
  *              recipe share links, 300 AI credits/mo.

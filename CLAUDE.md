@@ -49,6 +49,10 @@ Better Auth v1.4 (magic links, Drizzle adapter) · Drizzle ORM + Neon serverless
 Resend + React Email · AWS S3 / Cloudflare R2 (photo uploads) · TanStack Query v5  
 tRPC v11 + superjson (Round 11 — every client-driven interaction)
 
+## Copy & writing style
+
+- **No em dashes (`—`) in any user-facing copy.** This applies to every rendered string: marketing pages (landing, `/pricing`, `/privacy`, `/help`), settings, emails, toasts, button labels, page metadata/descriptions, FAQ answers, anywhere a user can read it. Rewrite with a comma, a period, parentheses, or a colon instead. Example: `"free, forever — within a monthly grant"` becomes `"free, forever, within a monthly grant"`. Em dashes inside code comments are fine; this rule is about product copy only.
+
 ## Architecture
 
 ### Request flow

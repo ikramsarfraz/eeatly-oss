@@ -24,7 +24,64 @@ import {
   searchUsersForOverride
 } from "@/services/feature-overrides";
 import { updateUserBetaCohort } from "@/services/user-lifecycle";
+import {
+  getStripeCatalog,
+  perMonthDisplay,
+  __resetCatalogCache,
+  type CatalogPlan
+} from "@/services/stripe-catalog";
+import { getServerEnv, hasStripeEnv } from "@/lib/env/server";
+import { MONTHLY_CREDIT_GRANT, TIERS } from "@/lib/pricing";
 import { adminProcedure, router } from "../trpc";
+
+const CATALOG_PLANS: readonly CatalogPlan[] = ["plus", "premium", "pro"];
+
+/**
+ * A JSON-serializable view of the live Stripe catalog for the admin sync page:
+ * each paid tier's live monthly/annual price (with the per-month figure for
+ * annual) next to the hardcoded `lib/pricing` fallback, plus credit packs and
+ * whether Stripe is wired at all. Read-only — edits happen in the Stripe
+ * Dashboard; the Sync action just busts our 5-minute cache and refetches.
+ */
+async function buildStripeCatalogView() {
+  const configured = hasStripeEnv(getServerEnv());
+  const catalog = await getStripeCatalog();
+
+  const plans = CATALOG_PLANS.map((plan) => {
+    const t = catalog.tiers[plan];
+    return {
+      plan,
+      name: TIERS[plan].name,
+      blurb: TIERS[plan].blurb,
+      monthlyCredits: MONTHLY_CREDIT_GRANT[plan],
+      sellable: Boolean(t.monthly || t.annual),
+      monthly: t.monthly
+        ? { display: t.monthly.display, priceId: t.monthly.priceId, amount: t.monthly.amount }
+        : null,
+      annual: t.annual
+        ? {
+            display: t.annual.display,
+            perMonth: perMonthDisplay(t.annual),
+            priceId: t.annual.priceId,
+            amount: t.annual.amount
+          }
+        : null,
+      fallback: {
+        monthly: TIERS[plan].monthly.display,
+        annualPerMonth: TIERS[plan].annual.perMonthDisplay
+      }
+    };
+  });
+
+  const packs = catalog.packs.map((p) => ({
+    priceId: p.priceId,
+    display: p.display,
+    credits: p.credits,
+    amount: p.amount
+  }));
+
+  return { configured, plans, packs };
+}
 
 /**
  * Round 11 — admin reads. `featureRegistry` is the static catalog
@@ -241,6 +298,21 @@ export const adminRouter = router({
       });
       return { skipped: result.skipped, detail: result.detail };
     }),
+
+  /** Live Stripe catalog (tiers + packs) for the admin sync page. */
+  stripeCatalog: adminProcedure.query(() => buildStripeCatalogView()),
+
+  /**
+   * Pull the latest catalog from Stripe right now: bust the in-memory cache
+   * and force a fresh fetch so price/metadata edits made in the Stripe
+   * Dashboard take effect immediately instead of waiting out the 5-min TTL.
+   */
+  syncStripeCatalog: adminProcedure.mutation(async ({ ctx }) => {
+    __resetCatalogCache();
+    await getStripeCatalog({ force: true });
+    logger.info("admin_stripe_catalog_synced", { adminId: ctx.user.id });
+    return buildStripeCatalogView();
+  }),
 
   trackReminderPlaceholder: adminProcedure
     .input(

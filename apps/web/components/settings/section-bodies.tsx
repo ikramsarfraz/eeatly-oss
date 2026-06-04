@@ -45,7 +45,7 @@ export function SharingSection() {
       <Card className="overflow-hidden p-0">
         <SettingRow
           label="New recipes & plans are private"
-          sub="Everything you create starts visible to only you. This can't be turned off — sharing is always an explicit, per-item choice."
+          sub="Everything you create starts visible to only you. This can't be turned off; sharing is always an explicit, per-item choice."
           suffix={
             <span
               className="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--sage-soft)] px-2.5 py-1 font-mono text-[10px] font-semibold uppercase text-[color:var(--primary)]"
@@ -309,7 +309,7 @@ export function DangerSection() {
     <Card className="overflow-hidden border-[color:var(--danger-soft)] p-0">
       <SettingRow
         label="Export your data"
-        sub="Download everything in your kitchen — meals, logs, plans, annotations — as JSON."
+        sub="Download everything in your kitchen (meals, logs, plans, annotations) as JSON."
         suffix={
           <Button
             variant="outline"
@@ -356,7 +356,7 @@ function DeleteAccountRow() {
           variant: "error",
           title: "Can't delete your account yet",
           description:
-            "You own a kitchen with other members. Transfer ownership before deleting — for now, contact support to make the change."
+            "You own a kitchen with other members. Transfer ownership before deleting; for now, contact support to make the change."
         });
         return;
       }

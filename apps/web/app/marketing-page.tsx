@@ -390,7 +390,7 @@ function WebHome() {
 
 /* ─── Showcase gallery (tabs drive a phone) ────────────────────── */
 const GALLERY = [
-  { num: "01", label: "Home", screen: <HomeScreen />, eyebrow: "THE LIBRARY", title: "Everything your family cooks", body: "Every recipe in one warm, searchable place — credited to whoever added it.", bullets: ["Hashed-color tiles, no photos needed", "Filter by who, by season, by dish"] },
+  { num: "01", label: "Home", screen: <HomeScreen />, eyebrow: "THE LIBRARY", title: "Everything your family cooks", body: "Every recipe in one warm, searchable place, credited to whoever added it.", bullets: ["Hashed-color tiles, no photos needed", "Filter by who, by season, by dish"] },
   { num: "02", label: "Add", screen: <AddScreen />, eyebrow: "CAPTURE", title: "Save it however it arrives", body: "Photo, voice note, or a pasted link. eeatly structures what it can.", bullets: ["Voice → structured recipe", "Photo of handwriting → text"] },
   { num: "03", label: "Recipe", screen: <RecipeScreen />, eyebrow: "THE DISH", title: "The recipe, kept whole", body: "Ingredients, method, and the story of who it came from.", bullets: ["Credited to the family member", "Cook count + last cooked"] },
   { num: "04", label: "Refine", screen: <RefineScreen />, eyebrow: "REFINE", title: "Change it by asking", body: "“Add more heat.” “Half the recipe.” The AI proposes; you decide.", bullets: ["Plain-language edits", "Review before you save"] }
@@ -441,7 +441,7 @@ export default function MarketingPage({ prices }: { prices: TierDisplayMap }) {
           <div className="hero-lead">
             <span className="eyebrow">For families who cook from far apart</span>
             <h1>One kitchen.<br />Your whole family.<br />Any distance.</h1>
-            <p className="hero-sub">Save the recipes your family actually cooks — from voice notes, WhatsApp photos, recipe links, however they reach you. Everyone in your kitchen can see them, even when you&apos;re not in the same one.</p>
+            <p className="hero-sub">Save the recipes your family actually cooks, from voice notes, WhatsApp photos, recipe links, however they reach you. Everyone in your kitchen can see them, even when you&apos;re not in the same one.</p>
             <div className="hero-ctas">
               <Link className="btn btn-primary" href={"/sign-up" as Route}>Start your kitchen {arrow}</Link>
               <a className="link" href="#pricing">See pricing</a>
@@ -482,8 +482,8 @@ export default function MarketingPage({ prices }: { prices: TierDisplayMap }) {
             </div>
             <div className="editorial-body">
               <p>Mom sends the recipe over WhatsApp. You scroll past it. Three months later you want it back, and it&apos;s buried in a chat with four thousand messages.</p>
-              <p>Your sister texts you a photo of the spice ratio — your camera roll eats it. You cook something amazing for a holiday dinner, and by next year, you can&apos;t remember exactly what you did.</p>
-              <p>Family recipes shouldn&apos;t be this fragile. eeatly keeps them — across phones, across chats, across continents.</p>
+              <p>Your sister texts you a photo of the spice ratio, and your camera roll eats it. You cook something amazing for a holiday dinner, and by next year, you can&apos;t remember exactly what you did.</p>
+              <p>Family recipes shouldn&apos;t be this fragile. eeatly keeps them: across phones, across chats, across continents.</p>
             </div>
           </div>
         </div>
@@ -542,7 +542,7 @@ export default function MarketingPage({ prices }: { prices: TierDisplayMap }) {
         <div className="wrap">
           <span className="section-eyebrow">Coming soon</span>
           <h2 className="section-title">An eeatly app for your iPhone</h2>
-          <p className="section-sub">eeatly works in any browser today. We&apos;re building a native iPhone app for capturing recipes the moment they arrive and cooking with your phone in hand — here&apos;s a preview of what&apos;s on the way.</p>
+          <p className="section-sub">eeatly works in any browser today. We&apos;re building a native iPhone app for capturing recipes the moment they arrive and cooking with your phone in hand. Here&apos;s a preview of what&apos;s on the way.</p>
           <ShowcaseGallery />
         </div>
       </section>
@@ -552,7 +552,7 @@ export default function MarketingPage({ prices }: { prices: TierDisplayMap }) {
         <div className="wrap">
           <h2>Your family&apos;s recipes deserve better than a chat archive</h2>
           <p>Start preserving them today. It takes less than a minute to save your first recipe.</p>
-          <Link className="btn btn-primary" href={"/sign-up" as Route}>Start your kitchen — it&apos;s free {arrow}</Link>
+          <Link className="btn btn-primary" href={"/sign-up" as Route}>Start your kitchen, it&apos;s free {arrow}</Link>
         </div>
       </section>
 
@@ -562,7 +562,7 @@ export default function MarketingPage({ prices }: { prices: TierDisplayMap }) {
           <div className="pricing-card">
             <span className="section-eyebrow">Pricing</span>
             <h2 className="section-title" style={{ marginBottom: 14 }}>Free to start. Chef to share. Head Chef for more AI. Master Chef to collaborate.</h2>
-            <p className="section-sub" style={{ marginBottom: 0 }}>Log meals, save photos, search your kitchen, and capture recipes with AI — free, forever (within a monthly credit grant). Chef adds shared family kitchens, meal planning, and public links; Head Chef adds priority AI and more credits; Master Chef adds co-editing and shareable plans.</p>
+            <p className="section-sub" style={{ marginBottom: 0 }}>Log meals, save photos, search your kitchen, and capture recipes with AI, free, forever (within a monthly credit grant). Chef adds shared family kitchens, meal planning, and public links; Head Chef adds priority AI and more credits; Master Chef adds co-editing and shareable plans.</p>
             <div className="pricing-table">
               <table>
                 <thead><tr><th>Feature</th><th>Cook</th><th>Chef</th><th>Head Chef</th><th>Master Chef</th></tr></thead>
@@ -575,8 +575,8 @@ export default function MarketingPage({ prices }: { prices: TierDisplayMap }) {
                   <tr><td>Shared family kitchens</td><td className="cross">×</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
                   <tr><td>Occasion &amp; meal planning</td><td className="cross">×</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
                   <tr><td>Public recipe share links</td><td className="cross">×</td><td className="check">✓</td><td className="check">✓</td><td className="check">✓</td></tr>
-                  <tr><td>Priority AI — no burst limits</td><td className="cross">×</td><td className="cross">×</td><td className="check">✓</td><td className="check">✓</td></tr>
-                  <tr><td>Co-editing — family edits your recipes &amp; plans</td><td className="cross">×</td><td className="cross">×</td><td className="cross">×</td><td className="check">✓</td></tr>
+                  <tr><td>Priority AI, no burst limits</td><td className="cross">×</td><td className="cross">×</td><td className="check">✓</td><td className="check">✓</td></tr>
+                  <tr><td>Co-editing: family edits your recipes &amp; plans</td><td className="cross">×</td><td className="cross">×</td><td className="cross">×</td><td className="check">✓</td></tr>
                   <tr><td>Shareable meal plans (public plan pages)</td><td className="cross">×</td><td className="cross">×</td><td className="cross">×</td><td className="check">✓</td></tr>
                   <tr><td>AI credits / month</td><td className="tier-num">{prices.free.credits.toLocaleString()}</td><td className="tier-num">{prices.plus.credits.toLocaleString()}</td><td className="tier-num">{prices.premium.credits.toLocaleString()}</td><td className="tier-num">{prices.pro.credits.toLocaleString()}</td></tr>
                 </tbody>
@@ -596,7 +596,7 @@ export default function MarketingPage({ prices }: { prices: TierDisplayMap }) {
           <span className="section-eyebrow">Questions</span>
           <h2 className="section-title" style={{ marginBottom: 48 }}>Common questions</h2>
           <div className="faq">
-            <details className="faq-item"><summary>Who is eeatly for?</summary><div className="faq-body">Anyone who cooks at home and wants a better place than camera roll, Notes app, or scattered chat threads. It&apos;s built for every cuisine — the patterns are universal: recipes get lost, voice notes from a grandparent get buried, the dish someone always brings has no proper home.</div></details>
+            <details className="faq-item"><summary>Who is eeatly for?</summary><div className="faq-body">Anyone who cooks at home and wants a better place than camera roll, Notes app, or scattered chat threads. It&apos;s built for every cuisine, and the patterns are universal: recipes get lost, voice notes from a grandparent get buried, the dish someone always brings has no proper home.</div></details>
             <details className="faq-item"><summary>What about family members who aren&apos;t tech-comfortable?</summary><div className="faq-body">They can send you a voice note over WhatsApp and you save it on their behalf, credited to them. Or join with magic-link sign-in: no passwords, just an email.</div></details>
             <details className="faq-item"><summary>What happens to recipes if someone leaves the kitchen?</summary><div className="faq-body">Recipes stay with the kitchen. The person who added them is still credited; their access can be revoked at any time without losing the recipes themselves.</div></details>
             <details className="faq-item"><summary>What is the AI actually doing with my photos and voice notes?</summary><div className="faq-body">It transcribes voice notes, extracts text from photos, and helps structure free-form notes into ingredients and steps. We don&apos;t train on your content, and you can always edit or remove what AI suggested.</div></details>

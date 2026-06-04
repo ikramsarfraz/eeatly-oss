@@ -286,15 +286,19 @@ function CardCta({
     }
     return (
       <Button asChild variant={variant} className={className}>
-        <Link href={"/home" as Route}>You&apos;re all set — Chef is unlocked</Link>
+        <Link href={"/home" as Route}>You&apos;re all set, Chef is unlocked</Link>
       </Button>
     );
   }
 
+  // No live Stripe price yet → don't gate the plan behind a dead "Coming soon".
+  // Send people into the app (free during launch) so every plan feels open.
   if (!billingConfigured) {
     return (
-      <Button type="button" disabled variant={variant} className={className}>
-        Coming soon
+      <Button asChild variant={variant} className={className}>
+        <Link href={(authState.kind === "anonymous" ? "/sign-up" : "/home") as Route}>
+          Try eeatly
+        </Link>
       </Button>
     );
   }
@@ -310,7 +314,7 @@ function CardCta({
   if (subscribedHere) {
     return (
       <Button asChild variant={variant} className={className}>
-        <Link href={"/settings" as Route}>Your plan — manage billing</Link>
+        <Link href={"/settings" as Route}>Your plan, manage billing</Link>
       </Button>
     );
   }

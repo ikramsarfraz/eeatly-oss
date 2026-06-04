@@ -9,9 +9,18 @@ import { Card } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
 import { useToast } from "@/components/providers/toast-provider";
 import { trpc } from "@/lib/trpc/client";
+import { TIERS, TIER_FEATURES } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
 
 type PaidTier = "plus" | "premium" | "pro";
+
+/** A few "what's included" lines per tier — credits are shown separately, so
+ *  drop any feature row that just restates the monthly credit grant. */
+function planHighlights(tier: "free" | PaidTier): string[] {
+  return TIER_FEATURES[tier]
+    .filter((f) => !/credits?\s*\/\s*month/i.test(f))
+    .slice(0, 3);
+}
 const TIER_NAME: Record<string, string> = {
   free: "Cook",
   plus: "Chef",
@@ -93,11 +102,11 @@ export function PlanManager() {
 
   const statusLine = active
     ? sub!.cancelAtPeriodEnd
-      ? `Cancels ${formatDate(sub!.currentPeriodEnd)} — access until then.`
+      ? `Cancels ${formatDate(sub!.currentPeriodEnd)}, access until then.`
       : `Renews ${formatDate(sub!.currentPeriodEnd)}.`
     : onTrial
       ? `${trialDaysLeft} day${trialDaysLeft === 1 ? "" : "s"} left in your Master Chef trial. Pick a plan to keep these features.`
-      : "Free plan — AI runs on your monthly credit grant.";
+      : "Free plan. AI runs on your monthly credit grant.";
 
   return (
     <section id="plan" className="grid gap-3 scroll-mt-24">
@@ -171,22 +180,27 @@ export function PlanManager() {
           ))}
         </div>
 
-        {/* Tier cards */}
-        <div className="mt-3 grid gap-2.5 sm:grid-cols-3">
-          {(["plus", "premium", "pro"] as const).map((tier) => {
-            const t = catalog?.[tier];
+        {/* Tier cards — Cook (free) through Master Chef, each with a short
+            description + what's included so the differences are legible. */}
+        <div className="mt-3 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+          {(["free", "plus", "premium", "pro"] as const).map((tier) => {
+            const isFreeTier = tier === "free";
+            const t = isFreeTier ? undefined : catalog?.[tier];
             const price = interval === "monthly" ? t?.monthly : t?.annual;
-            const perMonth =
-              interval === "monthly"
+            const perMonth = isFreeTier
+              ? "$0"
+              : interval === "monthly"
                 ? price?.display
                 : (t?.annual && "perMonthDisplay" in t.annual ? t.annual.perMonthDisplay : undefined);
+            const credits = isFreeTier ? TIERS.free.monthlyCredits : (t?.monthlyCredits ?? 0);
+            const sellable = isFreeTier ? false : Boolean(t?.sellable);
             const isCurrent = subscribedTier === tier;
             const isUpgrade = RANK[tier] > RANK[subscribedTier];
             return (
               <div
                 key={tier}
                 className={cn(
-                  "grid gap-2 rounded-xl border p-4",
+                  "grid content-start gap-2 rounded-xl border p-4",
                   isCurrent ? "border-primary/50 bg-[color:var(--sage-soft)]" : "border-border"
                 )}
               >
@@ -204,27 +218,44 @@ export function PlanManager() {
                 <div>
                   <span className="font-serif text-[24px] text-foreground">{perMonth ?? "—"}</span>
                   <span className="ml-1 text-[12px] text-muted-foreground">/ mo</span>
-                  {interval === "annual" ? (
+                  {isFreeTier ? (
+                    <p className="text-[11px] text-muted-foreground">free forever</p>
+                  ) : interval === "annual" ? (
                     <p className="text-[11px] text-muted-foreground">billed annually</p>
                   ) : null}
                 </div>
-                <p className="text-[12px] text-muted-foreground">
-                  {(t?.monthlyCredits ?? 0).toLocaleString()} AI credits / month
+                <p className="text-pretty text-[12px] leading-snug text-muted-foreground">
+                  {TIERS[tier].blurb}
                 </p>
+                <p className="text-[12px] font-medium text-foreground">
+                  {credits.toLocaleString()} AI credits / month
+                </p>
+                <ul className="grid gap-1">
+                  {planHighlights(tier).map((f) => (
+                    <li key={f} className="flex items-start gap-1.5 text-[11.5px] leading-snug text-muted-foreground">
+                      <Check className="mt-px h-3 w-3 shrink-0 text-primary" />
+                      <span>{f}</span>
+                    </li>
+                  ))}
+                </ul>
                 {isCurrent ? (
-                  <Button type="button" variant="outline" size="sm" disabled className="h-9">
+                  <Button type="button" variant="outline" size="sm" disabled className="mt-1 h-9">
                     <Check className="h-3.5 w-3.5" />
                     Your plan
                   </Button>
-                ) : !t?.sellable ? (
-                  <Button type="button" variant="outline" size="sm" disabled className="h-9">
-                    Coming soon
+                ) : isFreeTier ? (
+                  <Button type="button" variant="outline" size="sm" disabled className="mt-1 h-9">
+                    Always included
+                  </Button>
+                ) : !sellable ? (
+                  <Button type="button" variant="outline" size="sm" disabled className="mt-1 h-9">
+                    Included during launch
                   </Button>
                 ) : (
                   <Button
                     type="button"
                     size="sm"
-                    className="h-9"
+                    className="mt-1 h-9"
                     disabled={busy}
                     onClick={() => upgradeTo(tier)}
                   >

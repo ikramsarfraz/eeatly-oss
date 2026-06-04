@@ -6,21 +6,21 @@ import { getTierDisplayPrices } from "@/services/pricing-display";
 import MarketingPage from "./marketing-page";
 
 const META_DESCRIPTION =
-  "Save the family recipes that matter — from voice notes, WhatsApp photos, recipe links, however they reach you. Shared kitchens across continents.";
+  "Save the family recipes that matter, from voice notes, WhatsApp photos, recipe links, however they reach you. Shared kitchens across continents.";
 
 export const metadata: Metadata = {
-  title: "eeatly — One kitchen for your whole family",
+  title: "eeatly: One kitchen for your whole family",
   description: META_DESCRIPTION,
   alternates: { canonical: "/" },
   openGraph: {
-    title: "eeatly — One kitchen for your whole family",
+    title: "eeatly: One kitchen for your whole family",
     description: META_DESCRIPTION,
     type: "website",
     siteName: "eeatly"
   },
   twitter: {
     card: "summary_large_image",
-    title: "eeatly — One kitchen for your whole family",
+    title: "eeatly: One kitchen for your whole family",
     description: META_DESCRIPTION
   }
 };

@@ -23,7 +23,7 @@ const topics: Topic[] = [
         Open your dashboard and tap{" "}
         <span className="font-medium text-foreground">Log a meal</span>. Type
         the dish name, pick an effort level (quick, easy, medium, or high),
-        choose the date, and add any notes. That&apos;s it — the whole thing
+        choose the date, and add any notes. That&apos;s it: the whole thing
         takes under a minute. If you cooked something you&apos;ve made before,
         use <span className="font-medium text-foreground">Log again</span> from
         the meal&apos;s detail page to save it with today&apos;s date in one
@@ -42,25 +42,25 @@ const topics: Topic[] = [
         . Three inputs work:
         <ul className="mt-2 list-inside list-disc grid gap-1">
           <li>
-            <span className="text-foreground">Photo</span> — snap the dish or a
+            <span className="text-foreground">Photo</span>: snap the dish or a
             recipe card; we&apos;ll name it and pull the recipe text when there
             is one.
           </li>
           <li>
-            <span className="text-foreground">Text</span> — paste a recipe or
+            <span className="text-foreground">Text</span>: paste a recipe or
             just a paragraph about the dish.
           </li>
           <li>
-            <span className="text-foreground">Voice note</span> — record in the
+            <span className="text-foreground">Voice note</span>: record in the
             browser or upload a WhatsApp voice note. Speaking in Urdu, Hindi,
             English, or any mix works.
           </li>
         </ul>
         Saving a recipe from YouTube, TikTok, or Pinterest? Paste the URL into
         the <span className="font-medium text-foreground">Source URL</span>{" "}
-        field on the meal form — we&apos;ll embed the video or pin on the recipe
-        page so you can play it back when you cook. The AI fills the form fields
-        — always review before saving. Your voice and audio are processed
+        field on the meal form, and we&apos;ll embed the video or pin on the recipe
+        page so you can play it back when you cook. The AI fills the form fields,
+        but always review before saving. Your voice and audio are processed
         in-memory and never stored on our servers (more in our{" "}
         <Link
           href={"/privacy" as Route}
@@ -92,7 +92,7 @@ const topics: Topic[] = [
         find your kitchen. Tap{" "}
         <span className="font-medium text-foreground">Invite</span>, enter an
         email, and we&apos;ll send them a link. Once they accept, their meals
-        show up alongside yours and theirs alongside yours — recipes are shared,
+        show up alongside yours and theirs alongside yours: recipes are shared,
         attribution is preserved.
       </>
     ),
@@ -101,7 +101,7 @@ const topics: Topic[] = [
     question: "What if my family lives in a different time zone?",
     answer: (
       <>
-        eeatly is async by design — no real-time calls, no presence indicators.
+        eeatly is async by design: no real-time calls, no presence indicators.
         Mom in Karachi logs Sunday&apos;s biryani while you&apos;re asleep in
         Toronto; you see it when you wake up. The whole product is built around
         &ldquo;kept safe across continents&rdquo; as a first principle, not an
@@ -121,7 +121,7 @@ const topics: Topic[] = [
         <span className="font-medium text-foreground">Manage billing</span>.
         That opens the Stripe billing portal where you can cancel, change plan,
         or update your card. Cancellation takes effect at the end of your
-        current billing period — you keep your plan&apos;s features until then.
+        current billing period; you keep your plan&apos;s features until then.
       </>
     ),
   },
@@ -148,7 +148,7 @@ const topics: Topic[] = [
       <>
         Inside the app, tap{" "}
         <span className="font-medium text-foreground">Feedback</span> in the
-        sidebar — we read every message. If you&apos;re not signed in yet, the
+        sidebar, and we read every message. If you&apos;re not signed in yet, the
         fastest path is to{" "}
         <Link
           href="/sign-up"

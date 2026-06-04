@@ -29,16 +29,16 @@ export default function PrivacyPage() {
             Only the things you put in:
           </p>
           <ul className="mt-2 list-inside list-disc grid gap-1 text-sm text-muted-foreground">
-            <li>Your account info — email and the name you sign up with</li>
-            <li>Meals you log — name, date, effort, notes</li>
+            <li>Your account info: email and the name you sign up with</li>
+            <li>Meals you log: name, date, effort, notes</li>
             <li>Photos you upload (optional)</li>
             <li>Audio you record or upload for voice notes (see &ldquo;AI processing&rdquo; below)</li>
             <li>Which kitchen you belong to and who else is in it</li>
             <li>Recipes you save and any shareable links you create</li>
           </ul>
           <p className="mt-3 text-sm text-muted-foreground">
-            Beyond what you log, we keep lightweight product analytics — which
-            pages get visited and when people sign up — to understand how
+            Beyond what you log, we keep lightweight product analytics (which
+            pages get visited and when people sign up) to understand how
             eeatly is used (see &ldquo;Analytics &amp; error tracking&rdquo;
             below). We don&apos;t sell your data or track you across other
             sites.
@@ -50,8 +50,8 @@ export default function PrivacyPage() {
           <p className="mt-3 text-sm text-muted-foreground">
             Your account, meals, recipes, and household info live in a
             managed Postgres database (Neon). Photos you upload live in
-            object storage (Cloudflare R2). Payment info — only if you upgrade
-            to a paid plan — is handled entirely by Stripe; we never see your
+            object storage (Cloudflare R2). Payment info (only if you upgrade
+            to a paid plan) is handled entirely by Stripe; we never see your
             card details.
           </p>
         </section>
@@ -64,14 +64,14 @@ export default function PrivacyPage() {
           </p>
           <ul className="mt-2 list-inside list-disc grid gap-1 text-sm text-muted-foreground">
             <li>
-              <span className="text-foreground">PostHog</span> — product
+              <span className="text-foreground">PostHog</span>: product
               analytics for page visits and sign-ups, so we can see what&apos;s
               working. Anonymous visits are counted without a profile; a
               profile is only created once you sign in. We don&apos;t sell this
               data or use it to track you on other sites.
             </li>
             <li>
-              <span className="text-foreground">Sentry</span> — error
+              <span className="text-foreground">Sentry</span>: error
               monitoring. When something breaks, a diagnostic report (the error
               and a stack trace) is sent so we can fix it. We don&apos;t attach
               your personal data to these reports.
@@ -82,8 +82,8 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-xl font-semibold">AI processing</h2>
           <p className="mt-3 text-sm text-muted-foreground">
-            When you use the AI suggest feature — to fill a meal from a photo,
-            pasted text, or a voice note — your input is sent to an AI
+            When you use the AI suggest feature (to fill a meal from a photo,
+            pasted text, or a voice note) your input is sent to an AI
             provider (OpenAI primary, Anthropic as a fallback) to extract the
             recipe. Two specifics worth being explicit about:
           </p>
@@ -108,8 +108,8 @@ export default function PrivacyPage() {
           </ul>
           <p className="mt-3 text-sm text-muted-foreground">
             If you&apos;d rather not send your data to a third-party AI
-            provider, you can ignore the AI suggest feature entirely —
-            everything in eeatly works without it.
+            provider, you can ignore the AI suggest feature entirely.
+            Everything in eeatly works without it.
           </p>
         </section>
 
@@ -124,7 +124,7 @@ export default function PrivacyPage() {
           <p className="mt-3 text-sm text-muted-foreground">
             If a member leaves the kitchen or deletes their account, the
             meals they logged stay with the household but their
-            attribution becomes &ldquo;Former member&rdquo; — their name
+            attribution becomes &ldquo;Former member&rdquo;: their name
             and email come off. The history doesn&apos;t disappear; the
             personal identifier does.
           </p>
@@ -135,8 +135,8 @@ export default function PrivacyPage() {
           <p className="mt-3 text-sm text-muted-foreground">
             When you create a public share link for a recipe, anyone with
             that link can view the recipe (no sign-in required). Share
-            links are unlisted — they aren&apos;t indexed or made
-            findable — but they&apos;re not secret either. You can revoke
+            links are unlisted (they aren&apos;t indexed or made
+            findable) but they&apos;re not secret either. You can revoke
             a share link at any time from the recipe&apos;s settings.
           </p>
         </section>
@@ -154,7 +154,7 @@ export default function PrivacyPage() {
             </li>
             <li>
               If you&apos;re part of a shared kitchen, your meals stay with
-              the household as described above — your name comes off, but
+              the household as described above; your name comes off, but
               the cooking history doesn&apos;t.
             </li>
             <li>
@@ -174,7 +174,7 @@ export default function PrivacyPage() {
           <p className="mt-3 text-sm text-muted-foreground">
             The session cookie that keeps you signed in after you click a
             magic link, plus a PostHog analytics cookie that counts visits.
-            No ad cookies and no tracking pixels — we don&apos;t follow you
+            No ad cookies and no tracking pixels; we don&apos;t follow you
             around the web.
           </p>
         </section>
@@ -183,7 +183,7 @@ export default function PrivacyPage() {
           <h2 className="text-xl font-semibold">Feedback we receive</h2>
           <p className="mt-3 text-sm text-muted-foreground">
             If you send feedback through the app, a small team reads it.
-            We use it to fix things and improve the product — never publicly,
+            We use it to fix things and improve the product, never publicly,
             and never attached to your name without asking.
           </p>
         </section>
