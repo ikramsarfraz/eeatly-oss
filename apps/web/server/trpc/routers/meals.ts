@@ -7,6 +7,7 @@ import { trackMealLogLifecycleEvent } from "@/lib/observability/funnel";
 import { logger } from "@/lib/observability/logger";
 import {
   effortLevelSchema,
+  manualRecipeInputSchema,
   mealLogInputSchema,
   setMealPhotoInputSchema
 } from "@eeatly/api/validators/meals";
@@ -18,8 +19,9 @@ import {
   getMealDetail,
   setMealPhoto
 } from "@/services/meals";
+import { saveStructuredRecipe } from "@/services/recipe-edit";
 import { createNotification } from "@/services/notifications";
-import { householdMemberProcedure, rateLimit, router } from "../trpc";
+import { householdMemberProcedure, protectedProcedure, rateLimit, router } from "../trpc";
 
 /**
  * Round 11 — meal reads.
@@ -83,6 +85,40 @@ export const mealsRouter = router({
     .query(({ ctx, input }) =>
       getMealDetail(ctx.user.id, ctx.household.id, input.mealId)
     ),
+
+  /**
+   * Manual (no-AI, no-credit) structured recipe edit. Replaces the meal's
+   * `meal_ingredients` + `recipe_steps` with the submitted lists. Uses
+   * `protectedProcedure` (not household-scoped) because authorization is the
+   * per-item editor check inside the service, so shared recipes are editable by
+   * the same people who can Refine them. No `withAiCredits` — this is the
+   * credit-free path for editing ingredients/steps by hand.
+   */
+  saveStructuredRecipe: protectedProcedure
+    .use(rateLimit("mutation"))
+    .input(manualRecipeInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const result = await saveStructuredRecipe({
+          userId: ctx.user.id,
+          mealId: input.mealId,
+          ingredients: input.ingredients,
+          steps: input.steps
+        });
+        revalidatePath(`/meal/${input.mealId}`);
+        return result;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown error.";
+        if (message.toLowerCase().includes("not authorized")) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have edit access to this recipe.",
+            cause: { reason: "NOT_AUTHORIZED" }
+          });
+        }
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
+      }
+    }),
 
   historyRows: householdMemberProcedure
     .input(historyOptionsSchema.optional())

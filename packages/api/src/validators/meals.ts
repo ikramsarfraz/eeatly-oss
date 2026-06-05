@@ -85,3 +85,33 @@ export const setMealPhotoInputSchema = z.object({
 });
 
 export type SetMealPhotoInput = z.infer<typeof setMealPhotoInputSchema>;
+
+/**
+ * Manual (no-AI, no-credit) structured recipe edit. The submitted ingredient +
+ * step lists fully REPLACE the meal's structured rows (see
+ * `services/recipe-edit.ts`). Blank rows are dropped server-side, so the client
+ * can keep trailing empty rows in the editor without consequence.
+ */
+export const manualRecipeInputSchema = z.object({
+  mealId: z.string().uuid(),
+  ingredients: z
+    .array(
+      z.object({
+        name: z.string().max(200, "Ingredient name is too long."),
+        quantityString: z.string().max(120, "Quantity is too long.").optional(),
+        prepNote: z.string().max(200, "Prep note is too long.").nullable().optional()
+      })
+    )
+    .max(100, "Recipes shouldn't carry more than 100 ingredients."),
+  steps: z
+    .array(
+      z.object({
+        title: z.string().max(160, "Step title is too long."),
+        time: z.string().max(80, "Step time is too long.").nullable().optional(),
+        body: z.string().max(4000, "Step text is too long.").optional()
+      })
+    )
+    .max(60, "Recipes shouldn't carry more than 60 steps.")
+});
+
+export type ManualRecipeInput = z.infer<typeof manualRecipeInputSchema>;

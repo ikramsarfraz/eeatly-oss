@@ -72,6 +72,11 @@ const mealsServiceMock = vi.hoisted(() => ({
 }));
 vi.mock("@/services/meals", () => mealsServiceMock);
 
+const recipeEditServiceMock = vi.hoisted(() => ({
+  saveStructuredRecipe: vi.fn()
+}));
+vi.mock("@/services/recipe-edit", () => recipeEditServiceMock);
+
 // AI service mock — the ai router imports these named exports at module
 // load, so every one must be present or the router fails to construct.
 const aiServiceMock = vi.hoisted(() => ({
@@ -522,6 +527,48 @@ describe("mealsRouter mutations (Task 3)", () => {
     expect(caught).toMatchObject({
       code: "FORBIDDEN",
       cause: { reason: "NOT_CREATOR" }
+    });
+  });
+
+  it("saveStructuredRecipe: passes ingredients + steps through (no credits)", async () => {
+    recipeEditServiceMock.saveStructuredRecipe.mockResolvedValueOnce({
+      ingredientCount: 2,
+      stepCount: 1
+    });
+    const result = await call(makeUser()).meals.saveStructuredRecipe({
+      mealId: "22222222-2222-4222-8222-222222222222",
+      ingredients: [
+        { name: "Rice", quantityString: "1 cup" },
+        { name: "Salt", quantityString: "" }
+      ],
+      steps: [{ title: "Cook", time: "10 min", body: "Boil the rice." }]
+    });
+    expect(result).toEqual({ ingredientCount: 2, stepCount: 1 });
+    expect(recipeEditServiceMock.saveStructuredRecipe).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "u-1",
+        mealId: "22222222-2222-4222-8222-222222222222"
+      })
+    );
+  });
+
+  it("saveStructuredRecipe: maps a not-authorized service error to FORBIDDEN", async () => {
+    recipeEditServiceMock.saveStructuredRecipe.mockRejectedValueOnce(
+      new Error("Not authorized to edit this item.")
+    );
+    let caught: unknown;
+    try {
+      await call(makeUser()).meals.saveStructuredRecipe({
+        mealId: "22222222-2222-4222-8222-222222222222",
+        ingredients: [],
+        steps: []
+      });
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toMatchObject({
+      code: "FORBIDDEN",
+      cause: { reason: "NOT_AUTHORIZED" }
     });
   });
 });

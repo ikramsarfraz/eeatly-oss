@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
-import { Camera, Loader2, Sparkles } from "lucide-react";
+import { Camera, Loader2, Pencil, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -478,6 +478,16 @@ export function RecipeDetailClient({
                 <Link href={`/meal/${meal.id}/refine` as Route}>
                   <Sparkles className="h-3.5 w-3.5" />
                   Refine with AI
+                </Link>
+              </Button>
+            ) : null}
+            {/* Credit-free manual editor — edit ingredients/steps by hand, no
+                AI. Same editor authz as Refine (owner + edit/admin grantees). */}
+            {canEdit ? (
+              <Button asChild variant="outline" className="min-h-[40px]">
+                <Link href={`/meal/${meal.id}/edit` as Route}>
+                  <Pencil className="h-3.5 w-3.5" />
+                  Edit recipe
                 </Link>
               </Button>
             ) : null}
