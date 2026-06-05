@@ -21,14 +21,17 @@ import { AI_CREDIT_COSTS } from "@/lib/pricing";
  */
 
 /** Curated cost rows for the "How credits work" disclosure, derived from the
- *  single-source-of-truth cost table so they can't drift. */
+ *  single-source-of-truth cost table so they can't drift, and sorted cheapest
+ *  first so the list reads as a clear ascending ladder. */
 const COST_ROWS: ReadonlyArray<{ label: string; cost: number }> = [
   { label: "Capture or refine from text", cost: AI_CREDIT_COSTS.suggest_text },
   { label: "Capture or refine from voice or photo", cost: AI_CREDIT_COSTS.suggest_voice },
   { label: "Extract ingredients", cost: AI_CREDIT_COSTS.extract_ingredients },
   { label: "Create a share link", cost: AI_CREDIT_COSTS.share_recipe },
   { label: "Generate a dish image", cost: AI_CREDIT_COSTS.dish_image }
-];
+]
+  .slice()
+  .sort((a, b) => a.cost - b.cost);
 
 type CreditUsageBarProps = {
   className?: string;
