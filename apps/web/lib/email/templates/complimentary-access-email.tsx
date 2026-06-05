@@ -29,9 +29,10 @@ export function ComplimentaryAccessEmail({
       <Section>
         <Heading style={emailHeading}>Enjoy {dayLabel} on us, {name}</Heading>
         <Text style={emailText}>
-          We&apos;ve unlocked full <strong>Master Chef</strong> access on your eeatly
-          account, no card needed. You&apos;ve got every feature: shared kitchens, meal
-          planning, co-editing, priority AI, and a generous monthly credit grant.
+          We&apos;ve unlocked full <strong>Master Chef</strong>{" "}access on your
+          eeatly account, no card needed. You&apos;ve got every feature: shared
+          kitchens, meal planning, co-editing, priority AI, and a generous monthly
+          credit grant.
         </Text>
         <Text style={emailText}>
           Your complimentary access runs through <strong>{accessUntilLabel}</strong>.
