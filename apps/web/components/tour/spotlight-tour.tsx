@@ -48,7 +48,21 @@ export function SpotlightTour({
       scrolledRef.current = index;
     }
     const b = el.getBoundingClientRect();
-    setVp({ w: window.innerWidth, h: window.innerHeight });
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    // Skip anchors that are hidden or off-screen (e.g. the off-canvas sidebar
+    // on mobile) so we never highlight empty space — keep polling / advance.
+    if (
+      b.width === 0 ||
+      b.height === 0 ||
+      b.right <= 0 ||
+      b.bottom <= 0 ||
+      b.left >= vw ||
+      b.top >= vh
+    ) {
+      return false;
+    }
+    setVp({ w: vw, h: vh });
     setBox({ x: b.left - PAD, y: b.top - PAD, w: b.width + PAD * 2, h: b.height + PAD * 2 });
     return true;
   }, [step.anchor, index]);
