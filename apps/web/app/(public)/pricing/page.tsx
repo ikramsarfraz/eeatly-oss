@@ -9,9 +9,17 @@ import { getStripeCatalog, perMonthDisplay } from "@/services/stripe-catalog";
 import { PricingGrid } from "@/components/pricing/pricing-grid";
 
 export const metadata: Metadata = {
-  title: "Pricing: eeatly",
+  title: "Pricing",
   description:
-    "Cook is free forever. Chef shares your kitchen with family: household sharing, meal plans, and public recipe links. Master Chef adds co-editing, shareable plans, and priority AI."
+    "Cook is free forever. Chef shares your kitchen with family: household sharing, meal plans, and public recipe links. Master Chef adds co-editing, shareable plans, and priority AI.",
+  alternates: { canonical: "/pricing" },
+  openGraph: {
+    title: "eeatly pricing",
+    description:
+      "Cook is free forever. Paid tiers add shared kitchens, meal planning, co-editing, and more AI.",
+    url: "/pricing",
+    type: "website"
+  }
 };
 
 export const dynamic = "force-dynamic";
@@ -54,8 +62,22 @@ export default async function PricingPage() {
   const premiumPrices = tierPrices(catalog.tiers.premium);
   const proPrices = tierPrices(catalog.tiers.pro);
 
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: FAQ_ITEMS.map((item) => ({
+      "@type": "Question",
+      name: item.q,
+      acceptedAnswer: { "@type": "Answer", text: item.a }
+    }))
+  };
+
   return (
     <div className="relative">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       {/* Decorative dot grid bleeding full-width out of the top. */}
       <div
         aria-hidden
@@ -88,7 +110,7 @@ export default async function PricingPage() {
           </p>
           <span className="mt-6 inline-flex items-center gap-2.5 rounded-full border bg-[var(--primary-soft)] py-1.5 pl-3 pr-3.5 text-[13px] font-medium text-primary">
             <Sparkles className="h-3.5 w-3.5" aria-hidden />
-            Every new account starts with a 14-day Master Chef trial, no card needed.
+            Every new account starts with a 7-day Master Chef trial, no card needed.
           </span>
         </header>
 
@@ -187,7 +209,7 @@ export default async function PricingPage() {
 const FAQ_ITEMS: { q: string; a: string }[] = [
   {
     q: "How does the free Master Chef trial work?",
-    a: "Every new account gets 14 days of Master Chef automatically, no card needed. You'll have the full set of features, including co-editing and priority AI. Near the end we'll prompt you to pick a plan; if you don't, your account simply drops to Cook and your library stays exactly as it is."
+    a: "Every new account gets 7 days of Master Chef automatically, no card needed. You'll have the full set of features, including co-editing and priority AI. Near the end we'll prompt you to pick a plan; if you don't, your account simply drops to Cook and your library stays exactly as it is."
   },
   {
     q: "What's the difference between Chef and Master Chef?",

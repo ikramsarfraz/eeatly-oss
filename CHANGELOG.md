@@ -3,6 +3,61 @@
 All notable changes to eeatly are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-06-05
+
+First post-launch feature release. Closes the AI capture/edit loop, adds
+in-app onboarding, hardens SEO, and fixes mobile-web layout issues.
+
+### Recipes & cooking
+- AI capture now generates a full best-effort recipe (ordered ingredients +
+  numbered steps) from a bare dish name, finished-dish photo, or voice note
+  that only names a dish, and flags it as an "AI draft, verify" so inferred
+  content is clearly distinguished from extracted content.
+- Logging a meal auto-splits the captured recipe into structured ingredients
+  and steps, and opens the recipe detail page on creation.
+- New credit-free manual recipe editor: add, edit, reorder, and delete
+  ingredients and steps without spending AI credits, writing the same
+  structured tables the Refine flow uses.
+
+### Onboarding & help
+- In-app Tour & Help: a first-run welcome modal, a coached spotlight tour
+  (desktop), and a searchable Help slide-over with per-feature guides.
+  Contextual "?" tips sit on page titles. The tour gracefully offers guides
+  instead of the spotlight on mobile.
+
+### Pricing & trials
+- Master Chef trial shortened to 7 days.
+- Admin "grant complimentary access" tool: give a user paid-tier access for a
+  chosen number of days (with an email), independent of Stripe.
+- Re-balanced AI credit costs onto a 1·2·3·5·10 ladder; "How credits work"
+  rows now sort cheapest-first.
+
+### SEO
+- `robots.txt`, sitemap, per-route `noindex` for private pages, an
+  `X-Robots-Tag` header for non-public paths, and JSON-LD structured data.
+
+### Appearance
+- App now defaults to light mode (no OS theme tracking).
+
+### Admin
+- Sticky admin top bar with breadcrumbs and a wider, tighter content area.
+
+### Mobile web fixes
+- Bottom tab bar is fixed to the viewport with route-matched icons and labels
+  (Home / Library / Plans); Ideas is parked for a rebuild (#61).
+- Share modal no longer overflows the screen on narrow viewports.
+
+### Fixes & copy
+- Help panel accessibility: the Sheet now has a proper title for screen
+  readers.
+- Removed remaining em dashes from user-facing copy per the house rule.
+
+### Database
+- Migrations `0039_user_complimentary_access` and `0040_recipe_ai_draft`
+  (applied at build time on deploy).
+
+[1.1.0]: https://github.com/ikramsarfraz/eeatly/releases/tag/v1.1.0
+
 ## [1.0.0] - 2026-06-04
 
 First production release: the public v1 launch. eeatly is a shared kitchen for

@@ -1,4 +1,8 @@
+import { noIndexMetadata } from "@/lib/seo/no-index";
+
 export const dynamic = "force-dynamic";
+
+export const metadata = noIndexMetadata;
 
 export default function OnboardingLayout({ children }: { children: React.ReactNode }) {
   return (

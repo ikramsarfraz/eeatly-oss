@@ -26,6 +26,19 @@ function isAdminHostAllowedPath(pathname: string): boolean {
 // First admin page (there's no `/admin` index route).
 const ADMIN_HOME = "/admin/analytics";
 
+// The only crawlable, indexable pages. Everything else (the authenticated app,
+// admin, auth, onboarding, token-gated pages, API) gets an `X-Robots-Tag`
+// noindex header — defence in depth alongside robots.txt + per-route metadata,
+// and the only signal that survives a redirect (e.g. an app route bouncing an
+// anonymous crawler to /sign-in).
+const PUBLIC_INDEXABLE_PATHS = new Set(["/", "/pricing", "/privacy", "/help"]);
+
+function isIndexable(pathname: string): boolean {
+  if (PUBLIC_INDEXABLE_PATHS.has(pathname)) return true;
+  // robots.txt + sitemap.xml + web manifest are served to crawlers as-is.
+  return pathname === "/robots.txt" || pathname === "/sitemap.xml";
+}
+
 export function proxy(request: NextRequest) {
   const incomingId = request.headers.get(REQUEST_ID_HEADER);
   const requestId = incomingId && incomingId.trim().length > 0
@@ -56,6 +69,10 @@ export function proxy(request: NextRequest) {
   });
   // Echo the id back so the client can include it when filing bug reports.
   response.headers.set(REQUEST_ID_HEADER, requestId);
+  // Keep every non-public path out of search indexes.
+  if (!isIndexable(request.nextUrl.pathname)) {
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  }
   return response;
 }
 

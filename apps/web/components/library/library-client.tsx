@@ -17,6 +17,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ScreenTip } from "@/components/tour/screen-tip";
 import { MealTile } from "@/components/ui/meal-tile";
 import { ShareSheet } from "@/components/sharing/share-sheet";
 import { useQuickLog } from "@/components/dashboard/quick-log-provider";
@@ -259,15 +260,21 @@ export function LibraryClient({
           distinct from the green primary). */}
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="grid gap-2">
-          <h1
-            className="font-serif text-[44px] leading-[1.02] text-foreground sm:text-[52px] lg:text-[64px]"
-            style={{ letterSpacing: "-0.025em" }}
-          >
-            Library.
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1
+              className="font-serif text-[44px] leading-[1.02] text-foreground sm:text-[52px] lg:text-[64px]"
+              style={{ letterSpacing: "-0.025em" }}
+            >
+              Library.
+            </h1>
+            <ScreenTip
+              title="Your whole cookbook"
+              body="Every meal you've saved, searchable and filterable. Click any card to open the recipe."
+            />
+          </div>
           {surface === "yours" ? (
             <p className="max-w-[560px] text-[14px] leading-[1.55] text-muted-foreground">
-              Everything you&apos;ve saved. Private by default —{" "}
+              Everything you&apos;ve saved. Private by default:{" "}
               <strong className="text-foreground">nothing is shared until you choose to.</strong>
             </p>
           ) : (

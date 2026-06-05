@@ -1,6 +1,10 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { Wordmark } from "@/components/brand/logo";
+import { noIndexMetadata } from "@/lib/seo/no-index";
+
+// Sign-in / sign-up are utility pages, not search landing pages.
+export const metadata = noIndexMetadata;
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (

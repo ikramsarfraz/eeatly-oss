@@ -2,7 +2,7 @@ import "server-only";
 
 import { revalidatePath } from "next/cache";
 import { TRPCError } from "@trpc/server";
-import { differenceInCalendarDays } from "date-fns";
+import { differenceInCalendarDays, format } from "date-fns";
 import { eq, max } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db/client";
@@ -24,6 +24,8 @@ import {
   searchUsersForOverride
 } from "@/services/feature-overrides";
 import { updateUserBetaCohort } from "@/services/user-lifecycle";
+import { applyTierGrant } from "@/services/ai-credits";
+import { TRIAL_DAYS } from "@/lib/pricing";
 import {
   getStripeCatalog,
   perMonthDisplay,
@@ -229,6 +231,92 @@ export const adminRouter = router({
         cohort: input.cohort
       });
       return { ok: true as const };
+    }),
+
+  /**
+   * Grant a user N more days of complimentary Master Chef (Pro) access, no
+   * card. Extends from their current access end (auto trial or a prior grant),
+   * or from now if lapsed. Bumps their monthly credit bucket to Pro right away
+   * and optionally emails them. Useful to comp specific users, e.g. before
+   * Stripe is wired.
+   */
+  grantComplimentaryAccess: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1).max(128),
+        days: z.number().int().min(1).max(365),
+        sendEmail: z.boolean().default(true)
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [user] = await db
+        .select({
+          id: users.id,
+          email: users.email,
+          name: users.name,
+          createdAt: users.createdAt,
+          complimentaryAccessUntil: users.complimentaryAccessUntil
+        })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+
+      if (!user) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User not found.",
+          cause: { reason: "NOT_FOUND" }
+        });
+      }
+
+      // Base = the later of: now, any existing grant, and the auto-trial end.
+      // "More N days" then extends from where their access actually runs out.
+      const now = new Date();
+      const autoTrialEnd = user.createdAt
+        ? new Date(user.createdAt.getTime() + TRIAL_DAYS * 86_400_000)
+        : null;
+      const baseMs = Math.max(
+        now.getTime(),
+        user.complimentaryAccessUntil?.getTime() ?? 0,
+        autoTrialEnd?.getTime() ?? 0
+      );
+      const accessUntil = new Date(baseMs + input.days * 86_400_000);
+
+      await db
+        .update(users)
+        .set({ complimentaryAccessUntil: accessUntil, updatedAt: now })
+        .where(eq(users.id, input.userId));
+
+      // Raise the monthly credit bucket to Pro immediately (GREATEST, never
+      // lowers) so the grant is felt right away, not just next cycle.
+      await applyTierGrant({ userId: input.userId, oldTier: "free", newTier: "pro" });
+
+      let emailSkipped = true;
+      if (input.sendEmail) {
+        const result = await dispatchTransactionalEmail({
+          template: "complimentary_access",
+          toEmail: user.email,
+          toName: user.name?.trim() || user.email.split("@")[0] || "eeatly friend",
+          userId: input.userId,
+          complimentaryAccess: {
+            days: input.days,
+            accessUntilLabel: format(accessUntil, "MMMM d, yyyy")
+          },
+          trackDispatch: true
+        });
+        emailSkipped = result.skipped;
+      }
+
+      revalidatePath("/admin/users");
+      logger.info("admin_complimentary_access_granted", {
+        adminId: ctx.user.id,
+        userId: input.userId,
+        days: input.days,
+        accessUntil: accessUntil.toISOString(),
+        emailSkipped
+      });
+
+      return { accessUntil: accessUntil.toISOString(), emailSkipped };
     }),
 
   dispatchLifecycleEmail: adminProcedure

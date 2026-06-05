@@ -54,11 +54,16 @@ const suggestMealTool = {
       servings: {
         type: "string",
         description:
-          "Free-form yield/servings exactly as the source states it ('Serves 4', 'Makes 8 sliders', 'Feeds 6'). Empty string if no yield is stated."
+          "Free-form yield/servings ('Serves 4', 'Makes 8 sliders'). Use a sensible default when you generated the recipe. Empty string only if neither stated nor generated."
+      },
+      generated: {
+        type: "boolean",
+        description:
+          "true if the recipe/ingredients were GENERATED because the source only named a dish; false if extracted from a recipe present in the source."
       },
       confidence: { type: "string", enum: ["high", "medium", "low"], description: "Confidence level in this suggestion" }
     },
-    required: ["name", "effortGuess", "notes", "recipeText", "ingredients", "servings", "confidence"]
+    required: ["name", "effortGuess", "notes", "recipeText", "ingredients", "servings", "generated", "confidence"]
   }
 };
 
@@ -80,6 +85,7 @@ function parseSuggestion(input: unknown): MealSuggestion {
     recipeText: typeof raw.recipeText === "string" ? raw.recipeText.trim() : "",
     ingredients: coerceIngredients(raw.ingredients),
     servings: typeof raw.servings === "string" ? raw.servings.trim() : "",
+    generated: raw.generated === true,
     confidence
   };
 }

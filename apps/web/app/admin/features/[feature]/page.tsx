@@ -25,7 +25,7 @@ export default async function AdminFeatureDetailPage(props: {
   const config = FEATURE_REGISTRY[feature];
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
+    <main className="w-full px-5 py-5">
       <Link
         href={"/admin/features" as Route}
         className="text-xs text-muted-foreground hover:text-foreground"

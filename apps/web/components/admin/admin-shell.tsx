@@ -3,8 +3,9 @@
 import * as React from "react";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
+import { AdminTopBar } from "@/components/admin/admin-top-bar";
 import type { AppUser } from "@/lib/auth/session";
 
 /**
@@ -28,18 +29,9 @@ export function AdminShell({
             it, responsive charts (recharts ResponsiveContainer on /admin/analytics)
             measure width(-1) and warn/collapse on first render. */}
         <div className="relative flex w-full min-w-0 flex-1 flex-col bg-background">
-          {/* Narrow-viewport top strip: the sidebar collapses off-canvas, so
-              expose a trigger to bring it back. Hidden at md+ where the rail
-              is permanent. */}
-          <div className="flex h-12 items-center gap-2 border-b border-[var(--border)] px-4 md:hidden">
-            <SidebarTrigger />
-            <span
-              className="font-mono text-[11px] uppercase text-muted-foreground"
-              style={{ letterSpacing: "0.14em" }}
-            >
-              Platform admin
-            </span>
-          </div>
+          {/* Sticky top bar: sidebar toggle + breadcrumbs. The toggle lets the
+              rail collapse off-canvas to reclaim width on data-heavy pages. */}
+          <AdminTopBar />
           {children}
         </div>
       </SidebarProvider>

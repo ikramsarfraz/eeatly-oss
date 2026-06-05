@@ -2,26 +2,22 @@
 
 import * as React from "react";
 import { useTheme } from "next-themes";
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * Round 31 — System / Light / Dark pill row.
+ * Light / Dark pill row.
  *
- * Reads the current theme via `next-themes`' `useTheme()` hook and
- * lets the user switch between OS-tracking and the two explicit
- * appearances. The class-based theming set up in `app/layout.tsx`
- * (and the migrated `.dark` selectors in `globals.css`) means the
- * variable swap happens automatically when `setTheme()` toggles the
+ * The app defaults to Light (see `app/layout.tsx`) and does not track the OS
+ * appearance — a dark-OS user still gets light unless they explicitly pick
+ * Dark here. The class-based theming (the `.dark` selectors in `globals.css`)
+ * means the variable swap happens automatically when `setTheme()` toggles the
  * `class` attribute on `<html>`.
  *
- * The hook returns `undefined` for `theme` during SSR / pre-mount,
- * which would render the row with no active pill on first paint. We
- * guard with a `mounted` flag and render a placeholder row server-
- * side, swapping to the live state once hydration completes. This
- * matches the standard `next-themes` recipe and avoids the FOUC
- * where System briefly highlights before user-preferred Light flips
- * in.
+ * The hook returns `undefined` for `theme` during SSR / pre-mount, which would
+ * render the row with no active pill on first paint. We guard with a `mounted`
+ * flag and render a Light-stable placeholder server-side, swapping to the live
+ * state once hydration completes (standard `next-themes` recipe, avoids FOUC).
  */
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
@@ -36,10 +32,11 @@ export function ThemeToggle() {
     setMounted(true);
   }, []);
 
-  const value = mounted ? (theme ?? "system") : "system";
+  // Treat anything that isn't an explicit "dark" as Light (covers the default
+  // and any stale "system" value from before OS-tracking was removed).
+  const value = mounted && theme === "dark" ? "dark" : "light";
 
   const options = [
-    { value: "system", label: "System", Icon: Monitor },
     { value: "light", label: "Light", Icon: Sun },
     { value: "dark", label: "Dark", Icon: Moon }
   ] as const;

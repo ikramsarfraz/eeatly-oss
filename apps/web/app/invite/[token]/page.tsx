@@ -17,8 +17,12 @@ import {
   findInvitationContextByToken,
   type InvitationContext
 } from "@/services/households";
+import { noIndexMetadata } from "@/lib/seo/no-index";
 
 export const dynamic = "force-dynamic";
+
+// Token-gated invite link — must never be indexed.
+export const metadata = noIndexMetadata;
 
 export default async function InviteAcceptPage({
   params

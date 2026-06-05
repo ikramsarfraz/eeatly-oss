@@ -16,6 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ScreenTip } from "@/components/tour/screen-tip";
 import { Textarea } from "@/components/ui/textarea";
 import { MealLogForm } from "@/components/forms/meal-log-form";
 import { CreditUsageBar } from "@/components/credits/credit-usage-bar";
@@ -66,8 +67,8 @@ const AI_TITLE: Record<"photo" | "text" | "voice" | "link", string> = {
   link: "Paste a link"
 };
 const AI_HINT: Record<"photo" | "text" | "voice" | "link", string> = {
-  photo: "Recipe card or menu",
-  text: "Paste ingredients + steps",
+  photo: "Dish photo or recipe card",
+  text: "Name a dish, or paste a recipe",
   voice: "Talk it through",
   link: "YouTube · IG · URL"
 };
@@ -212,12 +213,18 @@ export function AddComposerClient({
         >
           Capture · Add
         </p>
-        <h1
-          className="font-serif text-[44px] leading-[1.02] text-foreground sm:text-[58px]"
-          style={{ letterSpacing: "-0.02em" }}
-        >
-          Add to your kitchen
-        </h1>
+        <div className="flex items-center gap-3">
+          <h1
+            className="font-serif text-[44px] leading-[1.02] text-foreground sm:text-[58px]"
+            style={{ letterSpacing: "-0.02em" }}
+          >
+            Add to your kitchen
+          </h1>
+          <ScreenTip
+            title="Capture how you cook"
+            body="Log a meal by hand, lift a recipe with AI from a photo, text or voice, or add a source link. Nothing saves until you review it."
+          />
+        </div>
         <p className="max-w-[560px] text-[15px] leading-[1.55] text-muted-foreground">
           One place to capture. Log a meal you cooked, or let AI pull a recipe from a photo,
           text, voice note or link — it all lands in the same form.
@@ -228,6 +235,7 @@ export function AddComposerClient({
       <div
         role="tablist"
         aria-label="Capture method"
+        data-tour="capture-cards"
         className="inline-flex w-fit max-w-full flex-wrap gap-1 rounded-[13px] border bg-[var(--surface-2)] p-1"
       >
         {SEGMENTS.map((seg) => {
@@ -271,7 +279,9 @@ export function AddComposerClient({
               hideAiSuggest
               initialSuggestion={suggestion ?? undefined}
               initialMealName={suggestion ? undefined : initialMealName}
-              onSuccess={() => router.push("/home" as Route)}
+              onSuccess={({ mealId }) =>
+                router.push((mealId ? `/meal/${mealId}` : "/home") as Route)
+              }
             />
           </Card>
         ) : (
@@ -440,7 +450,8 @@ function AiSurface({
           {AI_TITLE[method]}
         </h3>
         <p className="max-w-[360px] text-[13.5px] leading-[1.5] text-muted-foreground">
-          {AI_HINT[method]} — AI extracts the ingredients and steps into the form.
+          {AI_HINT[method]}. AI fills in the ingredients and steps for you to review, generating
+          a starting recipe when you only give a name.
         </p>
 
         {/* Per-method input */}
@@ -488,7 +499,7 @@ function AiSurface({
             value={textInput}
             onChange={(e) => onText(e.target.value)}
             rows={6}
-            placeholder="Paste a recipe — ingredients and steps. The more context, the better."
+            placeholder="Name a dish (e.g. chicken biryani) or paste a full recipe. The more you give, the closer it is to yours."
             className="w-full max-w-[480px] text-left text-[14px] leading-[1.55]"
           />
         ) : null}

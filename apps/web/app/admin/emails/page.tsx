@@ -57,7 +57,7 @@ export default async function AdminEmailsPage(props: {
   ];
 
   return (
-    <main id="main" tabIndex={-1} className="mx-auto grid min-h-screen w-full max-w-7xl gap-5 px-4 py-6 sm:px-6 lg:px-8">
+    <main id="main" tabIndex={-1} className="grid w-full gap-5 px-5 py-5">
       <header>
         <p className="text-sm font-medium text-muted-foreground">Platform admin</p>
         <h1 className="mt-1 text-3xl font-semibold tracking-normal">Email delivery</h1>

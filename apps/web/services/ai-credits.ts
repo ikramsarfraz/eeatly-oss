@@ -41,7 +41,7 @@ const TIER_RANK: Record<Tier, number> = { free: 0, plus: 1, premium: 2, pro: 3 }
 
 /**
  * The user's effective tier — their active subscription if any, otherwise
- * the no-card first-time Pro trial (14 days from signup), otherwise Free.
+ * the no-card first-time Pro trial (7 days from signup), otherwise Free.
  * One query joins the account row (for `createdAt`) with its subscription.
  */
 export async function getUserTier(userId: string): Promise<Tier> {
@@ -63,7 +63,8 @@ export async function getTierStatus(userId: string): Promise<{
     .select({
       status: subscriptions.status,
       subTier: subscriptions.tier,
-      createdAt: users.createdAt
+      createdAt: users.createdAt,
+      complimentaryAccessUntil: users.complimentaryAccessUntil
     })
     .from(users)
     .leftJoin(subscriptions, eq(subscriptions.userId, users.id))
@@ -73,6 +74,7 @@ export async function getTierStatus(userId: string): Promise<{
     subscriptionStatus: row?.status ?? null,
     subscriptionTier: row?.subTier ?? null,
     createdAt: row?.createdAt ?? null,
+    complimentaryAccessUntil: row?.complimentaryAccessUntil ?? null,
     now: new Date()
   });
 }

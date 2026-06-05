@@ -12,7 +12,7 @@ export default function AppearanceSettingsPage() {
       <Card className="overflow-hidden p-0">
         <SettingRow
           label="Theme"
-          sub="Light follows your editorial cream. Dark uses a warm near-black. System tracks your OS."
+          sub="Light is the default, your editorial cream. Switch to Dark for a warm near-black anytime."
           suffix={<ThemeToggle />}
           last
         />

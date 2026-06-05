@@ -38,7 +38,11 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border bg-card p-5 shadow-lg focus:outline-none sm:p-6",
+        // `[&>*]:min-w-0` keeps grid children from blowing the dialog wider
+        // than the viewport on mobile (a long row's min-content would
+        // otherwise stretch the single auto column). `max-h` + scroll keeps
+        // tall dialogs within a short screen.
+        "fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl border bg-card p-5 shadow-lg focus:outline-none [&>*]:min-w-0 sm:p-6",
         className
       )}
       {...props}

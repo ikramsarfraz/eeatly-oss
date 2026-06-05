@@ -1,7 +1,11 @@
 import { AdminShell } from "@/components/admin/admin-shell";
 import { requirePlatformAdmin } from "@/lib/auth/session";
+import { noIndexMetadata } from "@/lib/seo/no-index";
 
 export const dynamic = "force-dynamic";
+
+// Platform admin must never be indexed or followed.
+export const metadata = noIndexMetadata;
 
 /**
  * Admin layout — gates the whole `/admin/*` subtree on the platform-admin role

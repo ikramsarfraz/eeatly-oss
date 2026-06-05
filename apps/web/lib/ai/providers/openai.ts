@@ -60,9 +60,10 @@ const SUGGESTION_SCHEMA = {
     recipeText: { type: "string" },
     ingredients: { type: "array", items: { type: "string" } },
     servings: { type: "string" },
+    generated: { type: "boolean" },
     confidence: { type: "string", enum: ["high", "medium", "low"] }
   },
-  required: ["name", "effortGuess", "notes", "recipeText", "ingredients", "servings", "confidence"],
+  required: ["name", "effortGuess", "notes", "recipeText", "ingredients", "servings", "generated", "confidence"],
   additionalProperties: false
 } as const;
 
@@ -82,6 +83,7 @@ function parseSuggestion(raw: Record<string, unknown>): MealSuggestion {
     recipeText: typeof raw.recipeText === "string" ? raw.recipeText.trim() : "",
     ingredients: coerceIngredients(raw.ingredients),
     servings: typeof raw.servings === "string" ? raw.servings.trim() : "",
+    generated: raw.generated === true,
     confidence
   };
 }

@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
-import { Camera, Loader2, Sparkles } from "lucide-react";
+import { Camera, Loader2, Pencil, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -146,6 +146,8 @@ export type RecipeDetailMeal = {
   recipeSourceUrl: string | null;
   servings: string | null;
   ingredients: string[] | null;
+  /** Recipe was AI-generated from a name; show a "review this" banner. */
+  recipeIsAiDraft: boolean;
   /** Viewer's effective permissions (owner / admin / editor / viewer). */
   viewerCanEdit: boolean;
   viewerCanManageSharing: boolean;
@@ -481,6 +483,16 @@ export function RecipeDetailClient({
                 </Link>
               </Button>
             ) : null}
+            {/* Credit-free manual editor — edit ingredients/steps by hand, no
+                AI. Same editor authz as Refine (owner + edit/admin grantees). */}
+            {canEdit ? (
+              <Button asChild variant="outline" className="min-h-[40px]">
+                <Link href={`/meal/${meal.id}/edit` as Route}>
+                  <Pencil className="h-3.5 w-3.5" />
+                  Edit recipe
+                </Link>
+              </Button>
+            ) : null}
             {/* Device photo upload — editors (owner/admin/edit) only. Reuses
                 the presign → R2 flow; the photo becomes the meal's own image
                 and wins over the app-wide AI fallback. */}
@@ -530,6 +542,28 @@ export function RecipeDetailClient({
         isOwner={canManageSharing}
         ownerName={meal.createdByName}
       />
+
+      {/* AI-generated draft notice — this recipe was inferred from the dish
+          name, not the user's source, so nudge a review. Cleared once the
+          recipe is hand-edited or refined. */}
+      {meal.recipeIsAiDraft ? (
+        <div className="flex flex-wrap items-center gap-3 border-b border-[color:var(--warning,#b7791f)]/30 bg-[color:var(--warning,#b7791f)]/10 px-5 py-3 text-[13px] text-foreground">
+          <Sparkles className="h-4 w-4 shrink-0 text-[color:var(--warning,#b7791f)]" />
+          <span className="min-w-0 flex-1">
+            <strong className="font-semibold">AI-generated draft.</strong> This recipe was
+            generated from the dish name. Review the ingredients and steps, quantities are a
+            starting point.
+          </span>
+          {canEdit ? (
+            <Button asChild size="sm" variant="outline" className="shrink-0">
+              <Link href={`/meal/${meal.id}/edit` as Route}>
+                <Pencil className="h-3.5 w-3.5" />
+                Review &amp; edit
+              </Link>
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
 
       {/* Body band — cream-soft ingredients sidebar + recipe column. */}
       <section className="grid grid-cols-1 md:grid-cols-[360px_1fr]">

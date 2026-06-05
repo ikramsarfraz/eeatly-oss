@@ -128,17 +128,17 @@ export function ShareSheet({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid gap-4">
+        <div className="grid min-w-0 gap-4">
           {/* Add row — search an eligible person, pick a role, Share. */}
-          <div className="grid gap-1.5">
-            <div className="flex items-center gap-2 rounded-[12px] border px-2.5 py-1.5">
+          <div className="grid min-w-0 gap-1.5">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 rounded-[12px] border px-2.5 py-1.5">
               <UserPlus className="h-4 w-4 shrink-0 text-muted-foreground" />
               <input
                 value={addText}
                 onChange={(e) => setAddText(e.target.value)}
                 placeholder="Search people to add…"
                 aria-label="Add a person"
-                className="min-w-0 flex-1 bg-transparent text-[14px] text-foreground outline-none placeholder:text-muted-foreground"
+                className="min-w-[140px] flex-1 bg-transparent text-[14px] text-foreground outline-none placeholder:text-muted-foreground"
               />
               <select
                 aria-label="Access level for new people"
@@ -202,7 +202,7 @@ export function ShareSheet({
           </div>
 
           {/* People with access — owner + grantees. */}
-          <div className="grid gap-1">
+          <div className="grid min-w-0 gap-1">
             <p
               className="font-mono text-[10.5px] uppercase text-muted-foreground"
               style={{ letterSpacing: "0.14em" }}
@@ -229,7 +229,7 @@ export function ShareSheet({
                 return (
                   <li
                     key={g.granteeUserId}
-                    className="flex items-center gap-3 border-t border-[var(--border-soft,var(--border))] py-2.5"
+                    className="flex min-w-0 items-center gap-3 border-t border-[var(--border-soft,var(--border))] py-2.5"
                   >
                     <Initial label={label} />
                     <span className="min-w-0 flex-1">
@@ -394,7 +394,7 @@ function LinkToggle({
           <p className="truncate font-mono text-[11px] text-muted-foreground">{url}</p>
         ) : (
           <p className="text-[12px] text-muted-foreground">
-            A read-only live view — no eeatly account needed.
+            A read-only live view, no eeatly account needed.
           </p>
         )}
       </div>

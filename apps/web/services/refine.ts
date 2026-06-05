@@ -1007,10 +1007,11 @@ export async function saveSession(args: {
         }
       }
     }
-    // Bump the meal's updatedAt + close the session.
+    // Bump the meal's updatedAt + close the session. Refining counts as a
+    // review, so clear the AI-draft flag.
     await tx
       .update(meals)
-      .set({ updatedAt: new Date() })
+      .set({ updatedAt: new Date(), recipeIsAiDraft: false })
       .where(eq(meals.id, session.mealId));
     await tx
       .update(refineSessions)

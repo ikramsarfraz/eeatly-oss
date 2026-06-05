@@ -7,6 +7,7 @@ import { eeatlyEmailTags, recordOutboundEmailFromApiSend } from "@/services/emai
 import { getResendClient } from "@/lib/email/resend-client";
 import { getMailSender, type MailIdentity } from "@/lib/email/senders";
 import { AccountDeletedEmail } from "@/lib/email/templates/account-deleted-email";
+import { ComplimentaryAccessEmail } from "@/lib/email/templates/complimentary-access-email";
 import { FirstMealEncouragementEmail } from "@/lib/email/templates/first-meal-encouragement-email";
 import { HouseholdInvitationEmail } from "@/lib/email/templates/household-invitation-email";
 import { ConnectionInvitationEmail } from "@/lib/email/templates/connection-invitation-email";
@@ -25,6 +26,7 @@ export type TransactionalTemplate =
   | "household_invitation"
   | "connection_invitation"
   | "household_member_removed"
+  | "complimentary_access"
   | "account_deleted";
 
 /**
@@ -42,6 +44,7 @@ const TEMPLATE_IDENTITY: Record<TransactionalTemplate, MailIdentity> = {
   household_invitation: "invitation",
   connection_invitation: "invitation",
   household_member_removed: "notification",
+  complimentary_access: "welcome",
   account_deleted: "notification"
 };
 
@@ -81,6 +84,11 @@ export type DispatchTransactionalEmailInput = {
   /** For household_member_removed — passed straight into the template. */
   removal?: {
     householdName: string;
+  };
+  /** For complimentary_access — admin-granted Pro days + when it ends. */
+  complimentaryAccess?: {
+    days: number;
+    accessUntilLabel: string;
   };
   /**
    * When true, record `reminder_email_sent` for analytics (non-blocking).
@@ -158,6 +166,19 @@ export async function dispatchTransactionalEmail(
         contactEmail
       });
       break;
+
+    case "complimentary_access": {
+      const days = input.complimentaryAccess?.days ?? 0;
+      subject = `You've got ${days} ${days === 1 ? "day" : "days"} of Master Chef on us`;
+      element = React.createElement(ComplimentaryAccessEmail, {
+        name: input.toName,
+        days,
+        accessUntilLabel: input.complimentaryAccess?.accessUntilLabel ?? "",
+        dashboardUrl: href,
+        contactEmail
+      });
+      break;
+    }
 
     case "weekly_recap_placeholder":
       subject = "Your eeatly week (preview)";

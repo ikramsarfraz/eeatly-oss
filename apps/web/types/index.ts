@@ -71,6 +71,11 @@ export type MealSuggestion = {
   // Free-form yield/servings, e.g. "Serves 4" / "Makes 8 sliders". Empty
   // string when the source doesn't state a yield. Optional for back-compat.
   servings?: string;
+  // True when the recipe/ingredients were GENERATED from the dish name
+  // (the source only named a dish) rather than extracted from provided
+  // content — the capture form surfaces an "AI draft, verify" note.
+  // Optional so older provider responses / fixtures still typecheck.
+  generated?: boolean;
 };
 
 export type DashboardMeals = {

@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { Fragment } from "react";
 import { usePathname } from "next/navigation";
-import { Search } from "lucide-react";
+import { HelpCircle, Search } from "lucide-react";
 
 import {
   Breadcrumb,
@@ -17,6 +17,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { NotificationBell } from "@/components/layout/notification-bell";
+import { useTourHelp } from "@/components/tour/tour-help-provider";
 import { useBreadcrumbOverride } from "@/components/layout/breadcrumb-context";
 import { useTopBarActions } from "@/components/layout/top-bar-actions";
 import { getCrumbs } from "@/lib/nav/breadcrumbs";
@@ -79,6 +80,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
     );
   })();
   const actions = useTopBarActions();
+  const { openHelp } = useTourHelp();
 
   return (
     <header
@@ -127,6 +129,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
             right cues the shortcut. */}
         <button
           type="button"
+          data-tour="search"
           onClick={onOpenSearch}
           aria-label="Open search"
           className="hidden h-9 w-[280px] cursor-pointer items-center gap-2 rounded-md border bg-[var(--surface-2)] px-3 text-left text-[13px] text-muted-foreground transition-colors hover:bg-[var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex lg:w-[320px]"
@@ -148,6 +151,17 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
         </button>
 
         <NotificationBell />
+
+        {/* Help: opens the guides slide-over (and a "replay tour" entry). */}
+        <button
+          type="button"
+          data-tour="help-btn"
+          onClick={openHelp}
+          aria-label="Help and guides"
+          className="flex h-9 w-9 items-center justify-center rounded-md border bg-[var(--surface-2)] text-muted-foreground transition-colors hover:bg-[var(--surface)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <HelpCircle className="h-[18px] w-[18px]" />
+        </button>
 
         {actions}
       </div>

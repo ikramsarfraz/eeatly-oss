@@ -79,6 +79,13 @@ export const users = pgTable("user", {
   subscriptionCurrentPeriodEnd: timestamp("subscription_current_period_end", {
     withTimezone: true
   }),
+  // Admin-granted complimentary Pro access window end. When set and in the
+  // future, `resolveTier` treats the user as Master Chef (no card), outranking
+  // the account-age trial. Used to comp specific users (e.g. before Stripe is
+  // wired). Null for everyone by default.
+  complimentaryAccessUntil: timestamp("complimentary_access_until", {
+    withTimezone: true
+  }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
 });
