@@ -189,7 +189,7 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
               asChild
               className="bg-foreground text-background hover:bg-[#2a3431] hover:text-background active:bg-[#2a3431] active:text-background dark:hover:bg-[color:var(--ink-2,#a8a28f)] dark:active:bg-[color:var(--ink-2,#a8a28f)]"
             >
-              <Link href={"/add" as Route}>
+              <Link href={"/add" as Route} data-tour="log-cta">
                 <Plus className="h-4 w-4 shrink-0" />
                 <span>Add a meal</span>
               </Link>
@@ -198,7 +198,7 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
         </SidebarMenu>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent data-tour="sidebar">
         <SidebarGroup className="py-1">
           <SidebarGroupLabel
             className="font-mono uppercase"
@@ -216,7 +216,10 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
                       asChild
                       isActive={itemActive(pathname, item)}
                     >
-                      <Link href={item.href}>
+                      <Link
+                        href={item.href}
+                        data-tour={item.label === "Library" ? "nav-library" : undefined}
+                      >
                         <Icon className="size-4" />
                         <span>{item.label}</span>
                       </Link>
@@ -246,7 +249,10 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
                       asChild
                       isActive={itemActive(pathname, item)}
                     >
-                      <Link href={item.href}>
+                      <Link
+                        href={item.href}
+                        data-tour={item.label === "Library" ? "nav-library" : undefined}
+                      >
                         <Icon className="size-4" />
                         <span>{item.label}</span>
                       </Link>

@@ -228,6 +228,7 @@ export function AddComposerClient({
       <div
         role="tablist"
         aria-label="Capture method"
+        data-tour="capture-cards"
         className="inline-flex w-fit max-w-full flex-wrap gap-1 rounded-[13px] border bg-[var(--surface-2)] p-1"
       >
         {SEGMENTS.map((seg) => {

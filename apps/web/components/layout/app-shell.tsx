@@ -16,6 +16,7 @@ import { TabletRailEnforcer } from "@/components/layout/tablet-rail-enforcer";
 import { TopBar } from "@/components/layout/top-bar";
 import { TopBarActionsProvider } from "@/components/layout/top-bar-actions";
 import { QuickLogProvider } from "@/components/dashboard/quick-log-provider";
+import { TourHelpProvider } from "@/components/tour/tour-help-provider";
 import type { AppUser } from "@/lib/auth/session";
 
 /**
@@ -63,23 +64,25 @@ export function AppShell({
           <TopBarActionsProvider>
             <BreadcrumbProvider>
             <QuickLogProvider>
-              <TabletRailEnforcer />
-              <AppSidebar user={user} />
-              <SidebarInset>
-                <TopBar onOpenSearch={() => setPaletteOpen(true)} />
-                <main
-                  id="main"
-                  tabIndex={-1}
-                  className="flex-1 px-8 py-7 pb-20 max-md:px-4 max-md:py-5 max-md:pb-28"
-                >
-                  {children}
-                </main>
-                <BottomTabBar />
-              </SidebarInset>
-              <CommandPalette
-                open={paletteOpen}
-                onOpenChange={setPaletteOpen}
-              />
+              <TourHelpProvider>
+                <TabletRailEnforcer />
+                <AppSidebar user={user} />
+                <SidebarInset>
+                  <TopBar onOpenSearch={() => setPaletteOpen(true)} />
+                  <main
+                    id="main"
+                    tabIndex={-1}
+                    className="flex-1 px-8 py-7 pb-20 max-md:px-4 max-md:py-5 max-md:pb-28"
+                  >
+                    {children}
+                  </main>
+                  <BottomTabBar />
+                </SidebarInset>
+                <CommandPalette
+                  open={paletteOpen}
+                  onOpenChange={setPaletteOpen}
+                />
+              </TourHelpProvider>
             </QuickLogProvider>
             </BreadcrumbProvider>
           </TopBarActionsProvider>

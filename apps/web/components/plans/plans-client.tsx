@@ -97,7 +97,7 @@ export function PlansClient({ plans }: PlansClientProps) {
       </header>
 
       {/* Scheduled grid — 3-up with empty-state always last */}
-      <section aria-labelledby="scheduled-heading" className="grid gap-4">
+      <section aria-labelledby="scheduled-heading" data-tour="plans-list" className="grid gap-4">
         <SectionLabel id="scheduled-heading">Scheduled</SectionLabel>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {scheduled.map((plan) => (

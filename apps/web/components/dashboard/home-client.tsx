@@ -331,6 +331,7 @@ export function HomeClient({
               chip per spec. Each row navigates to /meal/[id]. */}
           <section
             aria-labelledby="resurface-heading"
+            data-tour="rediscover"
             className="grid gap-3"
           >
             <SectionLabel id="resurface-heading">
