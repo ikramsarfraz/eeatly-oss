@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MealTile } from "@/components/ui/meal-tile";
 import { SectionLabel } from "@/components/ui/section-label";
+import { ScreenTip } from "@/components/tour/screen-tip";
 
 /**
  * Round 28 — editorial Plans list.
@@ -74,12 +75,18 @@ export function PlansClient({ plans }: PlansClientProps) {
           letting it float centered against the title+subtitle block. */}
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="grid gap-2">
-          <h1
-            className="font-serif text-[44px] leading-[1.02] text-foreground sm:text-[52px] lg:text-[64px]"
-            style={{ letterSpacing: "-0.025em" }}
-          >
-            Plans.
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1
+              className="font-serif text-[44px] leading-[1.02] text-foreground sm:text-[52px] lg:text-[64px]"
+              style={{ letterSpacing: "-0.025em" }}
+            >
+              Plans.
+            </h1>
+            <ScreenTip
+              title="What plans are for"
+              body="Use a plan to gather several dishes under one occasion and date. Dishes stay in your Library even if the plan is deleted."
+            />
+          </div>
           <p className="max-w-[560px] text-[14px] leading-[1.55] text-muted-foreground">
             Sketch out the weeks ahead. Eid menus, dinner parties, school-
             night rotations — whatever rhythm the kitchen runs on.

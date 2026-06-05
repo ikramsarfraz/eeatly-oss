@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { MealTile } from "@/components/ui/meal-tile";
 import { SectionLabel } from "@/components/ui/section-label";
 import { trpc } from "@/lib/trpc/client";
+import { ScreenTip } from "@/components/tour/screen-tip";
 import { cn } from "@/lib/utils";
 import type {
   DashboardMeals,
@@ -206,9 +207,16 @@ export function HomeClient({
           screen); the hero stays clean. */}
       <section className="pt-2 sm:pt-4">
         <div className="grid gap-2">
-          <p className="font-serif text-[20px] italic text-muted-foreground sm:text-[22px]">
-            {timeOfDayKicker()}
-          </p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="font-serif text-[20px] italic text-muted-foreground sm:text-[22px]">
+              {timeOfDayKicker()}
+            </p>
+            <ScreenTip
+              align="right"
+              title="Your home base"
+              body="Home greets you with recent cooks, meals worth repeating, and upcoming plans, your evening at a glance."
+            />
+          </div>
           <h1
             className="font-serif text-[56px] font-normal leading-[0.95] text-foreground max-md:text-[44px] sm:text-[72px] lg:text-[88px]"
             style={{ letterSpacing: "-0.02em" }}

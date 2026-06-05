@@ -16,6 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ScreenTip } from "@/components/tour/screen-tip";
 import { Textarea } from "@/components/ui/textarea";
 import { MealLogForm } from "@/components/forms/meal-log-form";
 import { CreditUsageBar } from "@/components/credits/credit-usage-bar";
@@ -212,12 +213,18 @@ export function AddComposerClient({
         >
           Capture · Add
         </p>
-        <h1
-          className="font-serif text-[44px] leading-[1.02] text-foreground sm:text-[58px]"
-          style={{ letterSpacing: "-0.02em" }}
-        >
-          Add to your kitchen
-        </h1>
+        <div className="flex items-center gap-3">
+          <h1
+            className="font-serif text-[44px] leading-[1.02] text-foreground sm:text-[58px]"
+            style={{ letterSpacing: "-0.02em" }}
+          >
+            Add to your kitchen
+          </h1>
+          <ScreenTip
+            title="Capture how you cook"
+            body="Log a meal by hand, lift a recipe with AI from a photo, text or voice, or add a source link. Nothing saves until you review it."
+          />
+        </div>
         <p className="max-w-[560px] text-[15px] leading-[1.55] text-muted-foreground">
           One place to capture. Log a meal you cooked, or let AI pull a recipe from a photo,
           text, voice note or link — it all lands in the same form.
