@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { ChevronRight, Search, Sparkles, X } from "lucide-react";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { HELP_CATEGORIES } from "@/lib/help/content";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +37,7 @@ export function HelpPanel({
       <SheetContent
         side="right"
         showCloseButton={false}
+        aria-describedby={undefined}
         className="flex w-full flex-col gap-0 border-l bg-background p-0 sm:w-[440px] sm:max-w-[440px]"
       >
         {/* Header */}
@@ -46,9 +47,9 @@ export function HelpPanel({
               <p className="mb-1.5 font-mono text-[10px] uppercase tracking-[2px] text-muted-foreground">
                 Help &amp; guides
               </p>
-              <h2 className="font-serif text-[32px] leading-none tracking-[-0.02em] text-foreground">
+              <SheetTitle className="font-serif text-[32px] font-normal leading-none tracking-[-0.02em] text-foreground">
                 How can we help?
-              </h2>
+              </SheetTitle>
             </div>
             <button
               type="button"
