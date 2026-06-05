@@ -16,8 +16,14 @@ export function WelcomeModal({
   onSkip: () => void;
 }) {
   const [i, setI] = React.useState(0);
-  const slides = [Slide1, Slide2, Slide3];
-  const Current = slides[i];
+  // The coached tour is desktop-only; on a phone the final slide points at the
+  // guides instead of promising a spatial walkthrough.
+  const [isDesktop, setIsDesktop] = React.useState(true);
+  React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time mount read
+    setIsDesktop(window.matchMedia("(min-width: 768px)").matches);
+  }, []);
+  const slides = [<Slide1 key="1" />, <Slide2 key="2" />, <Slide3 key="3" isDesktop={isDesktop} />];
   const last = i === slides.length - 1;
 
   return (
@@ -31,9 +37,7 @@ export function WelcomeModal({
       }}
     >
       <div className="w-full max-w-[560px] rounded-[22px] border border-[color:var(--border)] bg-background p-7 shadow-[0_40px_90px_-20px_rgba(0,0,0,0.5)] sm:p-[40px_44px_32px]">
-        <div className="min-h-[260px] sm:min-h-[300px]">
-          <Current />
-        </div>
+        <div className="min-h-[260px] sm:min-h-[300px]">{slides[i]}</div>
 
         {/* Progress */}
         <div className="my-[22px] flex gap-1.5">
@@ -73,7 +77,8 @@ export function WelcomeModal({
           >
             {last ? (
               <>
-                <Sparkles className="h-[17px] w-[17px]" /> Start the tour
+                <Sparkles className="h-[17px] w-[17px]" />
+                {isDesktop ? "Start the tour" : "Browse the guides"}
               </>
             ) : (
               "Continue"
@@ -145,16 +150,17 @@ function Slide2() {
   );
 }
 
-function Slide3() {
+function Slide3({ isDesktop }: { isDesktop: boolean }) {
   return (
     <>
       <Eyebrow>Ready</Eyebrow>
       <div className="mb-4 font-serif text-[34px] leading-[1.05] tracking-[-0.02em] text-foreground sm:text-[40px]">
-        Take a quick tour?
+        {isDesktop ? "Take a quick tour?" : "You're all set."}
       </div>
       <p className="max-w-[440px] text-[15px] leading-[1.55] text-muted-foreground">
-        A 60-second walkthrough points out each feature, right where it lives. You can skip
-        and explore on your own, Help is always in the top bar.
+        {isDesktop
+          ? "A 60-second walkthrough points out each feature, right where it lives. You can skip and explore on your own, Help is always in the top bar."
+          : "Tap the ? in the top bar anytime for step-by-step guides on every feature. Explore at your own pace."}
       </p>
     </>
   );

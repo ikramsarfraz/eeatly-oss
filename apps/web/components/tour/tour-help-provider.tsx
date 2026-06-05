@@ -97,6 +97,15 @@ export function TourHelpProvider({ children }: { children: React.ReactNode }) {
   const startTour = () => {
     markSeen();
     setShowWelcome(false);
+    // The coached tour is a desktop experience: it highlights the left sidebar
+    // and other anchors that are off-canvas on a phone. On narrow viewports,
+    // open the (fully responsive) guides instead.
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setTourIndex(null);
+      setHelpOpen(true);
+      return;
+    }
+    setHelpOpen(false);
     applyStep(0);
   };
 

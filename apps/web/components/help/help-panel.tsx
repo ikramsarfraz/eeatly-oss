@@ -76,7 +76,7 @@ export function HelpPanel({
             <button
               type="button"
               onClick={onReplayTour}
-              className="mb-[22px] flex w-full items-center gap-3 rounded-[14px] bg-primary px-4 py-[15px] text-left text-primary-foreground shadow-[0_6px_20px_-8px_color-mix(in_srgb,var(--primary)_55%,transparent)]"
+              className="mb-[22px] hidden w-full items-center gap-3 rounded-[14px] bg-primary px-4 py-[15px] text-left text-primary-foreground shadow-[0_6px_20px_-8px_color-mix(in_srgb,var(--primary)_55%,transparent)] md:flex"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] bg-white/15">
                 <Sparkles className="h-[21px] w-[21px]" />
