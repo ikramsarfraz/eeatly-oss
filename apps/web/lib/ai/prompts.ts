@@ -32,13 +32,15 @@ export const SUGGEST_FROM_IMAGE_PROMPT = `Look at this image and determine wheth
 (a) A finished dish or prepared meal
 (b) A recipe card, cookbook page, or written/printed recipe
 
-If it is a finished dish:
+If it is a finished dish (the photo shows plated food, NOT a written recipe):
 - Name the dish concisely (2–5 words, e.g. "Lemon herb chicken bowls")
 - Estimate the effort to cook it: quick (under 15 min), easy (simple, 15–30 min), medium (30–60 min), high_effort (over 60 min or technically complex)
 - Write a brief note about what you observe — one sentence at most
-- Leave recipeText empty
-- Leave ingredients as an empty array (the dish photo doesn't tell you the ingredient list)
-- Leave servings empty (a finished-dish photo doesn't reliably tell you the yield)
+- The photo doesn't contain a recipe, so GENERATE a representative, standard home-cook recipe for the dish you identified:
+  - recipeText: a complete recipe with an ingredients section then clear numbered steps, in plain text.
+  - ingredients: an ordered array of strings, one ingredient line each, with typical quantities (e.g. "2 chicken breasts", "1 tbsp olive oil"). Aim for a realistic 4–12 ingredients.
+  - servings: a sensible default yield as a short phrase ("Serves 4").
+- Set generated: true (this recipe was inferred from the dish name, not read off the image).
 
 If it is a recipe card or written recipe:
 - Use the recipe title as the name
@@ -47,6 +49,7 @@ If it is a recipe card or written recipe:
 - Also extract ingredients as an ordered array of strings. Each entry is one ingredient line as the recipe presents it — preserve quantities, units, and qualifiers ("to taste", "optional", "or ghee"). Follow the order on the recipe card.
 - servings: the recipe's stated yield, copied verbatim if present ("Serves 4", "Makes 12 cookies", "Feeds 6"). If the card gives a numeric yield with no unit, phrase it as "Serves N". Empty string if no yield is stated.
 - Leave notes empty
+- Set generated: false (this recipe was read from the source).
 
 Set confidence to "high" if the image is clear and the identification is certain, "medium" if reasonably sure, or "low" if the image is blurry, ambiguous, or you are guessing.
 
@@ -88,9 +91,10 @@ export const SUGGEST_FROM_VOICE_NOTE_PROMPT = `This is a transcript of a voice n
 - name: the dish's name as commonly known. If the dish has a traditional Urdu/Hindi/regional name, prefer that (e.g., "Chicken Karahi" not "Chicken Curry"); concise (2–5 words).
 - effortGuess: cooking effort — quick (under 15 min), easy (15–30 min), medium (30–60 min), high_effort (over 60 min or technically complex).
 - notes: cooking tips worth remembering, max 2 sentences. Corrections and asides often contain these — surface non-obvious technique or a specific tip the speaker emphasized. Empty string if nothing stands out.
-- recipeText: ingredients then steps, cleaned up into a readable recipe — preserve quantities and methods, drop fillers, repetitions, and tangents. Plain text only.
-- ingredients: an ordered array of strings — one ingredient line each, in the order the speaker mentioned them. Speakers often skip quantities — a bare "ginger paste" is fine when no quantity was given. Be lenient. Empty array if no ingredients were named.
-- servings: the yield if the speaker mentioned one ("makes about 8 sliders", "enough for four", "feeds the whole family"), normalized to a short phrase ("Makes 8 sliders", "Serves 4"). Empty string if they didn't say how much it makes.
+- recipeText: ingredients then steps, cleaned up into a readable recipe — preserve quantities and methods, drop fillers, repetitions, and tangents. Plain text only. If the speaker only NAMED a dish without giving a recipe, GENERATE a representative standard recipe for that dish instead (ingredients section then numbered steps).
+- ingredients: an ordered array of strings — one ingredient line each, in the order the speaker mentioned them. Speakers often skip quantities — a bare "ginger paste" is fine when no quantity was given. Be lenient. If the speaker only named the dish, GENERATE a realistic ingredient list (4–12 lines) with typical quantities for that dish.
+- servings: the yield if the speaker mentioned one ("makes about 8 sliders", "enough for four", "feeds the whole family"), normalized to a short phrase ("Makes 8 sliders", "Serves 4"). If you generated the recipe, use a sensible default ("Serves 4"). Empty string only if you neither heard nor generated a yield.
+- generated: true if you GENERATED the recipe/ingredients because the transcript only named the dish; false if you extracted them from what the speaker actually described.
 - confidence: "high" if the transcript clearly described a complete recipe, "medium" if some details required inference, "low" if the transcript was fragmented or barely recipe-shaped.
 
 If the transcript is in Urdu/Hindi/mixed, produce the recipe in English while keeping the traditional dish name in the name field.
@@ -185,9 +189,10 @@ export const SUGGEST_FROM_TEXT_PROMPT = `The user has pasted text about a meal o
 - name: the dish name, concise (2–5 words)
 - effortGuess: cooking effort — quick (under 15 min), easy (15–30 min), medium (30–60 min), high_effort (over 60 min or technically complex)
 - notes: any useful tips or notable aspects in 1–2 sentences, or an empty string if nothing stands out
-- recipeText: if a recipe is present in the text, extract it fully (ingredients and steps); otherwise leave empty
-- ingredients: an ordered array of strings. Each entry is one ingredient line as the text presents it — preserve quantities, units, and qualifiers ("to taste", "optional", "or ghee"). If the text has a clear ingredients section, preserve that order. If ingredients are scattered through prose, extract them in the order they appear. Empty array if the text doesn't describe a recipe with ingredients.
-- servings: the recipe's stated yield, copied verbatim if present ("Serves 4", "Makes 8 sliders", "Feeds 6"). If the text gives a numeric yield with no unit, phrase it as "Serves N". Empty string if no yield is stated.
+- recipeText: if a recipe is present in the text, extract it fully (ingredients and steps). If the text only NAMES a dish (no recipe details), GENERATE a representative standard home-cook recipe for that dish: an ingredients section then clear numbered steps, plain text.
+- ingredients: an ordered array of strings. Each entry is one ingredient line as the text presents it — preserve quantities, units, and qualifiers ("to taste", "optional", "or ghee"). If the text has a clear ingredients section, preserve that order. If ingredients are scattered through prose, extract them in the order they appear. If the text only names a dish, GENERATE a realistic ingredient list (4–12 lines) with typical quantities for that dish.
+- servings: the recipe's stated yield, copied verbatim if present ("Serves 4", "Makes 8 sliders", "Feeds 6"). If the text gives a numeric yield with no unit, phrase it as "Serves N". If you generated the recipe, use a sensible default ("Serves 4"). Empty string only if there's neither a stated nor generated yield.
+- generated: true if you GENERATED the recipe/ingredients because the input only named the dish; false if you extracted them from a recipe present in the text.
 - confidence: "high" if the text clearly describes a specific dish, "medium" if somewhat ambiguous, "low" if very unclear
 
 Return your answer in the required format.

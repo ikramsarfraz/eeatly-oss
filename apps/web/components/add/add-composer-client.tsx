@@ -66,8 +66,8 @@ const AI_TITLE: Record<"photo" | "text" | "voice" | "link", string> = {
   link: "Paste a link"
 };
 const AI_HINT: Record<"photo" | "text" | "voice" | "link", string> = {
-  photo: "Recipe card or menu",
-  text: "Paste ingredients + steps",
+  photo: "Dish photo or recipe card",
+  text: "Name a dish, or paste a recipe",
   voice: "Talk it through",
   link: "YouTube · IG · URL"
 };
@@ -440,7 +440,8 @@ function AiSurface({
           {AI_TITLE[method]}
         </h3>
         <p className="max-w-[360px] text-[13.5px] leading-[1.5] text-muted-foreground">
-          {AI_HINT[method]} — AI extracts the ingredients and steps into the form.
+          {AI_HINT[method]}. AI fills in the ingredients and steps for you to review, generating
+          a starting recipe when you only give a name.
         </p>
 
         {/* Per-method input */}
@@ -488,7 +489,7 @@ function AiSurface({
             value={textInput}
             onChange={(e) => onText(e.target.value)}
             rows={6}
-            placeholder="Paste a recipe — ingredients and steps. The more context, the better."
+            placeholder="Name a dish (e.g. chicken biryani) or paste a full recipe. The more you give, the closer it is to yours."
             className="w-full max-w-[480px] text-left text-[14px] leading-[1.55]"
           />
         ) : null}
