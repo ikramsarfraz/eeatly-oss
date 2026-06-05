@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { usePathname } from "next/navigation";
-import { BookOpen, Home, Menu, Plus, Sparkles } from "lucide-react";
+import { BookOpen, CalendarDays, Home, Menu, Plus } from "lucide-react";
 
 import { useSidebar } from "@/components/ui/sidebar";
 import { useQuickLog } from "@/components/dashboard/quick-log-provider";
@@ -33,10 +33,10 @@ const tabs: TabItem[] = [
     match: (p) => p.startsWith("/library") || p.startsWith("/meal"),
   },
   {
-    href: "/ideas",
-    label: "Ideas",
-    icon: Sparkles,
-    match: (p) => p.startsWith("/ideas"),
+    href: "/plans",
+    label: "Plans",
+    icon: CalendarDays,
+    match: (p) => p.startsWith("/plans"),
   },
 ];
 

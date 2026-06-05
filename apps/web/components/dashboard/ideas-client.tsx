@@ -34,7 +34,7 @@ export function IdeasClient({ initialData }: { initialData: DashboardMeals }) {
         </h1>
         <p className="max-w-[560px] text-[14.5px] leading-[1.55] text-muted-foreground">
           {suggestions.length > 0
-            ? "Meals worth resurfacing — a mix of recent favorites, quick wins, and dishes you haven't cooked in a while."
+            ? "Meals worth resurfacing: a mix of recent favorites, quick wins, and dishes you haven't cooked in a while."
             : "We resurface meals once you've logged a few. Quick logs make this page useful within a week."}
         </p>
       </header>
@@ -48,7 +48,7 @@ export function IdeasClient({ initialData }: { initialData: DashboardMeals }) {
           </div>
           <div className="grid gap-1">
             <p className="font-medium text-foreground">
-              {hasMeals ? "Keep logging — ideas appear here soon." : "Log your first meal."}
+              {hasMeals ? "Keep logging, ideas appear here soon." : "Log your first meal."}
             </p>
             <p>
               {hasMeals

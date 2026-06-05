@@ -274,7 +274,7 @@ export function LibraryClient({
           </div>
           {surface === "yours" ? (
             <p className="max-w-[560px] text-[14px] leading-[1.55] text-muted-foreground">
-              Everything you&apos;ve saved. Private by default —{" "}
+              Everything you&apos;ve saved. Private by default:{" "}
               <strong className="text-foreground">nothing is shared until you choose to.</strong>
             </p>
           ) : (
