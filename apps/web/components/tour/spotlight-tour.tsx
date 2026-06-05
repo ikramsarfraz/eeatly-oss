@@ -40,9 +40,12 @@ export function SpotlightTour({
     onNextRef.current = onNext;
   });
 
-  const measure = React.useCallback(() => {
+  // "ok" → highlight it; "wait" → not in the DOM yet (keep polling); "skip" →
+  // present but hidden/off-screen (e.g. the off-canvas sidebar on mobile), so
+  // advance immediately instead of highlighting empty space.
+  const measure = React.useCallback((): "ok" | "wait" | "skip" => {
     const el = document.querySelector<HTMLElement>(`[data-tour="${step.anchor}"]`);
-    if (!el) return false;
+    if (!el) return "wait";
     if (scrolledRef.current !== index) {
       el.scrollIntoView({ block: "center", inline: "nearest" });
       scrolledRef.current = index;
@@ -50,8 +53,6 @@ export function SpotlightTour({
     const b = el.getBoundingClientRect();
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    // Skip anchors that are hidden or off-screen (e.g. the off-canvas sidebar
-    // on mobile) so we never highlight empty space — keep polling / advance.
     if (
       b.width === 0 ||
       b.height === 0 ||
@@ -60,11 +61,11 @@ export function SpotlightTour({
       b.left >= vw ||
       b.top >= vh
     ) {
-      return false;
+      return "skip";
     }
     setVp({ w: vw, h: vh });
     setBox({ x: b.left - PAD, y: b.top - PAD, w: b.width + PAD * 2, h: b.height + PAD * 2 });
-    return true;
+    return "ok";
   }, [step.anchor, index]);
 
   React.useEffect(() => {
@@ -76,7 +77,12 @@ export function SpotlightTour({
     let raf = 0;
     let tries = 0;
     const tick = () => {
-      if (measure()) return;
+      const r = measure();
+      if (r === "ok") return;
+      if (r === "skip") {
+        onNextRef.current();
+        return;
+      }
       if (tries++ < 80) {
         raf = requestAnimationFrame(tick);
       } else {
