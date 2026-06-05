@@ -20,7 +20,9 @@ import { cn } from "@/lib/utils";
 import type { MealSuggestion } from "@/types";
 
 type MealLogFormProps = {
-  onSuccess?: () => void;
+  /** Called after a successful save with the created/updated meal's id (the
+   *  `meals` row, for navigating to the recipe detail). Null if unavailable. */
+  onSuccess?: (result: { mealId: string | null }) => void;
   initialMealName?: string;
   autoFocusRecipe?: boolean;
   /**
@@ -213,7 +215,7 @@ export function MealLogForm({
   const isSubmitting = form.formState.isSubmitting || mutation.isPending;
   const selectedEffort = form.watch("effortLevel");
 
-  function resetAfterSuccess() {
+  function resetAfterSuccess(mealId: string | null) {
     form.reset({
       mealName: "",
       effortLevel: "easy",
@@ -232,12 +234,12 @@ export function MealLogForm({
     setAiDraft(false);
     if (aiNoticeTimerRef.current) clearTimeout(aiNoticeTimerRef.current);
     setSuccessMessage("Logged! Your meal has been saved.");
-    onSuccess?.();
+    onSuccess?.({ mealId });
   }
 
   async function persist(values: MealLogInput) {
     const photoUrl = photoFile ? await uploadPhoto(photoFile) : values.photoUrl;
-    await mutation.mutateAsync({
+    return mutation.mutateAsync({
       ...values,
       photoUrl,
       // Persist whether this recipe was AI-generated (vs extracted/manual) so
@@ -251,8 +253,8 @@ export function MealLogForm({
     setSuccessMessage(null);
 
     try {
-      await persist(values);
-      resetAfterSuccess();
+      const result = await persist(values);
+      resetAfterSuccess(result?.mealId ?? null);
     } catch (error) {
       setFormError(error instanceof Error ? error.message : "Unable to log meal.");
     }

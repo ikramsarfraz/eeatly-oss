@@ -271,7 +271,9 @@ export function AddComposerClient({
               hideAiSuggest
               initialSuggestion={suggestion ?? undefined}
               initialMealName={suggestion ? undefined : initialMealName}
-              onSuccess={() => router.push("/home" as Route)}
+              onSuccess={({ mealId }) =>
+                router.push((mealId ? `/meal/${mealId}` : "/home") as Route)
+              }
             />
           </Card>
         ) : (

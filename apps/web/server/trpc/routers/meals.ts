@@ -196,7 +196,10 @@ export const mealsRouter = router({
         });
       }
 
-      return { mealLog: { id: mealLog?.id } };
+      // `mealId` (the meals row) is what the recipe detail page is keyed on —
+      // the caller navigates there on creation. Distinct from `mealLog.id`
+      // (the per-cook log row).
+      return { mealLog: { id: mealLog?.id }, mealId: mealLog?.mealId ?? null };
     }),
 
   /**

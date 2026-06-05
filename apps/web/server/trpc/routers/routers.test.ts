@@ -451,9 +451,9 @@ describe("mealsRouter mutations (Task 3)", () => {
     expect(mealsServiceMock.createMealLog).not.toHaveBeenCalled();
   });
 
-  it("createLog: passes input through and returns the new log id", async () => {
+  it("createLog: passes input through and returns the new log id + meal id", async () => {
     mealsServiceMock.createMealLog.mockResolvedValueOnce({
-      mealLog: { id: "log-1" },
+      mealLog: { id: "log-1", mealId: "meal-1" },
       mealLogCount: 1
     });
     const result = await call(makeUser()).meals.createLog({
@@ -469,6 +469,7 @@ describe("mealsRouter mutations (Task 3)", () => {
       source: "quick_log"
     });
     expect(result.mealLog.id).toBe("log-1");
+    expect(result.mealId).toBe("meal-1");
     expect(mealsServiceMock.createMealLog).toHaveBeenCalledWith(
       "u-1",
       "h-current",
