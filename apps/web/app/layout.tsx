@@ -111,15 +111,16 @@ export default function RootLayout({
         >
           Skip to content
         </a>
-        {/* R31 — theme provider. `attribute="class"` toggles
-            `.dark` on `<html>` based on `theme` value; `enableSystem`
-            picks up OS preference when `theme === "system"`.
-            `disableTransitionOnChange` avoids the brief flash of
-            transitioning colors when the user flips the toggle. */}
+        {/* Theme provider. `attribute="class"` toggles `.dark` on `<html>`
+            based on the `theme` value. We default to LIGHT and do NOT track the
+            OS preference (`enableSystem={false}`), so a user on a dark-OS still
+            gets light unless they explicitly choose Dark in Settings. Any stale
+            stored "system" value falls back to the light default.
+            `disableTransitionOnChange` avoids the color flash on toggle. */}
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          defaultTheme="light"
+          enableSystem={false}
           disableTransitionOnChange
         >
           <QueryProvider>
