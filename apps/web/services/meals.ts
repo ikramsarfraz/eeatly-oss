@@ -14,6 +14,7 @@ import {
   type ItemRole
 } from "@/services/sharing";
 import { normalizeMealName } from "@/lib/utils";
+import { parseStructuredRecipe } from "@/lib/meals/parse-recipe";
 import { mealLogInputSchema, type MealLogInput } from "@eeatly/api/validators/meals";
 import {
   dishImages,
@@ -268,6 +269,48 @@ export async function createMealLog(
         .where(eq(meals.id, existingMeal.id));
       // NB: existingMeal.createdByUserId is preserved — attribution sticks
       // with the first member who added this recipe.
+    }
+
+    // Auto-structure the recipe at log time: split the bundled recipe blob into
+    // structured ingredient + step rows so the recipe view + manual editor get
+    // cleanly separated content (not one prose blob). Only when we can
+    // confidently find steps, and only when the meal has no structured rows yet
+    // (never clobber a Refine'd or already-structured recipe).
+    const parsed = parseStructuredRecipe(recipeText ?? null, ingredients ?? null);
+    if (parsed.steps.length > 0) {
+      const [hasIngredient] = await tx
+        .select({ id: mealIngredients.id })
+        .from(mealIngredients)
+        .where(eq(mealIngredients.mealId, meal.id))
+        .limit(1);
+      const [hasStep] = await tx
+        .select({ id: recipeSteps.id })
+        .from(recipeSteps)
+        .where(eq(recipeSteps.mealId, meal.id))
+        .limit(1);
+      if (!hasIngredient && !hasStep) {
+        if (parsed.ingredients.length > 0) {
+          await tx.insert(mealIngredients).values(
+            parsed.ingredients.map((ing, idx) => ({
+              mealId: meal.id,
+              position: idx,
+              name: ing.name,
+              quantityString: ing.quantityString,
+              prepNote: ing.prepNote
+            }))
+          );
+        }
+        await tx.insert(recipeSteps).values(
+          parsed.steps.map((s, idx) => ({
+            mealId: meal.id,
+            position: idx,
+            title: s.title,
+            time: s.time,
+            body: s.body,
+            ingredientIds: [] as string[]
+          }))
+        );
+      }
     }
 
     const [log] = await tx

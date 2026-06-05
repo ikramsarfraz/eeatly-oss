@@ -90,7 +90,9 @@ export async function saveStructuredRecipe(args: {
         cleanSteps.map((s, idx) => ({
           mealId: args.mealId,
           position: idx,
-          title: s.title || "Step",
+          // Empty title is fine — the step card hides it and shows the number
+          // + body (a clean numbered instruction).
+          title: s.title,
           time: s.time,
           body: s.body,
           // Step↔ingredient linking is deferred; readers tolerate empty.

@@ -39,6 +39,10 @@ export type StepCardData = {
 export function StepCard({ step }: { step: StepCardData }) {
   const hasBody = step.body.trim().length > 0;
   const hasItems = step.ingredients.length > 0;
+  // Parsed/auto-structured steps are single instructions with no separate
+  // title — render just the number + body so they read as a clean numbered
+  // list instead of a big empty heading.
+  const hasTitle = step.title.trim().length > 0;
 
   return (
     <article
@@ -58,12 +62,14 @@ export function StepCard({ step }: { step: StepCardData }) {
         {step.number}.
       </span>
       <div className="min-w-0">
-        <p
-          className="font-serif text-[24px] leading-[1.05] text-foreground sm:text-[28px]"
-          style={{ letterSpacing: "-0.02em" }}
-        >
-          {step.title}
-        </p>
+        {hasTitle ? (
+          <p
+            className="font-serif text-[24px] leading-[1.05] text-foreground sm:text-[28px]"
+            style={{ letterSpacing: "-0.02em" }}
+          >
+            {step.title}
+          </p>
+        ) : null}
         {step.time ? (
           <p
             className="mt-2 font-mono text-[10.5px] uppercase text-muted-foreground"

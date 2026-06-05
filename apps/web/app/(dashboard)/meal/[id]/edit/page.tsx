@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
 import { getMealDetail } from "@/services/meals";
+import { parseStructuredRecipe } from "@/lib/meals/parse-recipe";
 import {
   ManualRecipeEditor,
   type EditorIngredient,
@@ -13,33 +14,6 @@ type PageProps = {
   params: Promise<{ id: string }>;
 };
 
-/**
- * Seed the steps editor from a legacy `recipeText` prose blob when a meal has
- * no structured steps. If the prose has a recognizable "Steps/Method/…" header,
- * split the lines after it into step rows; otherwise keep the whole blob in one
- * row (lossless) for the user to split by hand.
- */
-function seedStepsFromRecipeText(recipeText: string | null): EditorStep[] {
-  if (!recipeText || !recipeText.trim()) return [];
-  const text = recipeText.replace(/\r\n/g, "\n");
-  const lines = text.split("\n");
-  const headerIdx = lines.findIndex((l) =>
-    /^\s*(steps|method|instructions|directions|preparation)\b/i.test(l.trim())
-  );
-  if (headerIdx >= 0) {
-    const stepLines = lines
-      .slice(headerIdx + 1)
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0)
-      .map((l) => l.replace(/^\s*(?:\d+[.)]|[-*•])\s*/, "").trim())
-      .filter((l) => l.length > 0);
-    if (stepLines.length > 0) {
-      return stepLines.map((body) => ({ title: "", time: "", body }));
-    }
-  }
-  return [{ title: "", time: "", body: text.trim() }];
-}
-
 export default async function MealEditPage({ params }: PageProps) {
   const { id } = await params;
   const { user, household } = await requireCurrentUserWithHousehold();
@@ -50,6 +24,11 @@ export default async function MealEditPage({ params }: PageProps) {
     notFound();
   }
 
+  // Legacy meals (pre auto-structuring) have only the prose blob + ingredient
+  // array — parse them the same way log-time does so the editor opens with
+  // cleanly separated rows.
+  const parsedLegacy = parseStructuredRecipe(meal.recipeText, meal.ingredients);
+
   const initialIngredients: EditorIngredient[] =
     meal.structuredIngredients.length > 0
       ? meal.structuredIngredients.map((i) => ({
@@ -57,16 +36,16 @@ export default async function MealEditPage({ params }: PageProps) {
           quantityString: i.quantityString,
           prepNote: i.prepNote ?? ""
         }))
-      : (meal.ingredients ?? []).map((line) => ({
-          name: line,
-          quantityString: "",
-          prepNote: ""
+      : parsedLegacy.ingredients.map((i) => ({
+          name: i.name,
+          quantityString: i.quantityString,
+          prepNote: i.prepNote ?? ""
         }));
 
   const initialSteps: EditorStep[] =
     meal.structuredSteps.length > 0
       ? meal.structuredSteps.map((s) => ({ title: s.title, time: s.time ?? "", body: s.body }))
-      : seedStepsFromRecipeText(meal.recipeText);
+      : parsedLegacy.steps.map((s) => ({ title: s.title, time: s.time ?? "", body: s.body }));
 
   return (
     <main id="main" tabIndex={-1}>
