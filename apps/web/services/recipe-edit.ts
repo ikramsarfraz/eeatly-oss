@@ -36,6 +36,7 @@ export type ManualStepInput = {
 export async function saveStructuredRecipe(args: {
   userId: string;
   mealId: string;
+  servings?: string;
   ingredients: ManualIngredientInput[];
   steps: ManualStepInput[];
 }): Promise<{ ingredientCount: number; stepCount: number }> {
@@ -98,7 +99,16 @@ export async function saveStructuredRecipe(args: {
       );
     }
 
-    await tx.update(meals).set({ updatedAt: new Date() }).where(eq(meals.id, args.mealId));
+    // A hand-edit counts as reviewed: clear the AI-draft flag. Update servings
+    // only when provided (undefined leaves it; empty string clears it).
+    await tx
+      .update(meals)
+      .set({
+        updatedAt: new Date(),
+        recipeIsAiDraft: false,
+        ...(args.servings !== undefined && { servings: args.servings.trim() || null })
+      })
+      .where(eq(meals.id, args.mealId));
   });
 
   return { ingredientCount: cleanIngredients.length, stepCount: cleanSteps.length };

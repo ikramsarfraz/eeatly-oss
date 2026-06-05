@@ -212,6 +212,10 @@ export async function createMealLog(
       .filter((line) => line.length > 0);
     return cleaned.length > 0 ? cleaned : null;
   })();
+  // Whether the recipe being saved is an AI-generated draft (set on capture
+  // when the AI generated rather than extracted). Undefined on quick/log-again
+  // saves, where we leave the existing flag untouched.
+  const recipeGenerated = payload.recipeGenerated;
 
   return db.transaction(async (tx) => {
     // Match against the household's existing meal by normalized name —
@@ -239,6 +243,7 @@ export async function createMealLog(
             recipeSourceUrl: recipeSourceUrl ?? null,
             servings: servings ?? null,
             ingredients: ingredients ?? null,
+            recipeIsAiDraft: recipeGenerated === true,
             updatedAt: new Date()
           })
           .returning()
@@ -257,6 +262,7 @@ export async function createMealLog(
           ...(recipeSourceUrl !== undefined && { recipeSourceUrl }),
           ...(servings !== undefined && { servings }),
           ...(ingredients !== undefined && { ingredients }),
+          ...(recipeGenerated !== undefined && { recipeIsAiDraft: recipeGenerated }),
           updatedAt: new Date()
         })
         .where(eq(meals.id, existingMeal.id));
@@ -619,6 +625,9 @@ export type MealDetailView = {
   recipeSourceUrl: string | null;
   servings: string | null;
   ingredients: string[] | null;
+  /** Recipe was AI-generated from a name (not the user's source). The view
+   *  surfaces a "review this" badge; cleared on manual edit / refine. */
+  recipeIsAiDraft: boolean;
   notes: string | null;
   createdByUserId: string | null;
   createdByName: string | null;
@@ -693,6 +702,7 @@ export async function getMealDetail(
       recipeSourceUrl: meals.recipeSourceUrl,
       servings: meals.servings,
       ingredients: meals.ingredients,
+      recipeIsAiDraft: meals.recipeIsAiDraft,
       notes: meals.notes,
       createdAt: meals.createdAt,
       createdByUserId: meals.createdByUserId,
@@ -803,6 +813,7 @@ export async function getMealDetail(
     recipeSourceUrl: row.recipeSourceUrl,
     servings: row.servings,
     ingredients: row.ingredients,
+    recipeIsAiDraft: row.recipeIsAiDraft,
     notes: row.notes,
     createdByUserId: row.createdByUserId,
     createdByName: row.createdByName,

@@ -102,6 +102,7 @@ export const mealsRouter = router({
         const result = await saveStructuredRecipe({
           userId: ctx.user.id,
           mealId: input.mealId,
+          servings: input.servings,
           ingredients: input.ingredients,
           steps: input.steps
         });

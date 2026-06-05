@@ -239,7 +239,10 @@ export function MealLogForm({
     const photoUrl = photoFile ? await uploadPhoto(photoFile) : values.photoUrl;
     await mutation.mutateAsync({
       ...values,
-      photoUrl
+      photoUrl,
+      // Persist whether this recipe was AI-generated (vs extracted/manual) so
+      // the recipe view can flag it for review.
+      recipeGenerated: aiDraft
     });
   }
 

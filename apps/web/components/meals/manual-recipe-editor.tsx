@@ -27,11 +27,13 @@ type StepRow = EditorStep & { _key: string };
 export function ManualRecipeEditor({
   mealId,
   mealName,
+  initialServings,
   initialIngredients,
   initialSteps
 }: {
   mealId: string;
   mealName: string;
+  initialServings: string;
   initialIngredients: EditorIngredient[];
   initialSteps: EditorStep[];
 }) {
@@ -56,6 +58,7 @@ export function ManualRecipeEditor({
       (s, idx) => ({ ...s, _key: `s${idx}` })
     )
   );
+  const [servings, setServings] = React.useState(initialServings);
 
   const mealHref = `/meal/${mealId}` as Route;
 
@@ -71,6 +74,7 @@ export function ManualRecipeEditor({
     try {
       const result = await save.mutateAsync({
         mealId,
+        servings,
         ingredients: ingredients.map((i) => ({
           name: i.name,
           quantityString: i.quantityString,
@@ -107,6 +111,22 @@ export function ManualRecipeEditor({
           Edit ingredients and steps by hand. No AI, no credits. Changes replace the saved recipe.
         </p>
       </header>
+
+      {/* Yield */}
+      <div className="grid max-w-[280px] gap-[5px]">
+        <label
+          htmlFor="recipe-servings"
+          className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground"
+        >
+          Yield
+        </label>
+        <Input
+          id="recipe-servings"
+          placeholder="e.g. Serves 4"
+          value={servings}
+          onChange={(e) => setServings(e.target.value)}
+        />
+      </div>
 
       {/* Ingredients */}
       <section className="grid gap-3">

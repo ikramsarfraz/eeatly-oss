@@ -274,6 +274,13 @@
       "when": 1779580813000,
       "tag": "0039_user_complimentary_access",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1779580814000,
+      "tag": "0040_recipe_ai_draft",
+      "breakpoints": true
     }
   ]
 }

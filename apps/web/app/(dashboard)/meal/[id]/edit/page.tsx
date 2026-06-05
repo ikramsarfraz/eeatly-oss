@@ -73,6 +73,7 @@ export default async function MealEditPage({ params }: PageProps) {
       <ManualRecipeEditor
         mealId={meal.id}
         mealName={meal.name}
+        initialServings={meal.servings ?? ""}
         initialIngredients={initialIngredients}
         initialSteps={initialSteps}
       />
