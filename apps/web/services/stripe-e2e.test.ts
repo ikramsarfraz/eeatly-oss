@@ -86,10 +86,10 @@ run("Stripe integration — end to end (real DB)", () => {
   });
 
   it("consumes credits per AI op and refunds when the op fails", async () => {
-    // suggest_text costs 1.
+    // suggest_text costs 2.
     await withAiCredits(USER_ID, "suggest_text", async () => "ok");
     let balance = await getCreditBalance(USER_ID);
-    expect(balance.total).toBe(14);
+    expect(balance.total).toBe(13);
 
     // A failing op is refunded — net zero.
     await expect(
@@ -98,7 +98,7 @@ run("Stripe integration — end to end (real DB)", () => {
       })
     ).rejects.toThrow("provider boom");
     balance = await getCreditBalance(USER_ID);
-    expect(balance.total).toBe(14);
+    expect(balance.total).toBe(13);
   });
 
   it("grants credits on a one-time credit Checkout (idempotent)", async () => {

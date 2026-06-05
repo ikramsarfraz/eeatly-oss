@@ -209,19 +209,27 @@ export const PRICING = {
 } as const;
 
 /**
- * AI operations and their credit cost. Cheap text/LLM ops cost 1; ops that
- * lean on heavier models (vision, Whisper) cost 2; image *generation*
- * (gpt-image-1) is the expensive one at 10. Keys are the `AiOperation`
- * union the metering wrapper passes.
+ * AI operations and their credit cost — a deliberate `1 · 2 · 3 · 5 · 10`
+ * ladder rather than a strict COGS pass-through, so the dish-image price
+ * (10, Gemini 2.5 Flash Image) doesn't dwarf everything else:
+ *   - share link            → 1
+ *   - text capture / refine  → 2
+ *   - ingredient extraction  → 3
+ *   - voice / photo capture / refine → 5 (vision + Whisper lean on heavier models)
+ *   - dish image generation  → 10
+ * Keys are the `AiOperation` union the metering wrapper passes. The grouped
+ * "voice or photo" and "text" rows in the UI read one representative key each
+ * (`suggest_voice` / `suggest_text`), so the capture+refine variants are kept
+ * in lockstep below.
  */
 export const AI_CREDIT_COSTS = {
-  suggest_text: 1,
-  suggest_voice: 2,
-  suggest_image: 2,
-  refine_text: 1,
-  refine_voice: 2,
-  refine_photo: 2,
-  extract_ingredients: 1,
+  suggest_text: 2,
+  suggest_voice: 5,
+  suggest_image: 5,
+  refine_text: 2,
+  refine_voice: 5,
+  refine_photo: 5,
+  extract_ingredients: 3,
   share_recipe: 1,
   dish_image: 10
 } as const;
