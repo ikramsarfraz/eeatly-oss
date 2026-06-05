@@ -53,7 +53,9 @@ export default async function HomePage() {
         "@id": `${base}/#organization`,
         name: "eeatly",
         url: base,
-        logo: `${base}/icon.svg`
+        // Raster mark (Google prefers raster for Organization.logo); matches
+        // the shipped favicon/app-icon set. Absolute URL per schema.org.
+        logo: `${base}/icon-512.png`
       },
       {
         "@type": "WebApplication",
