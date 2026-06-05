@@ -3,8 +3,14 @@ import { getPublicEnv } from "@/lib/env/public";
 
 /**
  * robots.txt. Only the public marketing surfaces are crawlable; the whole
- * authenticated product, admin, auth flow, and token-gated pages are disallowed
- * (and additionally carry `noindex` metadata + an `X-Robots-Tag` header).
+ * authenticated product, admin, and auth flow are disallowed (and additionally
+ * carry `noindex` metadata + an `X-Robots-Tag` header).
+ *
+ * `/share/*` is intentionally NOT disallowed: those token pages must be
+ * fetchable by social-card scrapers (WhatsApp, Twitterbot, etc.) so shared
+ * links render a preview card. They're kept out of search indexes by their
+ * own `robots: { index: false }` metadata plus the proxy's `X-Robots-Tag`
+ * header, not by a crawl block here.
  */
 export default function robots(): MetadataRoute.Robots {
   const base = (getPublicEnv().NEXT_PUBLIC_APP_URL ?? "https://eeatly.com").replace(/\/$/, "");
@@ -29,8 +35,7 @@ export default function robots(): MetadataRoute.Robots {
           "/sign-in",
           "/sign-up",
           "/invite",
-          "/connect",
-          "/share"
+          "/connect"
         ]
       }
     ],
