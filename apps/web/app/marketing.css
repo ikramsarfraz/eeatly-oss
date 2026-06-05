@@ -1774,3 +1774,34 @@
     align-items: center;
   }
 }
+
+/* ─── Phone (≤640px) ─────────────────────────────────────────────
+   The header has no hamburger; on a phone we drop the middle nav
+   (Features / Pricing / Help, all reachable from the footer) and keep
+   the wordmark plus the two conversion actions (Sign in / Try eeatly).
+   Section gutters tighten so content isn't squeezed by 32px rails. */
+@media (max-width: 640px) {
+  .mkt .topnav-inner {
+    padding: 12px 16px;
+    gap: 10px;
+  }
+  .mkt .topnav-links {
+    display: none;
+  }
+  .mkt .topnav-actions {
+    padding-left: 0;
+    border-left: 0;
+    gap: 10px;
+  }
+  .mkt .topnav-actions a:not(.btn),
+  .mkt .topnav-actions .btn {
+    font-size: 13.5px;
+  }
+  .mkt .wrap,
+  .mkt .wrap-narrow {
+    padding: 0 20px;
+  }
+  .mkt .hero h1 {
+    font-size: 36px;
+  }
+}

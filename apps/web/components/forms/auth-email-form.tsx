@@ -134,7 +134,7 @@ export function AuthEmailForm({ mode, initialEmail, callbackURL }: AuthEmailForm
             : "Send my sign-in link"}
       </Button>
       <p className="text-center text-xs text-muted-foreground">
-        We&apos;ll send you a link — no password needed.
+        We&apos;ll send you a link, no password needed.
       </p>
     </form>
   );

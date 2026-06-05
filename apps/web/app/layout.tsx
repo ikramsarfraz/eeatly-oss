@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Instrument_Serif, JetBrains_Mono, Geist } from "next/font/google";
-import { ThemeProvider } from "next-themes";
+import { AppThemeProvider } from "@/components/providers/app-theme-provider";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { ToastProvider } from "@/components/providers/toast-provider";
 import { PostHogProvider } from "@/components/providers/posthog-provider";
@@ -111,24 +111,17 @@ export default function RootLayout({
         >
           Skip to content
         </a>
-        {/* Theme provider. `attribute="class"` toggles `.dark` on `<html>`
-            based on the `theme` value. We default to LIGHT and do NOT track the
-            OS preference (`enableSystem={false}`), so a user on a dark-OS still
-            gets light unless they explicitly choose Dark in Settings. Any stale
-            stored "system" value falls back to the light default.
-            `disableTransitionOnChange` avoids the color flash on toggle. */}
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem={false}
-          disableTransitionOnChange
-        >
+        {/* Theme provider (class strategy on <html>). Defaults to LIGHT, no OS
+            tracking; the marketing / public / auth "front door" routes are
+            forced to light regardless of the saved choice. See
+            `AppThemeProvider`. */}
+        <AppThemeProvider>
           <QueryProvider>
             <PostHogProvider>
               <ToastProvider>{children}</ToastProvider>
             </PostHogProvider>
           </QueryProvider>
-        </ThemeProvider>
+        </AppThemeProvider>
       </body>
     </html>
   );
