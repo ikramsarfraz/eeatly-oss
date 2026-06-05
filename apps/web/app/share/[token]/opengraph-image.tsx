@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { notFound } from "next/navigation";
-import { getPlanShareByToken, getRecipeShareByToken } from "@/services/shares";
+import { getOgShareCard } from "@/lib/share/og-share-read";
 import { mealPalette } from "@/components/ui/meal-tile";
 
 /**
@@ -15,8 +15,13 @@ import { mealPalette } from "@/components/ui/meal-tile";
  * The route backs the same `/share/[token]` URL the page does, so it serves
  * both recipe and plan shares. Color comes from the exported `mealPalette`
  * helper so a given dish lands on the same tile color here and in the live
- * app. Revoked / private / unknown tokens return `null` from the read
- * services, which we turn into a 404 so no card leaks.
+ * app. Revoked / private / unknown tokens return `null` from the reader,
+ * which we turn into a 404 so no card leaks.
+ *
+ * The token lookup goes through `lib/share/og-share-read` (a lean,
+ * DB-only path) rather than `services/shares`, so rendering needs only
+ * `DATABASE_URL` and not the full server-env guard (which requires the AI
+ * keys). That keeps an unrelated missing key from taking down share cards.
  *
  * `runtime = nodejs` is required for the `fs` TTF reads (Satori can't use
  * the woff2 build output).
@@ -41,22 +46,15 @@ export default async function Image(props: {
 }) {
   const { token } = await props.params;
 
-  // Recipe first, then plan — same precedence as the page. Either resolves
-  // to a branded card; neither means revoked/unknown → 404.
-  const recipe = await getRecipeShareByToken({ token });
-  const plan = recipe ? null : await getPlanShareByToken({ token });
+  // Recipe first, then plan — same precedence as the page. `null` means
+  // revoked/unknown → 404 so no card leaks.
+  const share = await getOgShareCard(token);
+  if (!share) notFound();
 
-  const card = recipe
-    ? { name: recipe.mealName, eyebrow: "A FAMILY RECIPE" }
-    : plan
-      ? { name: plan.planName, eyebrow: "A FAMILY MENU" }
-      : null;
-
-  if (!card) notFound();
-
-  const palette = mealPalette(card.name);
-  const letter = firstLetter(card.name);
-  const title = clampTitle(card.name);
+  const eyebrow = share.kind === "recipe" ? "A FAMILY RECIPE" : "A FAMILY MENU";
+  const palette = mealPalette(share.name);
+  const letter = firstLetter(share.name);
+  const title = clampTitle(share.name);
 
   const dir = join(process.cwd(), "assets/og");
   const [serifItalic, serifRegular, mono] = await Promise.all([
@@ -110,7 +108,7 @@ export default async function Image(props: {
               marginBottom: 20
             }}
           >
-            {card.eyebrow}
+            {eyebrow}
           </div>
           <div
             style={{
