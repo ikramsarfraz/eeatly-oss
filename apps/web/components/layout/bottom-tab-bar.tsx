@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { usePathname } from "next/navigation";
-import { Clock3, Menu, Moon, Plus, Sparkles } from "lucide-react";
+import { BookOpen, Home, Menu, Plus, Sparkles } from "lucide-react";
 
 import { useSidebar } from "@/components/ui/sidebar";
 import { useQuickLog } from "@/components/dashboard/quick-log-provider";
@@ -20,15 +20,17 @@ type TabItem = {
 const tabs: TabItem[] = [
   {
     href: "/home",
-    label: "Tonight",
-    icon: Moon,
+    label: "Home",
+    icon: Home,
     match: (p) => p === "/home",
   },
   {
     href: "/library",
-    label: "History",
-    icon: Clock3,
-    match: (p) => p.startsWith("/library"),
+    label: "Library",
+    icon: BookOpen,
+    // Library stays active on the recipe detail subtree (/meal/[id]),
+    // mirroring the desktop sidebar's activePrefixes rule.
+    match: (p) => p.startsWith("/library") || p.startsWith("/meal"),
   },
   {
     href: "/ideas",
@@ -46,7 +48,7 @@ export function BottomTabBar() {
   return (
     <nav
       aria-label="Primary"
-      className="sticky bottom-0 z-30 grid grid-cols-5 gap-1 border-t bg-[color-mix(in_oklab,var(--background)_96%,transparent)] px-2 pb-[calc(8px+env(safe-area-inset-bottom))] pt-2 backdrop-blur-md md:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 gap-1 border-t bg-[color-mix(in_oklab,var(--background)_96%,transparent)] px-2 pb-[calc(8px+env(safe-area-inset-bottom))] pt-2 backdrop-blur-md md:hidden"
     >
       {tabs.slice(0, 2).map((tab) => (
         <TabLink key={tab.label} tab={tab} active={tab.match(pathname)} />
