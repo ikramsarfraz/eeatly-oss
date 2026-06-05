@@ -15,7 +15,7 @@ export default async function AdminFeaturesPage() {
   const features = await listFeaturesWithCounts();
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
+    <main className="w-full px-5 py-5">
       <header className="mb-6 grid gap-1">
         <h1 className="text-2xl font-semibold tracking-normal">Feature gates</h1>
         <p className="text-sm text-muted-foreground">
