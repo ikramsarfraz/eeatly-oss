@@ -6,8 +6,12 @@ import { AppShell } from "@/components/layout/app-shell";
 import { getCurrentHousehold, requireCurrentUser } from "@/lib/auth/session";
 import { db } from "@/lib/db/client";
 import { countHouseholdMembers } from "@/services/households";
+import { noIndexMetadata } from "@/lib/seo/no-index";
 
 export const dynamic = "force-dynamic";
+
+// The authenticated product is private — keep it out of every index.
+export const metadata = noIndexMetadata;
 
 export default async function DashboardLayout({
   children

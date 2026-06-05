@@ -5,7 +5,8 @@ import type { Route } from "next";
 export const metadata: Metadata = {
   title: "Privacy",
   description:
-    "What eeatly collects, how AI processing works, what gets shared in a kitchen, and how to delete your account."
+    "What eeatly collects, how AI processing works, what gets shared in a kitchen, and how to delete your account.",
+  alternates: { canonical: "/privacy" }
 };
 
 export default function PrivacyPage() {

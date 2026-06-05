@@ -36,12 +36,35 @@ export default async function HomePage() {
   const env = getServerEnv();
   const prices = await getTierDisplayPrices();
 
+  const base = (env.NEXT_PUBLIC_APP_URL ?? "https://eeatly.com").replace(/\/$/, "");
   const structuredData = {
     "@context": "https://schema.org",
-    "@type": "WebSite",
-    name: "eeatly",
-    url: env.NEXT_PUBLIC_APP_URL,
-    description: META_DESCRIPTION
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": `${base}/#website`,
+        name: "eeatly",
+        url: base,
+        description: META_DESCRIPTION,
+        publisher: { "@id": `${base}/#organization` }
+      },
+      {
+        "@type": "Organization",
+        "@id": `${base}/#organization`,
+        name: "eeatly",
+        url: base,
+        logo: `${base}/icon.svg`
+      },
+      {
+        "@type": "WebApplication",
+        name: "eeatly",
+        url: base,
+        applicationCategory: "LifestyleApplication",
+        operatingSystem: "Web",
+        description: META_DESCRIPTION,
+        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" }
+      }
+    ]
   };
 
   return (

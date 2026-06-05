@@ -13,6 +13,7 @@ import { ConnectAcceptCard } from "@/components/people/connect-accept-card";
 import { buildAuthCallbackHref } from "@/lib/auth/callback-url";
 import { getCurrentUser } from "@/lib/auth/session";
 import { findInvitationByToken } from "@/services/connections";
+import { noIndexMetadata } from "@/lib/seo/no-index";
 
 /**
  * Accept a sharing-circle invitation. Mirrors the household /invite flow:
@@ -21,6 +22,9 @@ import { findInvitationByToken } from "@/services/connections";
  * button (the actual connect happens client-side via tRPC).
  */
 export const dynamic = "force-dynamic";
+
+// Token-gated connect link — must never be indexed.
+export const metadata = noIndexMetadata;
 
 export default async function ConnectAcceptPage({
   params

@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: "Help",
   description:
     "How to log meals, capture recipes from photos / text / voice, save recipe links, share with family, and manage your account.",
+  alternates: { canonical: "/help" }
 };
 
 type Topic = {

@@ -9,9 +9,17 @@ import { getStripeCatalog, perMonthDisplay } from "@/services/stripe-catalog";
 import { PricingGrid } from "@/components/pricing/pricing-grid";
 
 export const metadata: Metadata = {
-  title: "Pricing: eeatly",
+  title: "Pricing",
   description:
-    "Cook is free forever. Chef shares your kitchen with family: household sharing, meal plans, and public recipe links. Master Chef adds co-editing, shareable plans, and priority AI."
+    "Cook is free forever. Chef shares your kitchen with family: household sharing, meal plans, and public recipe links. Master Chef adds co-editing, shareable plans, and priority AI.",
+  alternates: { canonical: "/pricing" },
+  openGraph: {
+    title: "eeatly pricing",
+    description:
+      "Cook is free forever. Paid tiers add shared kitchens, meal planning, co-editing, and more AI.",
+    url: "/pricing",
+    type: "website"
+  }
 };
 
 export const dynamic = "force-dynamic";
@@ -54,8 +62,22 @@ export default async function PricingPage() {
   const premiumPrices = tierPrices(catalog.tiers.premium);
   const proPrices = tierPrices(catalog.tiers.pro);
 
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: FAQ_ITEMS.map((item) => ({
+      "@type": "Question",
+      name: item.q,
+      acceptedAnswer: { "@type": "Answer", text: item.a }
+    }))
+  };
+
   return (
     <div className="relative">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       {/* Decorative dot grid bleeding full-width out of the top. */}
       <div
         aria-hidden
