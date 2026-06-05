@@ -3,6 +3,32 @@
 All notable changes to eeatly are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.1.1] - 2026-06-05
+
+Front-door polish. No new features, schema, or migrations.
+
+### Marketing, public & auth pages
+- The landing, public (privacy / help / pricing), and auth (sign-in / sign-up)
+  pages are now always presented in light mode, even for a signed-in user who
+  chose Dark in Settings. Driven by `forcedTheme` on the single root theme
+  provider (matched by route), so it never touches the saved preference and the
+  dashboard still honors Dark. Removed the now-redundant dark toggle from the
+  marketing header.
+- Mobile: the marketing header is responsive now. On phones it drops the middle
+  nav (Features / Pricing / Help, still in the footer) and keeps the Sign in /
+  Try eeatly actions, with tighter section gutters and a trimmed hero heading.
+  Verified the landing, sign-in, sign-up, help, privacy, and pricing render
+  light with no horizontal overflow at phone width.
+
+### Copy
+- Removed a stray em dash from the auth form caption (house rule).
+
+### Docs
+- Added `docs/product-overview.md`, a portable product brief (positioning,
+  feature catalog, tiers/credits, launch status) for marketing strategy work.
+
+[1.1.1]: https://github.com/ikramsarfraz/eeatly/releases/tag/v1.1.1
+
 ## [1.1.0] - 2026-06-05
 
 First post-launch feature release. Closes the AI capture/edit loop, adds
