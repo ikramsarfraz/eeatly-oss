@@ -106,7 +106,7 @@ async function grantsWithNames(
         eq(selfCol, userId),
         eq(itemGrants.itemType, "recipe"),
         isNull(itemGrants.revokedAt),
-        isNull(meals.archivedAt)
+        isNull(meals.archivedAt), isNull(meals.deletedAt)
       )
     );
 
@@ -209,7 +209,7 @@ export async function listOwnedShareableItems(userId: string): Promise<ItemChip[
     db
       .select({ itemId: meals.id, name: meals.name })
       .from(meals)
-      .where(and(eq(meals.createdByUserId, userId), isNull(meals.archivedAt)))
+      .where(and(eq(meals.createdByUserId, userId), isNull(meals.archivedAt), isNull(meals.deletedAt)))
       .orderBy(meals.name),
     db
       .select({ itemId: plans.id, name: plans.name })

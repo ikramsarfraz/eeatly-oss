@@ -68,7 +68,16 @@ export const meals = pgTable(
     effortLevel: effortLevelEnum("effort_level"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-    archivedAt: timestamp("archived_at", { withTimezone: true })
+    // R36 — user-facing "Archive" (reversible; the recipe is tucked into the
+    // Archived view but still openable + restorable). This is what the legacy
+    // soft-delete column now means at the product level.
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    // R36 — destructive "Delete" (soft, so Undo can restore the row + its logs
+    // and structured rows within the toast window; a purge job is out of scope).
+    // Excluded from EVERY view, including the Archived view. Reads that already
+    // drop archived rows also drop deleted rows; `getMealDetail` allows archived
+    // (Open from Archived) but never deleted.
+    deletedAt: timestamp("deleted_at", { withTimezone: true })
     // Sharing is fully per-item now (see db/schema/sharing.ts `item_grants`).
     // The legacy `shared_at` flag + its visibility clause were removed; the
     // canonical predicate in `apps/web/lib/meals/visibility.ts` is
@@ -89,6 +98,10 @@ export const meals = pgTable(
     householdArchivedAtIdx: index("meals_household_archived_at_idx").on(
       table.householdId,
       table.archivedAt
+    ),
+    householdDeletedAtIdx: index("meals_household_deleted_at_idx").on(
+      table.householdId,
+      table.deletedAt
     )
   })
 );

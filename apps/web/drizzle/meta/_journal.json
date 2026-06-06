@@ -288,6 +288,13 @@
       "when": 1780738856000,
       "tag": "0041_add_meal_effort_override",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1780825256000,
+      "tag": "0042_meal_delete",
+      "breakpoints": true
     }
   ]
 }

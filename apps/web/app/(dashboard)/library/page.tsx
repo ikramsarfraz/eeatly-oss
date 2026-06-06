@@ -101,7 +101,8 @@ export default async function HistoryPage({
     id: r.id,
     name: r.name,
     photoUrl: r.photoUrl,
-    createdByUserId: r.createdByUserId
+    createdByUserId: r.createdByUserId,
+    addedAt: r.addedAt.toISOString()
   }));
   const libraryStats = Array.from(statsById.values());
   const initialSurface = surface === "shared" ? ("shared" as const) : ("yours" as const);

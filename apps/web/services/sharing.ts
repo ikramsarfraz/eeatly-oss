@@ -664,7 +664,7 @@ export async function listSharedWithMe(userId: string): Promise<SharedWithMeItem
         eq(itemGrants.granteeUserId, userId),
         eq(itemGrants.itemType, "recipe"),
         isNull(itemGrants.revokedAt),
-        isNull(meals.archivedAt)
+        isNull(meals.archivedAt), isNull(meals.deletedAt)
       )
     );
 
@@ -913,7 +913,7 @@ export async function forkRecipe(args: {
       await db
         .select({ normalizedName: meals.normalizedName })
         .from(meals)
-        .where(and(eq(meals.householdId, household.id), isNull(meals.archivedAt)))
+        .where(and(eq(meals.householdId, household.id), isNull(meals.archivedAt), isNull(meals.deletedAt)))
     ).map((r) => r.normalizedName)
   );
   let name = source.name;
@@ -1039,7 +1039,7 @@ export async function listActiveShareLinks(userId: string): Promise<ActiveShareL
         and(
           eq(recipeShares.createdByUserId, userId),
           isNull(recipeShares.revokedAt),
-          isNull(meals.archivedAt)
+          isNull(meals.archivedAt), isNull(meals.deletedAt)
         )
       ),
     db

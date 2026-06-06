@@ -48,7 +48,7 @@ export async function saveStructuredRecipe(args: {
   // Authorize as a write (same gate as Refine). Loads the meal first so the
   // canonical not-authorized error doesn't leak whether the meal exists.
   const mealRow = await db.query.meals.findFirst({
-    where: and(eq(meals.id, args.mealId), isNull(meals.archivedAt))
+    where: and(eq(meals.id, args.mealId), isNull(meals.archivedAt), isNull(meals.deletedAt))
   });
   if (!mealRow) throw new Error("Not authorized to edit this item.");
   await requireItemEditor(args.userId, "recipe", args.mealId, mealRow.createdByUserId);
@@ -67,7 +67,7 @@ export async function saveStructuredRecipe(args: {
           eq(meals.householdId, mealRow.householdId),
           eq(meals.normalizedName, normalizedName),
           ne(meals.id, args.mealId),
-          isNull(meals.archivedAt)
+          isNull(meals.archivedAt), isNull(meals.deletedAt)
         )
       });
       if (clash) throw new MealNameTakenError(trimmedName);

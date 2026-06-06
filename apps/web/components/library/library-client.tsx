@@ -5,26 +5,63 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import {
+  Archive,
   ArrowUpDown,
   BookOpen,
+  Check,
   Copy,
   EyeOff,
+  LayoutGrid,
+  List as ListIcon,
   Lock,
+  MoreVertical,
+  Pencil,
   Plus,
+  RotateCcw,
   Share2,
   Trash2
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from "@/components/ui/alert-dialog";
 import { ScreenTip } from "@/components/tour/screen-tip";
 import { MealTile } from "@/components/ui/meal-tile";
 import { ShareSheet } from "@/components/sharing/share-sheet";
 import { useQuickLog } from "@/components/dashboard/quick-log-provider";
 import { useToast } from "@/components/providers/toast-provider";
+import { useLibraryManagement } from "@/components/library/use-library-management";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 import type { SharedWithMeItem, TombstoneView } from "@/services/sharing";
+
+const PAGE_SIZE = 12;
+
+type SortKey = "recent" | "most" | "new" | "az" | "effort";
+const SORT_LABELS: Record<SortKey, string> = {
+  recent: "Recently cooked",
+  most: "Most cooked",
+  new: "Newest added",
+  az: "A to Z",
+  effort: "Effort (easy first)"
+};
+const EFFORT_RANK: Record<string, number> = { quick: 0, easy: 1, medium: 2, high_effort: 3 };
 
 /**
  * Round 28 — editorial Library.
@@ -72,6 +109,8 @@ export type LibraryRow = {
   name: string;
   photoUrl: string | null;
   createdByUserId: string | null;
+  /** Creation order (ISO) — backs the "Newest added" sort. */
+  addedAt: string;
 };
 
 export type LibraryStat = {
@@ -111,7 +150,8 @@ type FilterKey =
   | "shared"
   | "quick"
   | "high"
-  | "never";
+  | "never"
+  | "archived";
 
 const FILTER_LABELS: Record<FilterKey, string> = {
   all: "All",
@@ -121,7 +161,8 @@ const FILTER_LABELS: Record<FilterKey, string> = {
   shared: "Shared",
   quick: "Quick",
   high: "High effort",
-  never: "Never cooked"
+  never: "Never cooked",
+  archived: "Archived"
 };
 
 // R32 — Personal + Shared sit between "Most cooked" and the decorative
@@ -154,6 +195,31 @@ export function LibraryClient({
     initialSurface ?? "yours"
   );
   const [shareTarget, setShareTarget] = React.useState<LibraryRow | null>(null);
+
+  // R36 — view toggle, sort, "load more" cap, archived view, delete confirm.
+  const [view, setView] = React.useState<"grid" | "list">("grid");
+  const [sort, setSort] = React.useState<SortKey>("recent");
+  const [shown, setShown] = React.useState(PAGE_SIZE);
+  const [deleteTarget, setDeleteTarget] = React.useState<{ id: string; name: string; cooks: number } | null>(null);
+  const isArchived = filter === "archived";
+  const manage = useLibraryManagement();
+
+  // Archived recipes are fetched lazily (and reconciled by invalidation) only
+  // while the Archived pill is selected.
+  const archivedQuery = trpc.meals.archivedList.useQuery(undefined, {
+    enabled: isArchived,
+    staleTime: 30_000
+  });
+
+  // Reset the load-more cap whenever the view's contents change. Done during
+  // render (React's sanctioned "adjust state on dependency change" pattern)
+  // rather than in an effect, which would cascade an extra render.
+  const viewKey = `${filter}:${sort}`;
+  const [lastViewKey, setLastViewKey] = React.useState(viewKey);
+  if (viewKey !== lastViewKey) {
+    setLastViewKey(viewKey);
+    setShown(PAGE_SIZE);
+  }
 
   // Stats map keyed by mealId.
   const statsByMealId = React.useMemo(() => {
@@ -220,7 +286,8 @@ export function LibraryClient({
       shared,
       quick: 0,
       high: 0,
-      never
+      never,
+      archived: 0
     } as Record<FilterKey, number>;
   }, [ownedRows, statsByMealId, now, thirtyDays, currentUserId, shareCounts]);
 
@@ -251,6 +318,46 @@ export function LibraryClient({
       return true;
     });
   }, [ownedRows, statsByMealId, filter, now, thirtyDays, currentUserId, shareCounts]);
+
+  // R36 — drop optimistically-archived/deleted rows, then sort, then cap to
+  // the load-more window. Ties always break A to Z.
+  const sortedRows = React.useMemo(() => {
+    const byName = (a: LibraryRow, b: LibraryRow) => a.name.localeCompare(b.name);
+    const lastCooked = (r: LibraryRow) => {
+      const t = statsByMealId.get(r.id)?.lastCookedAt;
+      return t ? new Date(t).getTime() : null;
+    };
+    const visible = filteredRows.filter((r) => !manage.hiddenIds.has(r.id));
+    const out = [...visible];
+    out.sort((a, b) => {
+      switch (sort) {
+        case "az":
+          return byName(a, b);
+        case "new":
+          return new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime() || byName(a, b);
+        case "most":
+          return (statsByMealId.get(b.id)?.cookCount ?? 0) - (statsByMealId.get(a.id)?.cookCount ?? 0) || byName(a, b);
+        case "effort": {
+          const ea = EFFORT_RANK[statsByMealId.get(a.id)?.effortLevel ?? ""] ?? 99;
+          const eb = EFFORT_RANK[statsByMealId.get(b.id)?.effortLevel ?? ""] ?? 99;
+          return ea - eb || byName(a, b);
+        }
+        case "recent":
+        default: {
+          const la = lastCooked(a);
+          const lb = lastCooked(b);
+          if (la === null && lb === null) return byName(a, b);
+          if (la === null) return 1; // never-cooked last
+          if (lb === null) return -1;
+          return lb - la || byName(a, b);
+        }
+      }
+    });
+    return out;
+  }, [filteredRows, manage.hiddenIds, sort, statsByMealId]);
+
+  const pageRows = sortedRows.slice(0, shown);
+  const archivedRows = (archivedQuery.data ?? []).filter((r) => !manage.hiddenIds.has(r.id));
 
   return (
     <div className="grid gap-7">
@@ -353,37 +460,126 @@ export function LibraryClient({
             onClick={() => setFilter(key)}
           />
         ))}
-        {/* Sort indicator — pushed to the far right (the library is
-            sorted A–Z by name server-side). A proper outlined pill with a
-            sort icon, visually grouped with the filters and distinct from
-            the green "New recipe" primary. */}
-        <span
-          className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-border bg-transparent px-3 py-1.5 text-[12.5px] font-medium text-muted-foreground"
-          style={{ letterSpacing: "-0.05px" }}
-        >
-          <ArrowUpDown className="h-3.5 w-3.5" />
-          A–Z
-        </span>
+        <FilterChip
+          active={isArchived}
+          count={null}
+          label={FILTER_LABELS.archived}
+          icon={<Archive className="h-3.5 w-3.5" />}
+          onClick={() => setFilter("archived")}
+        />
+
+        {/* Sort + Grid/List, pushed to the far right. */}
+        <div className="ml-auto flex items-center gap-2">
+          {!isArchived ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-transparent px-3 py-1.5 text-[12.5px] font-medium text-muted-foreground hover:text-foreground"
+                  style={{ letterSpacing: "-0.05px" }}
+                >
+                  <ArrowUpDown className="h-3.5 w-3.5" />
+                  {SORT_LABELS[sort]}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
+                  <DropdownMenuItem key={key} onSelect={() => setSort(key)}>
+                    <Check className={cn("h-4 w-4", sort === key ? "opacity-100" : "opacity-0")} />
+                    {SORT_LABELS[key]}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
+          <div className="inline-flex rounded-full border border-border p-0.5">
+            <ViewToggleButton active={view === "grid"} onClick={() => setView("grid")} label="Grid view">
+              <LayoutGrid className="h-4 w-4" />
+            </ViewToggleButton>
+            <ViewToggleButton active={view === "list"} onClick={() => setView("list")} label="List view">
+              <ListIcon className="h-4 w-4" />
+            </ViewToggleButton>
+          </div>
+        </div>
       </nav>
 
-      {/* 4-up grid */}
-      {filteredRows.length > 0 ? (
-        <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {filteredRows.map((row) => (
-            <li key={row.id}>
-              <LibraryCard
-                row={row}
-                stat={statsByMealId.get(row.id)}
-                showPersonalIndicator={
-                  isMultiMember && (shareCounts[row.id] ?? 0) === 0
-                }
-                shareCount={shareCounts[row.id] ?? 0}
-                isOwner={row.createdByUserId === currentUserId}
-                onShare={() => setShareTarget(row)}
-              />
-            </li>
-          ))}
-        </ul>
+      {isArchived ? (
+        archivedRows.length > 0 ? (
+          <ItemCollection view={view}>
+            {archivedRows.map((r) => {
+              const item: CardItem = {
+                id: r.id,
+                name: r.name,
+                photoUrl: r.photoUrl,
+                cookCount: r.cookCount,
+                lastCookedAt: r.lastCookedAt,
+                effortLevel: null,
+                isOwner: r.createdByUserId === currentUserId
+              };
+              const menu = (
+                <RecipeActionMenu
+                  id={r.id}
+                  archivedView
+                  onRestore={() => manage.restore(r.id, r.name)}
+                  onDeletePermanent={() => setDeleteTarget({ id: r.id, name: r.name, cooks: r.cookCount })}
+                />
+              );
+              return view === "list" ? (
+                <LibraryItemRow key={r.id} item={item} menu={menu} archived />
+              ) : (
+                <LibraryItemCard key={r.id} item={item} menu={menu} archived />
+              );
+            })}
+          </ItemCollection>
+        ) : (
+          <p className="rounded-[14px] border border-dashed bg-[var(--surface-2)] px-6 py-10 text-center text-[13.5px] italic text-muted-foreground">
+            {archivedQuery.isLoading ? "Loading archived recipes..." : "Nothing archived. Recipes you archive land here."}
+          </p>
+        )
+      ) : sortedRows.length > 0 ? (
+        <>
+          <ItemCollection view={view}>
+            {pageRows.map((row) => {
+              const stat = statsByMealId.get(row.id);
+              const item: CardItem = {
+                id: row.id,
+                name: row.name,
+                photoUrl: row.photoUrl,
+                cookCount: stat?.cookCount ?? 0,
+                lastCookedAt: stat?.lastCookedAt ?? null,
+                effortLevel: stat?.effortLevel ?? null,
+                isOwner: row.createdByUserId === currentUserId,
+                showPersonalIndicator: isMultiMember && (shareCounts[row.id] ?? 0) === 0,
+                shareCount: shareCounts[row.id] ?? 0,
+                onShare: () => setShareTarget(row)
+              };
+              const menu =
+                row.createdByUserId === currentUserId ? (
+                  <RecipeActionMenu
+                    id={row.id}
+                    onArchive={() => manage.archive(row.id, row.name)}
+                    onDelete={() => setDeleteTarget({ id: row.id, name: row.name, cooks: stat?.cookCount ?? 0 })}
+                  />
+                ) : null;
+              return view === "list" ? (
+                <LibraryItemRow key={row.id} item={item} menu={menu} />
+              ) : (
+                <LibraryItemCard key={row.id} item={item} menu={menu} />
+              );
+            })}
+          </ItemCollection>
+
+          <div className="flex flex-col items-center gap-2 pt-1">
+            {sortedRows.length > shown ? (
+              <Button variant="outline" onClick={() => setShown((s) => s + PAGE_SIZE)}>
+                Load more
+              </Button>
+            ) : null}
+            <p className="font-mono text-[11px] uppercase tracking-[0.13em] text-muted-foreground">
+              Showing {Math.min(shown, sortedRows.length)} of {sortedRows.length}
+            </p>
+          </div>
+        </>
       ) : (
         <p className="rounded-[14px] border border-dashed bg-[var(--surface-2)] px-6 py-10 text-center text-[13.5px] italic text-muted-foreground">
           {ownedRows.length === 0
@@ -393,6 +589,39 @@ export function LibraryClient({
       )}
         </>
       )}
+
+      <AlertDialog open={deleteTarget !== null} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--terra-soft,#f3e0d7)] text-[color:var(--terra,var(--destructive))]">
+                <Trash2 className="h-4 w-4" />
+              </span>
+              Delete &ldquo;{deleteTarget?.name}&rdquo;?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget && deleteTarget.cooks > 0
+                ? `This removes the recipe and its ${deleteTarget.cooks} logged cook${deleteTarget.cooks === 1 ? "" : "s"}. You can undo right after.`
+                : "This removes the recipe from your library. You can undo right after."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-[color:var(--terra,var(--destructive))] text-white hover:opacity-90"
+              onClick={() => {
+                if (deleteTarget) {
+                  if (isArchived) manage.removePermanent(deleteTarget.id, deleteTarget.name);
+                  else manage.remove(deleteTarget.id, deleteTarget.name);
+                }
+                setDeleteTarget(null);
+              }}
+            >
+              Delete recipe
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {shareTarget ? (
         <ShareSheet
@@ -457,12 +686,14 @@ function FilterChip({
   count,
   active,
   decorative,
+  icon,
   onClick
 }: {
   label: string;
   count: number | null;
   active: boolean;
   decorative?: boolean;
+  icon?: React.ReactNode;
   onClick: () => void;
 }) {
   return (
@@ -479,6 +710,7 @@ function FilterChip({
       )}
       style={{ letterSpacing: "-0.05px" }}
     >
+      {icon}
       {label}
       {count !== null ? (
         <span
@@ -492,145 +724,274 @@ function FilterChip({
   );
 }
 
-function LibraryCard({
-  row,
-  stat,
-  showPersonalIndicator,
-  shareCount,
-  isOwner,
-  onShare
-}: {
-  row: LibraryRow;
-  stat: LibraryStat | undefined;
-  /**
-   * R32 — gate the MealTile lock indicator. Threaded in as a single
-   * boolean so the card stays unopinionated about how the parent
-   * derives the "multi-member && personal" condition.
-   */
-  showPersonalIndicator: boolean;
-  /** How many people this item is shared with (owner-side). */
-  shareCount: number;
-  /** Only the owner sees the Share affordance. */
+/** Normalized shape consumed by the grid card + list row (active or archived). */
+type CardItem = {
+  id: string;
+  name: string;
+  photoUrl: string | null;
+  cookCount: number;
+  lastCookedAt: string | null;
+  effortLevel: LibraryStat["effortLevel"];
   isOwner: boolean;
-  onShare: () => void;
-}) {
-  // Build a compact meta line: cook count + last-cooked relative
-  // ("3× cooked · last Mar 4"). When no stats, just "Not yet cooked".
-  let meta: string;
-  if (stat?.cookCount) {
-    const parts: string[] = [
-      `${stat.cookCount}× cooked`
-    ];
-    if (stat.lastCookedAt) {
-      const last = new Date(stat.lastCookedAt);
-      parts.push(
-        `last ${last.toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric"
-        })}`
-      );
-    }
-    meta = parts.join(" · ");
-  } else {
-    meta = "Not yet cooked";
-  }
+  showPersonalIndicator?: boolean;
+  shareCount?: number;
+  onShare?: () => void;
+};
 
-  // Warm the Share sheet's queries on hover/focus so it opens populated
-  // (people + grants + link state) instead of fetching after the click.
+function metaLine(item: Pick<CardItem, "cookCount" | "lastCookedAt">): string {
+  if (!item.cookCount) return "Not yet cooked";
+  const parts = [`${item.cookCount}× cooked`];
+  if (item.lastCookedAt) {
+    parts.push(
+      `last ${new Date(item.lastCookedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+    );
+  }
+  return parts.join(" · ");
+}
+
+function effortBadge(level: LibraryStat["effortLevel"]) {
+  if (!level) return null;
+  return (
+    <Badge
+      variant={level === "high_effort" ? "terra" : level === "medium" ? "wheat" : "sage"}
+      className="text-[10.5px]"
+    >
+      {level === "high_effort" ? "High effort" : level}
+    </Badge>
+  );
+}
+
+function ViewToggleButton({
+  active,
+  onClick,
+  label,
+  children
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={active}
+      className={cn(
+        "flex h-8 w-8 items-center justify-center rounded-full transition-colors",
+        active ? "bg-[color:var(--sage-soft)] text-primary" : "text-muted-foreground hover:text-foreground"
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ItemCollection({ view, children }: { view: "grid" | "list"; children: React.ReactNode }) {
+  return view === "list" ? (
+    <ul className="divide-y divide-border overflow-hidden rounded-[14px] border bg-[var(--surface)]">{children}</ul>
+  ) : (
+    <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">{children}</ul>
+  );
+}
+
+/** The ⋯ action menu shared by the grid card + list row. */
+function RecipeActionMenu({
+  id,
+  archivedView,
+  onArchive,
+  onDelete,
+  onRestore,
+  onDeletePermanent
+}: {
+  id: string;
+  archivedView?: boolean;
+  onArchive?: () => void;
+  onDelete?: () => void;
+  onRestore?: () => void;
+  onDeletePermanent?: () => void;
+}) {
+  const stop = (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label="Recipe actions"
+          onClick={stop}
+          className="flex h-8 w-8 items-center justify-center rounded-full border bg-[var(--surface)]/90 text-muted-foreground backdrop-blur transition-colors hover:text-foreground"
+        >
+          <MoreVertical className="h-4 w-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" onClick={stop}>
+        <DropdownMenuItem asChild>
+          <Link href={`/meal/${id}` as Route}>
+            <BookOpen className="h-4 w-4" />
+            Open recipe
+          </Link>
+        </DropdownMenuItem>
+        {archivedView ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={onRestore}>
+              <RotateCcw className="h-4 w-4" />
+              Restore
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={onDeletePermanent}
+              className="text-[color:var(--terra,var(--destructive))] focus:text-[color:var(--terra,var(--destructive))]"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete permanently
+            </DropdownMenuItem>
+          </>
+        ) : (
+          <>
+            <DropdownMenuItem asChild>
+              <Link href={`/meal/${id}/edit` as Route}>
+                <Pencil className="h-4 w-4" />
+                Edit
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={onArchive}>
+              <Archive className="h-4 w-4" />
+              Archive
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={onDelete}
+              className="text-[color:var(--terra,var(--destructive))] focus:text-[color:var(--terra,var(--destructive))]"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** Compact list-view row. */
+function LibraryItemRow({ item, menu, archived }: { item: CardItem; menu: React.ReactNode; archived?: boolean }) {
+  return (
+    <li className="flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--surface-2)]">
+      <Link href={`/meal/${item.id}` as Route} className="flex min-w-0 flex-1 items-center gap-3">
+        {item.photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={item.photoUrl} alt="" className="h-[46px] w-[46px] shrink-0 rounded-md border object-cover" />
+        ) : (
+          <MealTile name={item.name} size="s" className="h-[46px] w-[46px] shrink-0 rounded-md border" />
+        )}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[14px] font-medium text-foreground">{item.name}</span>
+          <span className="font-mono text-[10.5px] uppercase tracking-[0.13em] text-muted-foreground">
+            {metaLine(item)}
+          </span>
+        </span>
+      </Link>
+      {effortBadge(item.effortLevel)}
+      {item.isOwner && !archived ? menu : archived ? menu : null}
+    </li>
+  );
+}
+
+/** Grid-view card over a normalized {@link CardItem}, with the ⋯ menu + (active
+ *  only) the Share affordance + personal-meal indicator. */
+function LibraryItemCard({
+  item,
+  menu,
+  archived
+}: {
+  item: CardItem;
+  menu: React.ReactNode;
+  archived?: boolean;
+}) {
+  // Warm the Share sheet's queries on hover/focus so it opens populated.
   const utils = trpc.useUtils();
   const prefetchShare = React.useCallback(() => {
     void utils.sharing.connections.prefetch(undefined, { staleTime: 30_000 });
     void utils.sharing.grantsForItem.prefetch(
-      { itemType: "recipe", itemId: row.id },
+      { itemType: "recipe", itemId: item.id },
       { staleTime: 30_000 }
     );
-    void utils.shares.activeForMeal.prefetch({ mealId: row.id }, { staleTime: 30_000 });
-  }, [utils, row.id]);
+    void utils.shares.activeForMeal.prefetch({ mealId: item.id }, { staleTime: 30_000 });
+  }, [utils, item.id]);
 
   return (
-    <Link
-      href={`/meal/${row.id}` as Route}
-      className="group grid gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-      aria-label={`Open recipe for ${row.name}`}
-    >
-      <span className="relative block">
-        {row.photoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={row.photoUrl}
-            alt=""
-            className="aspect-square w-full rounded-md border bg-muted object-cover transition-opacity group-hover:opacity-90"
-          />
-        ) : (
-          <MealTile
-            name={row.name}
-            size="m"
-            className="aspect-square w-full rounded-md border transition-opacity group-hover:opacity-90"
-            isPersonal={showPersonalIndicator}
-          />
-        )}
-        {showPersonalIndicator ? (
-          <span
-            aria-label="Personal meal"
-            title="Personal — only you see this"
-            className="absolute left-2 top-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-background/85 text-foreground"
-          >
-            <Lock className="h-3 w-3" strokeWidth={2.2} />
-          </span>
-        ) : null}
-        {isOwner ? (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onShare();
-            }}
-            onPointerEnter={prefetchShare}
-            onFocus={prefetchShare}
-            className={cn(
-              "absolute right-2 top-2 inline-flex h-[30px] items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium transition-colors",
-              shareCount > 0
-                ? "bg-[color:var(--sage-bg,var(--sage-soft))] text-[color:var(--primary)]"
-                : "border bg-[var(--surface)]/90 text-muted-foreground backdrop-blur hover:text-foreground"
-            )}
-            aria-label={shareCount > 0 ? `Shared with ${shareCount}` : "Share"}
-          >
-            <Share2 className="h-3.5 w-3.5" />
-            {shareCount > 0 ? shareCount : "Share"}
-          </button>
-        ) : null}
-      </span>
-      <div className="grid gap-0.5">
-        <p className="truncate text-[14px] font-medium text-foreground group-hover:underline">
-          {row.name}
-        </p>
-        <p
-          className="font-mono text-[10.5px] uppercase text-muted-foreground"
-          style={{ letterSpacing: "0.13em" }}
-        >
-          {meta}
-        </p>
-        {stat?.effortLevel ? (
-          <div className="mt-1 flex flex-wrap items-center gap-1">
-            <Badge
-              variant={
-                stat.effortLevel === "high_effort"
-                  ? "terra"
-                  : stat.effortLevel === "medium"
-                    ? "wheat"
-                    : "sage"
-              }
-              className="text-[10.5px]"
+    <li>
+      <Link
+        href={`/meal/${item.id}` as Route}
+        className="group grid gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        aria-label={`Open recipe for ${item.name}`}
+      >
+        <span className="relative block">
+          {item.photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={item.photoUrl}
+              alt=""
+              className="aspect-square w-full rounded-md border bg-muted object-cover transition-opacity group-hover:opacity-90"
+            />
+          ) : (
+            <MealTile
+              name={item.name}
+              size="m"
+              className="aspect-square w-full rounded-md border transition-opacity group-hover:opacity-90"
+              isPersonal={item.showPersonalIndicator}
+            />
+          )}
+          {item.showPersonalIndicator ? (
+            <span
+              aria-label="Personal meal"
+              title="Personal, only you see this"
+              className="absolute left-2 top-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-background/85 text-foreground"
             >
-              {stat.effortLevel === "high_effort"
-                ? "High effort"
-                : stat.effortLevel}
-            </Badge>
-          </div>
-        ) : null}
-      </div>
-    </Link>
+              <Lock className="h-3 w-3" strokeWidth={2.2} />
+            </span>
+          ) : null}
+
+          {/* Top-right controls: ⋯ menu (always) + Share (active, owner). */}
+          <span className="absolute right-2 top-2 flex items-center gap-1.5">
+            {!archived && item.isOwner && item.onShare ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  item.onShare?.();
+                }}
+                onPointerEnter={prefetchShare}
+                onFocus={prefetchShare}
+                className={cn(
+                  "inline-flex h-[30px] items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium transition-colors",
+                  (item.shareCount ?? 0) > 0
+                    ? "bg-[color:var(--sage-bg,var(--sage-soft))] text-[color:var(--primary)]"
+                    : "border bg-[var(--surface)]/90 text-muted-foreground backdrop-blur hover:text-foreground"
+                )}
+                aria-label={(item.shareCount ?? 0) > 0 ? `Shared with ${item.shareCount}` : "Share"}
+              >
+                <Share2 className="h-3.5 w-3.5" />
+                {(item.shareCount ?? 0) > 0 ? item.shareCount : "Share"}
+              </button>
+            ) : null}
+            {menu}
+          </span>
+        </span>
+        <div className="grid gap-0.5">
+          <p className="truncate text-[14px] font-medium text-foreground group-hover:underline">{item.name}</p>
+          <p className="font-mono text-[10.5px] uppercase text-muted-foreground" style={{ letterSpacing: "0.13em" }}>
+            {metaLine(item)}
+          </p>
+          {item.effortLevel ? <div className="mt-1 flex flex-wrap items-center gap-1">{effortBadge(item.effortLevel)}</div> : null}
+        </div>
+      </Link>
+    </li>
   );
 }
 

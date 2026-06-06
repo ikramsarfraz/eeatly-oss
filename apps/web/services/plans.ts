@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { requireHouseholdMember } from "@/lib/auth/session";
 import { requireFeatureAccess } from "@/lib/gates/resolver";
@@ -840,6 +840,10 @@ export type MealLibraryRow = {
   name: string;
   photoUrl: string | null;
   createdByUserId: string | null;
+  /** Creation order — backs the "Newest added" sort. */
+  addedAt: Date;
+  /** When archived — null for active rows; set for the Archived view. */
+  archivedAt: Date | null;
 };
 
 export async function listMealLibrary(args: {
@@ -847,11 +851,18 @@ export async function listMealLibrary(args: {
   householdId: string;
   q?: string;
   limit?: number;
+  /**
+   * R36 — `active` (default) is the library grid: not archived, not deleted.
+   * `archived` is the Archived view: archived AND not deleted, newest-archived
+   * first. Deleted rows never appear in either.
+   */
+  scope?: "active" | "archived";
 }): Promise<MealLibraryRow[]> {
   await requireHouseholdMember(args.userId, args.householdId);
 
   const limit = Math.max(1, Math.min(500, args.limit ?? 200));
   const q = args.q?.trim().toLowerCase() ?? "";
+  const scope = args.scope ?? "active";
 
   return db
     .select({
@@ -861,14 +872,18 @@ export async function listMealLibrary(args: {
       // coalesce the dashboard + recipe reads use). Failed dish-image rows
       // carry a null image_url, so coalesce skips them automatically.
       photoUrl: sql<string | null>`coalesce(${meals.photoUrl}, ${dishImages.imageUrl})`,
-      createdByUserId: meals.createdByUserId
+      createdByUserId: meals.createdByUserId,
+      addedAt: meals.createdAt,
+      archivedAt: meals.archivedAt
     })
     .from(meals)
     .leftJoin(dishImages, eq(dishImages.normalizedName, meals.normalizedName))
     .where(
       and(
         eq(meals.householdId, args.householdId),
-        isNull(meals.archivedAt),
+        // R36 — deleted rows are excluded from both scopes.
+        isNull(meals.deletedAt),
+        scope === "archived" ? isNotNull(meals.archivedAt) : isNull(meals.archivedAt),
         // R32 — strip other members' personal meals from the Library
         // listing + the add-dish picker. The client UI is responsible
         // for then partitioning the remaining (creator-own + shared)
@@ -877,7 +892,7 @@ export async function listMealLibrary(args: {
         q.length > 0 ? sql`lower(${meals.name}) like ${`%${q}%`}` : undefined
       )
     )
-    .orderBy(asc(meals.name))
+    .orderBy(scope === "archived" ? desc(meals.archivedAt) : asc(meals.name))
     .limit(limit);
 }
 
