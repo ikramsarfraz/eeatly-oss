@@ -121,6 +121,8 @@ export default async function HistoryPage({
         householdMemberCount={memberCount}
         sharedWithMe={sharedWithMe}
         initialSurface={initialSurface}
+        userName={user.name ?? null}
+        userEmail={user.email ?? null}
       />
       <div className="hidden md:block">
         <LibraryClient
