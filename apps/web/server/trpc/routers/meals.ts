@@ -20,6 +20,7 @@ import {
   setMealPhoto
 } from "@/services/meals";
 import { saveStructuredRecipe } from "@/services/recipe-edit";
+import { MealNameTakenError } from "@/lib/errors/meals";
 import { createNotification } from "@/services/notifications";
 import { householdMemberProcedure, protectedProcedure, rateLimit, router } from "../trpc";
 
@@ -102,6 +103,8 @@ export const mealsRouter = router({
         const result = await saveStructuredRecipe({
           userId: ctx.user.id,
           mealId: input.mealId,
+          name: input.name,
+          effortLevel: input.effortLevel,
           servings: input.servings,
           ingredients: input.ingredients,
           steps: input.steps
@@ -109,6 +112,13 @@ export const mealsRouter = router({
         revalidatePath(`/meal/${input.mealId}`);
         return result;
       } catch (error) {
+        if (error instanceof MealNameTakenError) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: error.message,
+            cause: { reason: "MEAL_NAME_COLLISION" }
+          });
+        }
         const message = error instanceof Error ? error.message : "Unknown error.";
         if (message.toLowerCase().includes("not authorized")) {
           throw new TRPCError({

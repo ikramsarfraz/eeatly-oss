@@ -24,7 +24,7 @@ type ImageMime = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
 
 /**
  * Add a meal — "Assist" redesign. Manual entry is always the surface; the AI
- * Assist Bar pours a photo / voice / text / link into the same fields. Replaces
+ * Assist Bar pours a photo / voice / text capture into the same fields. Replaces
  * the old `/add` composer (and the "credits left" + tip side panels).
  */
 export function AddAssistClient({ initialMealName }: { initialMealName?: string }) {
@@ -44,7 +44,6 @@ export function AddAssistClient({ initialMealName }: { initialMealName?: string 
   const [recipeText, setRecipeText] = React.useState("");
   const [ingredients, setIngredients] = React.useState<string[]>([]);
   const [servings, setServings] = React.useState("");
-  const [recipeSourceUrl, setRecipeSourceUrl] = React.useState("");
   const [recipeGenerated, setRecipeGenerated] = React.useState(false);
   const [nameError, setNameError] = React.useState(false);
 
@@ -118,13 +117,6 @@ export function AddAssistClient({ initialMealName }: { initialMealName?: string 
       throw err;
     }
   };
-  const runLink = async (url: string) => {
-    // No URL-extraction backend yet — capture the source link onto the meal so
-    // it's saved with the recipe (the recipe view renders it as an embed).
-    setRecipeSourceUrl(url.trim());
-    showToast({ variant: "success", title: "Link saved to your meal" });
-  };
-
   async function save() {
     if (mealName.trim().length < 2) {
       setNameError(true);
@@ -141,7 +133,6 @@ export function AddAssistClient({ initialMealName }: { initialMealName?: string 
         photoUrl,
         notes: notes.trim(),
         recipeText: recipeText.trim(),
-        recipeSourceUrl: recipeSourceUrl.trim(),
         servings: servings.trim(),
         ingredients: ingredients.length > 0 ? ingredients : undefined,
         recipeGenerated
@@ -165,19 +156,20 @@ export function AddAssistClient({ initialMealName }: { initialMealName?: string 
         Add a meal
       </h1>
       <p className="mb-[22px] max-w-[470px] text-[14.5px] leading-[1.5] text-[color:var(--ae-ink2)]">
-        Fill it in below, or let AI do the typing from a photo, voice note, or link.
+        Fill it in below, or let AI do the typing from a photo, voice note, or text.
       </p>
 
-      <AssistBar
-        variant="add"
-        title="Start from a photo, voice note, or link"
-        sub="AI fills the fields below, you just review."
-        cta="Use AI"
-        runPhoto={runPhoto}
-        runText={runText}
-        runVoice={runVoice}
-        runLink={runLink}
-      />
+      <div data-tour="capture-cards">
+        <AssistBar
+          variant="add"
+          title="Start from a photo, voice note, or text"
+          sub="AI fills the fields below, you just review."
+          cta="Use AI"
+          runPhoto={runPhoto}
+          runText={runText}
+          runVoice={runVoice}
+        />
+      </div>
 
       <AeDivider label="or write it in" />
 

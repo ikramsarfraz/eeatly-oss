@@ -67,14 +67,6 @@ export const Document = ({ size, className }: IconProps) => (
   </Svg>
 );
 
-export const LinkGlyph = ({ size, className }: IconProps) => (
-  <Svg size={size} className={className} strokeWidth={1.8}>
-    <path d="M9.5 14.5l5-5" />
-    <path d="M11 7.5l1.6-1.6a3.5 3.5 0 014.95 4.95L15.9 12.5" />
-    <path d="M13 16.5l-1.6 1.6a3.5 3.5 0 01-4.95-4.95L8.1 11.5" />
-  </Svg>
-);
-
 export const ChevronRight = ({ size, className }: IconProps) => (
   <Svg size={size} className={className} strokeWidth={2}>
     <path d="M9 6l6 6-6 6" />

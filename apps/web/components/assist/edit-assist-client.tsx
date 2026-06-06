@@ -148,10 +148,16 @@ export function EditAssistClient({
   };
 
   async function save() {
+    if (name.trim().length < 2) {
+      showToast({ variant: "error", title: "Add a recipe name first" });
+      return;
+    }
     setSaving(true);
     try {
       await saveMutation.mutateAsync({
         mealId,
+        name: name.trim(),
+        effortLevel,
         servings: servings.trim(),
         ingredients: ingredients
           .filter((r) => r.text.trim().length > 0)
@@ -164,9 +170,10 @@ export function EditAssistClient({
       showToast({ variant: "success", title: "Changes saved" });
       router.push(`/meal/${mealId}` as Route);
     } catch (err) {
+      const collision = getCause(err)?.reason === "MEAL_NAME_COLLISION";
       showToast({
         variant: "error",
-        title: "Couldn't save",
+        title: collision ? "That name is taken" : "Couldn't save",
         description: err instanceof Error ? err.message : "Please try again."
       });
     } finally {

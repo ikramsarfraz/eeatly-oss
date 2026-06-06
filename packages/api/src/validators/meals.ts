@@ -98,6 +98,12 @@ export type SetMealPhotoInput = z.infer<typeof setMealPhotoInputSchema>;
  */
 export const manualRecipeInputSchema = z.object({
   mealId: z.string().uuid(),
+  // R34 — the Assist Edit screen also edits the recipe name + effort. Both are
+  // optional so other callers (legacy manual editor) can omit them. `name`
+  // renames the meal (collision-checked server-side); `effortLevel` sets the
+  // recipe-level effort override.
+  name: z.string().trim().min(2, "Name needs at least 2 characters.").max(120).optional(),
+  effortLevel: effortLevelSchema.optional(),
   // Free-form yield, e.g. "Serves 4". Empty string clears it.
   servings: z.string().max(120, "Keep the yield under 120 characters.").optional(),
   ingredients: z

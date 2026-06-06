@@ -2,9 +2,9 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { Camera, Mic, Document, LinkGlyph } from "./assist-icons";
+import { Camera, Mic, Document } from "./assist-icons";
 
-export type AssistSource = "photo" | "voice" | "text" | "link";
+export type AssistSource = "photo" | "voice" | "text";
 
 const ALL_TABS: Array<{
   id: AssistSource;
@@ -13,11 +13,10 @@ const ALL_TABS: Array<{
 }> = [
   { id: "photo", label: "Photo", Icon: Camera },
   { id: "voice", label: "Voice", Icon: Mic },
-  { id: "text", label: "Text", Icon: Document },
-  { id: "link", label: "Link", Icon: LinkGlyph }
+  { id: "text", label: "Text", Icon: Document }
 ];
 
-/** Equal-width source tabs. `items` narrows the set (Edit drops Link). */
+/** Equal-width source tabs (Photo / Voice / Text). `items` narrows the set. */
 export function SourceTabs({
   value,
   onChange,

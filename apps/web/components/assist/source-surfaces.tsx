@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Camera } from "./assist-icons";
-import { AeButton, AeInput, AeTextarea } from "./field-atoms";
+import { AeButton, AeTextarea } from "./field-atoms";
 
 type Variant = "add" | "edit";
 
@@ -81,36 +81,6 @@ export function TextSurface({
               : "Build the recipe"}
         </AeButton>
       </div>
-    </div>
-  );
-}
-
-/** Link → single-line URL input + "Pull the recipe" (Add only). */
-export function LinkSurface({
-  busy,
-  onSubmit
-}: {
-  busy: boolean;
-  onSubmit: (url: string) => void;
-}) {
-  const [url, setUrl] = React.useState("");
-  return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-      <AeInput
-        type="url"
-        inputMode="url"
-        value={url}
-        onChange={(e) => setUrl(e.target.value)}
-        placeholder="https://…  a recipe link or video"
-        className="flex-1"
-      />
-      <AeButton
-        disabled={busy || url.trim().length === 0}
-        onClick={() => onSubmit(url)}
-        className="shrink-0"
-      >
-        {busy ? "Saving…" : "Pull the recipe"}
-      </AeButton>
     </div>
   );
 }

@@ -58,7 +58,7 @@ export const TOUR_STEPS: TourStep[] = [
     place: "top",
     kicker: "Capture",
     title: "Capture how you cook.",
-    body: "Log a meal by hand, lift a recipe with AI from a photo, text or voice, or add a source link."
+    body: "Add a meal by hand, or let AI lift a recipe from a photo, voice note, or text."
   },
   {
     anchor: "nav-library",

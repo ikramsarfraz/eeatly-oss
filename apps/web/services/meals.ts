@@ -746,6 +746,8 @@ export async function getMealDetail(
       servings: meals.servings,
       ingredients: meals.ingredients,
       recipeIsAiDraft: meals.recipeIsAiDraft,
+      // R34 — recipe-level effort override (null = derive from cook logs).
+      effortOverride: meals.effortLevel,
       notes: meals.notes,
       createdAt: meals.createdAt,
       createdByUserId: meals.createdByUserId,
@@ -866,7 +868,9 @@ export async function getMealDetail(
     cookCount: Number(stats?.cookCount ?? 0),
     lastCookedAt: stats?.lastCookedAt ?? null,
     createdAt: row.createdAt.toISOString(),
-    effortLevel: pickModalEffort(effortRows),
+    // Prefer a hand-set recipe-level effort (R34); fall back to the cook logs'
+    // modal effort when the recipe has no override.
+    effortLevel: row.effortOverride ?? pickModalEffort(effortRows),
     structuredIngredients: structuredIngredientRows,
     structuredSteps: structuredStepRows
   };

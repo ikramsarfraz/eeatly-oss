@@ -4,7 +4,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { Sparkle, ChevronRight, X } from "./assist-icons";
 import { SourceTabs, type AssistSource } from "./source-tabs";
-import { PhotoSurface, TextSurface, LinkSurface } from "./source-surfaces";
+import { PhotoSurface, TextSurface } from "./source-surfaces";
 import { VoiceRecorder } from "./voice-recorder";
 
 export type AssistRunners = {
@@ -13,8 +13,6 @@ export type AssistRunners = {
   runPhoto: (file: File) => Promise<void>;
   runText: (text: string) => Promise<void>;
   runVoice: (audio: Blob, fileName: string) => Promise<void>;
-  /** Add only; omit on Edit. */
-  runLink?: (url: string) => Promise<void>;
 };
 
 const EDIT_CHIPS = ["Make it spicier", "Convert to grams", "Halve for 2 people"];
@@ -22,7 +20,7 @@ const EDIT_CHIPS = ["Make it spicier", "Convert to grams", "Halve for 2 people"]
 /**
  * The reusable AI Assist Bar — a sage pill that expands into a capture strip
  * and pours its result straight into the form. Shared by Add and Edit; the
- * `variant` swaps copy, the Link tab, and the edit suggestion chips.
+ * `variant` swaps copy and adds the edit suggestion chips.
  */
 export function AssistBar({
   variant,
@@ -31,8 +29,7 @@ export function AssistBar({
   cta,
   runPhoto,
   runText,
-  runVoice,
-  runLink
+  runVoice
 }: {
   variant: "add" | "edit";
   title: string;
@@ -125,9 +122,6 @@ export function AssistBar({
             isBuilding={busy}
             onBuild={(blob, fileName) => run(() => runVoice(blob, fileName))}
           />
-        )}
-        {source === "link" && runLink && (
-          <LinkSurface busy={busy} onSubmit={(u) => run(() => runLink(u))} />
         )}
       </div>
 

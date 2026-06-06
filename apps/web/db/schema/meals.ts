@@ -61,6 +61,11 @@ export const meals = pgTable(
     // off the user's source), so the recipe view can flag it "review this".
     // Cleared once the user edits it by hand or refines it.
     recipeIsAiDraft: boolean("recipe_is_ai_draft").notNull().default(false),
+    // R34 — recipe-level effort override set from the Edit screen. NULL means
+    // "derive from the cook logs' modal effort" (the original behaviour, kept
+    // for legacy meals + meals never edited). When set, getMealDetail prefers
+    // it so a hand-set effort sticks regardless of how it was last cooked.
+    effortLevel: effortLevelEnum("effort_level"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     archivedAt: timestamp("archived_at", { withTimezone: true })
