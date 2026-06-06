@@ -49,12 +49,21 @@ export async function generateMetadata(props: {
         title: planTitle,
         description: planDesc,
         alternates: { canonical: canonicalUrl },
+        // Previewable in chat apps, but not search-indexed (privacy). See
+        // the recipe branch below for the full rationale.
+        robots: { index: false, follow: true },
         openGraph: {
           type: "website",
           title: planTitle,
           description: planDesc,
           url: canonicalUrl,
           siteName: "eeatly"
+          // og:image from the co-located opengraph-image.tsx (menu card).
+        },
+        twitter: {
+          card: "summary_large_image",
+          title: planTitle,
+          description: planDesc
         }
       };
     }
@@ -68,25 +77,31 @@ export async function generateMetadata(props: {
 
   const title = `${share.mealName} · eeatly`;
   const description = truncateForDescription(share.recipeText);
-  const imageUrl = share.photoUrl ?? undefined;
 
   return {
     title,
     description,
     alternates: { canonical: canonicalUrl },
+    // Public shares are previewable (so chat apps render the card) but kept
+    // out of search indexes: a shared family recipe (name, method,
+    // contributor) shouldn't surface in Google. `follow: true` still lets a
+    // crawler traverse to the marketing pages. Mirrors the `X-Robots-Tag`
+    // the proxy already sets on every /share response. User-controlled
+    // "make this discoverable" opt-in is a separate backlog item.
+    robots: { index: false, follow: true },
     openGraph: {
       type: "article",
       title,
       description,
       url: canonicalUrl,
-      siteName: "eeatly",
-      images: imageUrl ? [{ url: imageUrl, alt: share.mealName }] : undefined
+      siteName: "eeatly"
+      // og:image comes from the co-located opengraph-image.tsx (the branded
+      // dish tile). A manual entry here would emit a second og:image tag.
     },
     twitter: {
-      card: imageUrl ? "summary_large_image" : "summary",
+      card: "summary_large_image",
       title,
-      description,
-      images: imageUrl ? [imageUrl] : undefined
+      description
     }
   };
 }

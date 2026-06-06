@@ -58,21 +58,18 @@ export const metadata: Metadata = {
     description: "Remember meals you love. Decide what to cook next.",
     url: appUrl,
     siteName: "eeatly",
-    type: "website",
-    images: [
-      {
-        url: "/og.svg",
-        width: 1200,
-        height: 630,
-        alt: "eeatly dashboard preview"
-      }
-    ]
+    type: "website"
+    // `og:image` is injected by the file-based `app/opengraph-image.tsx`
+    // route (1200x630 PNG). No `images` array here: a manual entry would
+    // emit a second `og:image` tag, and the old `/og.svg` was never
+    // rendered by social scrapers (they don't accept SVG), which is why
+    // shared links showed a blank card.
   },
   twitter: {
     card: "summary_large_image",
     title: "eeatly",
-    description: "Remember meals you love. Decide what to cook next.",
-    images: ["/og.svg"]
+    description: "Remember meals you love. Decide what to cook next."
+    // `twitter:image` injected by `app/twitter-image.tsx`.
   }
   // Browser-tab favicon, modern icon, and apple-touch-icon come from the
   // `app/` file conventions (`favicon.ico`, `icon.png`, `apple-icon.png`);
