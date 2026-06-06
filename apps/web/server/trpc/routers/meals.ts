@@ -12,12 +12,17 @@ import {
   setMealPhotoInputSchema
 } from "@eeatly/api/validators/meals";
 import {
+  archiveMeal,
   createMealLog,
+  deleteMeal,
   deleteMealLog,
   getHistoryRows,
   getHistoryStats,
   getMealDetail,
-  setMealPhoto
+  listArchivedRecipes,
+  restoreMeal,
+  setMealPhoto,
+  unarchiveMeal
 } from "@/services/meals";
 import { saveStructuredRecipe } from "@/services/recipe-edit";
 import { MealNameTakenError } from "@/lib/errors/meals";
@@ -275,5 +280,59 @@ export const mealsRouter = router({
         logId: input.logId
       });
       return { ok: true as const };
-    })
+    }),
+
+  // R36 Library — per-recipe management. Archive (reversible) / Delete (soft).
+  // Owner-only is enforced in the service; a non-owner / missing id surfaces as
+  // NOT_FOUND so it can't probe another member's library.
+  archive: householdMemberProcedure
+    .use(rateLimit("mutation"))
+    .input(z.object({ mealId: z.string().uuid() }))
+    .mutation(({ ctx, input }) => mealLifecycle(archiveMeal, ctx, input.mealId)),
+
+  unarchive: householdMemberProcedure
+    .use(rateLimit("mutation"))
+    .input(z.object({ mealId: z.string().uuid() }))
+    .mutation(({ ctx, input }) => mealLifecycle(unarchiveMeal, ctx, input.mealId)),
+
+  delete: householdMemberProcedure
+    .use(rateLimit("mutation"))
+    .input(z.object({ mealId: z.string().uuid() }))
+    .mutation(({ ctx, input }) => mealLifecycle(deleteMeal, ctx, input.mealId)),
+
+  restore: householdMemberProcedure
+    .use(rateLimit("mutation"))
+    .input(z.object({ mealId: z.string().uuid() }))
+    .mutation(({ ctx, input }) => mealLifecycle(restoreMeal, ctx, input.mealId)),
+
+  archivedList: householdMemberProcedure.query(({ ctx }) =>
+    listArchivedRecipes(ctx.user.id, ctx.household.id)
+  )
 });
+
+/**
+ * Shared body for the four lifecycle mutations: run the owner-scoped service,
+ * map "not found" to a NOT_FOUND TRPCError, and revalidate the library SSR.
+ */
+async function mealLifecycle(
+  fn: (userId: string, householdId: string, mealId: string) => Promise<void>,
+  ctx: { user: { id: string }; household: { id: string } },
+  mealId: string
+) {
+  try {
+    await fn(ctx.user.id, ctx.household.id, mealId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error.";
+    if (message.toLowerCase().includes("not found")) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message,
+        cause: { reason: "MEAL_NOT_FOUND" }
+      });
+    }
+    throw error;
+  }
+  revalidatePath("/library");
+  revalidatePath("/home");
+  return { ok: true as const };
+}

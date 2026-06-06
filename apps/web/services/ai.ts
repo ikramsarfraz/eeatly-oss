@@ -91,7 +91,7 @@ export async function generateShareableRecipe(
     .from(meals)
     .innerJoin(households, eq(households.id, meals.householdId))
     .where(
-      and(eq(meals.id, mealId), eq(meals.householdId, householdId), isNull(meals.archivedAt))
+      and(eq(meals.id, mealId), eq(meals.householdId, householdId), isNull(meals.archivedAt), isNull(meals.deletedAt))
     )
     .limit(1);
 
@@ -168,7 +168,7 @@ export async function extractIngredientsForMeal(args: {
       createdByUserId: meals.createdByUserId
     })
     .from(meals)
-    .where(and(eq(meals.id, args.mealId), isNull(meals.archivedAt)))
+    .where(and(eq(meals.id, args.mealId), isNull(meals.archivedAt), isNull(meals.deletedAt)))
     .limit(1);
 
   if (!mealRow) {
@@ -246,7 +246,7 @@ export async function generateDishImageForMeal(args: {
       and(
         eq(meals.id, args.mealId),
         eq(meals.householdId, args.householdId),
-        isNull(meals.archivedAt),
+        isNull(meals.archivedAt), isNull(meals.deletedAt),
         mealVisibilityFilter(args.userId, args.householdId)
       )
     )
@@ -284,7 +284,7 @@ export async function getExistingMealImage(args: {
       and(
         eq(meals.id, args.mealId),
         eq(meals.householdId, args.householdId),
-        isNull(meals.archivedAt),
+        isNull(meals.archivedAt), isNull(meals.deletedAt),
         mealVisibilityFilter(args.userId, args.householdId)
       )
     )

@@ -87,7 +87,7 @@ export type SessionState = {
 
 async function loadRecipeContext(mealId: string): Promise<RecipeContext> {
   const mealRow = await db.query.meals.findFirst({
-    where: and(eq(meals.id, mealId), isNull(meals.archivedAt))
+    where: and(eq(meals.id, mealId), isNull(meals.archivedAt), isNull(meals.deletedAt))
   });
   if (!mealRow) throw new Error("Meal not found.");
 
@@ -259,7 +259,7 @@ export async function startSession(args: {
   // throws a canonical not-authorized error (→ FORBIDDEN) for everyone else,
   // without leaking whether the meal exists.
   const mealRow = await db.query.meals.findFirst({
-    where: and(eq(meals.id, args.mealId), isNull(meals.archivedAt))
+    where: and(eq(meals.id, args.mealId), isNull(meals.archivedAt), isNull(meals.deletedAt))
   });
   if (!mealRow) throw new Error("Not authorized to edit this item.");
   await requireItemEditor(args.userId, "recipe", args.mealId, mealRow.createdByUserId);
@@ -711,7 +711,7 @@ export async function saveSession(args: {
   // is already user-scoped via ensureSessionOwnership above; this guards
   // against access being revoked mid-draft.
   const mealRow = await db.query.meals.findFirst({
-    where: and(eq(meals.id, session.mealId), isNull(meals.archivedAt))
+    where: and(eq(meals.id, session.mealId), isNull(meals.archivedAt), isNull(meals.deletedAt))
   });
   if (!mealRow) throw new Error("Meal not found.");
   await requireItemEditor(args.userId, "recipe", session.mealId, mealRow.createdByUserId);
@@ -1166,7 +1166,7 @@ export async function previewChanges(args: {
   imageBase64?: string;
 }): Promise<RecipePreview> {
   const mealRow = await db.query.meals.findFirst({
-    where: and(eq(meals.id, args.mealId), isNull(meals.archivedAt))
+    where: and(eq(meals.id, args.mealId), isNull(meals.archivedAt), isNull(meals.deletedAt))
   });
   if (!mealRow) throw new Error("Meal not found.");
   // Same write gate as the manual editor + refine save.

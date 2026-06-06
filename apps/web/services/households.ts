@@ -398,7 +398,7 @@ export async function acceptHouseholdInvitation(
           and(
             eq(meals.householdId, currentMembership.householdId),
             eq(meals.createdByUserId, userId),
-            isNull(meals.archivedAt)
+            isNull(meals.archivedAt), isNull(meals.deletedAt)
           )
         );
 
@@ -413,7 +413,7 @@ export async function acceptHouseholdInvitation(
                 meals.normalizedName,
                 userMealNames.map((m) => m.normalizedName)
               ),
-              isNull(meals.archivedAt)
+              isNull(meals.archivedAt), isNull(meals.deletedAt)
             )
           );
         const targetSet = new Set(targetNames.map((m) => m.normalizedName));
@@ -441,7 +441,7 @@ export async function acceptHouseholdInvitation(
               and(
                 eq(meals.householdId, currentMembership.householdId),
                 eq(meals.createdByUserId, userId),
-                isNull(meals.archivedAt)
+                isNull(meals.archivedAt), isNull(meals.deletedAt)
               )
             )
         : [{ value: 0 }];
