@@ -70,16 +70,16 @@ export const metadata: Metadata = {
     title: "eeatly",
     description: "Remember meals you love. Decide what to cook next."
     // `twitter:image` injected by `app/twitter-image.tsx`.
-  },
-  icons: {
-    icon: "/icon.svg",
-    apple: "/apple-icon.svg"
-  },
-  manifest: "/manifest.webmanifest"
+  }
+  // Browser-tab favicon, modern icon, and apple-touch-icon come from the
+  // `app/` file conventions (`favicon.ico`, `icon.png`, `apple-icon.png`);
+  // the PWA manifest from `app/manifest.ts`. Next auto-injects the link tags
+  // for all of these, so no explicit `icons`/`manifest` metadata is needed.
 };
 
 export const viewport: Viewport = {
-  themeColor: "#2f6f58",
+  // Brand forest. Matches `theme_color` in `app/manifest.ts`.
+  themeColor: "#2E5739",
   viewportFit: "cover"
 };
 
