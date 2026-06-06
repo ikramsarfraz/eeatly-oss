@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import * as schema from "@/db/schema";
 import { meals, planShares, plans, recipeShares } from "@/db/schema";
 import { getDatabaseUrl } from "@/lib/env/server";
+import { logger } from "@/lib/observability/logger";
 
 /**
  * Lean, env-guard-free read path for the public share-OG card
@@ -29,7 +30,16 @@ let cached: NeonDatabase<typeof schema> | null = null;
 
 function ogDb(): NeonDatabase<typeof schema> {
   if (cached) return cached;
-  cached = drizzle(new Pool({ connectionString: getDatabaseUrl() }), { schema });
+  const pool = new Pool({ connectionString: getDatabaseUrl() });
+  // Swallow idle-client socket drops so they don't become uncaught exceptions.
+  // See lib/db/client.ts for the full rationale (Neon WebSocket Pool in
+  // serverless); the next query reconnects.
+  pool.on("error", (error: unknown) => {
+    logger.warn("og_db_pool_idle_error", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  });
+  cached = drizzle(pool, { schema });
   return cached;
 }
 

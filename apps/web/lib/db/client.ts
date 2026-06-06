@@ -4,6 +4,7 @@ import { Pool } from "@neondatabase/serverless";
 import { drizzle, type NeonDatabase } from "drizzle-orm/neon-serverless";
 import * as schema from "@/db/schema";
 import { getServerEnv } from "@/lib/env/server";
+import { logger } from "@/lib/observability/logger";
 
 /**
  * Round 15.5 Task 1 — lazy DB client.
@@ -33,6 +34,17 @@ function getDb(): Database {
   if (_db) return _db;
   const { DATABASE_URL } = getServerEnv();
   const pool = new Pool({ connectionString: DATABASE_URL });
+  // Neon's serverless Pool is WebSocket-backed. In serverless the socket is
+  // dropped when the function is suspended or hits Neon's idle timeout, which
+  // node-postgres surfaces as an 'error' event on the idle client. Without a
+  // listener that event is rethrown as an uncaught exception (it was reaching
+  // Sentry as "Connection terminated unexpectedly"). Log and swallow — the next
+  // query reconnects; an idle-socket drop is expected, not a request failure.
+  pool.on("error", (error: unknown) => {
+    logger.warn("db_pool_idle_error", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  });
   _db = drizzle(pool, { schema });
   return _db;
 }
