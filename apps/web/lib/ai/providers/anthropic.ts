@@ -31,6 +31,13 @@ const FALLBACK_TIMEOUT_MS = 15_000;
 // fires after the primary already failed).
 const REFINE_FALLBACK_TIMEOUT_MS = 26_000;
 
+// Fallback budget for recipe-generation suggests (image / text / voice).
+// These emit a full recipe (1024-1500 tokens) which the 15s FALLBACK ceiling
+// aborts mid-generation; the OpenAI primary has the matching `GENERATE_TIMEOUT_MS`.
+// Longer than the primary for the usual reason (we only get here after the
+// primary already failed), but kept under the 60s function budget.
+const GENERATE_FALLBACK_TIMEOUT_MS = 24_000;
+
 const suggestMealTool = {
   name: "suggest_meal",
   description: "Return a structured meal suggestion extracted from the provided image or text.",
@@ -127,7 +134,7 @@ export async function suggestMealFromImage(
         }
       ]
     },
-    { signal: AbortSignal.timeout(FALLBACK_TIMEOUT_MS) }
+    { signal: AbortSignal.timeout(GENERATE_FALLBACK_TIMEOUT_MS) }
   );
 
   recordAiTokens({
@@ -156,7 +163,7 @@ export async function suggestMealFromText(
       tool_choice: { type: "tool", name: "suggest_meal" },
       messages: [{ role: "user", content: `${SUGGEST_FROM_TEXT_PROMPT}${unitsDirective(system)}\n\n${text}` }]
     },
-    { signal: AbortSignal.timeout(FALLBACK_TIMEOUT_MS) }
+    { signal: AbortSignal.timeout(GENERATE_FALLBACK_TIMEOUT_MS) }
   );
 
   recordAiTokens({
@@ -187,7 +194,7 @@ export async function suggestMealFromVoiceTranscript(
         { role: "user", content: `${SUGGEST_FROM_VOICE_NOTE_PROMPT}${unitsDirective(system)}\n\n${transcript}` }
       ]
     },
-    { signal: AbortSignal.timeout(FALLBACK_TIMEOUT_MS) }
+    { signal: AbortSignal.timeout(GENERATE_FALLBACK_TIMEOUT_MS) }
   );
 
   recordAiTokens({

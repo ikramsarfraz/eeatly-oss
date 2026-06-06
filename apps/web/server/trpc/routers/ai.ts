@@ -240,9 +240,13 @@ export const aiRouter = router({
           userId: ctx.user.id,
           error: error instanceof Error ? error.message : String(error)
         });
+        // Transcription failures are already mapped above (mapAudioError ->
+        // AUDIO_TRANSCRIPTION_FAILED). Reaching here means we heard the audio
+        // but the recipe-generation step failed (usually a provider timeout),
+        // so the message shouldn't blame the audio.
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "We couldn't read that audio. Please try again.",
+          message: "We heard you, but couldn't turn that into a recipe just now. Please try again.",
           cause: { reason: "AI_PROVIDER_ERROR" }
         });
       }

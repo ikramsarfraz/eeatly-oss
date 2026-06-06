@@ -56,6 +56,18 @@ const nextConfig: NextConfig = {
   // Round 12: workspace packages live as .ts source (not pre-built .d.ts +
   // .js). Next needs to compile them through SWC alongside app code.
   transpilePackages: ["@eeatly/api", "@eeatly/shared"],
+  // R32.5: the file-based OG image routes read vendored TTFs via
+  // `readFile(join(process.cwd(), 'assets/og/...'))`. `process.cwd()` isn't
+  // statically analyzable, so nft won't auto-trace the fonts into the
+  // serverless bundle — without this they'd 404 at runtime on Vercel. Glob
+  // them into each OG function (the twitter-image routes re-export the same
+  // default, so they read the fonts too).
+  outputFileTracingIncludes: {
+    "/opengraph-image": ["./assets/og/*.ttf"],
+    "/twitter-image": ["./assets/og/*.ttf"],
+    "/share/[token]/opengraph-image": ["./assets/og/*.ttf"],
+    "/share/[token]/twitter-image": ["./assets/og/*.ttf"]
+  },
   // PostHog needs trailing slashes preserved on its ingestion paths.
   skipTrailingSlashRedirect: true,
   async rewrites() {
