@@ -19,7 +19,10 @@ import {
   Plus,
   RotateCcw,
   Share2,
-  Trash2
+  SlidersHorizontal,
+  Tag as TagIcon,
+  Trash2,
+  X
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -47,6 +50,18 @@ import { ShareSheet } from "@/components/sharing/share-sheet";
 import { useQuickLog } from "@/components/dashboard/quick-log-provider";
 import { useToast } from "@/components/providers/toast-provider";
 import { useLibraryManagement } from "@/components/library/use-library-management";
+import { FilterPanelBody } from "@/components/library/filter-panel";
+import { EditTagsDialog } from "@/components/library/edit-tags";
+import { FACET_GROUPS, effortLabel, type FacetKey, type MealTags } from "@/lib/meals/tags";
+import {
+  emptyFacetState,
+  facetCounts,
+  facetOptions,
+  matchesFacets,
+  totalSelected,
+  type FacetRow,
+  type FacetState
+} from "@/lib/meals/facets";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 import type { SharedWithMeItem, TombstoneView } from "@/services/sharing";
@@ -111,6 +126,12 @@ export type LibraryRow = {
   createdByUserId: string | null;
   /** Creation order (ISO) — backs the "Newest added" sort. */
   addedAt: string;
+  /** R36 — AI tags, for faceted filtering + Edit-tags. */
+  cuisine: string | null;
+  course: string | null;
+  mainIngredient: string | null;
+  diet: string[];
+  occasion: string[];
 };
 
 export type LibraryStat = {
@@ -201,8 +222,20 @@ export function LibraryClient({
   const [sort, setSort] = React.useState<SortKey>("recent");
   const [shown, setShown] = React.useState(PAGE_SIZE);
   const [deleteTarget, setDeleteTarget] = React.useState<{ id: string; name: string; cooks: number } | null>(null);
+  const [facetState, setFacetState] = React.useState<FacetState>(emptyFacetState);
+  const [filtersOpen, setFiltersOpen] = React.useState(false);
+  const [editTagsTarget, setEditTagsTarget] = React.useState<{ id: string; name: string; tags: MealTags } | null>(null);
   const isArchived = filter === "archived";
   const manage = useLibraryManagement();
+
+  const toggleFacet = (key: FacetKey, value: string) =>
+    setFacetState((s) => {
+      const next = { ...s, [key]: new Set(s[key]) };
+      if (next[key].has(value)) next[key].delete(value);
+      else next[key].add(value);
+      return next;
+    });
+  const activeFacetCount = totalSelected(facetState);
 
   // Archived recipes are fetched lazily (and reconciled by invalidation) only
   // while the Archived pill is selected.
@@ -227,6 +260,18 @@ export function LibraryClient({
     for (const stat of stats) map.set(stat.mealId, stat);
     return map;
   }, [stats]);
+
+  const toFacetRow = React.useCallback(
+    (row: LibraryRow): FacetRow => ({
+      cuisine: row.cuisine,
+      course: row.course,
+      mainIngredient: row.mainIngredient,
+      diet: row.diet,
+      occasion: row.occasion,
+      effort: statsByMealId.get(row.id)?.effortLevel ?? null
+    }),
+    [statsByMealId]
+  );
 
   // The "Yours" surface is strictly recipes you OWN. `listMealLibrary` is
   // household-scoped + visibility-filtered, so in a multi-member kitchen it
@@ -327,7 +372,9 @@ export function LibraryClient({
       const t = statsByMealId.get(r.id)?.lastCookedAt;
       return t ? new Date(t).getTime() : null;
     };
-    const visible = filteredRows.filter((r) => !manage.hiddenIds.has(r.id));
+    const visible = filteredRows.filter(
+      (r) => !manage.hiddenIds.has(r.id) && matchesFacets(toFacetRow(r), facetState)
+    );
     const out = [...visible];
     out.sort((a, b) => {
       switch (sort) {
@@ -354,7 +401,13 @@ export function LibraryClient({
       }
     });
     return out;
-  }, [filteredRows, manage.hiddenIds, sort, statsByMealId]);
+  }, [filteredRows, manage.hiddenIds, sort, statsByMealId, facetState, toFacetRow]);
+
+  // Facet options + live counts are computed over the activity-filtered base
+  // (so they reflect the current pill but not the facet selection itself).
+  const facetRows = React.useMemo(() => filteredRows.map(toFacetRow), [filteredRows, toFacetRow]);
+  const facetOpts = React.useMemo(() => facetOptions(facetRows), [facetRows]);
+  const facetCountMap = React.useMemo(() => facetCounts(facetRows, facetState), [facetRows, facetState]);
 
   const pageRows = sortedRows.slice(0, shown);
   const archivedRows = (archivedQuery.data ?? []).filter((r) => !manage.hiddenIds.has(r.id));
@@ -468,8 +521,59 @@ export function LibraryClient({
           onClick={() => setFilter("archived")}
         />
 
-        {/* Sort + Grid/List, pushed to the far right. */}
+        {/* Filters + Sort + Grid/List, pushed to the far right. */}
         <div className="ml-auto flex items-center gap-2">
+          {!isArchived ? (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setFiltersOpen((o) => !o)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors",
+                  activeFacetCount > 0
+                    ? "border-primary bg-[color:var(--sage-soft)] text-primary"
+                    : "border-border bg-transparent text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                Filters
+                {activeFacetCount > 0 ? (
+                  <span className="rounded-full bg-primary px-1.5 font-mono text-[10px] text-primary-foreground">
+                    {activeFacetCount}
+                  </span>
+                ) : null}
+              </button>
+              {filtersOpen ? (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setFiltersOpen(false)} />
+                  <div className="absolute right-0 z-40 mt-2 w-[340px] rounded-[16px] border border-border bg-[var(--surface)] p-4 shadow-[var(--card-shadow,0_8px_30px_-12px_rgba(40,30,10,0.25))]">
+                    <FilterPanelBody
+                      options={facetOpts}
+                      counts={facetCountMap}
+                      state={facetState}
+                      onToggle={toggleFacet}
+                    />
+                    <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                      <button
+                        type="button"
+                        onClick={() => setFacetState(emptyFacetState())}
+                        className="text-[12.5px] font-medium text-muted-foreground hover:text-foreground"
+                      >
+                        Clear all
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFiltersOpen(false)}
+                        className="h-9 rounded-[10px] bg-primary px-4 text-[13px] font-semibold text-primary-foreground"
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          ) : null}
           {!isArchived ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -502,6 +606,33 @@ export function LibraryClient({
           </div>
         </div>
       </nav>
+
+      {/* Active facet chips. */}
+      {!isArchived && activeFacetCount > 0 ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {FACET_GROUPS.flatMap((group) =>
+            [...facetState[group.key]].map((value) => (
+              <button
+                key={`${group.key}:${value}`}
+                type="button"
+                onClick={() => toggleFacet(group.key, value)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-primary bg-[color:var(--sage-soft)] px-2.5 py-1 text-[12px] font-medium text-primary"
+              >
+                <span className="font-mono text-[9.5px] uppercase tracking-[0.1em] opacity-70">{group.label}</span>
+                {group.key === "effort" ? effortLabel(value) : value}
+                <X className="h-3 w-3" />
+              </button>
+            ))
+          )}
+          <button
+            type="button"
+            onClick={() => setFacetState(emptyFacetState())}
+            className="text-[12px] font-medium text-muted-foreground underline-offset-2 hover:underline"
+          >
+            Clear all
+          </button>
+        </div>
+      ) : null}
 
       {isArchived ? (
         archivedRows.length > 0 ? (
@@ -559,6 +690,19 @@ export function LibraryClient({
                     id={row.id}
                     onArchive={() => manage.archive(row.id, row.name)}
                     onDelete={() => setDeleteTarget({ id: row.id, name: row.name, cooks: stat?.cookCount ?? 0 })}
+                    onEditTags={() =>
+                      setEditTagsTarget({
+                        id: row.id,
+                        name: row.name,
+                        tags: {
+                          cuisine: row.cuisine,
+                          course: row.course,
+                          mainIngredient: row.mainIngredient,
+                          diet: row.diet,
+                          occasion: row.occasion
+                        }
+                      })
+                    }
                   />
                 ) : null;
               return view === "list" ? (
@@ -632,6 +776,8 @@ export function LibraryClient({
           onOpenChange={(o) => !o && setShareTarget(null)}
         />
       ) : null}
+
+      <EditTagsDialog target={editTagsTarget} onClose={() => setEditTagsTarget(null)} />
     </div>
   );
 }
@@ -803,7 +949,8 @@ function RecipeActionMenu({
   onArchive,
   onDelete,
   onRestore,
-  onDeletePermanent
+  onDeletePermanent,
+  onEditTags
 }: {
   id: string;
   archivedView?: boolean;
@@ -811,6 +958,7 @@ function RecipeActionMenu({
   onDelete?: () => void;
   onRestore?: () => void;
   onDeletePermanent?: () => void;
+  onEditTags?: () => void;
 }) {
   const stop = (e: React.SyntheticEvent) => {
     e.preventDefault();
@@ -857,6 +1005,10 @@ function RecipeActionMenu({
                 <Pencil className="h-4 w-4" />
                 Edit
               </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onEditTags}>
+              <TagIcon className="h-4 w-4" />
+              Edit tags
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={onArchive}>

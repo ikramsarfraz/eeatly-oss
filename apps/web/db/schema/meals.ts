@@ -77,7 +77,20 @@ export const meals = pgTable(
     // Excluded from EVERY view, including the Archived view. Reads that already
     // drop archived rows also drop deleted rows; `getMealDetail` allows archived
     // (Open from Archived) but never deleted.
-    deletedAt: timestamp("deleted_at", { withTimezone: true })
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    // R36 Library — AI auto-tags (faceted filtering). Single-select facets are
+    // columns; Diet + Occasion are arrays (a dish can be both Vegetarian +
+    // Vegan, Weeknight + Meal prep). Free-form strings (not enums) so the
+    // taxonomy can grow without a migration; the filter UI derives the option
+    // list from the values actually present. `tagsSource` tracks provenance
+    // ('ai' | 'user' | 'mixed') so a user edit isn't clobbered by re-tagging.
+    cuisine: text("cuisine"),
+    course: text("course"),
+    mainIngredient: text("main_ingredient"),
+    diet: text("diet").array(),
+    occasion: text("occasion").array(),
+    tagsSource: text("tags_source"),
+    taggedAt: timestamp("tagged_at", { withTimezone: true })
     // Sharing is fully per-item now (see db/schema/sharing.ts `item_grants`).
     // The legacy `shared_at` flag + its visibility clause were removed; the
     // canonical predicate in `apps/web/lib/meals/visibility.ts` is

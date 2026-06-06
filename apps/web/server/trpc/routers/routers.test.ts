@@ -73,7 +73,9 @@ const mealsServiceMock = vi.hoisted(() => ({
   unarchiveMeal: vi.fn(),
   deleteMeal: vi.fn(),
   restoreMeal: vi.fn(),
-  listArchivedRecipes: vi.fn()
+  listArchivedRecipes: vi.fn(),
+  generateTagsForMeal: vi.fn(),
+  setMealTags: vi.fn()
 }));
 vi.mock("@/services/meals", () => mealsServiceMock);
 
@@ -533,6 +535,22 @@ describe("mealsRouter mutations (Task 3)", () => {
     const result = await call(makeUser()).meals.archivedList();
     expect(result).toHaveLength(1);
     expect(mealsServiceMock.listArchivedRecipes).toHaveBeenCalledWith("u-1", "h-current");
+  });
+
+  it("updateTags: saves user tags through the service marked 'user'", async () => {
+    mealsServiceMock.setMealTags.mockResolvedValueOnce(undefined);
+    const tags = { cuisine: "Indian", course: "Dinner", mainIngredient: "Chicken", diet: [], occasion: ["Weeknight"] };
+    const result = await call(makeUser()).meals.updateTags({ mealId, tags });
+    expect(result).toEqual({ ok: true });
+    expect(mealsServiceMock.setMealTags).toHaveBeenCalledWith("u-1", "h-current", mealId, tags, "user");
+  });
+
+  it("generateTags: returns the (re-)generated tags", async () => {
+    const tags = { cuisine: "Thai", course: "Dinner", mainIngredient: "Seafood", diet: [], occasion: [] };
+    mealsServiceMock.generateTagsForMeal.mockResolvedValueOnce(tags);
+    const result = await call(makeUser()).meals.generateTags({ mealId, force: true });
+    expect(result).toEqual(tags);
+    expect(mealsServiceMock.generateTagsForMeal).toHaveBeenCalledWith("u-1", "h-current", mealId, { force: true });
   });
 
   it("setPhoto: passes input through and returns the saved photo URL", async () => {

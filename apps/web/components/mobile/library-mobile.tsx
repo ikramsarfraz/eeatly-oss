@@ -16,6 +16,9 @@ import {
   Plus,
   RotateCcw,
   Search,
+  Share2,
+  SlidersHorizontal,
+  Tag as TagIcon,
   Trash2
 } from "lucide-react";
 
@@ -25,7 +28,21 @@ import { MealImage } from "@/components/mobile/meal-image";
 import { EffortPill } from "@/components/history/effort-pill";
 import { MobileScaffold, MobileTopBar } from "@/components/mobile/mobile-scaffold";
 import { MobileSheet, SheetRow } from "@/components/mobile/mobile-sheet";
+import { ShareSheet } from "@/components/sharing/share-sheet";
 import { useLibraryManagement } from "@/components/library/use-library-management";
+import { FilterPanelBody } from "@/components/library/filter-panel";
+import { EditTagsSheet } from "@/components/library/edit-tags";
+import { FACET_GROUPS, effortLabel, type FacetKey, type MealTags } from "@/lib/meals/tags";
+import {
+  cloneFacetState,
+  emptyFacetState,
+  facetCounts,
+  facetOptions,
+  matchesFacets,
+  totalSelected,
+  type FacetRow,
+  type FacetState
+} from "@/lib/meals/facets";
 import type { LibraryRow, LibraryStat } from "@/components/library/library-client";
 import type { SharedWithMeItem } from "@/services/sharing";
 import type { EffortLevel } from "@/types";
@@ -53,7 +70,7 @@ const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
 const PAGE_SIZE = 12;
 
 /** A meal targeted by the action sheet / delete confirm. */
-type Target = { id: string; name: string; cooks: number; archived: boolean };
+type Target = { id: string; name: string; cooks: number; archived: boolean; tags?: MealTags };
 
 /**
  * R36 mobile-web Library. Extends the R35 grid with per-recipe management
@@ -85,6 +102,14 @@ export function LibraryMobile({
   const [sortSheet, setSortSheet] = React.useState(false);
   const [actionTarget, setActionTarget] = React.useState<Target | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<Target | null>(null);
+  const [shareTarget, setShareTarget] = React.useState<{ id: string; name: string } | null>(null);
+  const [editTagsTarget, setEditTagsTarget] = React.useState<{ id: string; name: string; tags: MealTags } | null>(null);
+
+  // Facets: `staged` is edited in the sheet and applied to `facetState` on
+  // "Show results" (per the handoff's staged-mobile model).
+  const [facetState, setFacetState] = React.useState<FacetState>(emptyFacetState);
+  const [staged, setStaged] = React.useState<FacetState>(emptyFacetState);
+  const [filterSheet, setFilterSheet] = React.useState(false);
 
   const isArchived = filter === "archived";
   const manage = useLibraryManagement();
@@ -117,19 +142,48 @@ export function LibraryMobile({
   );
   const showSurfaceToggle = householdMemberCount > 1 || sharedRecipes.length > 0;
 
+  const toFacetRow = React.useCallback(
+    (row: LibraryRow): FacetRow => ({
+      cuisine: row.cuisine,
+      course: row.course,
+      mainIngredient: row.mainIngredient,
+      diet: row.diet,
+      occasion: row.occasion,
+      effort: statsByMealId.get(row.id)?.effortLevel ?? null
+    }),
+    [statsByMealId]
+  );
+
+  // Rows passing the activity pill (pre-facet) back the filter counts/options.
+  const activityRows = React.useMemo(
+    () =>
+      ownedRows.filter((row) => {
+        if (manage.hiddenIds.has(row.id)) return false;
+        if (filter === "all" || filter === "archived") return true;
+        const stat = statsByMealId.get(row.id);
+        if (filter === "never") return !stat;
+        if (filter === "recent")
+          return Boolean(stat?.lastCookedAt && now - new Date(stat.lastCookedAt).getTime() <= THIRTY_DAYS);
+        if (filter === "most") return (stat?.cookCount ?? 0) >= 2;
+        return true;
+      }),
+    [ownedRows, manage.hiddenIds, filter, statsByMealId, now]
+  );
+  const facetRows = React.useMemo(() => activityRows.map(toFacetRow), [activityRows, toFacetRow]);
+  const facetOpts = React.useMemo(() => facetOptions(facetRows), [facetRows]);
+  const facetCountMap = React.useMemo(() => facetCounts(facetRows, staged), [facetRows, staged]);
+  const activeFacetCount = totalSelected(facetState);
+  const toggleStaged = (key: FacetKey, value: string) =>
+    setStaged((s) => {
+      const next = { ...s, [key]: new Set(s[key]) };
+      if (next[key].has(value)) next[key].delete(value);
+      else next[key].add(value);
+      return next;
+    });
+
   const sortedRows = React.useMemo(() => {
     const byName = (a: LibraryRow, b: LibraryRow) => a.name.localeCompare(b.name);
-    const filtered = ownedRows.filter((row) => {
-      if (manage.hiddenIds.has(row.id)) return false;
-      if (filter === "all") return true;
-      const stat = statsByMealId.get(row.id);
-      if (filter === "never") return !stat;
-      if (filter === "recent") {
-        return Boolean(stat?.lastCookedAt && now - new Date(stat.lastCookedAt).getTime() <= THIRTY_DAYS);
-      }
-      if (filter === "most") return (stat?.cookCount ?? 0) >= 2;
-      return true;
-    });
+    const filtered = activityRows.filter((row) => matchesFacets(toFacetRow(row), facetState));
     return filtered.sort((a, b) => {
       switch (sort) {
         case "az":
@@ -154,7 +208,7 @@ export function LibraryMobile({
         }
       }
     });
-  }, [ownedRows, statsByMealId, filter, sort, now, manage.hiddenIds]);
+  }, [activityRows, statsByMealId, sort, facetState, toFacetRow]);
 
   const pageRows = sortedRows.slice(0, shown);
   const archivedRows = (archivedQuery.data ?? []).filter((r) => !manage.hiddenIds.has(r.id));
@@ -201,8 +255,31 @@ export function LibraryMobile({
 
       {surface === "yours" ? (
         <>
-          {/* Sort + Grid/List */}
+          {/* Filters + Sort + Grid/List */}
           <div className="flex items-center gap-2 px-4 pt-3">
+            {!isArchived && (
+              <button
+                type="button"
+                onClick={() => {
+                  setStaged(cloneFacetState(facetState));
+                  setFilterSheet(true);
+                }}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-medium",
+                  activeFacetCount > 0
+                    ? "border-primary bg-secondary text-primary"
+                    : "border-border bg-card text-muted-foreground"
+                )}
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                Filters
+                {activeFacetCount > 0 ? (
+                  <span className="rounded-full bg-primary px-1.5 font-mono text-[10px] text-primary-foreground">
+                    {activeFacetCount}
+                  </span>
+                ) : null}
+              </button>
+            )}
             {!isArchived && (
               <button
                 type="button"
@@ -232,6 +309,38 @@ export function LibraryMobile({
               </Chip>
             ))}
           </div>
+
+          {/* Active facet chips */}
+          {!isArchived && activeFacetCount > 0 && (
+            <div className="flex flex-wrap items-center gap-2 px-4 pt-2">
+              {FACET_GROUPS.flatMap((group) =>
+                [...facetState[group.key]].map((value) => (
+                  <button
+                    key={`${group.key}:${value}`}
+                    type="button"
+                    onClick={() =>
+                      setFacetState((s) => {
+                        const next = { ...s, [group.key]: new Set(s[group.key]) };
+                        next[group.key].delete(value);
+                        return next;
+                      })
+                    }
+                    className="inline-flex items-center gap-1 rounded-full border border-primary bg-secondary px-2.5 py-1 text-[11.5px] font-medium text-primary"
+                  >
+                    {group.key === "effort" ? effortLabel(value) : value}
+                    <span className="text-[13px] leading-none">×</span>
+                  </button>
+                ))
+              )}
+              <button
+                type="button"
+                onClick={() => setFacetState(emptyFacetState())}
+                className="text-[11.5px] font-medium text-muted-foreground underline-offset-2"
+              >
+                Clear
+              </button>
+            </div>
+          )}
 
           {isArchived ? (
             archivedRows.length === 0 ? (
@@ -284,7 +393,19 @@ export function LibraryMobile({
                         effort={stat?.effortLevel ?? null}
                         meta={metaFor(stat ?? null)}
                         onMenu={() =>
-                          setActionTarget({ id: row.id, name: row.name, cooks: stat?.cookCount ?? 0, archived: false })
+                          setActionTarget({
+                            id: row.id,
+                            name: row.name,
+                            cooks: stat?.cookCount ?? 0,
+                            archived: false,
+                            tags: {
+                              cuisine: row.cuisine,
+                              course: row.course,
+                              mainIngredient: row.mainIngredient,
+                              diet: row.diet,
+                              occasion: row.occasion
+                            }
+                          })
                         }
                       />
                     );
@@ -303,7 +424,19 @@ export function LibraryMobile({
                         effort={stat?.effortLevel ?? null}
                         meta={metaFor(stat ?? null)}
                         onMenu={() =>
-                          setActionTarget({ id: row.id, name: row.name, cooks: stat?.cookCount ?? 0, archived: false })
+                          setActionTarget({
+                            id: row.id,
+                            name: row.name,
+                            cooks: stat?.cookCount ?? 0,
+                            archived: false,
+                            tags: {
+                              cuisine: row.cuisine,
+                              course: row.course,
+                              mainIngredient: row.mainIngredient,
+                              diet: row.diet,
+                              occasion: row.occasion
+                            }
+                          })
                         }
                       />
                     );
@@ -344,6 +477,32 @@ export function LibraryMobile({
         </Grid>
       )}
 
+      {/* Filters sheet (staged — applies on Show results) */}
+      <MobileSheet open={filterSheet} label="Filters" onClose={() => setFilterSheet(false)}>
+        <div className="max-h-[60vh] overflow-y-auto pb-2">
+          <FilterPanelBody options={facetOpts} counts={facetCountMap} state={staged} onToggle={toggleStaged} />
+        </div>
+        <div className="mt-3 flex items-center gap-2 border-t border-border pt-3">
+          <button
+            type="button"
+            onClick={() => setStaged(emptyFacetState())}
+            className="h-11 flex-1 rounded-[12px] border border-border bg-card text-[14px] font-semibold text-foreground"
+          >
+            Clear
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setFacetState(cloneFacetState(staged));
+              setFilterSheet(false);
+            }}
+            className="h-11 flex-1 rounded-[12px] bg-primary text-[14px] font-semibold text-primary-foreground"
+          >
+            Show results
+          </button>
+        </div>
+      </MobileSheet>
+
       {/* Sort sheet */}
       <MobileSheet open={sortSheet} label="Sort by" onClose={() => setSortSheet(false)}>
         {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
@@ -375,9 +534,27 @@ export function LibraryMobile({
             onArchive={() => manage.archive(actionTarget.id, actionTarget.name)}
             onRestore={() => manage.restore(actionTarget.id, actionTarget.name)}
             onDelete={() => setDeleteTarget(actionTarget)}
+            onShare={() => setShareTarget({ id: actionTarget.id, name: actionTarget.name })}
+            onEditTags={() => {
+              if (actionTarget.tags) {
+                setEditTagsTarget({ id: actionTarget.id, name: actionTarget.name, tags: actionTarget.tags });
+              }
+            }}
           />
         )}
       </MobileSheet>
+
+      <EditTagsSheet target={editTagsTarget} onClose={() => setEditTagsTarget(null)} />
+
+      {shareTarget && (
+        <ShareSheet
+          itemType="recipe"
+          itemId={shareTarget.id}
+          itemName={shareTarget.name}
+          open={shareTarget !== null}
+          onOpenChange={(o) => !o && setShareTarget(null)}
+        />
+      )}
 
       {/* Delete confirm (centered) */}
       {deleteTarget && (
@@ -425,13 +602,17 @@ function ActionSheetBody({
   onClose,
   onArchive,
   onRestore,
-  onDelete
+  onDelete,
+  onShare,
+  onEditTags
 }: {
   target: Target;
   onClose: () => void;
   onArchive: () => void;
   onRestore: () => void;
   onDelete: () => void;
+  onShare: () => void;
+  onEditTags: () => void;
 }) {
   const router = useRouter();
   const go = (href: Route) => {
@@ -472,6 +653,22 @@ function ActionSheetBody({
             icon={<Pencil className="h-5 w-5" />}
             label="Edit"
             onClick={() => go(`/meal/${target.id}/edit` as Route)}
+          />
+          <SheetRow
+            icon={<TagIcon className="h-5 w-5" />}
+            label="Edit tags"
+            onClick={() => {
+              onClose();
+              onEditTags();
+            }}
+          />
+          <SheetRow
+            icon={<Share2 className="h-5 w-5" />}
+            label="Share"
+            onClick={() => {
+              onClose();
+              onShare();
+            }}
           />
           <SheetRow
             icon={<Archive className="h-5 w-5" />}

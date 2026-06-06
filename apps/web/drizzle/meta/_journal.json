@@ -295,6 +295,13 @@
       "when": 1780825256000,
       "tag": "0042_meal_delete",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1780911656000,
+      "tag": "0043_meal_tags",
+      "breakpoints": true
     }
   ]
 }

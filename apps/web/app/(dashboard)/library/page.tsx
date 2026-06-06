@@ -102,7 +102,12 @@ export default async function HistoryPage({
     name: r.name,
     photoUrl: r.photoUrl,
     createdByUserId: r.createdByUserId,
-    addedAt: r.addedAt.toISOString()
+    addedAt: r.addedAt.toISOString(),
+    cuisine: r.cuisine,
+    course: r.course,
+    mainIngredient: r.mainIngredient,
+    diet: r.diet,
+    occasion: r.occasion
   }));
   const libraryStats = Array.from(statsById.values());
   const initialSurface = surface === "shared" ? ("shared" as const) : ("yours" as const);

@@ -844,6 +844,12 @@ export type MealLibraryRow = {
   addedAt: Date;
   /** When archived — null for active rows; set for the Archived view. */
   archivedAt: Date | null;
+  /** R36 — AI tags, for faceted filtering. */
+  cuisine: string | null;
+  course: string | null;
+  mainIngredient: string | null;
+  diet: string[];
+  occasion: string[];
 };
 
 export async function listMealLibrary(args: {
@@ -864,7 +870,7 @@ export async function listMealLibrary(args: {
   const q = args.q?.trim().toLowerCase() ?? "";
   const scope = args.scope ?? "active";
 
-  return db
+  const rows = await db
     .select({
       id: meals.id,
       name: meals.name,
@@ -874,7 +880,12 @@ export async function listMealLibrary(args: {
       photoUrl: sql<string | null>`coalesce(${meals.photoUrl}, ${dishImages.imageUrl})`,
       createdByUserId: meals.createdByUserId,
       addedAt: meals.createdAt,
-      archivedAt: meals.archivedAt
+      archivedAt: meals.archivedAt,
+      cuisine: meals.cuisine,
+      course: meals.course,
+      mainIngredient: meals.mainIngredient,
+      diet: meals.diet,
+      occasion: meals.occasion
     })
     .from(meals)
     .leftJoin(dishImages, eq(dishImages.normalizedName, meals.normalizedName))
@@ -894,6 +905,9 @@ export async function listMealLibrary(args: {
     )
     .orderBy(scope === "archived" ? desc(meals.archivedAt) : asc(meals.name))
     .limit(limit);
+
+  // Array columns come back `string[] | null`; normalize to [] for the client.
+  return rows.map((r) => ({ ...r, diet: r.diet ?? [], occasion: r.occasion ?? [] }));
 }
 
 // Helper used by clone-UX to detect cross-household ids that ended up in
