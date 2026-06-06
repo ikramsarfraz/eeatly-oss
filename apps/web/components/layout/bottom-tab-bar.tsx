@@ -6,72 +6,89 @@ import type { Route } from "next";
 import { usePathname } from "next/navigation";
 import { BookOpen, CalendarDays, Home, Menu, Plus } from "lucide-react";
 
-import { useSidebar } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
+import {
+  AddSheetContent,
+  MobileSheet,
+  MoreSheetContent
+} from "@/components/mobile/mobile-sheet";
 
 type TabItem = {
   href: Route;
   label: string;
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number; fill?: string }>;
+  filled?: boolean;
   match: (path: string) => boolean;
 };
 
 const tabs: TabItem[] = [
-  {
-    href: "/home",
-    label: "Home",
-    icon: Home,
-    match: (p) => p === "/home",
-  },
+  { href: "/home", label: "Home", icon: Home, filled: true, match: (p) => p === "/home" },
   {
     href: "/library",
     label: "Library",
     icon: BookOpen,
-    // Library stays active on the recipe detail subtree (/meal/[id]),
-    // mirroring the desktop sidebar's activePrefixes rule.
-    match: (p) => p.startsWith("/library") || p.startsWith("/meal"),
+    filled: true,
+    // Library stays active on the recipe-detail subtree.
+    match: (p) => p.startsWith("/library") || p.startsWith("/meal")
   },
   {
     href: "/plans",
     label: "Plans",
     icon: CalendarDays,
-    match: (p) => p.startsWith("/plans"),
-  },
+    match: (p) => p.startsWith("/plans")
+  }
 ];
 
+/**
+ * R35 mobile-web bottom tab bar — Home · Library · raised "+" FAB · Plans · More.
+ * The FAB opens the Add sheet; More opens the More sheet (members / search /
+ * notifications / settings / theme toggle). Hidden at `md+` (desktop sidebar).
+ */
 export function BottomTabBar() {
   const pathname = usePathname() ?? "";
-  const { toggleSidebar } = useSidebar();
+  const [sheet, setSheet] = React.useState<null | "add" | "more">(null);
+  const close = React.useCallback(() => setSheet(null), []);
 
   return (
-    <nav
-      aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 gap-1 border-t bg-[color-mix(in_oklab,var(--background)_96%,transparent)] px-2 pb-[calc(8px+env(safe-area-inset-bottom))] pt-2 backdrop-blur-md md:hidden"
-    >
-      {tabs.slice(0, 2).map((tab) => (
-        <TabLink key={tab.label} tab={tab} active={tab.match(pathname)} />
-      ))}
-
-      <Link
-        href={"/add" as Route}
-        aria-label="Add a meal"
-        className="-mt-4 justify-self-center grid h-[52px] w-[52px] place-items-center rounded-full border-[3px] border-[var(--background)] bg-primary text-primary-foreground shadow-[0_8px_18px_-8px_rgba(47,111,88,0.6),0_2px_4px_rgba(27,34,32,0.08)] transition-transform active:scale-95"
+    <>
+      <nav
+        aria-label="Primary"
+        className="fixed inset-x-0 bottom-0 z-30 flex h-[calc(74px+env(safe-area-inset-bottom))] items-stretch border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden"
       >
-        <Plus className="h-5 w-5" strokeWidth={2.25} />
-      </Link>
+        <TabLink tab={tabs[0]} active={tabs[0].match(pathname)} />
+        <TabLink tab={tabs[1]} active={tabs[1].match(pathname)} />
 
-      <TabLink tab={tabs[2]} active={tabs[2].match(pathname)} />
+        <div className="relative flex flex-1 justify-center">
+          <button
+            type="button"
+            aria-label="Add"
+            onClick={() => setSheet("add")}
+            className="absolute -top-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_6px_20px_rgba(46,87,57,0.35)] active:scale-95"
+          >
+            <Plus className="h-[26px] w-[26px]" strokeWidth={2.2} />
+          </button>
+        </div>
 
-      <button
-        type="button"
-        aria-label="Open menu"
-        onClick={toggleSidebar}
-        className="flex flex-col items-center gap-[3px] rounded-[9px] py-1.5 text-[10.5px] font-medium text-muted-foreground"
-      >
-        <Menu className="h-[18px] w-[18px]" strokeWidth={2} />
-        <span>More</span>
-      </button>
-    </nav>
+        <TabLink tab={tabs[2]} active={tabs[2].match(pathname)} />
+
+        <button
+          type="button"
+          aria-label="More"
+          onClick={() => setSheet("more")}
+          className="flex flex-1 flex-col items-center justify-center gap-1 pt-2 text-[10.5px] font-medium text-[color:var(--ink3)]"
+        >
+          <Menu className="h-[23px] w-[23px]" strokeWidth={2} />
+          More
+        </button>
+      </nav>
+
+      <MobileSheet open={sheet === "add"} label="Add to your kitchen" onClose={close}>
+        <AddSheetContent onClose={close} />
+      </MobileSheet>
+      <MobileSheet open={sheet === "more"} label="More" onClose={close}>
+        <MoreSheetContent onClose={close} />
+      </MobileSheet>
+    </>
   );
 }
 
@@ -82,12 +99,16 @@ function TabLink({ tab, active }: { tab: TabItem; active: boolean }) {
       href={tab.href}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex flex-col items-center gap-[3px] rounded-[9px] py-1.5 text-[10.5px] font-medium",
-        active ? "text-primary" : "text-muted-foreground",
+        "flex flex-1 flex-col items-center justify-center gap-1 pt-2 text-[10.5px]",
+        active ? "font-semibold text-primary" : "font-medium text-[color:var(--ink3)]"
       )}
     >
-      <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
-      <span>{tab.label}</span>
+      <Icon
+        className="h-[23px] w-[23px]"
+        strokeWidth={2}
+        fill={active && tab.filled ? "currentColor" : "none"}
+      />
+      {tab.label}
     </Link>
   );
 }

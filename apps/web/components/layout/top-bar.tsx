@@ -84,7 +84,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
 
   return (
     <header
-      className="sticky top-0 z-20 flex h-16 shrink-0 items-center gap-3 border-b bg-[color-mix(in_oklab,var(--background)_92%,transparent)] px-4 backdrop-blur-md sm:px-6"
+      className="sticky top-0 z-20 hidden h-16 shrink-0 items-center gap-3 border-b bg-[color-mix(in_oklab,var(--background)_92%,transparent)] px-4 backdrop-blur-md md:flex sm:px-6"
       data-slot="top-bar"
     >
       {/* SidebarTrigger renders the shadcn icon button. Hidden on md+

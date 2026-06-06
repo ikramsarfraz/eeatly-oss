@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { HomeClient } from "@/components/dashboard/home-client";
+import { HomeMobile } from "@/components/mobile/home-mobile";
 import { WelcomeToast } from "@/components/dashboard/welcome-toast";
 import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
 import { getDashboardMeals } from "@/services/meals";
@@ -36,12 +37,19 @@ export default async function DashboardPage() {
       <Suspense fallback={null}>
         <WelcomeToast />
       </Suspense>
-      <HomeClient
+      <HomeMobile
         initialData={meals}
-        currentUserId={user.id}
         currentUserName={user.name ?? null}
-        isHouseholdOwner={ownsHousehold}
+        householdName={household.name}
       />
+      <div className="hidden md:block">
+        <HomeClient
+          initialData={meals}
+          currentUserId={user.id}
+          currentUserName={user.name ?? null}
+          isHouseholdOwner={ownsHousehold}
+        />
+      </div>
     </>
   );
 }

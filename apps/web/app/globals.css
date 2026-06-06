@@ -72,25 +72,29 @@
 :root {
   color-scheme: light dark;
 
-  --background: #f7f5ee;
-  --foreground: #1b2220;
-  --card: #fdfcf7;
-  --card-foreground: #1b2220;
-  --popover: #fdfcf7;
-  --popover-foreground: #1b2220;
-  --primary: #2f6f58;
-  --primary-foreground: #f9fffb;
-  --secondary: #dde9e2;
-  --secondary-foreground: #1c4738;
-  --muted: #f1efe6;
-  --muted-foreground: #6b746e;
-  --accent: #d77a4a;
-  --accent-foreground: #25120b;
-  --destructive: #c44949;
-  --destructive-foreground: #fffafa;
-  --border: #e2dfd3;
-  --input: #e2dfd3;
-  --ring: rgba(47, 111, 88, 0.35);
+  /* R35 — adopted the refined brand palette (forest #2E5739, cream #F5EFE2,
+     etc., already used by marketing + the Assist screens) as the app's global
+     light tokens, unifying the look across desktop + the new mobile-web
+     experience. The dark block below was already on this palette. */
+  --background: #f5efe2;
+  --foreground: #1a1f1a;
+  --card: #ffffff;
+  --card-foreground: #1a1f1a;
+  --popover: #ffffff;
+  --popover-foreground: #1a1f1a;
+  --primary: #2e5739;
+  --primary-foreground: #f5efe2;
+  --secondary: #e3e8d5;
+  --secondary-foreground: #2e5739;
+  --muted: #fbf6ea;
+  --muted-foreground: #5f665b;
+  --accent: #c66b47;
+  --accent-foreground: #f5efe2;
+  --destructive: #a8413a;
+  --destructive-foreground: #f5efe2;
+  --border: #e6dcc4;
+  --input: #e6dcc4;
+  --ring: rgba(46, 87, 57, 0.35);
   --radius: 0.75rem;
 
   /* R26 — sidebar tokens retuned to the design's warmer cream palette.
@@ -103,14 +107,18 @@
   --sidebar-foreground: #1b2220;
   --sidebar-border: #d9cfb7;
   --sidebar-accent: #dfd3b7;
-  --sidebar-accent-foreground: #1c4738;
-  --sidebar-primary: #2f6f58;
-  --sidebar-primary-foreground: #f9fffb;
-  --sidebar-ring: rgba(47, 111, 88, 0.35);
+  --sidebar-accent-foreground: #2e5739;
+  --sidebar-primary: #2e5739;
+  --sidebar-primary-foreground: #f5efe2;
+  --sidebar-ring: rgba(46, 87, 57, 0.35);
 
   /* Extended design tokens */
-  --surface: #fdfcf7;
-  --surface-2: #f1efe6;
+  --surface: #ffffff;
+  --surface-2: #fbf6ea;
+  /* R35 — tertiary ink ramps for the mobile-web screens (mono eyebrows,
+     meta lines, grips). Dark siblings in the .dark block. */
+  --ink3: #9c9787;
+  --ink4: #c7c1b0;
   --primary-soft: #dde9e2;
   --accent-soft: #f5dccb;
   --border-strong: #cfccc0;
@@ -208,6 +216,8 @@
        muted alt backgrounds. */
     --surface: #1f1d17;
     --surface-2: #1c1a14;
+    --ink3: #736f5e;
+    --ink4: #3a382e;
     --primary-soft: #2a3022;
     --accent-soft: #3a2820;
     --border-strong: #3a382e;
@@ -245,6 +255,26 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans-val);
   -webkit-font-smoothing: antialiased;
+}
+
+/* R35 mobile-web — bottom-sheet motion. Gated behind reduced-motion. */
+@keyframes aeFade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes aeSlideUp {
+  from {
+    transform: translateY(100%);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ae-scrim {
+    animation: aeFade 0.18s ease;
+  }
+  .ae-sheet {
+    animation: aeSlideUp 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
 }
 
 button,
