@@ -139,6 +139,40 @@ export function getServerEnv() {
   return cachedEnv;
 }
 
+const databaseUrlSchema = z
+  .string()
+  .url("DATABASE_URL must be a valid Postgres connection URL.");
+
+let cachedDatabaseUrl: string | null = null;
+
+/**
+ * Validate and return ONLY `DATABASE_URL`, independent of the full
+ * `getServerEnv()` schema.
+ *
+ * `getServerEnv()` validates every server var at once, including the
+ * `required` AI keys (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`). That makes a
+ * pure DB read transitively depend on unrelated keys: a public share-OG card
+ * (token -> dish name, no AI) would fail to render if the AI key happened to
+ * be unset, and the route is untestable locally without it. This narrow
+ * accessor lets an env-guard-free read path (`lib/share/og-share-read.ts`)
+ * open a pool with just the one var it actually needs. Still fail-fast on a
+ * missing/invalid `DATABASE_URL`. Keep all `process.env` access in this file.
+ */
+export function getDatabaseUrl(): string {
+  if (cachedDatabaseUrl) {
+    return cachedDatabaseUrl;
+  }
+
+  const result = databaseUrlSchema.safeParse(process.env.DATABASE_URL);
+  if (!result.success) {
+    const messages = result.error.issues.map((issue) => issue.message);
+    throw new Error(`Invalid DATABASE_URL:\n${messages.join("\n")}`);
+  }
+
+  cachedDatabaseUrl = result.data;
+  return cachedDatabaseUrl;
+}
+
 export function hasR2Env(env = getServerEnv()) {
   return Boolean(
     env.R2_ACCOUNT_ID &&

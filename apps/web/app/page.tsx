@@ -15,6 +15,9 @@ export const metadata: Metadata = {
   openGraph: {
     title: "eeatly: One kitchen for your whole family",
     description: META_DESCRIPTION,
+    // Resolved to an absolute URL against `metadataBase`. Set here because a
+    // page-level `openGraph` replaces the root layout's `url` field.
+    url: "/",
     type: "website",
     siteName: "eeatly"
   },
