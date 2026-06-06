@@ -7,7 +7,6 @@ import { usePathname } from "next/navigation";
 import { BookOpen, CalendarDays, Home, Menu, Plus } from "lucide-react";
 
 import { useSidebar } from "@/components/ui/sidebar";
-import { useQuickLog } from "@/components/dashboard/quick-log-provider";
 import { cn } from "@/lib/utils";
 
 type TabItem = {
@@ -43,7 +42,6 @@ const tabs: TabItem[] = [
 export function BottomTabBar() {
   const pathname = usePathname() ?? "";
   const { toggleSidebar } = useSidebar();
-  const { open: openQuickLog } = useQuickLog();
 
   return (
     <nav
@@ -54,15 +52,13 @@ export function BottomTabBar() {
         <TabLink key={tab.label} tab={tab} active={tab.match(pathname)} />
       ))}
 
-      <button
-        type="button"
-        aria-label="Log a meal"
-        aria-haspopup="dialog"
-        onClick={openQuickLog}
+      <Link
+        href={"/add" as Route}
+        aria-label="Add a meal"
         className="-mt-4 justify-self-center grid h-[52px] w-[52px] place-items-center rounded-full border-[3px] border-[var(--background)] bg-primary text-primary-foreground shadow-[0_8px_18px_-8px_rgba(47,111,88,0.6),0_2px_4px_rgba(27,34,32,0.08)] transition-transform active:scale-95"
       >
         <Plus className="h-5 w-5" strokeWidth={2.25} />
-      </button>
+      </Link>
 
       <TabLink tab={tabs[2]} active={tabs[2].match(pathname)} />
 
