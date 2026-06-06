@@ -3,6 +3,49 @@
 All notable changes to eeatly are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] - 2026-06-06
+
+Social-share previews and app branding, plus reliability fixes. Shared links now
+render a rich preview card, the app ships its real favicon, icons, and PWA
+manifest, and AI meal suggestions no longer time out on longer recipes. No
+schema changes or migrations.
+
+### Sharing & social previews
+- Links shared from eeatly (a recipe, a meal plan, or the home page) now render
+  a branded 1200x630 preview card in WhatsApp, iMessage, and X instead of a
+  blank or text-only box. Recipe and plan cards show the dish's color tile,
+  monogram, and title; the default card carries the wordmark and tagline. Cards
+  are generated server-side.
+- Public share pages stay out of search results (per-page noindex) while
+  remaining fetchable by social-preview crawlers, so the cards render without
+  the shared recipes getting indexed.
+
+### Branding & install
+- Added the brand favicon, app icon, and apple-touch-icon, plus a PWA web
+  manifest (install name, 192/512 icons, standalone display, brand theme
+  color), replacing the framework defaults. The browser tab now shows the
+  cream-on-forest mark.
+
+### SEO
+- Set `metadataBase`, an absolute `og:url`, and a raster Organization logo for
+  structured data, and reconciled `robots.txt` and the sitemap to the live
+  routes. Removed the old SVG share image that social scrapers never rendered.
+
+### Fixes
+- Voice, text, and photo AI suggestions no longer fail on longer recipes. The
+  suggestion step had been running on a short timeout sized for small calls
+  while it generates a full recipe; it now gets a generation-appropriate budget,
+  matching the Refine flow. When generation does fail, the voice error no longer
+  wrongly blames the audio.
+- Neon's idle serverless connection drops ("Connection terminated unexpectedly")
+  no longer surface as uncaught exceptions. Internal hygiene, no user impact.
+
+### Internal
+- The share-card image route reads through a lean database-only path, so it no
+  longer depends on the AI provider keys.
+
+[1.2.0]: https://github.com/ikramsarfraz/eeatly/releases/tag/v1.2.0
+
 ## [1.1.1] - 2026-06-05
 
 Front-door polish. No new features, schema, or migrations.
