@@ -21,7 +21,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc/client";
-import { MealTile } from "@/components/ui/meal-tile";
+import { MealImage } from "@/components/mobile/meal-image";
 import { EffortPill } from "@/components/history/effort-pill";
 import { MobileScaffold, MobileTopBar } from "@/components/mobile/mobile-scaffold";
 import { MobileSheet, SheetRow } from "@/components/mobile/mobile-sheet";
@@ -245,6 +245,7 @@ export function LibraryMobile({
                     key={r.id}
                     id={r.id}
                     name={r.name}
+                    photoUrl={r.photoUrl}
                     effort={null}
                     meta={metaForCount(r.cookCount)}
                     onMenu={() => setActionTarget({ id: r.id, name: r.name, cooks: r.cookCount, archived: true })}
@@ -258,6 +259,7 @@ export function LibraryMobile({
                     key={r.id}
                     id={r.id}
                     name={r.name}
+                    photoUrl={r.photoUrl}
                     effort={null}
                     meta={metaForCount(r.cookCount)}
                     onMenu={() => setActionTarget({ id: r.id, name: r.name, cooks: r.cookCount, archived: true })}
@@ -278,6 +280,7 @@ export function LibraryMobile({
                         key={row.id}
                         id={row.id}
                         name={row.name}
+                        photoUrl={row.photoUrl}
                         effort={stat?.effortLevel ?? null}
                         meta={metaFor(stat ?? null)}
                         onMenu={() =>
@@ -296,6 +299,7 @@ export function LibraryMobile({
                         key={row.id}
                         id={row.id}
                         name={row.name}
+                        photoUrl={row.photoUrl}
                         effort={stat?.effortLevel ?? null}
                         meta={metaFor(stat ?? null)}
                         onMenu={() =>
@@ -332,6 +336,7 @@ export function LibraryMobile({
               key={item.itemId}
               id={item.itemId}
               name={item.name}
+              photoUrl={item.photoUrl}
               effort={null}
               meta={item.ownerName ? `From ${item.ownerName}` : "Shared with you"}
             />
@@ -515,12 +520,14 @@ function ListView({ children }: { children: React.ReactNode }) {
 function RecipeCard({
   id,
   name,
+  photoUrl,
   effort,
   meta,
   onMenu
 }: {
   id: string;
   name: string;
+  photoUrl?: string | null;
   effort: EffortLevel | null;
   meta: string;
   onMenu?: () => void;
@@ -528,7 +535,7 @@ function RecipeCard({
   return (
     <div className="relative">
       <Link href={`/meal/${id}` as Route} className="block">
-        <MealTile name={name} size="m" className="aspect-square w-full rounded-[14px] border" />
+        <MealImage name={name} photoUrl={photoUrl} size="m" className="aspect-square w-full rounded-[14px] border" />
         <p className="mt-2 line-clamp-2 text-[14px] font-medium leading-tight text-foreground">{name}</p>
         <div className="mt-1.5 flex items-center gap-2">
           {effort ? <EffortPill level={effort} compact /> : null}
@@ -554,12 +561,14 @@ function RecipeCard({
 function RecipeRow({
   id,
   name,
+  photoUrl,
   effort,
   meta,
   onMenu
 }: {
   id: string;
   name: string;
+  photoUrl?: string | null;
   effort: EffortLevel | null;
   meta: string;
   onMenu?: () => void;
@@ -567,7 +576,7 @@ function RecipeRow({
   return (
     <div className="flex items-center gap-3 px-3 py-2.5">
       <Link href={`/meal/${id}` as Route} className="flex min-w-0 flex-1 items-center gap-3">
-        <MealTile name={name} size="s" className="h-11 w-11 shrink-0 rounded-[10px] border" />
+        <MealImage name={name} photoUrl={photoUrl} size="s" className="h-11 w-11 shrink-0 rounded-[10px] border" />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[14.5px] font-medium text-foreground">{name}</span>
           <span className="flex items-center gap-2">

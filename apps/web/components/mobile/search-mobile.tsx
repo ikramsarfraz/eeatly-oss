@@ -7,7 +7,7 @@ import type { Route } from "next";
 import { ChevronLeft, Search, X } from "lucide-react";
 
 import { trpc } from "@/lib/trpc/client";
-import { MealTile } from "@/components/ui/meal-tile";
+import { MealImage } from "@/components/mobile/meal-image";
 
 const RECENTS_KEY = "eeatly:recent-searches";
 
@@ -136,7 +136,7 @@ export function SearchMobile() {
                 onClick={() => commitRecent(debounced)}
                 className="flex items-center gap-3 px-4 py-3 active:bg-[color:var(--surface-2)]"
               >
-                <MealTile name={row.name} size="s" className="h-11 w-11 shrink-0 rounded-[10px] border" />
+                <MealImage name={row.name} photoUrl={row.photoUrl} size="s" className="h-11 w-11 shrink-0 rounded-[10px] border" />
                 <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-foreground">{row.name}</span>
                 <Search className="h-4 w-4 shrink-0 -rotate-90 text-[color:var(--ink4)]" />
               </Link>
