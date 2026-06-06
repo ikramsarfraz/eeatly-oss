@@ -472,19 +472,9 @@ export function RecipeDetailClient({
               compact
               className="min-h-[40px]"
             />
-            {/* Refine is a WRITE surface — owner + edit/admin grantees can
-                use it. Viewers read the recipe (and can save their own copy
-                to edit). Non-editors are hidden from it to avoid a FORBIDDEN. */}
-            {canEdit ? (
-              <Button asChild variant="outline" className="min-h-[40px]">
-                <Link href={`/meal/${meal.id}/refine` as Route}>
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Refine with AI
-                </Link>
-              </Button>
-            ) : null}
-            {/* Credit-free manual editor — edit ingredients/steps by hand, no
-                AI. Same editor authz as Refine (owner + edit/admin grantees). */}
+            {/* One editor surface (R34): edit by hand or ask AI to change it,
+                in the same screen. WRITE surface — owner + edit/admin grantees
+                only; non-editors are hidden to avoid a FORBIDDEN. */}
             {canEdit ? (
               <Button asChild variant="outline" className="min-h-[40px]">
                 <Link href={`/meal/${meal.id}/edit` as Route}>

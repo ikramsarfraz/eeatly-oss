@@ -1,31 +1,23 @@
 import type { Metadata } from "next";
 import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
-import {
-  AddComposerClient,
-  type CaptureMethod
-} from "@/components/add/add-composer-client";
+import { AddAssistClient } from "@/components/assist/add-assist-client";
 
 export const metadata: Metadata = {
-  title: "Add to your kitchen"
+  title: "Add a meal"
 };
 
 export const dynamic = "force-dynamic";
 
-const METHODS: CaptureMethod[] = ["log", "photo", "text", "voice", "link"];
-
 /**
- * Unified capture composer — the single capture door. `?method=` deep-links
- * a specific tab (used by the redirects from the retired /add/log + /add/ai
- * routes, and by keyboard shortcuts). `?name=` pre-fills the log meal name
- * (Home's quick-log).
+ * Add a meal — the "Assist" capture surface. Manual entry is always shown; the
+ * AI Assist Bar pours a photo / voice / text / link into the same fields.
+ * `?name=` pre-fills the meal name (Home's quick-log handoff). The legacy
+ * `?method=` deep-link is accepted but no longer selects a tab (AI is one bar).
  */
 export default async function AddPage(props: {
   searchParams: Promise<{ method?: string; name?: string }>;
 }) {
   await requireCurrentUserWithHousehold();
-  const { method, name } = await props.searchParams;
-  const initialMethod = METHODS.includes(method as CaptureMethod)
-    ? (method as CaptureMethod)
-    : "log";
-  return <AddComposerClient initialMethod={initialMethod} initialMealName={name} />;
+  const { name } = await props.searchParams;
+  return <AddAssistClient initialMealName={name} />;
 }

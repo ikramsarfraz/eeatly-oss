@@ -1,0 +1,120 @@
+/*
+ * Add-a-meal & Edit-recipe "Assist" redesign — scoped design tokens.
+ *
+ * The handoff palette (forest #2E5739, cream #F5EFE2, …) is the refined brand
+ * palette already shipped to marketing (see marketing.css `.mkt`). It differs
+ * slightly from the authed app's own tokens (`--primary #2f6f58`), so we scope
+ * the exact handoff values under `.ae-scope` (light) + `.dark .ae-scope`
+ * rather than touch the global tokens. Imported by the two Assist screens.
+ *
+ * Values are copied verbatim from the design README token tables.
+ */
+.ae-scope {
+  --ae-cream: #f5efe2;
+  --ae-cream-soft: #efe7d6;
+  --ae-paper: #fbf6ea;
+  --ae-surface: #ffffff;
+  --ae-ink: #1a1f1a;
+  --ae-ink2: #5f665b;
+  --ae-ink3: #9c9787;
+  --ae-ink4: #c7c1b0;
+  --ae-forest: #2e5739;
+  --ae-forest-deep: #1f3d29;
+  --ae-forest-soft: #3c6b47;
+  --ae-forest-text: #f5efe2;
+  --ae-sage: #d4dcc5;
+  --ae-sage-bg: #e3e8d5;
+  --ae-terra: #c66b47;
+  --ae-wheat: #d9c68c;
+  --ae-border: #e6dcc4;
+  --ae-border-soft: #eee5d0;
+  --ae-danger: #a8413a;
+  --ae-danger-soft: #f0dbd8;
+
+  /* assist-bar + component specifics */
+  --ae-assist-bg: #e7ebda;
+  --ae-assist-border: #d5dcc2;
+  --ae-plaque-bg: #d4dcc5;
+  --ae-plaque-fg: #2e5739;
+  /* Accent for active tab / eyebrow / plaque icon — forest in light, the
+     lifted forest-soft in dark (so it reads on the warm near-black). */
+  --ae-accent: #2e5739;
+  --ae-tab-active-bg: #edeedf;
+  --ae-rose-bg: #e5d2ce;
+  --ae-rose-fg: #7a3d3d;
+  /* AI-flagged row (wheat) */
+  --ae-flag-bg: #fbf4df;
+  --ae-flag-border: #e4d08c;
+  --ae-flag-fg: #8a6b22;
+
+  --ae-cta-shadow: 0 6px 20px rgba(31, 61, 41, 0.35);
+  --ae-card-shadow: 0 1px 0 rgba(60, 40, 10, 0.02), 0 4px 18px -10px rgba(40, 30, 10, 0.08);
+
+  --ae-display: var(--font-serif-val);
+  --ae-body: var(--font-geist), var(--font-sans-val);
+  --ae-mono: var(--font-mono-val);
+
+  font-family: var(--ae-body);
+  color: var(--ae-ink);
+}
+
+.dark .ae-scope {
+  --ae-cream: #15140f;
+  --ae-cream-soft: #1c1a14;
+  --ae-paper: #1a1812;
+  --ae-surface: #1f1d17;
+  --ae-ink: #f0e9d9;
+  --ae-ink2: #a8a28f;
+  --ae-ink3: #736f5e;
+  --ae-ink4: #3a382e;
+  --ae-forest: #88b894;
+  --ae-forest-deep: #6fa37d;
+  --ae-forest-soft: #a1cba9;
+  --ae-forest-text: #10180f;
+  --ae-sage: #445040;
+  --ae-sage-bg: #2a3022;
+  --ae-terra: #d88865;
+  --ae-wheat: #c9b176;
+  --ae-border: #2d2b22;
+  --ae-border-soft: #26241d;
+  --ae-danger: #d88078;
+  --ae-danger-soft: #3a211e;
+
+  --ae-assist-bg: #2a3022;
+  --ae-assist-border: transparent;
+  --ae-plaque-bg: #445040;
+  --ae-plaque-fg: #a1cba9;
+  --ae-accent: #a1cba9;
+  --ae-tab-active-bg: #2a3022;
+  --ae-rose-bg: #3f2d2c;
+  --ae-rose-fg: #d9b4b0;
+  --ae-flag-bg: #2a2a1f;
+  --ae-flag-border: #c9b176;
+  --ae-flag-fg: #c9b176;
+
+  --ae-cta-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --ae-card-shadow: 0 1px 0 rgba(0, 0, 0, 0.2), 0 4px 18px -10px rgba(0, 0, 0, 0.5);
+}
+
+/* Decorative motion — gated behind reduced-motion in the components, but the
+   keyframes live here so both screens share them. */
+@keyframes aePulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.28;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+@keyframes aeSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes aeBlink {
+  50% {
+    opacity: 0.2;
+  }
+}

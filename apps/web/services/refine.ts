@@ -1031,3 +1031,191 @@ export async function saveSession(args: {
 // Drizzle import bookkeeping — `desc` is unused in this file but kept
 // for parity with the meals service style. Drop in a future cleanup.
 void desc;
+
+/* ─── R34 — stateless inline preview ────────────────────────────────
+ *
+ * The Assist Edit screen pours AI changes straight into the editable rows
+ * instead of staging a persistent session + diff-review. `previewChanges`
+ * reuses the same proposal AI (aiPropose*) + recipe context as the session
+ * path, applies the proposed PendingChange[] to an in-memory copy of the
+ * recipe (no DB write), and returns the full applied recipe as display
+ * rows + a `changed` flag for the wheat "AI" highlight. The Edit screen's
+ * "Save changes" then persists the final rows via meals.saveStructuredRecipe.
+ */
+
+export type RecipePreviewRow = { id: string; text: string; changed: boolean };
+export type RecipePreview = {
+  ingredients: RecipePreviewRow[];
+  steps: RecipePreviewRow[];
+  servings: string | null;
+  rationale: string | null;
+};
+
+function asString(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return "";
+  return String(value);
+}
+
+/** One-line display string for an ingredient row (quantity + name + prep). */
+function ingredientLine(i: {
+  quantityString: string;
+  name: string;
+  prepNote: string | null;
+}): string {
+  const head = [i.quantityString, i.name]
+    .map((p) => (p ?? "").trim())
+    .filter(Boolean)
+    .join(" ");
+  const prep = (i.prepNote ?? "").trim();
+  return prep ? `${head}, ${prep}` : head;
+}
+
+/** One-line display string for a step row (title + body). */
+function stepLine(s: { title: string; body: string }): string {
+  const title = (s.title ?? "").trim();
+  const body = (s.body ?? "").trim();
+  if (title && body) return `${title}: ${body}`;
+  return title || body;
+}
+
+/** Apply a PendingChange[] diff to an in-memory recipe (no persistence). */
+function applyPendingChanges(recipe: RecipeContext, changes: PendingChange[]) {
+  const ingredients = recipe.ingredients.map((i) => ({
+    id: i.id,
+    name: i.name,
+    quantityString: i.quantityString,
+    prepNote: i.prepNote
+  }));
+  const steps = recipe.steps.map((s) => ({
+    id: s.id,
+    title: s.title,
+    time: s.time,
+    body: s.body
+  }));
+  let servings = recipe.servings ?? null;
+  const changed = new Set<string>();
+  let addSeq = 0;
+
+  for (const change of changes) {
+    if (change.kind === "add") {
+      if (change.target === "ingredient") {
+        const id = `ai-ing-${addSeq++}`;
+        ingredients.push({
+          id,
+          name: asString(change.payload.name),
+          quantityString: asString(change.payload.quantityString),
+          prepNote: change.payload.prepNote ?? null
+        });
+        changed.add(id);
+      } else if (change.target === "step") {
+        const id = `ai-step-${addSeq++}`;
+        steps.push({
+          id,
+          title: asString(change.payload.title),
+          time: change.payload.time ?? null,
+          body: asString(change.payload.body)
+        });
+        changed.add(id);
+      } else if (change.target === "meta" && change.payload.servings != null) {
+        servings = change.payload.servings;
+      }
+    } else if (change.kind === "change") {
+      if (change.target === "ingredient") {
+        const row = ingredients.find((i) => i.id === change.refId);
+        if (row) {
+          if (change.field === "name") row.name = asString(change.after);
+          else if (change.field === "quantityString") row.quantityString = asString(change.after);
+          else if (change.field === "prepNote") row.prepNote = asString(change.after);
+          changed.add(row.id);
+        }
+      } else if (change.target === "step") {
+        const row = steps.find((s) => s.id === change.refId);
+        if (row) {
+          if (change.field === "title") row.title = asString(change.after);
+          else if (change.field === "time") row.time = asString(change.after);
+          else if (change.field === "body") row.body = asString(change.after);
+          changed.add(row.id);
+        }
+      } else if (change.target === "meta" && change.field === "servings") {
+        servings = asString(change.after);
+      }
+    } else {
+      // remove
+      if (change.target === "ingredient") {
+        const idx = ingredients.findIndex((i) => i.id === change.refId);
+        if (idx >= 0) ingredients.splice(idx, 1);
+      } else if (change.target === "step") {
+        const idx = steps.findIndex((s) => s.id === change.refId);
+        if (idx >= 0) steps.splice(idx, 1);
+      }
+    }
+  }
+
+  return { ingredients, steps, servings, changed };
+}
+
+export async function previewChanges(args: {
+  userId: string;
+  mealId: string;
+  source: "text" | "voice" | "photo";
+  prompt?: string;
+  audioBuffer?: Buffer;
+  mediaType?: string;
+  fileName?: string;
+  imageBase64?: string;
+}): Promise<RecipePreview> {
+  const mealRow = await db.query.meals.findFirst({
+    where: and(eq(meals.id, args.mealId), isNull(meals.archivedAt))
+  });
+  if (!mealRow) throw new Error("Meal not found.");
+  // Same write gate as the manual editor + refine save.
+  await requireItemEditor(args.userId, "recipe", args.mealId, mealRow.createdByUserId);
+
+  const recipe = await loadRecipeContext(args.mealId);
+
+  let proposal;
+  if (args.source === "text") {
+    proposal = await aiProposeText({
+      userId: args.userId,
+      recipe,
+      prompt: args.prompt ?? ""
+    });
+  } else if (args.source === "voice") {
+    if (!args.audioBuffer) throw new Error("Missing audio.");
+    proposal = await aiProposeVoice({
+      userId: args.userId,
+      recipe,
+      audioBuffer: args.audioBuffer,
+      mediaType: args.mediaType ?? "audio/webm",
+      fileName: args.fileName
+    });
+  } else {
+    proposal = await aiProposePhoto({
+      userId: args.userId,
+      recipe,
+      imageBase64: args.imageBase64 ?? "",
+      mediaType: (args.mediaType ?? "image/jpeg") as
+        | "image/jpeg"
+        | "image/png"
+        | "image/gif"
+        | "image/webp"
+    });
+  }
+
+  const applied = applyPendingChanges(recipe, proposal.proposed);
+  return {
+    ingredients: applied.ingredients.map((i) => ({
+      id: i.id,
+      text: ingredientLine(i),
+      changed: applied.changed.has(i.id)
+    })),
+    steps: applied.steps.map((s) => ({
+      id: s.id,
+      text: stepLine(s),
+      changed: applied.changed.has(s.id)
+    })),
+    servings: applied.servings,
+    rationale: proposal.rationale ?? null
+  };
+}
