@@ -79,6 +79,6 @@ export function proxy(request: NextRequest) {
 export const config = {
   // Skip on static assets and Next internals — they don't need correlation.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon.svg|apple-icon.svg|og.svg|manifest.webmanifest).*)"
+    "/((?!_next/static|_next/image|favicon.ico|og.svg|manifest.webmanifest).*)"
   ]
 };
