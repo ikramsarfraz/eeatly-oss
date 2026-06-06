@@ -13,6 +13,15 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
 
   return (
     <div className="pb-20 md:pb-0">
+      {/* R35 — mobile header (the desktop TopBar is hidden below md; on desktop
+          the "Settings." heading lives inside SettingsNav). */}
+      <div className="mb-4 md:hidden">
+        <div className="font-mono text-[9.5px] uppercase tracking-[0.14em] text-[color:var(--ink3)]">
+          eeatly · v{version}
+        </div>
+        <h1 className="mt-1 font-serif text-[32px] leading-none tracking-[-0.02em] text-foreground">Settings.</h1>
+      </div>
+
       <div className="relative grid gap-10 lg:grid-cols-[220px_1fr] lg:gap-12">
         {/* Version tag — top-right of the frame. */}
         <span

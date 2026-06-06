@@ -9,6 +9,7 @@ import {
   listTombstones
 } from "@/services/sharing";
 import { LibraryClient, type LibraryStat } from "@/components/library/library-client";
+import { LibraryMobile } from "@/components/mobile/library-mobile";
 
 export const metadata: Metadata = {
   title: "Library"
@@ -96,21 +97,37 @@ export default async function HistoryPage({
     }
   }
 
+  const libraryRows = rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    photoUrl: r.photoUrl,
+    createdByUserId: r.createdByUserId
+  }));
+  const libraryStats = Array.from(statsById.values());
+  const initialSurface = surface === "shared" ? ("shared" as const) : ("yours" as const);
+
   return (
-    <LibraryClient
-      rows={rows.map((r) => ({
-        id: r.id,
-        name: r.name,
-        photoUrl: r.photoUrl,
-        createdByUserId: r.createdByUserId
-      }))}
-      stats={Array.from(statsById.values())}
-      currentUserId={user.id}
-      householdMemberCount={memberCount}
-      sharedWithMe={sharedWithMe}
-      tombstones={tombstones}
-      shareCounts={shareCounts}
-      initialSurface={surface === "shared" ? "shared" : "yours"}
-    />
+    <>
+      <LibraryMobile
+        rows={libraryRows}
+        stats={libraryStats}
+        currentUserId={user.id}
+        householdMemberCount={memberCount}
+        sharedWithMe={sharedWithMe}
+        initialSurface={initialSurface}
+      />
+      <div className="hidden md:block">
+        <LibraryClient
+          rows={libraryRows}
+          stats={libraryStats}
+          currentUserId={user.id}
+          householdMemberCount={memberCount}
+          sharedWithMe={sharedWithMe}
+          tombstones={tombstones}
+          shareCounts={shareCounts}
+          initialSurface={initialSurface}
+        />
+      </div>
+    </>
   );
 }

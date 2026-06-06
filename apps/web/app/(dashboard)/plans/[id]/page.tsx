@@ -8,6 +8,7 @@ import {
 } from "@/services/plans";
 import { listHouseholdMembers } from "@/services/households";
 import { PlanDetailClient } from "@/components/plans/plan-detail-client";
+import { PlanDetailMobile } from "@/components/mobile/plan-detail-mobile";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,28 @@ export default async function PlanDetailPage(props: {
   ]);
 
   return (
+    <>
+      <PlanDetailMobile
+        plan={{
+          id: plan.id,
+          name: plan.name,
+          scheduledDate: plan.scheduledDate,
+          notes: plan.notes
+        }}
+        ownerName={plan.ownerName}
+        dishes={plan.dishes.map((d) => ({
+          id: d.id,
+          mealId: d.mealId,
+          mealName: d.mealName,
+          actualEffort: d.actualEffort,
+          annotationNotes: d.annotationNotes,
+          addedByName: d.addedByName,
+          locked: d.locked
+        }))}
+        hiddenDishCount={plan.hiddenDishCount}
+        shoppingList={shoppingList}
+      />
+      <div className="hidden md:block">
     <PlanDetailClient
       plan={{
         id: plan.id,
@@ -90,5 +113,7 @@ export default async function PlanDetailPage(props: {
         photoUrl: r.photoUrl
       }))}
     />
+      </div>
+    </>
   );
 }

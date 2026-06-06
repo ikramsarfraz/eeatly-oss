@@ -1,0 +1,290 @@
+"use client";
+
+import * as React from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ChevronLeft, ExternalLink, Pencil, Share2 } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+import { MealTile } from "@/components/ui/meal-tile";
+import { splitMealName } from "@/lib/meal/split-name";
+import { LogAgainButton } from "@/components/dashboard/log-again-button";
+import { MobileScaffold } from "@/components/mobile/mobile-scaffold";
+import type { RecipeDetailMeal, RecipeDetailViewer } from "@/components/meals/recipe-detail-client";
+
+const EFFORT_LABEL: Record<"quick" | "easy" | "medium" | "high_effort", string> = {
+  quick: "Quick",
+  easy: "Easy",
+  medium: "Medium",
+  high_effort: "High effort"
+};
+
+/** Format a structured ingredient row into a single display line. */
+function formatIngredient(row: { name: string; quantityString: string; prepNote: string | null }): string {
+  const name = row.name.trim() || "ingredient";
+  const qty = row.quantityString.trim();
+  const base = qty ? `${qty} ${name}` : name;
+  return row.prepNote?.trim() ? `${base}, ${row.prepNote.trim()}` : base;
+}
+
+/**
+ * R35 mobile-web Recipe detail. Renders below `md`; the desktop
+ * `<RecipeDetailClient>` renders `hidden md:block` alongside, both off the same
+ * server `meal` payload. Prefers structured ingredients/steps, falls back to
+ * the legacy `ingredients` array + `recipeText` blob (legacy meals predate
+ * Refine). The Cooking view is deferred (R35), so "Start cooking" scrolls to
+ * the method section.
+ */
+export function RecipeDetailMobile({ meal }: { meal: RecipeDetailMeal; viewer: RecipeDetailViewer }) {
+  const router = useRouter();
+  const titleParts = splitMealName(meal.name);
+
+  const ingredientLines = React.useMemo(() => {
+    if (meal.structuredIngredients.length > 0) {
+      return [...meal.structuredIngredients]
+        .sort((a, b) => a.position - b.position)
+        .map((r) => formatIngredient(r));
+    }
+    return (meal.ingredients ?? []).map((s) => s.trim()).filter(Boolean);
+  }, [meal.structuredIngredients, meal.ingredients]);
+
+  const steps = React.useMemo(() => {
+    if (meal.structuredSteps.length > 0) {
+      return [...meal.structuredSteps]
+        .sort((a, b) => a.position - b.position)
+        .map((s) => ({ title: s.title, time: s.time, body: s.body }));
+    }
+    // Legacy fallback: split the recipe-text blob into paragraph "steps".
+    const text = meal.recipeText?.trim() ?? "";
+    if (!text) return [];
+    return text
+      .split(/\n{2,}|\r\n{2,}/)
+      .map((p) => p.replace(/^\s*\d+[.)]\s*/, "").trim())
+      .filter(Boolean)
+      .map((body) => ({ title: "", time: null as string | null, body }));
+  }, [meal.structuredSteps, meal.recipeText]);
+
+  // Ingredient checklist: checked = "have it"; remaining = "to buy".
+  const [checked, setChecked] = React.useState<Set<number>>(() => new Set());
+  const toBuy = ingredientLines.length - checked.size;
+  const toggle = (i: number) =>
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
+
+  const shareList = React.useCallback(() => {
+    const remaining = ingredientLines.filter((_, i) => !checked.has(i));
+    const text = `Shopping list for ${meal.name}:\n${remaining.map((l) => `- ${l}`).join("\n")}`;
+    if (typeof navigator !== "undefined" && navigator.share) {
+      void navigator.share({ title: meal.name, text }).catch(() => {});
+    } else if (typeof navigator !== "undefined" && navigator.clipboard) {
+      void navigator.clipboard.writeText(text).catch(() => {});
+    }
+  }, [ingredientLines, checked, meal.name]);
+
+  const metaPills: string[] = [];
+  if (meal.servings) metaPills.push(meal.servings);
+  if (meal.cookCount > 0) metaPills.push(`${meal.cookCount} cook${meal.cookCount === 1 ? "" : "s"}`);
+
+  return (
+    <MobileScaffold>
+      {/* Transparent hero bar (back + share), overlaying the palette hero. */}
+      <div className="relative">
+        <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-4 pt-[max(env(safe-area-inset-top),10px)]">
+          <button
+            type="button"
+            aria-label="Back"
+            onClick={() => router.back()}
+            className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-card/85 text-foreground backdrop-blur"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            aria-label="Share"
+            onClick={shareList}
+            className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-card/85 text-foreground backdrop-blur"
+          >
+            <Share2 className="h-[18px] w-[18px]" />
+          </button>
+        </div>
+        <MealTile name={meal.name} size="l" className="h-[180px] w-full rounded-none" />
+      </div>
+
+      <div className="px-4 pt-4">
+        <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-[color:var(--ink3)]">
+          {meal.effortLevel ? EFFORT_LABEL[meal.effortLevel] : "Recipe"}
+        </div>
+        <h1 className="mt-1.5 font-serif text-[34px] leading-[1.04] tracking-[-0.02em] text-foreground">
+          {titleParts.kicker && <span className="italic text-primary">{titleParts.kicker} </span>}
+          {titleParts.headline}
+        </h1>
+        {metaPills.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {metaPills.map((p) => (
+              <span
+                key={p}
+                className="rounded-full bg-secondary px-3 py-1 text-[12px] font-medium text-secondary-foreground"
+              >
+                {p}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="mt-4 grid grid-cols-2 gap-2.5">
+          <a
+            href="#method"
+            className="flex h-11 items-center justify-center rounded-[12px] bg-primary text-[14px] font-semibold text-primary-foreground active:scale-[0.99]"
+          >
+            Start cooking
+          </a>
+          {meal.viewerCanEdit ? (
+            <Link
+              href={`/meal/${meal.id}/edit`}
+              className="flex h-11 items-center justify-center gap-1.5 rounded-[12px] border border-border bg-card text-[14px] font-semibold text-foreground active:scale-[0.99]"
+            >
+              <Pencil className="h-4 w-4" />
+              Edit
+            </Link>
+          ) : (
+            <LogAgainButton
+              mealName={meal.name}
+              effortLevel={meal.effortLevel}
+              icon="check"
+              label="I cooked this"
+              variant="outline"
+              size="default"
+              className="h-11 w-full rounded-[12px]"
+            />
+          )}
+        </div>
+        {meal.viewerCanEdit && (
+          <div className="mt-2.5">
+            <LogAgainButton
+              mealName={meal.name}
+              effortLevel={meal.effortLevel}
+              icon="check"
+              label="I cooked this"
+              variant="secondary"
+              size="default"
+              className="h-11 w-full rounded-[12px]"
+            />
+          </div>
+        )}
+
+        {meal.recipeSourceUrl && (
+          <a
+            href={meal.recipeSourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-primary"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            View original source
+          </a>
+        )}
+      </div>
+
+      {/* Ingredients */}
+      {ingredientLines.length > 0 && (
+        <section className="mt-6 px-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[color:var(--ink3)]">
+              Ingredients · {ingredientLines.length}
+            </h2>
+            <button
+              type="button"
+              onClick={shareList}
+              className="font-mono text-[10px] uppercase tracking-[0.1em] text-primary"
+            >
+              Share list
+            </button>
+          </div>
+          <p className="mt-1 text-[12px] text-[color:var(--ink3)]">
+            {toBuy === 0 ? "All set" : `${toBuy} to buy`}
+          </p>
+          <ul className="mt-3 divide-y divide-border overflow-hidden rounded-[14px] border border-border bg-card">
+            {ingredientLines.map((line, i) => {
+              const isChecked = checked.has(i);
+              return (
+                <li key={`${line}-${i}`}>
+                  <button
+                    type="button"
+                    onClick={() => toggle(i)}
+                    className="flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-[color:var(--surface-2)]"
+                  >
+                    <span
+                      className={cn(
+                        "flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border",
+                        isChecked ? "border-primary bg-primary text-primary-foreground" : "border-[color:var(--ink4)]"
+                      )}
+                    >
+                      {isChecked && (
+                        <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                          <path d="M2.5 6.5l2.5 2.5 4.5-5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </span>
+                    <span
+                      className={cn(
+                        "text-[14.5px] leading-snug",
+                        isChecked ? "text-[color:var(--ink3)] line-through" : "text-foreground"
+                      )}
+                    >
+                      {line}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {/* Method */}
+      {steps.length > 0 && (
+        <section id="method" className="mt-7 px-4 pb-4 scroll-mt-16">
+          <h2 className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[color:var(--ink3)]">Method</h2>
+          <ol className="mt-3 space-y-5">
+            {steps.map((step, i) => (
+              <li key={i} className="flex gap-3.5">
+                <span className="shrink-0 font-serif text-[26px] italic leading-none text-primary">{i + 1}</span>
+                <div className="min-w-0 flex-1 pt-0.5">
+                  {step.title && (
+                    <h3 className="font-serif text-[18px] leading-tight tracking-[-0.01em] text-foreground">
+                      {step.title}
+                    </h3>
+                  )}
+                  {step.time && (
+                    <div className="mt-0.5 font-mono text-[9.5px] uppercase tracking-[0.1em] text-[color:var(--ink3)]">
+                      {step.time}
+                    </div>
+                  )}
+                  <p className={cn("text-[14.5px] leading-relaxed text-foreground", step.title && "mt-1.5")}>
+                    {step.body}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
+      {ingredientLines.length === 0 && steps.length === 0 && (
+        <div className="px-4 py-10 text-center text-[14px] text-muted-foreground">
+          No recipe details saved yet.{" "}
+          {meal.viewerCanEdit && (
+            <Link href={`/meal/${meal.id}/edit`} className="font-medium text-primary">
+              Add them
+            </Link>
+          )}
+        </div>
+      )}
+    </MobileScaffold>
+  );
+}
