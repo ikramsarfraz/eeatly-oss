@@ -132,6 +132,19 @@ function buildAuth() {
       verification: schema.verifications
     }
   }),
+  // Email + password as a lower-friction alternative to the magic link.
+  // Magic links stay on (the `magicLink` plugin below) — returning users
+  // who'd rather not wait for an email can sign in with a password instead.
+  // Low-sensitivity data + a long rolling session, so we don't gate on email
+  // verification (that would re-introduce the very round-trip we're avoiding)
+  // and we auto-sign-in on sign-up. The `accounts.password` column already
+  // exists from `auth:generate`, so no migration is needed.
+  emailAndPassword: {
+    enabled: true,
+    requireEmailVerification: false,
+    autoSignIn: true,
+    minPasswordLength: 8
+  },
   plugins: [
     magicLink({
       storeToken: "hashed",

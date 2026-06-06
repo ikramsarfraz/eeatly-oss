@@ -39,7 +39,7 @@ export default async function SignUpPage({
       <CardHeader>
         <CardTitle>Start your cooking memory</CardTitle>
         <CardDescription>
-          Enter your email and we&apos;ll send a link to create your private eeatly account.
+          Create your private eeatly account with an email and password, or a one-tap email link.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
