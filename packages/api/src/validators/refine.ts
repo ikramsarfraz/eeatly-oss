@@ -207,6 +207,26 @@ export type ToggleTurnAcceptedInput = z.infer<
   typeof toggleTurnAcceptedInputSchema
 >;
 
+/* ─── Stateless "preview" inputs (R34 inline Edit-with-AI) ─────────────
+ * The Assist Edit screen applies AI changes directly into the editable rows
+ * (no persistent session). These mirror the submit*Turn inputs but key on the
+ * `mealId` instead of a `sessionId`. The result is the full applied recipe. */
+export const previewTextInputSchema = z.object({
+  mealId: z.string().uuid(),
+  prompt: z.string().trim().min(1, "Type a prompt first.").max(2000)
+});
+export type PreviewTextInput = z.infer<typeof previewTextInputSchema>;
+
+export const previewVoiceInputSchema = submitVoiceTurnInputSchema
+  .omit({ sessionId: true })
+  .extend({ mealId: z.string().uuid() });
+export type PreviewVoiceInput = z.infer<typeof previewVoiceInputSchema>;
+
+export const previewPhotoInputSchema = submitPhotoTurnInputSchema
+  .omit({ sessionId: true })
+  .extend({ mealId: z.string().uuid() });
+export type PreviewPhotoInput = z.infer<typeof previewPhotoInputSchema>;
+
 export const sessionOnlyInputSchema = z.object({
   sessionId: sessionIdSchema
 });

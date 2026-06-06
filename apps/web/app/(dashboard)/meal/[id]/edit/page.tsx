@@ -2,17 +2,31 @@ import { notFound } from "next/navigation";
 import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
 import { getMealDetail } from "@/services/meals";
 import { parseStructuredRecipe } from "@/lib/meals/parse-recipe";
-import {
-  ManualRecipeEditor,
-  type EditorIngredient,
-  type EditorStep
-} from "@/components/meals/manual-recipe-editor";
+import { EditAssistClient } from "@/components/assist/edit-assist-client";
 
 export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ id: string }>;
 };
+
+/** One-line display string for an ingredient (quantity + name + prep). */
+function ingredientLine(i: { quantityString: string; name: string; prepNote: string | null }): string {
+  const head = [i.quantityString, i.name]
+    .map((p) => (p ?? "").trim())
+    .filter(Boolean)
+    .join(" ");
+  const prep = (i.prepNote ?? "").trim();
+  return prep ? `${head}, ${prep}` : head;
+}
+
+/** One-line display string for a step (title + body). */
+function stepLine(s: { title: string; body: string }): string {
+  const title = (s.title ?? "").trim();
+  const body = (s.body ?? "").trim();
+  if (title && body) return `${title}: ${body}`;
+  return title || body;
+}
 
 export default async function MealEditPage({ params }: PageProps) {
   const { id } = await params;
@@ -24,37 +38,29 @@ export default async function MealEditPage({ params }: PageProps) {
     notFound();
   }
 
-  // Legacy meals (pre auto-structuring) have only the prose blob + ingredient
-  // array — parse them the same way log-time does so the editor opens with
-  // cleanly separated rows.
+  // Prefer structured rows; fall back to the legacy prose/array parser so legacy
+  // meals open with cleanly separated single-line rows.
   const parsedLegacy = parseStructuredRecipe(meal.recipeText, meal.ingredients);
 
-  const initialIngredients: EditorIngredient[] =
+  const ingredients =
     meal.structuredIngredients.length > 0
-      ? meal.structuredIngredients.map((i) => ({
-          name: i.name,
-          quantityString: i.quantityString,
-          prepNote: i.prepNote ?? ""
-        }))
-      : parsedLegacy.ingredients.map((i) => ({
-          name: i.name,
-          quantityString: i.quantityString,
-          prepNote: i.prepNote ?? ""
-        }));
+      ? meal.structuredIngredients.map(ingredientLine)
+      : parsedLegacy.ingredients.map(ingredientLine);
 
-  const initialSteps: EditorStep[] =
+  const steps =
     meal.structuredSteps.length > 0
-      ? meal.structuredSteps.map((s) => ({ title: s.title, time: s.time ?? "", body: s.body }))
-      : parsedLegacy.steps.map((s) => ({ title: s.title, time: s.time ?? "", body: s.body }));
+      ? meal.structuredSteps.map(stepLine)
+      : parsedLegacy.steps.map(stepLine);
 
   return (
     <main id="main" tabIndex={-1}>
-      <ManualRecipeEditor
+      <EditAssistClient
         mealId={meal.id}
         mealName={meal.name}
-        initialServings={meal.servings ?? ""}
-        initialIngredients={initialIngredients}
-        initialSteps={initialSteps}
+        effort={meal.effortLevel}
+        servings={meal.servings ?? ""}
+        ingredients={ingredients.filter((t) => t.trim().length > 0)}
+        steps={steps.filter((t) => t.trim().length > 0)}
       />
     </main>
   );
