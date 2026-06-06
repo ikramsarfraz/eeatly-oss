@@ -47,6 +47,15 @@ const PRIMARY_TIMEOUT_MS = 7_000;
 // a couple seconds.)
 const REFINE_TIMEOUT_MS = 22_000;
 
+// Recipe-generation suggests (image / text / voice -> a full structured
+// recipe, up to 1024-1500 output tokens) routinely need ~15-20s to finish.
+// The 7s PRIMARY ceiling above is sized for small ops (ingredient extraction,
+// share text); applied to these it aborts mid-generation, worst of all for
+// wordy voice transcripts (prod incident: both providers aborted at exactly
+// their timeouts, 7001ms / 15001ms). Sized to still fit the 60s function
+// budget even through the openai -> anthropic fallback chain.
+const GENERATE_TIMEOUT_MS = 20_000;
+
 // Strict JSON-schema mode on OpenAI requires every property in `properties`
 // to also be listed in `required`. We instruct the model in the prompt to
 // return an empty array when no ingredients are present rather than omit
@@ -127,7 +136,7 @@ export async function suggestMealFromImage(
         }
       ]
     },
-    { signal: AbortSignal.timeout(PRIMARY_TIMEOUT_MS) }
+    { signal: AbortSignal.timeout(GENERATE_TIMEOUT_MS) }
   );
 
   const usage = response.usage;
@@ -161,7 +170,7 @@ export async function suggestMealFromText(
         { role: "user", content: `${SUGGEST_FROM_TEXT_PROMPT}${unitsDirective(system)}\n\n${text}` }
       ]
     },
-    { signal: AbortSignal.timeout(PRIMARY_TIMEOUT_MS) }
+    { signal: AbortSignal.timeout(GENERATE_TIMEOUT_MS) }
   );
 
   const usage = response.usage;
@@ -198,7 +207,7 @@ export async function suggestMealFromVoiceTranscript(
         { role: "user", content: `${SUGGEST_FROM_VOICE_NOTE_PROMPT}${unitsDirective(system)}\n\n${transcript}` }
       ]
     },
-    { signal: AbortSignal.timeout(PRIMARY_TIMEOUT_MS) }
+    { signal: AbortSignal.timeout(GENERATE_TIMEOUT_MS) }
   );
 
   const usage = response.usage;
