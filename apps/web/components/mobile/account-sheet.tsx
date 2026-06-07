@@ -3,9 +3,10 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
-import { HelpCircle, LogOut, Settings, Users, X } from "lucide-react";
+import { HelpCircle, LogOut, MessageSquare, Settings, Sparkles, Users, X } from "lucide-react";
 import { authClient } from "@/lib/auth/client";
 import { MobileSheet, SheetRow } from "@/components/mobile/mobile-sheet";
+import { useTourHelp } from "@/components/tour/tour-help-provider";
 
 /**
  * R37 mobile-web — the Account sheet, opened by tapping the top-bar avatar.
@@ -16,20 +17,33 @@ export function AccountSheet({
   open,
   onClose,
   name,
-  email
+  email,
+  onSendFeedback
 }: {
   open: boolean;
   onClose: () => void;
   name: string | null;
   email: string | null;
+  /** Opens the feedback dialog (mounted by the parent app bar, so it survives
+   *  this sheet closing). */
+  onSendFeedback: () => void;
 }) {
   const router = useRouter();
+  const { openHelp, replayWelcome } = useTourHelp();
   const display = name?.trim() || email || "Your account";
   const initial = (display.charAt(0) || "?").toUpperCase();
 
   const go = (href: Route) => {
     onClose();
     router.push(href);
+  };
+
+  // Close the sheet first, then run the action. The Help panel, Welcome modal,
+  // and Feedback dialog all mount above this sheet (in the app shell / app bar),
+  // so dismissing the sheet first avoids stacked overlays.
+  const runAndClose = (fn: () => void) => {
+    onClose();
+    fn();
   };
 
   const signOut = async () => {
@@ -67,7 +81,10 @@ export function AccountSheet({
       <div className="pt-1">
         <SheetRow icon={<Users className="h-5 w-5" />} label="Members & sharing" onClick={() => go("/kitchen" as Route)} />
         <SheetRow icon={<Settings className="h-5 w-5" />} label="Settings" onClick={() => go("/settings" as Route)} />
-        <SheetRow icon={<HelpCircle className="h-5 w-5" />} label="Help & feedback" onClick={() => go("/help" as Route)} />
+        <div className="my-1.5 h-px bg-border" />
+        <SheetRow icon={<HelpCircle className="h-5 w-5" />} label="Help & guides" onClick={() => runAndClose(openHelp)} />
+        <SheetRow icon={<MessageSquare className="h-5 w-5" />} label="Send feedback" onClick={() => runAndClose(onSendFeedback)} />
+        <SheetRow icon={<Sparkles className="h-5 w-5" />} label="Show me around" onClick={() => runAndClose(replayWelcome)} />
         <div className="my-1.5 h-px bg-border" />
         <SheetRow danger icon={<LogOut className="h-5 w-5" />} label="Sign out" onClick={signOut} />
       </div>
