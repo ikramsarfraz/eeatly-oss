@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc/client";
 import { getCause } from "@/lib/trpc/errors";
 import { MobileScaffold, MobileTopBar } from "@/components/mobile/mobile-scaffold";
+import { MobileAppBar } from "@/components/mobile/mobile-app-bar";
 
 type Member = {
   userId: string;
@@ -63,6 +64,7 @@ export function MembersMobile({
 
   return (
     <MobileScaffold>
+      <MobileAppBar title="Members" />
       <MobileTopBar big eyebrow={householdName} title="Kitchen." />
 
       <div className="px-4 pt-3">

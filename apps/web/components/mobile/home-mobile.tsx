@@ -9,6 +9,7 @@ import { useDashboardMeals } from "@/hooks/use-dashboard-meals";
 import { MealImage } from "@/components/mobile/meal-image";
 import { EffortPill } from "@/components/history/effort-pill";
 import { MobileScaffold, MobileTopBar } from "@/components/mobile/mobile-scaffold";
+import { MobileAppBar } from "@/components/mobile/mobile-app-bar";
 import type { DashboardMeals, EffortLevel } from "@/types";
 
 function greeting(): string {
@@ -114,19 +115,11 @@ export function HomeMobile({
 
   return (
     <MobileScaffold>
+      <MobileAppBar title="Home" />
       <MobileTopBar
         big
         eyebrow={householdName.toUpperCase()}
         title={`${hello} ${firstName(currentUserName)}.`}
-        right={
-          <Link
-            href="/settings"
-            aria-label="Your profile"
-            className="mt-[2px] flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full bg-secondary font-serif text-[17px] text-primary"
-          >
-            {firstName(currentUserName).charAt(0).toUpperCase()}
-          </Link>
-        }
       />
 
       <p className="px-4 pb-1 pt-[6px] text-[14px] leading-snug text-muted-foreground">{summary}</p>

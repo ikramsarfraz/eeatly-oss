@@ -17,6 +17,7 @@ import type { EffortLevel } from "@/types";
 import { AssistBar } from "./assist-bar";
 import { EffortPills } from "./effort-pills";
 import { AeButton, AeInput, AeDivider, Lbl } from "./field-atoms";
+import { ChevronLeft } from "lucide-react";
 import { Drag, Trash, Plus, Check, Sparkle } from "./assist-icons";
 
 type ImageMime = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
@@ -185,6 +186,17 @@ export function EditAssistClient({
 
   return (
     <div className="ae-scope mx-auto w-full max-w-[720px] pb-24 sm:pb-2">
+      {/* Mobile back — matches the detail-screen chevron (desktop keeps Cancel
+          in the action row). */}
+      <button
+        type="button"
+        aria-label="Back"
+        onClick={() => router.back()}
+        className="mb-3 flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[11px] border border-[color:var(--ae-border)] bg-[color:var(--ae-surface)] text-[color:var(--ae-ink)] sm:hidden"
+      >
+        <ChevronLeft size={20} />
+      </button>
+
       {/* Identity */}
       <div className="mb-5 flex items-center gap-[13px]">
         <div className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[11px] bg-[color:var(--ae-rose-bg)] font-[family-name:var(--ae-display)] text-[26px] italic text-[color:var(--ae-rose-fg)]">

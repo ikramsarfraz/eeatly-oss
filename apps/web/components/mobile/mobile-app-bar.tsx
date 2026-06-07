@@ -8,6 +8,7 @@ import { ChevronLeft, Menu, Search } from "lucide-react";
 
 import { MobileSheet, MoreSheetContent } from "@/components/mobile/mobile-sheet";
 import { AccountSheet } from "@/components/mobile/account-sheet";
+import { authClient } from "@/lib/auth/client";
 
 /**
  * R37 — the shared mobile-web app bar ("actions bar"). Left is a hamburger that
@@ -16,8 +17,10 @@ import { AccountSheet } from "@/components/mobile/account-sheet";
  * opens the Account sheet (profile + Members/Settings/Help + Sign out). Manages
  * the nav + account sheets itself so any screen can drop it in.
  *
- * Extracted from the inline bar in `library-mobile.tsx` so Settings (and other
- * dashboard routes) get the same top chrome instead of a bare heading.
+ * `userName`/`userEmail` are optional — when omitted the bar reads the session
+ * itself (`authClient.useSession`), so any mobile screen can drop in
+ * `<MobileAppBar title="…" />` (or with `backHref`) without threading session
+ * props through its page.
  */
 export function MobileAppBar({
   title,
@@ -28,13 +31,16 @@ export function MobileAppBar({
   title: string;
   /** When set, the left control is a back chevron to this href (detail screens). */
   backHref?: string;
-  userName: string | null;
-  userEmail: string | null;
+  userName?: string | null;
+  userEmail?: string | null;
 }) {
   const router = useRouter();
+  const { data: session } = authClient.useSession();
+  const name = userName ?? session?.user?.name ?? null;
+  const email = userEmail ?? session?.user?.email ?? null;
   const [navOpen, setNavOpen] = React.useState(false);
   const [accountOpen, setAccountOpen] = React.useState(false);
-  const initial = (userName?.trim()?.charAt(0) || userEmail?.charAt(0) || "?").toUpperCase();
+  const initial = (name?.trim()?.charAt(0) || email?.charAt(0) || "?").toUpperCase();
 
   return (
     <>
@@ -81,7 +87,7 @@ export function MobileAppBar({
       <MobileSheet open={navOpen} label="Go to" onClose={() => setNavOpen(false)}>
         <MoreSheetContent onClose={() => setNavOpen(false)} />
       </MobileSheet>
-      <AccountSheet open={accountOpen} onClose={() => setAccountOpen(false)} name={userName} email={userEmail} />
+      <AccountSheet open={accountOpen} onClose={() => setAccountOpen(false)} name={name} email={email} />
     </>
   );
 }
