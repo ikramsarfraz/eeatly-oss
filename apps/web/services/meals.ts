@@ -15,6 +15,8 @@ import {
 } from "@/services/sharing";
 import { normalizeMealName } from "@/lib/utils";
 import { parseStructuredRecipe } from "@/lib/meals/parse-recipe";
+import { generateMealTags } from "@/services/ai-tags";
+import type { MealTags } from "@/lib/meals/tags";
 import { mealLogInputSchema, type MealLogInput } from "@eeatly/api/validators/meals";
 import {
   dishImages,
@@ -1022,6 +1024,74 @@ export function deleteMeal(userId: string, householdId: string, mealId: string):
 
 export function restoreMeal(userId: string, householdId: string, mealId: string): Promise<void> {
   return setMealLifecycle(userId, householdId, mealId, { deletedAt: null });
+}
+
+/**
+ * R36 Library — recipe tags. Tags are household-scoped recipe metadata, so any
+ * household member can correct them (mirrors recipe editing). `tagsSource`
+ * records provenance so a user's hand edits aren't clobbered by re-tagging.
+ */
+export async function setMealTags(
+  userId: string,
+  householdId: string,
+  mealId: string,
+  tags: MealTags,
+  source: "ai" | "user" | "heuristic" | "mixed"
+): Promise<void> {
+  await requireHouseholdMember(userId, householdId);
+  const [updated] = await db
+    .update(meals)
+    .set({
+      cuisine: tags.cuisine,
+      course: tags.course,
+      mainIngredient: tags.mainIngredient,
+      diet: tags.diet,
+      occasion: tags.occasion,
+      tagsSource: source,
+      taggedAt: new Date(),
+      updatedAt: new Date()
+    })
+    .where(and(eq(meals.id, mealId), eq(meals.householdId, householdId), isNull(meals.deletedAt)))
+    .returning({ id: meals.id });
+  if (!updated) throw new Error("Recipe not found.");
+}
+
+/**
+ * Generate + persist AI tags for a meal. No-ops (returns the existing tags) when
+ * the user has already hand-edited them, so auto-tagging on capture / a backfill
+ * never overwrites a deliberate correction.
+ */
+export async function generateTagsForMeal(
+  userId: string,
+  householdId: string,
+  mealId: string,
+  opts: { force?: boolean } = {}
+): Promise<MealTags> {
+  await requireHouseholdMember(userId, householdId);
+  const meal = await db.query.meals.findFirst({
+    where: and(eq(meals.id, mealId), eq(meals.householdId, householdId), isNull(meals.deletedAt))
+  });
+  if (!meal) throw new Error("Recipe not found.");
+
+  const existing: MealTags = {
+    cuisine: meal.cuisine ?? null,
+    course: meal.course ?? null,
+    mainIngredient: meal.mainIngredient ?? null,
+    diet: meal.diet ?? [],
+    occasion: meal.occasion ?? []
+  };
+  // Never clobber a hand edit; and unless forced (an explicit "re-tag"), skip a
+  // meal that already has tags so capture / backfill don't re-spend AI calls.
+  if (meal.tagsSource === "user") return existing;
+  if (meal.tagsSource && !opts.force) return existing;
+
+  const { tags, source } = await generateMealTags({
+    name: meal.name,
+    recipeText: meal.recipeText,
+    ingredients: meal.ingredients
+  });
+  await setMealTags(userId, householdId, mealId, tags, source);
+  return tags;
 }
 
 export type ArchivedRecipeRow = {

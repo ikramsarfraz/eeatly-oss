@@ -16,12 +16,14 @@ import {
   createMealLog,
   deleteMeal,
   deleteMealLog,
+  generateTagsForMeal,
   getHistoryRows,
   getHistoryStats,
   getMealDetail,
   listArchivedRecipes,
   restoreMeal,
   setMealPhoto,
+  setMealTags,
   unarchiveMeal
 } from "@/services/meals";
 import { saveStructuredRecipe } from "@/services/recipe-edit";
@@ -168,6 +170,15 @@ export const mealsRouter = router({
         input.log
       );
 
+      // R36 — auto-tag the recipe on capture (faceted filtering). Fire-and-
+      // forget + skips already-tagged meals, so logging the same dish again is
+      // a no-op; the backfill + Edit-tags are the reliable safety nets.
+      if (mealLog?.mealId) {
+        void Promise.resolve(generateTagsForMeal(ctx.user.id, ctx.household.id, mealLog.mealId)).catch(
+          () => {}
+        );
+      }
+
       revalidatePath("/home");
       revalidatePath("/library");
       revalidatePath("/ideas");
@@ -307,7 +318,56 @@ export const mealsRouter = router({
 
   archivedList: householdMemberProcedure.query(({ ctx }) =>
     listArchivedRecipes(ctx.user.id, ctx.household.id)
-  )
+  ),
+
+  // R36 Library — AI tags. `generateTags` (re-)runs the tagger; `updateTags`
+  // saves a user's hand edits (marked source 'user' so re-tagging won't clobber).
+  generateTags: householdMemberProcedure
+    .use(rateLimit("mutation"))
+    .input(z.object({ mealId: z.string().uuid(), force: z.boolean().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const tags = await generateTagsForMeal(ctx.user.id, ctx.household.id, input.mealId, {
+          force: input.force
+        });
+        revalidatePath("/library");
+        return tags;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown error.";
+        if (message.toLowerCase().includes("not found")) {
+          throw new TRPCError({ code: "NOT_FOUND", message, cause: { reason: "MEAL_NOT_FOUND" } });
+        }
+        throw error;
+      }
+    }),
+
+  updateTags: householdMemberProcedure
+    .use(rateLimit("mutation"))
+    .input(
+      z.object({
+        mealId: z.string().uuid(),
+        tags: z.object({
+          cuisine: z.string().trim().max(60).nullable(),
+          course: z.string().trim().max(60).nullable(),
+          mainIngredient: z.string().trim().max(60).nullable(),
+          diet: z.array(z.string().trim().max(60)).max(8),
+          occasion: z.array(z.string().trim().max(60)).max(8)
+        })
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        await setMealTags(ctx.user.id, ctx.household.id, input.mealId, input.tags, "user");
+        revalidatePath("/library");
+        return { ok: true as const };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown error.";
+        if (message.toLowerCase().includes("not found")) {
+          throw new TRPCError({ code: "NOT_FOUND", message, cause: { reason: "MEAL_NOT_FOUND" } });
+        }
+        throw error;
+      }
+    })
 });
 
 /**
