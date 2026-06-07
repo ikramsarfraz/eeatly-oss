@@ -10,6 +10,7 @@ import { MealImage } from "@/components/mobile/meal-image";
 import { splitMealName } from "@/lib/meal/split-name";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { MobileScaffold } from "@/components/mobile/mobile-scaffold";
+import { ShareSheet } from "@/components/sharing/share-sheet";
 import type { RecipeDetailMeal, RecipeDetailViewer } from "@/components/meals/recipe-detail-client";
 
 const EFFORT_LABEL: Record<"quick" | "easy" | "medium" | "high_effort", string> = {
@@ -38,6 +39,7 @@ function formatIngredient(row: { name: string; quantityString: string; prepNote:
 export function RecipeDetailMobile({ meal }: { meal: RecipeDetailMeal; viewer: RecipeDetailViewer }) {
   const router = useRouter();
   const titleParts = splitMealName(meal.name);
+  const [shareOpen, setShareOpen] = React.useState(false);
 
   const ingredientLines = React.useMemo(() => {
     if (meal.structuredIngredients.length > 0) {
@@ -102,14 +104,18 @@ export function RecipeDetailMobile({ meal }: { meal: RecipeDetailMeal; viewer: R
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
-          <button
-            type="button"
-            aria-label="Share"
-            onClick={shareList}
-            className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-card/85 text-foreground backdrop-blur"
-          >
-            <Share2 className="h-[18px] w-[18px]" />
-          </button>
+          {meal.viewerCanManageSharing ? (
+            <button
+              type="button"
+              aria-label="Share recipe"
+              onClick={() => setShareOpen(true)}
+              className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-card/85 text-foreground backdrop-blur"
+            >
+              <Share2 className="h-[18px] w-[18px]" />
+            </button>
+          ) : (
+            <span className="h-[38px] w-[38px]" aria-hidden />
+          )}
         </div>
         <MealImage name={meal.name} photoUrl={meal.photoUrl} size="l" className="h-[180px] w-full rounded-none" />
       </div>
@@ -285,6 +291,16 @@ export function RecipeDetailMobile({ meal }: { meal: RecipeDetailMeal; viewer: R
           )}
         </div>
       )}
+
+      {meal.viewerCanManageSharing ? (
+        <ShareSheet
+          itemType="recipe"
+          itemId={meal.id}
+          itemName={meal.name}
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+        />
+      ) : null}
     </MobileScaffold>
   );
 }

@@ -17,7 +17,6 @@ import {
   Share2,
   SlidersHorizontal,
   Sparkles,
-  Tag as TagIcon,
   Trash2
 } from "lucide-react";
 
@@ -31,8 +30,7 @@ import { MobileAppBar } from "@/components/mobile/mobile-app-bar";
 import { ShareSheet } from "@/components/sharing/share-sheet";
 import { useLibraryManagement } from "@/components/library/use-library-management";
 import { FilterPanelBody } from "@/components/library/filter-panel";
-import { EditTagsSheet } from "@/components/library/edit-tags";
-import { FACET_GROUPS, effortLabel, type FacetKey, type MealTags } from "@/lib/meals/tags";
+import { FACET_GROUPS, effortLabel, type FacetKey } from "@/lib/meals/tags";
 import {
   cloneFacetState,
   emptyFacetState,
@@ -78,7 +76,7 @@ const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
 const PAGE_SIZE = 12;
 
 /** A meal targeted by the action sheet / delete confirm. */
-type Target = { id: string; name: string; cooks: number; archived: boolean; tags?: MealTags };
+type Target = { id: string; name: string; cooks: number; archived: boolean };
 
 /**
  * R36 mobile-web Library. Extends the R35 grid with per-recipe management
@@ -115,7 +113,6 @@ export function LibraryMobile({
   const [actionTarget, setActionTarget] = React.useState<Target | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<Target | null>(null);
   const [shareTarget, setShareTarget] = React.useState<{ id: string; name: string } | null>(null);
-  const [editTagsTarget, setEditTagsTarget] = React.useState<{ id: string; name: string; tags: MealTags } | null>(null);
 
   // Facets: `staged` is edited in the sheet and applied to `facetState` on
   // "Show results" (per the handoff's staged-mobile model).
@@ -243,27 +240,7 @@ export function LibraryMobile({
           <div className="mt-3 flex items-start gap-2 rounded-[14px] bg-[color:var(--surface-2)] px-3.5 py-2.5">
             <Sparkles className="mt-px h-3.5 w-3.5 shrink-0 text-primary" />
             <p className="text-[12.5px] leading-snug text-muted-foreground">
-              Cuisine, course &amp; diet are auto-tagged when you capture a meal.{" "}
-              <button
-                type="button"
-                onClick={() => {
-                  const first = pageRows[0];
-                  setEditTagsTarget({
-                    id: first.id,
-                    name: first.name,
-                    tags: {
-                      cuisine: first.cuisine,
-                      course: first.course,
-                      mainIngredient: first.mainIngredient,
-                      diet: first.diet,
-                      occasion: first.occasion
-                    }
-                  });
-                }}
-                className="font-medium text-primary underline-offset-2"
-              >
-                Edit tags &rarr;
-              </button>
+              Cuisine, course &amp; diet are auto-tagged when you capture a meal.
             </p>
           </div>
         ) : null}
@@ -426,14 +403,7 @@ export function LibraryMobile({
                             id: row.id,
                             name: row.name,
                             cooks: stat?.cookCount ?? 0,
-                            archived: false,
-                            tags: {
-                              cuisine: row.cuisine,
-                              course: row.course,
-                              mainIngredient: row.mainIngredient,
-                              diet: row.diet,
-                              occasion: row.occasion
-                            }
+                            archived: false
                           })
                         }
                       />
@@ -457,14 +427,7 @@ export function LibraryMobile({
                             id: row.id,
                             name: row.name,
                             cooks: stat?.cookCount ?? 0,
-                            archived: false,
-                            tags: {
-                              cuisine: row.cuisine,
-                              course: row.course,
-                              mainIngredient: row.mainIngredient,
-                              diet: row.diet,
-                              occasion: row.occasion
-                            }
+                            archived: false
                           })
                         }
                       />
@@ -564,16 +527,9 @@ export function LibraryMobile({
             onRestore={() => manage.restore(actionTarget.id, actionTarget.name)}
             onDelete={() => setDeleteTarget(actionTarget)}
             onShare={() => setShareTarget({ id: actionTarget.id, name: actionTarget.name })}
-            onEditTags={() => {
-              if (actionTarget.tags) {
-                setEditTagsTarget({ id: actionTarget.id, name: actionTarget.name, tags: actionTarget.tags });
-              }
-            }}
           />
         )}
       </MobileSheet>
-
-      <EditTagsSheet target={editTagsTarget} onClose={() => setEditTagsTarget(null)} />
 
       {shareTarget && (
         <ShareSheet
@@ -632,8 +588,7 @@ function ActionSheetBody({
   onArchive,
   onRestore,
   onDelete,
-  onShare,
-  onEditTags
+  onShare
 }: {
   target: Target;
   onClose: () => void;
@@ -641,7 +596,6 @@ function ActionSheetBody({
   onRestore: () => void;
   onDelete: () => void;
   onShare: () => void;
-  onEditTags: () => void;
 }) {
   const router = useRouter();
   const go = (href: Route) => {
@@ -682,14 +636,6 @@ function ActionSheetBody({
             icon={<Pencil className="h-5 w-5" />}
             label="Edit"
             onClick={() => go(`/meal/${target.id}/edit` as Route)}
-          />
-          <SheetRow
-            icon={<TagIcon className="h-5 w-5" />}
-            label="Edit tags"
-            onClick={() => {
-              onClose();
-              onEditTags();
-            }}
           />
           <SheetRow
             icon={<Share2 className="h-5 w-5" />}
