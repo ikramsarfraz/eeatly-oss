@@ -72,10 +72,10 @@ export function BottomTabBar() {
           type="button"
           aria-label="More"
           onClick={() => setMoreOpen(true)}
-          className="flex flex-1 flex-col items-center justify-center gap-[3px] px-0 py-1.5 text-[10px] font-semibold tracking-[0.1px] text-[color:var(--ink3)]"
+          className="flex flex-1 flex-col items-center justify-center gap-[3px] px-0 py-1.5 text-[color:var(--ink3)]"
         >
           <Menu className="h-[22px] w-[22px]" strokeWidth={1.9} />
-          More
+          <span className="text-[10px] font-semibold tracking-[0.1px]">More</span>
         </button>
       </nav>
 
@@ -95,12 +95,12 @@ function TabLink({ tab, active }: { tab: TabItem; active: boolean }) {
       className={cn(
         // Active state is a colour change only (forest stroke) — the design's
         // `.tab.on` doesn't fill the icon or bump the weight.
-        "flex flex-1 flex-col items-center justify-center gap-[3px] py-1.5 text-[10px] font-semibold tracking-[0.1px]",
+        "flex flex-1 flex-col items-center justify-center gap-[3px] py-1.5",
         active ? "text-primary" : "text-[color:var(--ink3)]"
       )}
     >
       <Icon className="h-[22px] w-[22px]" strokeWidth={1.9} />
-      {tab.label}
+      <span className="text-[10px] font-semibold tracking-[0.1px]">{tab.label}</span>
     </Link>
   );
 }

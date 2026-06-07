@@ -20,7 +20,6 @@ import {
   RotateCcw,
   Share2,
   SlidersHorizontal,
-  Tag as TagIcon,
   Trash2,
   X
 } from "lucide-react";
@@ -51,8 +50,7 @@ import { useQuickLog } from "@/components/dashboard/quick-log-provider";
 import { useToast } from "@/components/providers/toast-provider";
 import { useLibraryManagement } from "@/components/library/use-library-management";
 import { FilterPanelBody } from "@/components/library/filter-panel";
-import { EditTagsDialog } from "@/components/library/edit-tags";
-import { FACET_GROUPS, effortLabel, type FacetKey, type MealTags } from "@/lib/meals/tags";
+import { FACET_GROUPS, effortLabel, type FacetKey } from "@/lib/meals/tags";
 import {
   emptyFacetState,
   facetCounts,
@@ -224,7 +222,6 @@ export function LibraryClient({
   const [deleteTarget, setDeleteTarget] = React.useState<{ id: string; name: string; cooks: number } | null>(null);
   const [facetState, setFacetState] = React.useState<FacetState>(emptyFacetState);
   const [filtersOpen, setFiltersOpen] = React.useState(false);
-  const [editTagsTarget, setEditTagsTarget] = React.useState<{ id: string; name: string; tags: MealTags } | null>(null);
   const isArchived = filter === "archived";
   const manage = useLibraryManagement();
 
@@ -692,19 +689,6 @@ export function LibraryClient({
                     id={row.id}
                     onArchive={() => manage.archive(row.id, row.name)}
                     onDelete={() => setDeleteTarget({ id: row.id, name: row.name, cooks: stat?.cookCount ?? 0 })}
-                    onEditTags={() =>
-                      setEditTagsTarget({
-                        id: row.id,
-                        name: row.name,
-                        tags: {
-                          cuisine: row.cuisine,
-                          course: row.course,
-                          mainIngredient: row.mainIngredient,
-                          diet: row.diet,
-                          occasion: row.occasion
-                        }
-                      })
-                    }
                   />
                 ) : null;
               return view === "list" ? (
@@ -778,8 +762,6 @@ export function LibraryClient({
           onOpenChange={(o) => !o && setShareTarget(null)}
         />
       ) : null}
-
-      <EditTagsDialog target={editTagsTarget} onClose={() => setEditTagsTarget(null)} />
     </div>
   );
 }
@@ -955,8 +937,7 @@ function RecipeActionMenu({
   onArchive,
   onDelete,
   onRestore,
-  onDeletePermanent,
-  onEditTags
+  onDeletePermanent
 }: {
   id: string;
   archivedView?: boolean;
@@ -964,7 +945,6 @@ function RecipeActionMenu({
   onDelete?: () => void;
   onRestore?: () => void;
   onDeletePermanent?: () => void;
-  onEditTags?: () => void;
 }) {
   const stop = (e: React.SyntheticEvent) => {
     e.preventDefault();
@@ -1011,10 +991,6 @@ function RecipeActionMenu({
                 <Pencil className="h-4 w-4" />
                 Edit
               </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={onEditTags}>
-              <TagIcon className="h-4 w-4" />
-              Edit tags
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={onArchive}>
