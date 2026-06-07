@@ -11,6 +11,7 @@ import { splitMealName } from "@/lib/meal/split-name";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { MobileScaffold } from "@/components/mobile/mobile-scaffold";
 import { ShareSheet } from "@/components/sharing/share-sheet";
+import { useToast } from "@/components/providers/toast-provider";
 import type { RecipeDetailMeal, RecipeDetailViewer } from "@/components/meals/recipe-detail-client";
 
 const EFFORT_LABEL: Record<"quick" | "easy" | "medium" | "high_effort", string> = {
@@ -29,6 +30,39 @@ function formatIngredient(row: { name: string; quantityString: string; prepNote:
 }
 
 /**
+ * Copy text to the clipboard. Prefers the async Clipboard API (secure
+ * contexts), and falls back to a hidden-textarea `execCommand("copy")` for
+ * non-secure dev contexts (e.g. http://localtest.me:3003) where
+ * `navigator.clipboard` is undefined. Returns whether the copy succeeded.
+ */
+async function copyToClipboard(text: string): Promise<boolean> {
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      /* fall through to the legacy path */
+    }
+  }
+  if (typeof document === "undefined") return false;
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.top = "-1000px";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * R35 mobile-web Recipe detail. Renders below `md`; the desktop
  * `<RecipeDetailClient>` renders `hidden md:block` alongside, both off the same
  * server `meal` payload. Prefers structured ingredients/steps, falls back to
@@ -38,6 +72,7 @@ function formatIngredient(row: { name: string; quantityString: string; prepNote:
  */
 export function RecipeDetailMobile({ meal }: { meal: RecipeDetailMeal; viewer: RecipeDetailViewer }) {
   const router = useRouter();
+  const { showToast } = useToast();
   const titleParts = splitMealName(meal.name);
   const [shareOpen, setShareOpen] = React.useState(false);
 
@@ -77,15 +112,37 @@ export function RecipeDetailMobile({ meal }: { meal: RecipeDetailMeal; viewer: R
       return next;
     });
 
-  const shareList = React.useCallback(() => {
+  const shareList = React.useCallback(async () => {
     const remaining = ingredientLines.filter((_, i) => !checked.has(i));
-    const text = `Shopping list for ${meal.name}:\n${remaining.map((l) => `- ${l}`).join("\n")}`;
-    if (typeof navigator !== "undefined" && navigator.share) {
-      void navigator.share({ title: meal.name, text }).catch(() => {});
-    } else if (typeof navigator !== "undefined" && navigator.clipboard) {
-      void navigator.clipboard.writeText(text).catch(() => {});
+    if (remaining.length === 0) {
+      showToast({ title: "All checked off", description: "Nothing left to buy.", variant: "info" });
+      return;
     }
-  }, [ingredientLines, checked, meal.name]);
+    const text = `Shopping list for ${meal.name}:\n${remaining.map((l) => `- ${l}`).join("\n")}`;
+
+    // Native share sheet first (mobile, secure context).
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: `${meal.name} shopping list`, text });
+        return;
+      } catch (err) {
+        // User dismissed the sheet: treat as a no-op. Any other failure falls
+        // through to the clipboard path below.
+        if (err instanceof DOMException && err.name === "AbortError") return;
+      }
+    }
+
+    const copied = await copyToClipboard(text);
+    showToast(
+      copied
+        ? {
+            title: "Shopping list copied",
+            description: `${remaining.length} item${remaining.length === 1 ? "" : "s"} to buy.`,
+            variant: "success"
+          }
+        : { title: "Couldn't share the list", description: "Try again from your browser menu.", variant: "error" }
+    );
+  }, [ingredientLines, checked, meal.name, showToast]);
 
   const metaPills: string[] = [];
   if (meal.servings) metaPills.push(meal.servings);
@@ -205,7 +262,7 @@ export function RecipeDetailMobile({ meal }: { meal: RecipeDetailMeal; viewer: R
             </h2>
             <button
               type="button"
-              onClick={shareList}
+              onClick={() => void shareList()}
               className="font-mono text-[10px] uppercase tracking-[0.1em] text-primary"
             >
               Share list
