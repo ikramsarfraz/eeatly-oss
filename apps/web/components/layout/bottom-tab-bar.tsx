@@ -6,9 +6,8 @@ import type { Route } from "next";
 import { usePathname } from "next/navigation";
 import { BookOpen, CalendarDays, Home, Menu, Plus } from "lucide-react";
 
-import { useSidebar } from "@/components/ui/sidebar";
-import { useQuickLog } from "@/components/dashboard/quick-log-provider";
 import { cn } from "@/lib/utils";
+import { MobileSheet, MoreSheetContent } from "@/components/mobile/mobile-sheet";
 
 type TabItem = {
   href: Route;
@@ -18,64 +17,72 @@ type TabItem = {
 };
 
 const tabs: TabItem[] = [
-  {
-    href: "/home",
-    label: "Home",
-    icon: Home,
-    match: (p) => p === "/home",
-  },
+  { href: "/home", label: "Home", icon: Home, match: (p) => p === "/home" },
   {
     href: "/library",
     label: "Library",
     icon: BookOpen,
-    // Library stays active on the recipe detail subtree (/meal/[id]),
-    // mirroring the desktop sidebar's activePrefixes rule.
-    match: (p) => p.startsWith("/library") || p.startsWith("/meal"),
+    // Library stays active on the recipe-detail subtree.
+    match: (p) => p.startsWith("/library") || p.startsWith("/meal")
   },
   {
     href: "/plans",
     label: "Plans",
     icon: CalendarDays,
-    match: (p) => p.startsWith("/plans"),
-  },
+    match: (p) => p.startsWith("/plans")
+  }
 ];
 
+/**
+ * R35/R37 mobile-web bottom tab bar — the single nav used on every dashboard
+ * route: Home · Library · center-docked "+" FAB · Plans · More.
+ * The **center FAB is the app's primary verb**: it links straight to "Log a
+ * meal" (`/add`). More opens the More sheet (members / search / notifications /
+ * settings / theme toggle); account access lives on the app-bar avatar, not
+ * here. Hidden at `md+` (desktop sidebar).
+ */
 export function BottomTabBar() {
   const pathname = usePathname() ?? "";
-  const { toggleSidebar } = useSidebar();
-  const { open: openQuickLog } = useQuickLog();
+  const [moreOpen, setMoreOpen] = React.useState(false);
 
   return (
-    <nav
-      aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 gap-1 border-t bg-[color-mix(in_oklab,var(--background)_96%,transparent)] px-2 pb-[calc(8px+env(safe-area-inset-bottom))] pt-2 backdrop-blur-md md:hidden"
-    >
-      {tabs.slice(0, 2).map((tab) => (
-        <TabLink key={tab.label} tab={tab} active={tab.match(pathname)} />
-      ))}
-
-      <button
-        type="button"
-        aria-label="Log a meal"
-        aria-haspopup="dialog"
-        onClick={openQuickLog}
-        className="-mt-4 justify-self-center grid h-[52px] w-[52px] place-items-center rounded-full border-[3px] border-[var(--background)] bg-primary text-primary-foreground shadow-[0_8px_18px_-8px_rgba(47,111,88,0.6),0_2px_4px_rgba(27,34,32,0.08)] transition-transform active:scale-95"
+    <>
+      <nav
+        aria-label="Primary"
+        className="fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-border bg-[color:var(--surface)] px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+8px)] md:hidden"
       >
-        <Plus className="h-5 w-5" strokeWidth={2.25} />
-      </button>
+        <TabLink tab={tabs[0]} active={tabs[0].match(pathname)} />
+        <TabLink tab={tabs[1]} active={tabs[1].match(pathname)} />
 
-      <TabLink tab={tabs[2]} active={tabs[2].match(pathname)} />
+        {/* Center-docked FAB — "Log a meal". 54×54 forest circle, overlapping
+            the bar's top edge by 22px (matches the design's `.tab-fab`). */}
+        <div className="relative flex flex-1 justify-center">
+          <Link
+            href={"/add" as Route}
+            aria-label="Log a meal"
+            className="absolute -top-[22px] flex h-[54px] w-[54px] items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_6px_20px_rgba(46,87,57,0.35)] active:scale-95"
+          >
+            <Plus className="h-[25px] w-[25px]" strokeWidth={2.2} />
+          </Link>
+        </div>
 
-      <button
-        type="button"
-        aria-label="Open menu"
-        onClick={toggleSidebar}
-        className="flex flex-col items-center gap-[3px] rounded-[9px] py-1.5 text-[10.5px] font-medium text-muted-foreground"
-      >
-        <Menu className="h-[18px] w-[18px]" strokeWidth={2} />
-        <span>More</span>
-      </button>
-    </nav>
+        <TabLink tab={tabs[2]} active={tabs[2].match(pathname)} />
+
+        <button
+          type="button"
+          aria-label="More"
+          onClick={() => setMoreOpen(true)}
+          className="flex flex-1 flex-col items-center justify-center gap-[3px] px-0 py-1.5 text-[color:var(--ink3)]"
+        >
+          <Menu className="h-[22px] w-[22px]" strokeWidth={1.9} />
+          <span className="text-[10px] font-semibold tracking-[0.1px]">More</span>
+        </button>
+      </nav>
+
+      <MobileSheet open={moreOpen} label="More" onClose={() => setMoreOpen(false)}>
+        <MoreSheetContent onClose={() => setMoreOpen(false)} />
+      </MobileSheet>
+    </>
   );
 }
 
@@ -86,12 +93,14 @@ function TabLink({ tab, active }: { tab: TabItem; active: boolean }) {
       href={tab.href}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex flex-col items-center gap-[3px] rounded-[9px] py-1.5 text-[10.5px] font-medium",
-        active ? "text-primary" : "text-muted-foreground",
+        // Active state is a colour change only (forest stroke) — the design's
+        // `.tab.on` doesn't fill the icon or bump the weight.
+        "flex flex-1 flex-col items-center justify-center gap-[3px] py-1.5",
+        active ? "text-primary" : "text-[color:var(--ink3)]"
       )}
     >
-      <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
-      <span>{tab.label}</span>
+      <Icon className="h-[22px] w-[22px]" strokeWidth={1.9} />
+      <span className="text-[10px] font-semibold tracking-[0.1px]">{tab.label}</span>
     </Link>
   );
 }

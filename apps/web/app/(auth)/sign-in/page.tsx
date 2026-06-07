@@ -39,7 +39,7 @@ export default async function SignInPage({
       <CardHeader>
         <CardTitle>Welcome back</CardTitle>
         <CardDescription>
-          Enter your email and we&apos;ll send a private sign-in link. No password needed.
+          Sign in with your email and password, or have us email you a private one-tap link.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">

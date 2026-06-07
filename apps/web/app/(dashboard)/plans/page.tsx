@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
 import { listPlansForHousehold } from "@/services/plans";
 import { PlansClient } from "@/components/plans/plans-client";
+import { PlansMobile } from "@/components/mobile/plans-mobile";
 
 export const metadata: Metadata = {
   title: "Plans"
@@ -26,15 +27,20 @@ export default async function PlansPage() {
     includeArchived: true
   });
 
+  const planItems = plans.map((p) => ({
+    id: p.id,
+    name: p.name,
+    scheduledDate: p.scheduledDate,
+    archivedAt: p.archivedAt,
+    dishCount: p.dishCount
+  }));
+
   return (
-    <PlansClient
-      plans={plans.map((p) => ({
-        id: p.id,
-        name: p.name,
-        scheduledDate: p.scheduledDate,
-        archivedAt: p.archivedAt,
-        dishCount: p.dishCount
-      }))}
-    />
+    <>
+      <PlansMobile plans={planItems} />
+      <div className="hidden md:block">
+        <PlansClient plans={planItems} />
+      </div>
+    </>
   );
 }

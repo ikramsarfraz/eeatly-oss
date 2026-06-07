@@ -12,14 +12,22 @@ import {
   setMealPhotoInputSchema
 } from "@eeatly/api/validators/meals";
 import {
+  archiveMeal,
   createMealLog,
+  deleteMeal,
   deleteMealLog,
+  generateTagsForMeal,
   getHistoryRows,
   getHistoryStats,
   getMealDetail,
-  setMealPhoto
+  listArchivedRecipes,
+  restoreMeal,
+  setMealPhoto,
+  setMealTags,
+  unarchiveMeal
 } from "@/services/meals";
 import { saveStructuredRecipe } from "@/services/recipe-edit";
+import { MealNameTakenError } from "@/lib/errors/meals";
 import { createNotification } from "@/services/notifications";
 import { householdMemberProcedure, protectedProcedure, rateLimit, router } from "../trpc";
 
@@ -102,6 +110,8 @@ export const mealsRouter = router({
         const result = await saveStructuredRecipe({
           userId: ctx.user.id,
           mealId: input.mealId,
+          name: input.name,
+          effortLevel: input.effortLevel,
           servings: input.servings,
           ingredients: input.ingredients,
           steps: input.steps
@@ -109,6 +119,13 @@ export const mealsRouter = router({
         revalidatePath(`/meal/${input.mealId}`);
         return result;
       } catch (error) {
+        if (error instanceof MealNameTakenError) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: error.message,
+            cause: { reason: "MEAL_NAME_COLLISION" }
+          });
+        }
         const message = error instanceof Error ? error.message : "Unknown error.";
         if (message.toLowerCase().includes("not authorized")) {
           throw new TRPCError({
@@ -152,6 +169,15 @@ export const mealsRouter = router({
         ctx.household.id,
         input.log
       );
+
+      // R36 — auto-tag the recipe on capture (faceted filtering). Fire-and-
+      // forget + skips already-tagged meals, so logging the same dish again is
+      // a no-op; the backfill + Edit-tags are the reliable safety nets.
+      if (mealLog?.mealId) {
+        void Promise.resolve(generateTagsForMeal(ctx.user.id, ctx.household.id, mealLog.mealId)).catch(
+          () => {}
+        );
+      }
 
       revalidatePath("/home");
       revalidatePath("/library");
@@ -265,5 +291,108 @@ export const mealsRouter = router({
         logId: input.logId
       });
       return { ok: true as const };
+    }),
+
+  // R36 Library — per-recipe management. Archive (reversible) / Delete (soft).
+  // Owner-only is enforced in the service; a non-owner / missing id surfaces as
+  // NOT_FOUND so it can't probe another member's library.
+  archive: householdMemberProcedure
+    .use(rateLimit("mutation"))
+    .input(z.object({ mealId: z.string().uuid() }))
+    .mutation(({ ctx, input }) => mealLifecycle(archiveMeal, ctx, input.mealId)),
+
+  unarchive: householdMemberProcedure
+    .use(rateLimit("mutation"))
+    .input(z.object({ mealId: z.string().uuid() }))
+    .mutation(({ ctx, input }) => mealLifecycle(unarchiveMeal, ctx, input.mealId)),
+
+  delete: householdMemberProcedure
+    .use(rateLimit("mutation"))
+    .input(z.object({ mealId: z.string().uuid() }))
+    .mutation(({ ctx, input }) => mealLifecycle(deleteMeal, ctx, input.mealId)),
+
+  restore: householdMemberProcedure
+    .use(rateLimit("mutation"))
+    .input(z.object({ mealId: z.string().uuid() }))
+    .mutation(({ ctx, input }) => mealLifecycle(restoreMeal, ctx, input.mealId)),
+
+  archivedList: householdMemberProcedure.query(({ ctx }) =>
+    listArchivedRecipes(ctx.user.id, ctx.household.id)
+  ),
+
+  // R36 Library — AI tags. `generateTags` (re-)runs the tagger; `updateTags`
+  // saves a user's hand edits (marked source 'user' so re-tagging won't clobber).
+  generateTags: householdMemberProcedure
+    .use(rateLimit("mutation"))
+    .input(z.object({ mealId: z.string().uuid(), force: z.boolean().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const tags = await generateTagsForMeal(ctx.user.id, ctx.household.id, input.mealId, {
+          force: input.force
+        });
+        revalidatePath("/library");
+        return tags;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown error.";
+        if (message.toLowerCase().includes("not found")) {
+          throw new TRPCError({ code: "NOT_FOUND", message, cause: { reason: "MEAL_NOT_FOUND" } });
+        }
+        throw error;
+      }
+    }),
+
+  updateTags: householdMemberProcedure
+    .use(rateLimit("mutation"))
+    .input(
+      z.object({
+        mealId: z.string().uuid(),
+        tags: z.object({
+          cuisine: z.string().trim().max(60).nullable(),
+          course: z.string().trim().max(60).nullable(),
+          mainIngredient: z.string().trim().max(60).nullable(),
+          diet: z.array(z.string().trim().max(60)).max(8),
+          occasion: z.array(z.string().trim().max(60)).max(8)
+        })
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        await setMealTags(ctx.user.id, ctx.household.id, input.mealId, input.tags, "user");
+        revalidatePath("/library");
+        return { ok: true as const };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown error.";
+        if (message.toLowerCase().includes("not found")) {
+          throw new TRPCError({ code: "NOT_FOUND", message, cause: { reason: "MEAL_NOT_FOUND" } });
+        }
+        throw error;
+      }
     })
 });
+
+/**
+ * Shared body for the four lifecycle mutations: run the owner-scoped service,
+ * map "not found" to a NOT_FOUND TRPCError, and revalidate the library SSR.
+ */
+async function mealLifecycle(
+  fn: (userId: string, householdId: string, mealId: string) => Promise<void>,
+  ctx: { user: { id: string }; household: { id: string } },
+  mealId: string
+) {
+  try {
+    await fn(ctx.user.id, ctx.household.id, mealId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error.";
+    if (message.toLowerCase().includes("not found")) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message,
+        cause: { reason: "MEAL_NOT_FOUND" }
+      });
+    }
+    throw error;
+  }
+  revalidatePath("/library");
+  revalidatePath("/home");
+  return { ok: true as const };
+}

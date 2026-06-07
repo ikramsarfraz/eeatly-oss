@@ -4,6 +4,7 @@ import {
   type RecipeDetailMeal,
   type RecipeDetailViewer
 } from "@/components/meals/recipe-detail-client";
+import { RecipeDetailMobile } from "@/components/mobile/recipe-detail-mobile";
 import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
 import { countHouseholdMembers } from "@/services/households";
 import { getMealDetail } from "@/services/meals";
@@ -60,6 +61,7 @@ export default async function MealDetailPage({ params }: PageProps) {
     recipeIsAiDraft: meal.recipeIsAiDraft,
     viewerCanEdit: meal.viewerCanEdit,
     viewerCanManageSharing: meal.viewerCanManageSharing,
+    viewerIsCreator: meal.createdByUserId === user.id,
     createdByUserId: meal.createdByUserId,
     createdByName: meal.createdByName,
     cookCount: meal.cookCount,
@@ -74,5 +76,12 @@ export default async function MealDetailPage({ params }: PageProps) {
     householdMemberCount: memberCount
   };
 
-  return <RecipeDetailClient meal={payload} viewer={viewer} />;
+  return (
+    <>
+      <RecipeDetailMobile meal={payload} viewer={viewer} />
+      <div className="hidden md:block">
+        <RecipeDetailClient meal={payload} viewer={viewer} />
+      </div>
+    </>
+  );
 }

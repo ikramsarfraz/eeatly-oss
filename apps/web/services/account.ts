@@ -1,9 +1,31 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
-import { users } from "@/db/schema";
+import { and, eq, isNotNull } from "drizzle-orm";
+import { accounts, users } from "@/db/schema";
 import { db } from "@/lib/db/client";
 import { logger } from "@/lib/observability/logger";
+
+/**
+ * Whether the user has an email + password credential. Better Auth stores it as
+ * an `account` row with providerId "credential" and a non-null password hash.
+ * Magic-link- or Google-only users return false: they have no current password
+ * to verify, so the change-password form is hidden for them (they set one via
+ * the reset link instead).
+ */
+export async function userHasPassword(userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ userId: accounts.userId })
+    .from(accounts)
+    .where(
+      and(
+        eq(accounts.userId, userId),
+        eq(accounts.providerId, "credential"),
+        isNotNull(accounts.password)
+      )
+    )
+    .limit(1);
+  return Boolean(row);
+}
 
 /**
  * Hard-deletes the user's row. Cascading FK constraints clean up auth

@@ -12,6 +12,9 @@ import { InsufficientCreditsError } from "@/lib/errors/credits";
 import { withAiCredits } from "@/services/ai-credits";
 import { logger } from "@/lib/observability/logger";
 import {
+  previewPhotoInputSchema,
+  previewTextInputSchema,
+  previewVoiceInputSchema,
   sessionOnlyInputSchema,
   startSessionInputSchema,
   submitPhotoTurnInputSchema,
@@ -22,6 +25,7 @@ import {
 import {
   discardSession,
   getSessionState,
+  previewChanges,
   saveSession,
   startSession,
   submitPhotoTurn,
@@ -226,6 +230,69 @@ export const refineRouter = router({
           submitPhotoTurn({
             userId: ctx.user.id,
             sessionId: input.sessionId,
+            imageBase64: input.imageBase64,
+            mediaType: input.mediaType
+          })
+        );
+      } catch (error) {
+        mapServiceError(error);
+      }
+    }),
+
+  /* ─── R34 inline preview (Assist Edit screen) ─── stateless: applies the
+   * AI's changes to an in-memory recipe and returns the full applied rows,
+   * which the Edit screen pours into the editable fields. No session written;
+   * "Save changes" persists via meals.saveStructuredRecipe. Metered like the
+   * session submit*Turn procedures. */
+  previewText: protectedProcedure
+    .use(rateLimit("ai"))
+    .input(previewTextInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await withAiCredits(ctx.user.id, "refine_text", () =>
+          previewChanges({
+            userId: ctx.user.id,
+            mealId: input.mealId,
+            source: "text",
+            prompt: input.prompt
+          })
+        );
+      } catch (error) {
+        mapServiceError(error);
+      }
+    }),
+
+  previewVoice: protectedProcedure
+    .use(rateLimit("ai"))
+    .input(previewVoiceInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const buffer = Buffer.from(input.audioBase64, "base64");
+        return await withAiCredits(ctx.user.id, "refine_voice", () =>
+          previewChanges({
+            userId: ctx.user.id,
+            mealId: input.mealId,
+            source: "voice",
+            audioBuffer: buffer,
+            mediaType: input.mediaType,
+            fileName: input.fileName
+          })
+        );
+      } catch (error) {
+        mapServiceError(error);
+      }
+    }),
+
+  previewPhoto: protectedProcedure
+    .use(rateLimit("ai"))
+    .input(previewPhotoInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await withAiCredits(ctx.user.id, "refine_photo", () =>
+          previewChanges({
+            userId: ctx.user.id,
+            mealId: input.mealId,
+            source: "photo",
             imageBase64: input.imageBase64,
             mediaType: input.mediaType
           })

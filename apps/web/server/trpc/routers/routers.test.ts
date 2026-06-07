@@ -68,7 +68,14 @@ const mealsServiceMock = vi.hoisted(() => ({
   getMealDetail: vi.fn(),
   createMealLog: vi.fn(),
   deleteMealLog: vi.fn(),
-  setMealPhoto: vi.fn()
+  setMealPhoto: vi.fn(),
+  archiveMeal: vi.fn(),
+  unarchiveMeal: vi.fn(),
+  deleteMeal: vi.fn(),
+  restoreMeal: vi.fn(),
+  listArchivedRecipes: vi.fn(),
+  generateTagsForMeal: vi.fn(),
+  setMealTags: vi.fn()
 }));
 vi.mock("@/services/meals", () => mealsServiceMock);
 
@@ -490,6 +497,60 @@ describe("mealsRouter mutations (Task 3)", () => {
       caught = e;
     }
     expect(caught).toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  // R36 — per-recipe management.
+  const mealId = "33333333-3333-4333-8333-333333333333";
+
+  it("archive: passes the meal id through to the owner-scoped service", async () => {
+    mealsServiceMock.archiveMeal.mockResolvedValueOnce(undefined);
+    const result = await call(makeUser()).meals.archive({ mealId });
+    expect(result).toEqual({ ok: true });
+    expect(mealsServiceMock.archiveMeal).toHaveBeenCalledWith("u-1", "h-current", mealId);
+  });
+
+  it("delete: rate-limits before touching the service", async () => {
+    rateLimitMock.checkMealMutationLimit.mockRejectedValueOnce(new Error("Too many requests."));
+    await expect(call(makeUser()).meals.delete({ mealId })).rejects.toMatchObject({
+      code: "TOO_MANY_REQUESTS"
+    });
+    expect(mealsServiceMock.deleteMeal).not.toHaveBeenCalled();
+  });
+
+  it("restore: maps service 'not found' to NOT_FOUND with a MEAL_NOT_FOUND cause", async () => {
+    mealsServiceMock.restoreMeal.mockRejectedValueOnce(new Error("Recipe not found."));
+    let caught: unknown;
+    try {
+      await call(makeUser()).meals.restore({ mealId });
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("archivedList: returns the service rows", async () => {
+    mealsServiceMock.listArchivedRecipes.mockResolvedValueOnce([
+      { id: mealId, name: "Old soup", photoUrl: null, createdByUserId: "u-1", cookCount: 2, lastCookedAt: null, archivedAt: null }
+    ]);
+    const result = await call(makeUser()).meals.archivedList();
+    expect(result).toHaveLength(1);
+    expect(mealsServiceMock.listArchivedRecipes).toHaveBeenCalledWith("u-1", "h-current");
+  });
+
+  it("updateTags: saves user tags through the service marked 'user'", async () => {
+    mealsServiceMock.setMealTags.mockResolvedValueOnce(undefined);
+    const tags = { cuisine: "Indian", course: "Dinner", mainIngredient: "Chicken", diet: [], occasion: ["Weeknight"] };
+    const result = await call(makeUser()).meals.updateTags({ mealId, tags });
+    expect(result).toEqual({ ok: true });
+    expect(mealsServiceMock.setMealTags).toHaveBeenCalledWith("u-1", "h-current", mealId, tags, "user");
+  });
+
+  it("generateTags: returns the (re-)generated tags", async () => {
+    const tags = { cuisine: "Thai", course: "Dinner", mainIngredient: "Seafood", diet: [], occasion: [] };
+    mealsServiceMock.generateTagsForMeal.mockResolvedValueOnce(tags);
+    const result = await call(makeUser()).meals.generateTags({ mealId, force: true });
+    expect(result).toEqual(tags);
+    expect(mealsServiceMock.generateTagsForMeal).toHaveBeenCalledWith("u-1", "h-current", mealId, { force: true });
   });
 
   it("setPhoto: passes input through and returns the saved photo URL", async () => {

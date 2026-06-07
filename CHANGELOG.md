@@ -3,6 +3,53 @@
 All notable changes to eeatly are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] - 2026-06-07
+
+Email and password sign-in with full account recovery, a redesigned web Library
+and Add/Edit flows, a rebuilt mobile app, and per-recipe archive and delete.
+Includes database migrations, which run automatically on deploy.
+
+### Accounts and sign-in
+- Sign in with an email and password as an alternative to the magic link. Magic
+  links stay on, and new accounts can use either from sign-up.
+- Forgot your password? Request a reset link from the sign-in page, then set a
+  new one. Links are one-time and expire after an hour, and the request always
+  shows the same confirmation so it never reveals whether an account exists.
+- Change your password from the Account settings. If you have only ever used a
+  magic link or Google, you can set a password there too (we email you a link).
+
+### Library
+- Archive or delete any recipe, with one-tap Undo. Archived recipes move to a
+  dedicated Archived view, and a delete can be reversed right afterward.
+- Switch between grid and list, sort your recipes, and load more.
+- Automatic AI tags on your recipes, plus faceted filters to slice the library.
+- Archive and Delete are also available directly on the recipe page.
+
+### Add and edit (web)
+- Rebuilt "Assist" flows for adding a meal and editing a recipe, with voice
+  capture and inline AI refine in the same screen.
+
+### Mobile
+- Rebuilt app: refreshed Library and Settings, and a unified bottom tab bar with
+  a center "Log a meal" action.
+- Recipe photos now render across mobile surfaces, not just the letter tile,
+  with a read-after-write retry so a fresh photo never shows as broken.
+- Back buttons and a consistent app bar across screens. Send feedback, Help and
+  guides, and onboarding now live in the account menu.
+- Share a recipe from the mobile recipe screen.
+- Mobile-web redesign of the shell and screens, including Notifications and
+  Search.
+
+### Recipes
+- Set a per-recipe effort level that overrides the value derived from your cook
+  logs.
+
+### Under the hood
+- Database migrations run on deploy: recipe effort override, archive and delete
+  columns, and recipe tags.
+
+[1.3.0]: https://github.com/ikramsarfraz/eeatly/releases/tag/v1.3.0
+
 ## [1.2.0] - 2026-06-06
 
 Social-share previews and app branding, plus reliability fixes. Shared links now

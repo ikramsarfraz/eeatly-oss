@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, count, desc, eq, inArray, isNull, max, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull, max, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { requireHouseholdMember } from "@/lib/auth/session";
 import { withSuggestions } from "@/lib/meals/rediscovery";
@@ -15,6 +15,8 @@ import {
 } from "@/services/sharing";
 import { normalizeMealName } from "@/lib/utils";
 import { parseStructuredRecipe } from "@/lib/meals/parse-recipe";
+import { generateMealTags } from "@/services/ai-tags";
+import type { MealTags } from "@/lib/meals/tags";
 import { mealLogInputSchema, type MealLogInput } from "@eeatly/api/validators/meals";
 import {
   dishImages,
@@ -40,7 +42,13 @@ import type { DashboardMeals, MealStat, RecentMeal } from "@/types";
 // the unique index. The whole point of the household-wide name index
 // is to deduplicate across visibility states.
 function scopeMealsToHousehold(householdId: string) {
-  return and(eq(meals.householdId, householdId), isNull(meals.archivedAt));
+  // R36 — normal reads drop both archived (tucked-away) and deleted rows. The
+  // Archived view + getMealDetail apply their own (archived-allowing) filters.
+  return and(
+    eq(meals.householdId, householdId),
+    isNull(meals.archivedAt),
+    isNull(meals.deletedAt)
+  );
 }
 
 // Round 32 — logs are filtered by household + soft-delete; the joined
@@ -746,6 +754,8 @@ export async function getMealDetail(
       servings: meals.servings,
       ingredients: meals.ingredients,
       recipeIsAiDraft: meals.recipeIsAiDraft,
+      // R34 — recipe-level effort override (null = derive from cook logs).
+      effortOverride: meals.effortLevel,
       notes: meals.notes,
       createdAt: meals.createdAt,
       createdByUserId: meals.createdByUserId,
@@ -766,7 +776,9 @@ export async function getMealDetail(
     .where(
       and(
         eq(meals.id, mealId),
-        isNull(meals.archivedAt),
+        // R36 — allow archived (the Archived view's "Open recipe"); never
+        // surface a deleted recipe.
+        isNull(meals.deletedAt),
         mealVisibilityFilter(userId, householdId)
       )
     )
@@ -866,7 +878,9 @@ export async function getMealDetail(
     cookCount: Number(stats?.cookCount ?? 0),
     lastCookedAt: stats?.lastCookedAt ?? null,
     createdAt: row.createdAt.toISOString(),
-    effortLevel: pickModalEffort(effortRows),
+    // Prefer a hand-set recipe-level effort (R34); fall back to the cook logs'
+    // modal effort when the recipe has no override.
+    effortLevel: row.effortOverride ?? pickModalEffort(effortRows),
     structuredIngredients: structuredIngredientRows,
     structuredSteps: structuredStepRows
   };
@@ -965,4 +979,174 @@ export async function deleteMealLog(
   if (!updated) {
     throw new Error("Meal log not found.");
   }
+}
+
+/**
+ * R36 Library — per-recipe management. Archive (reversible, `archivedAt`) and
+ * Delete (soft, `deletedAt`) are both **owner-only**: only the recipe's creator
+ * can manage it (the Library "Yours" surface only ever shows your own recipes).
+ * A non-owner / wrong-household / missing id resolves to "not found" so the
+ * action can't probe another member's library. All four are idempotent.
+ */
+async function setMealLifecycle(
+  userId: string,
+  householdId: string,
+  mealId: string,
+  patch: { archivedAt?: Date | null; deletedAt?: Date | null }
+): Promise<void> {
+  await requireHouseholdMember(userId, householdId);
+  const [updated] = await db
+    .update(meals)
+    .set({ ...patch, updatedAt: new Date() })
+    .where(
+      and(
+        eq(meals.id, mealId),
+        eq(meals.householdId, householdId),
+        // Owner-only — `createdByUserId` is the recipe's creator.
+        eq(meals.createdByUserId, userId)
+      )
+    )
+    .returning({ id: meals.id });
+  if (!updated) throw new Error("Recipe not found.");
+}
+
+export function archiveMeal(userId: string, householdId: string, mealId: string): Promise<void> {
+  return setMealLifecycle(userId, householdId, mealId, { archivedAt: new Date() });
+}
+
+export function unarchiveMeal(userId: string, householdId: string, mealId: string): Promise<void> {
+  return setMealLifecycle(userId, householdId, mealId, { archivedAt: null });
+}
+
+export function deleteMeal(userId: string, householdId: string, mealId: string): Promise<void> {
+  return setMealLifecycle(userId, householdId, mealId, { deletedAt: new Date() });
+}
+
+export function restoreMeal(userId: string, householdId: string, mealId: string): Promise<void> {
+  return setMealLifecycle(userId, householdId, mealId, { deletedAt: null });
+}
+
+/**
+ * R36 Library — recipe tags. Tags are household-scoped recipe metadata, so any
+ * household member can correct them (mirrors recipe editing). `tagsSource`
+ * records provenance so a user's hand edits aren't clobbered by re-tagging.
+ */
+export async function setMealTags(
+  userId: string,
+  householdId: string,
+  mealId: string,
+  tags: MealTags,
+  source: "ai" | "user" | "heuristic" | "mixed"
+): Promise<void> {
+  await requireHouseholdMember(userId, householdId);
+  const [updated] = await db
+    .update(meals)
+    .set({
+      cuisine: tags.cuisine,
+      course: tags.course,
+      mainIngredient: tags.mainIngredient,
+      diet: tags.diet,
+      occasion: tags.occasion,
+      tagsSource: source,
+      taggedAt: new Date(),
+      updatedAt: new Date()
+    })
+    .where(and(eq(meals.id, mealId), eq(meals.householdId, householdId), isNull(meals.deletedAt)))
+    .returning({ id: meals.id });
+  if (!updated) throw new Error("Recipe not found.");
+}
+
+/**
+ * Generate + persist AI tags for a meal. No-ops (returns the existing tags) when
+ * the user has already hand-edited them, so auto-tagging on capture / a backfill
+ * never overwrites a deliberate correction.
+ */
+export async function generateTagsForMeal(
+  userId: string,
+  householdId: string,
+  mealId: string,
+  opts: { force?: boolean } = {}
+): Promise<MealTags> {
+  await requireHouseholdMember(userId, householdId);
+  const meal = await db.query.meals.findFirst({
+    where: and(eq(meals.id, mealId), eq(meals.householdId, householdId), isNull(meals.deletedAt))
+  });
+  if (!meal) throw new Error("Recipe not found.");
+
+  const existing: MealTags = {
+    cuisine: meal.cuisine ?? null,
+    course: meal.course ?? null,
+    mainIngredient: meal.mainIngredient ?? null,
+    diet: meal.diet ?? [],
+    occasion: meal.occasion ?? []
+  };
+  // Never clobber a hand edit; and unless forced (an explicit "re-tag"), skip a
+  // meal that already has tags so capture / backfill don't re-spend AI calls.
+  if (meal.tagsSource === "user") return existing;
+  if (meal.tagsSource && !opts.force) return existing;
+
+  const { tags, source } = await generateMealTags({
+    name: meal.name,
+    recipeText: meal.recipeText,
+    ingredients: meal.ingredients
+  });
+  await setMealTags(userId, householdId, mealId, tags, source);
+  return tags;
+}
+
+export type ArchivedRecipeRow = {
+  id: string;
+  name: string;
+  photoUrl: string | null;
+  createdByUserId: string | null;
+  cookCount: number;
+  lastCookedAt: string | null;
+  archivedAt: string | null;
+};
+
+/**
+ * R36 — the Archived view. Mirrors the dashboard cook-stat aggregate but
+ * scoped to archived (and not deleted) recipes, which `getDashboardMeals`
+ * deliberately excludes. Newest-archived first.
+ */
+export async function listArchivedRecipes(
+  userId: string,
+  householdId: string
+): Promise<ArchivedRecipeRow[]> {
+  await requireHouseholdMember(userId, householdId);
+
+  const rows = await db
+    .select({
+      id: meals.id,
+      name: meals.name,
+      photoUrl: sql<string | null>`coalesce(${meals.photoUrl}, ${dishImages.imageUrl})`,
+      createdByUserId: meals.createdByUserId,
+      cookCount: count(mealLogs.id),
+      lastCookedAt: max(mealLogs.cookedAt),
+      archivedAt: meals.archivedAt
+    })
+    .from(meals)
+    .leftJoin(mealLogs, and(eq(mealLogs.mealId, meals.id), isNull(mealLogs.deletedAt)))
+    .leftJoin(dishImages, eq(dishImages.normalizedName, meals.normalizedName))
+    .where(
+      and(
+        eq(meals.householdId, householdId),
+        isNotNull(meals.archivedAt),
+        isNull(meals.deletedAt),
+        mealVisibilityFilter(userId, householdId)
+      )
+    )
+    .groupBy(meals.id, dishImages.imageUrl)
+    .orderBy(desc(meals.archivedAt))
+    .limit(200);
+
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    photoUrl: r.photoUrl,
+    createdByUserId: r.createdByUserId,
+    cookCount: Number(r.cookCount),
+    lastCookedAt: r.lastCookedAt,
+    archivedAt: r.archivedAt ? new Date(r.archivedAt).toISOString() : null
+  }));
 }

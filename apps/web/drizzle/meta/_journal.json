@@ -281,6 +281,27 @@
       "when": 1779580814000,
       "tag": "0040_recipe_ai_draft",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1780738856000,
+      "tag": "0041_add_meal_effort_override",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1780825256000,
+      "tag": "0042_meal_delete",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1780911656000,
+      "tag": "0043_meal_tags",
+      "breakpoints": true
     }
   ]
 }

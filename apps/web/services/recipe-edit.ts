@@ -1,10 +1,13 @@
 import "server-only";
 
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, ne } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { meals } from "@/db/schema";
 import { mealIngredients, recipeSteps } from "@/db/schema";
 import { requireItemEditor } from "@/services/sharing";
+import { normalizeMealName } from "@/lib/utils";
+import { MealNameTakenError } from "@/lib/errors/meals";
+import type { EffortLevel } from "@/types";
 
 /**
  * Credit-free MANUAL editing of a meal's structured recipe.
@@ -36,6 +39,8 @@ export type ManualStepInput = {
 export async function saveStructuredRecipe(args: {
   userId: string;
   mealId: string;
+  name?: string;
+  effortLevel?: EffortLevel;
   servings?: string;
   ingredients: ManualIngredientInput[];
   steps: ManualStepInput[];
@@ -43,10 +48,32 @@ export async function saveStructuredRecipe(args: {
   // Authorize as a write (same gate as Refine). Loads the meal first so the
   // canonical not-authorized error doesn't leak whether the meal exists.
   const mealRow = await db.query.meals.findFirst({
-    where: and(eq(meals.id, args.mealId), isNull(meals.archivedAt))
+    where: and(eq(meals.id, args.mealId), isNull(meals.archivedAt), isNull(meals.deletedAt))
   });
   if (!mealRow) throw new Error("Not authorized to edit this item.");
   await requireItemEditor(args.userId, "recipe", args.mealId, mealRow.createdByUserId);
+
+  // R34 — optional rename. Recompute normalizedName and guard the
+  // (household_id, normalized_name) unique index with a friendly error so the
+  // DB constraint never surfaces as a raw 500. No-op when the name is unchanged.
+  let renameTo: { name: string; normalizedName: string } | null = null;
+  const trimmedName = args.name?.trim();
+  if (trimmedName && trimmedName !== mealRow.name) {
+    const normalizedName = normalizeMealName(trimmedName);
+    if (normalizedName !== mealRow.normalizedName) {
+      const clash = await db.query.meals.findFirst({
+        columns: { id: true },
+        where: and(
+          eq(meals.householdId, mealRow.householdId),
+          eq(meals.normalizedName, normalizedName),
+          ne(meals.id, args.mealId),
+          isNull(meals.archivedAt), isNull(meals.deletedAt)
+        )
+      });
+      if (clash) throw new MealNameTakenError(trimmedName);
+    }
+    renameTo = { name: trimmedName, normalizedName };
+  }
 
   // Normalize + drop blank rows. An ingredient needs a name; a step needs a
   // title or a body.
@@ -102,13 +129,16 @@ export async function saveStructuredRecipe(args: {
     }
 
     // A hand-edit counts as reviewed: clear the AI-draft flag. Update servings
-    // only when provided (undefined leaves it; empty string clears it).
+    // only when provided (undefined leaves it; empty string clears it). R34:
+    // also apply the optional rename + effort override.
     await tx
       .update(meals)
       .set({
         updatedAt: new Date(),
         recipeIsAiDraft: false,
-        ...(args.servings !== undefined && { servings: args.servings.trim() || null })
+        ...(args.servings !== undefined && { servings: args.servings.trim() || null }),
+        ...(renameTo && { name: renameTo.name, normalizedName: renameTo.normalizedName }),
+        ...(args.effortLevel !== undefined && { effortLevel: args.effortLevel })
       })
       .where(eq(meals.id, args.mealId));
   });

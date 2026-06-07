@@ -84,7 +84,10 @@ const nextConfig: NextConfig = {
     return [
       { source: "/dashboard", destination: "/home", permanent: false },
       { source: "/history", destination: "/library", permanent: false },
-      { source: "/household", destination: "/kitchen", permanent: false }
+      { source: "/household", destination: "/kitchen", permanent: false },
+      // R34 — Refine merged into the unified Edit screen (manual + AI in one).
+      { source: "/meal/:id/refine", destination: "/meal/:id/edit", permanent: false },
+      { source: "/meal/:id/refine/review", destination: "/meal/:id/edit", permanent: false }
     ];
   },
   async headers() {

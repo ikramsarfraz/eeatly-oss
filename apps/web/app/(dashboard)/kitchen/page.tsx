@@ -7,6 +7,7 @@ import {
   listPendingInvitations
 } from "@/services/households";
 import { HouseholdClient } from "@/components/household/household-client";
+import { MembersMobile } from "@/components/mobile/members-mobile";
 
 /**
  * Round 31 — Kitchen page server shell.
@@ -40,25 +41,41 @@ export default async function HouseholdPage() {
       : Promise.resolve([])
   ]);
 
+  const householdCreatedAt = (householdRow?.createdAt ?? new Date()).toISOString();
+  const memberItems = members.map((m) => ({
+    userId: m.userId,
+    name: m.name,
+    email: m.email,
+    role: m.role,
+    joinedAt: m.joinedAt.toISOString()
+  }));
+  const invitationItems = invitations.map((i) => ({
+    id: i.id,
+    email: i.email,
+    createdAt: i.createdAt.toISOString(),
+    expiresAt: i.expiresAt.toISOString()
+  }));
+
   return (
-    <HouseholdClient
-      householdName={household.name}
-      householdCreatedAt={(householdRow?.createdAt ?? new Date()).toISOString()}
-      currentUserId={user.id}
-      isOwner={isOwner}
-      members={members.map((m) => ({
-        userId: m.userId,
-        name: m.name,
-        email: m.email,
-        role: m.role,
-        joinedAt: m.joinedAt.toISOString()
-      }))}
-      invitations={invitations.map((i) => ({
-        id: i.id,
-        email: i.email,
-        createdAt: i.createdAt.toISOString(),
-        expiresAt: i.expiresAt.toISOString()
-      }))}
-    />
+    <>
+      <MembersMobile
+        householdName={household.name}
+        householdCreatedAt={householdCreatedAt}
+        currentUserId={user.id}
+        isOwner={isOwner}
+        members={memberItems}
+        invitations={invitationItems}
+      />
+      <div className="hidden md:block">
+        <HouseholdClient
+          householdName={household.name}
+          householdCreatedAt={householdCreatedAt}
+          currentUserId={user.id}
+          isOwner={isOwner}
+          members={memberItems}
+          invitations={invitationItems}
+        />
+      </div>
+    </>
   );
 }

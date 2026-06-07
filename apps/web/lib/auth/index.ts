@@ -11,7 +11,7 @@ import {
   getRootDomain
 } from "@/lib/auth/admin-host";
 import { getServerEnv, hasGoogleAuthEnv } from "@/lib/env/server";
-import { sendMagicLinkEmail } from "@/lib/email/resend";
+import { sendMagicLinkEmail, sendPasswordResetEmail } from "@/lib/email/resend";
 import { logger } from "@/lib/observability/logger";
 import { trackEvent } from "@/lib/observability/analytics";
 import { capturePostHogServerEvent } from "@/lib/observability/posthog-server";
@@ -132,6 +132,34 @@ function buildAuth() {
       verification: schema.verifications
     }
   }),
+  // Email + password as a lower-friction alternative to the magic link.
+  // Magic links stay on (the `magicLink` plugin below) — returning users
+  // who'd rather not wait for an email can sign in with a password instead.
+  // Low-sensitivity data + a long rolling session, so we don't gate on email
+  // verification (that would re-introduce the very round-trip we're avoiding)
+  // and we auto-sign-in on sign-up. The `accounts.password` column already
+  // exists from `auth:generate`, so no migration is needed.
+  emailAndPassword: {
+    enabled: true,
+    requireEmailVerification: false,
+    autoSignIn: true,
+    minPasswordLength: 8,
+    // Forgot-password. Better Auth builds `url` as
+    // `${baseURL}/api/auth/reset-password/:token?callbackURL=/reset-password`;
+    // clicking it verifies the token server-side, then redirects to
+    // `/reset-password?token=…` (or `?error=INVALID_TOKEN` when expired/used).
+    // We only deliver the link. The request endpoint answers with a generic
+    // "if this email exists…" message, so it never reveals whether an account
+    // exists. Token TTL is Better Auth's 1h default.
+    sendResetPassword: async ({ user, url }) => {
+      await sendPasswordResetEmail(user.email, url);
+    },
+    // Fires once the new password is committed — a security signal worth a log
+    // line. Kept failure-isolated like the other auth-side effects.
+    onPasswordReset: async ({ user }) => {
+      logger.info("password_reset_completed", { userId: user.id });
+    }
+  },
   plugins: [
     magicLink({
       storeToken: "hashed",

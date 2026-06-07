@@ -28,6 +28,8 @@ pnpm dev              # Start web dev server (localhost:3000)
 pnpm build            # Production build of the web app
 pnpm lint             # ESLint — zero warnings tolerated
 pnpm typecheck        # tsc --noEmit (every workspace package in parallel)
+pnpm test             # Run web tests once (Vitest)
+pnpm test:watch       # Vitest in watch mode
 
 pnpm db:generate      # Generate Drizzle migration from schema changes
 pnpm db:migrate       # Apply migrations to Neon Postgres
@@ -36,7 +38,12 @@ pnpm db:studio        # Drizzle Studio GUI
 pnpm auth:generate    # Regenerate Better Auth schema (run after auth config changes)
 pnpm check:deploy     # Validate all required env vars are present
 pnpm smoke:prod       # HTTP smoke tests against production
+pnpm analyze          # Build with bundle analyzer (ANALYZE=true next build)
 ```
+
+Run a single test file: `cd apps/web && pnpm exec vitest run path/to/file.test.ts`
+
+Start the mobile Metro bundler (after the web dev server is running): `pnpm --filter @eeatly/mobile start`
 
 To work directly inside a workspace, `cd apps/web && pnpm <script>` works too — but prefer the root commands so the right workspace is always selected.
 
@@ -123,7 +130,7 @@ A refine session is a per-device draft layered on top of a meal. The user prompt
 
 ### Environment variables
 
-Four vars are required at runtime; the rest enable optional features:
+All server-side env access goes through `apps/web/lib/env/server.ts` → `getServerEnv()`, which validates and caches at startup. Never read `process.env` directly in server code. Copy `apps/web/.env.example` to `apps/web/.env.local` as a starting point.
 
 | Var | Required | Purpose |
 |---|---|---|
@@ -131,21 +138,31 @@ Four vars are required at runtime; the rest enable optional features:
 | `BETTER_AUTH_SECRET` | ✅ | ≥32 chars, signs sessions |
 | `BETTER_AUTH_URL` | ✅ | App origin (e.g. `https://eeatly.app`) |
 | `NEXT_PUBLIC_APP_URL` | ✅ | Public origin (the only `NEXT_PUBLIC_` var) |
+| `ANTHROPIC_API_KEY` | ✅ | AI provider (Refine, Capture, share copy) |
+| `OPENAI_API_KEY` | ✅ | AI provider (primary) + Whisper transcription |
 | `RESEND_API_KEY` + `EMAIL_FROM` | optional | Magic link email; falls back to console.log |
 | `RESEND_WEBHOOK_SECRET` | optional | Email delivery tracking |
 | R2 group (5 vars) | optional | Photo uploads — **all five must be set or none** |
-| `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` | optional | Enables "Continue with Google" on sign-in/sign-up — **both or neither** |
+| `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` | optional | Enables "Continue with Google" — **both or neither** |
 | `PLATFORM_ADMIN_HOST` | optional | Restricts `/admin/*` to a specific subdomain |
-
-All server-side env access goes through `apps/web/lib/env/server.ts` → `getServerEnv()`, which validates and caches at startup. Never read `process.env` directly in server code.
+| `GEMINI_API_KEY` | optional | Dish image generation (Gemini 2.5 Flash); falls back to gpt-image-1 |
+| `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` | optional | Rate limiting — no-ops in local dev when unset, enforced in uat/prod |
+| `STRIPE_SECRET_KEY` + `STRIPE_PUBLISHABLE_KEY` + `STRIPE_WEBHOOK_SECRET` | optional | Billing — **all three or none** |
+| `SENTRY_DSN` + `NEXT_PUBLIC_SENTRY_DSN` | optional | Error tracking |
+| `SENTRY_AUTH_TOKEN` | optional | Source-map upload at build time only |
+| `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` + `NEXT_PUBLIC_POSTHOG_HOST` | optional | Product analytics |
 
 ### Key patterns
 
 - **`server-only`** — imported at the top of any module that must never reach the client bundle (`apps/web/services/`, `apps/web/lib/db/`, `apps/web/lib/auth/`, `apps/web/server/trpc/`). A build error surfaces immediately if the boundary is crossed.
 - **Meal normalization** — `normalizedName` is `name.trim().toLowerCase()`. The unique index enforces one `meals` row per user per dish name; logging the same meal again creates a new `mealLogs` row against the existing `meals` row.
+- **AI provider fallback** — `withFallback(primary, fallback, ctx)` in `apps/web/lib/ai/providers/index.ts`. OpenAI is the primary provider; Anthropic is the fallback. Auth errors (401/403) are rethrown immediately without retrying — they indicate a config bug, not a transient failure. All AI services (`apps/web/services/ai.ts`, `ai-refine.ts`) use this pattern.
+- **Billing tiers** — free / plus / pro (see `apps/web/lib/pricing.ts`, the single source of truth for display amounts and credit grants). New sign-ups get a 7-day Pro trial automatically based on `createdAt` — no extra column. Display prices are hardcoded in `lib/pricing.ts`, not env-driven; Stripe Price IDs come from env vars in `services/billing.ts`. Stripe amounts must match `lib/pricing.ts` manually.
+- **Feature gates** — `FEATURE_REGISTRY` in `packages/api/src/gates/registry.ts` maps every gated key to a `defaultRule`. Enforce server-side with `requireFeatureAccess(userId, key)` at the service boundary; use `gatedProcedure("key")` at the procedure layer. Override rules stored in `feature_overrides` win over defaults; admin role wins over everything.
 - **Observability** — `apps/web/lib/observability/` holds the analytics event logger and funnel-tracking helpers. Events are fire-and-forget inside procedures (not awaited) so a logging failure can't surface a procedure error.
 - **Email fallback** — when `RESEND_API_KEY` is absent, `apps/web/lib/email/resend.ts` logs the email to the console instead of throwing. This keeps local dev functional without Resend credentials.
 - **Security headers** — defined in `apps/web/next.config.ts` (CSP, X-Frame-Options DENY, Permissions-Policy). Do not add `<iframe>` embeds without updating the CSP.
+- **Middleware** — `apps/web/proxy.ts` is the Next.js middleware (adds `x-request-id` correlation headers, enforces admin-subdomain path routing, sets `X-Robots-Tag: noindex` on non-public paths).
 
 ### Adding a new tRPC procedure
 
