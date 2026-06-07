@@ -8,7 +8,8 @@ import { ChevronRight, Lock, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MealImage } from "@/components/mobile/meal-image";
 import { EffortPill } from "@/components/history/effort-pill";
-import { MobileScaffold, MobileTopBar } from "@/components/mobile/mobile-scaffold";
+import { MobileScaffold } from "@/components/mobile/mobile-scaffold";
+import { MobileAppBar } from "@/components/mobile/mobile-app-bar";
 import type { EffortLevel } from "@/types";
 
 type PlanDish = {
@@ -53,7 +54,7 @@ export function PlanDetailMobile({
 
   return (
     <MobileScaffold>
-      <MobileTopBar back title={plan.name} sub={dateLabel} />
+      <MobileAppBar title={plan.name} backHref="/plans" />
 
       <div className="px-4 pt-3">
         <div className="rounded-[18px] border border-border bg-card p-4">

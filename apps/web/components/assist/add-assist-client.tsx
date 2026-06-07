@@ -15,6 +15,7 @@ import { blobToBase64 } from "@/lib/refine/use-voice-recorder";
 import { SUPPORTED_AUDIO_MEDIA_TYPES } from "@eeatly/api/validators/ai";
 import type { EffortLevel, MealSuggestion } from "@/types";
 
+import { ChevronLeft } from "lucide-react";
 import { AssistBar } from "./assist-bar";
 import { EffortPills } from "./effort-pills";
 import { AeButton, AeInput, AeTextarea, AeDivider, Lbl } from "./field-atoms";
@@ -152,6 +153,15 @@ export function AddAssistClient({ initialMealName }: { initialMealName?: string 
 
   return (
     <div className="ae-scope mx-auto w-full max-w-[680px] pb-24 sm:pb-2">
+      {/* Mobile back — matches the detail-screen chevron. */}
+      <button
+        type="button"
+        aria-label="Back"
+        onClick={() => router.back()}
+        className="mb-3 flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[11px] border border-[color:var(--ae-border)] bg-[color:var(--ae-surface)] text-[color:var(--ae-ink)] sm:hidden"
+      >
+        <ChevronLeft size={20} />
+      </button>
       <h1 className="mb-2 font-[family-name:var(--ae-display)] text-[40px] leading-none tracking-[-0.025em] text-[color:var(--ae-ink)] sm:text-[46px]">
         Add a meal
       </h1>

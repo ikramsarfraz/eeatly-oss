@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronRight, Plus } from "lucide-react";
 
 import { MobileScaffold, MobileTopBar } from "@/components/mobile/mobile-scaffold";
+import { MobileAppBar } from "@/components/mobile/mobile-app-bar";
 
 export type PlanListItem = {
   id: string;
@@ -40,6 +41,7 @@ export function PlansMobile({ plans }: { plans: PlanListItem[] }) {
 
   return (
     <MobileScaffold>
+      <MobileAppBar title="Plans" />
       <MobileTopBar
         big
         eyebrow="Occasions"
