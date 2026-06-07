@@ -11,13 +11,14 @@ import {
   Check,
   LayoutGrid,
   List as ListIcon,
+  Menu,
   MoreVertical,
   Pencil,
-  Plus,
   RotateCcw,
   Search,
   Share2,
   SlidersHorizontal,
+  Sparkles,
   Tag as TagIcon,
   Trash2
 } from "lucide-react";
@@ -26,8 +27,9 @@ import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc/client";
 import { MealImage } from "@/components/mobile/meal-image";
 import { EffortPill } from "@/components/history/effort-pill";
-import { MobileScaffold, MobileTopBar } from "@/components/mobile/mobile-scaffold";
-import { MobileSheet, SheetRow } from "@/components/mobile/mobile-sheet";
+import { MobileScaffold } from "@/components/mobile/mobile-scaffold";
+import { MobileSheet, MoreSheetContent, SheetRow } from "@/components/mobile/mobile-sheet";
+import { AccountSheet } from "@/components/mobile/account-sheet";
 import { ShareSheet } from "@/components/sharing/share-sheet";
 import { useLibraryManagement } from "@/components/library/use-library-management";
 import { FilterPanelBody } from "@/components/library/filter-panel";
@@ -64,6 +66,14 @@ const SORT_LABELS: Record<SortKey, string> = {
   az: "A to Z",
   effort: "Effort (easy first)"
 };
+// Short labels for the compact sort tool button (full labels stay in the sheet).
+const SORT_SHORT: Record<SortKey, string> = {
+  recent: "Recent",
+  most: "Most cooked",
+  new: "Newest",
+  az: "A to Z",
+  effort: "Effort"
+};
 const EFFORT_RANK: Record<string, number> = { quick: 0, easy: 1, medium: 2, high_effort: 3 };
 
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
@@ -83,7 +93,9 @@ export function LibraryMobile({
   currentUserId,
   householdMemberCount,
   sharedWithMe,
-  initialSurface
+  initialSurface,
+  userName,
+  userEmail
 }: {
   rows: LibraryRow[];
   stats: LibraryStat[];
@@ -91,6 +103,8 @@ export function LibraryMobile({
   householdMemberCount: number;
   sharedWithMe: SharedWithMeItem[];
   initialSurface?: "yours" | "shared";
+  userName: string | null;
+  userEmail: string | null;
 }) {
   const [surface, setSurface] = React.useState<"yours" | "shared">(initialSurface ?? "yours");
   const [filter, setFilter] = React.useState<FilterKey>("all");
@@ -104,6 +118,8 @@ export function LibraryMobile({
   const [deleteTarget, setDeleteTarget] = React.useState<Target | null>(null);
   const [shareTarget, setShareTarget] = React.useState<{ id: string; name: string } | null>(null);
   const [editTagsTarget, setEditTagsTarget] = React.useState<{ id: string; name: string; tags: MealTags } | null>(null);
+  const [accountOpen, setAccountOpen] = React.useState(false);
+  const [navOpen, setNavOpen] = React.useState(false);
 
   // Facets: `staged` is edited in the sheet and applied to `facetState` on
   // "Show results" (per the handoff's staged-mobile model).
@@ -215,29 +231,72 @@ export function LibraryMobile({
 
   return (
     <MobileScaffold>
-      <MobileTopBar
-        big
-        eyebrow="Your cookbook"
-        title="Library."
-        right={
-          <Link
-            href={"/search" as Route}
-            aria-label="Search recipes"
-            className="mt-[2px] flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[11px] border border-border bg-card text-muted-foreground"
-          >
-            <Search className="h-[18px] w-[18px]" />
-          </Link>
-        }
-      />
-
-      <div className="px-4 pt-3">
-        <Link
-          href="/add"
-          className="flex h-11 items-center justify-center gap-1.5 rounded-[12px] bg-primary text-[14px] font-semibold text-primary-foreground active:scale-[0.99]"
+      {/* App bar: hamburger (nav) · Library · search · avatar (account). */}
+      <div className="sticky top-0 z-20 flex items-center gap-2.5 bg-background px-3 pb-2 pt-[max(env(safe-area-inset-top),10px)]">
+        <button
+          type="button"
+          aria-label="Menu"
+          onClick={() => setNavOpen(true)}
+          className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[11px] border border-border bg-card text-foreground"
         >
-          <Plus className="h-4 w-4" strokeWidth={2.4} />
-          New recipe
+          <Menu className="h-[18px] w-[18px]" />
+        </button>
+        <span className="flex-1 font-serif text-[20px] tracking-[-0.01em] text-foreground">Library</span>
+        <Link
+          href={"/search" as Route}
+          aria-label="Search recipes"
+          className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[11px] border border-border bg-card text-muted-foreground"
+        >
+          <Search className="h-[18px] w-[18px]" />
         </Link>
+        <button
+          type="button"
+          aria-label="Your account"
+          onClick={() => setAccountOpen(true)}
+          className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-[11px] bg-primary font-serif text-[16px] text-primary-foreground"
+        >
+          {(userName?.trim()?.charAt(0) || userEmail?.charAt(0) || "?").toUpperCase()}
+        </button>
+      </div>
+
+      {/* Hero */}
+      <div className="px-4 pt-2">
+        <h1 className="font-serif text-[46px] leading-[0.98] tracking-[-0.02em] text-foreground">Library.</h1>
+        <p className="mt-2 text-[14px] text-muted-foreground">
+          Every meal cooked in your kitchen.{" "}
+          <span className="font-semibold text-foreground">
+            {ownedRows.length} recipe{ownedRows.length === 1 ? "" : "s"}
+          </span>
+          .
+        </p>
+        {pageRows.length > 0 ? (
+          <div className="mt-3 flex items-start gap-2 rounded-[14px] bg-[color:var(--surface-2)] px-3.5 py-2.5">
+            <Sparkles className="mt-px h-3.5 w-3.5 shrink-0 text-primary" />
+            <p className="text-[12.5px] leading-snug text-muted-foreground">
+              Cuisine, course &amp; diet are auto-tagged when you capture a meal.{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  const first = pageRows[0];
+                  setEditTagsTarget({
+                    id: first.id,
+                    name: first.name,
+                    tags: {
+                      cuisine: first.cuisine,
+                      course: first.course,
+                      mainIngredient: first.mainIngredient,
+                      diet: first.diet,
+                      occasion: first.occasion
+                    }
+                  });
+                }}
+                className="font-medium text-primary underline-offset-2"
+              >
+                Edit tags &rarr;
+              </button>
+            </p>
+          </div>
+        ) : null}
       </div>
 
       {showSurfaceToggle && (
@@ -265,10 +324,10 @@ export function LibraryMobile({
                   setFilterSheet(true);
                 }}
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-medium",
+                  "inline-flex items-center gap-1.5 rounded-[11px] border px-3 py-2 text-[12.5px] font-semibold",
                   activeFacetCount > 0
                     ? "border-primary bg-secondary text-primary"
-                    : "border-border bg-card text-muted-foreground"
+                    : "border-border bg-card text-foreground"
                 )}
               >
                 <SlidersHorizontal className="h-3.5 w-3.5" />
@@ -284,13 +343,13 @@ export function LibraryMobile({
               <button
                 type="button"
                 onClick={() => setSortSheet(true)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-[12.5px] font-medium text-muted-foreground"
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-[11px] border border-border bg-card px-3 py-2 text-[12.5px] font-semibold text-foreground"
               >
                 <ArrowUpDown className="h-3.5 w-3.5" />
-                {SORT_LABELS[sort]}
+                {SORT_SHORT[sort]}
               </button>
             )}
-            <div className="ml-auto inline-flex rounded-full border border-border p-0.5">
+            <div className="ml-auto inline-flex rounded-[10px] border border-border bg-card p-0.5">
               <ViewBtn active={view === "grid"} onClick={() => setView("grid")} label="Grid view">
                 <LayoutGrid className="h-4 w-4" />
               </ViewBtn>
@@ -391,7 +450,7 @@ export function LibraryMobile({
                         name={row.name}
                         photoUrl={row.photoUrl}
                         effort={stat?.effortLevel ?? null}
-                        meta={metaFor(stat ?? null)}
+                        meta={listMeta(row, stat?.cookCount ?? 0)}
                         onMenu={() =>
                           setActionTarget({
                             id: row.id,
@@ -545,6 +604,12 @@ export function LibraryMobile({
       </MobileSheet>
 
       <EditTagsSheet target={editTagsTarget} onClose={() => setEditTagsTarget(null)} />
+
+      {/* Hamburger nav + avatar Account sheet. */}
+      <MobileSheet open={navOpen} label="Go to" onClose={() => setNavOpen(false)}>
+        <MoreSheetContent onClose={() => setNavOpen(false)} />
+      </MobileSheet>
+      <AccountSheet open={accountOpen} onClose={() => setAccountOpen(false)} name={userName} email={userEmail} />
 
       {shareTarget && (
         <ShareSheet
@@ -702,6 +767,15 @@ function metaForCount(cookCount: number): string {
   return `Cooked ${cookCount}${cookCount === 1 ? " time" : " times"}`;
 }
 
+/** List-row meta: `cuisine · course · n×` (per the handoff), tags first. */
+function listMeta(row: LibraryRow, cookCount: number): string {
+  const parts: string[] = [];
+  if (row.cuisine) parts.push(row.cuisine);
+  if (row.course) parts.push(row.course);
+  if (cookCount > 0) parts.push(`${cookCount}×`);
+  return parts.length > 0 ? parts.join(" · ") : "Not yet cooked";
+}
+
 function Grid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-2 gap-3 px-4 pb-3 pt-3">{children}</div>;
 }
@@ -829,7 +903,7 @@ function ViewBtn({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "flex h-8 w-8 items-center justify-center rounded-full transition-colors",
+        "flex h-8 w-8 items-center justify-center rounded-[7px] transition-colors",
         active ? "bg-secondary text-primary" : "text-[color:var(--ink3)]"
       )}
     >
