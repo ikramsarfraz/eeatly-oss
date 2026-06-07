@@ -529,10 +529,12 @@ export function LibraryClient({
                 type="button"
                 onClick={() => setFiltersOpen((o) => !o)}
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors",
+                  // Squared tool button on a white surface — matches the mobile
+                  // Filters control (tools are rounded-rects, only chips are pills).
+                  "inline-flex items-center gap-1.5 rounded-[11px] border px-3 py-2 text-[12.5px] font-semibold transition-colors",
                   activeFacetCount > 0
-                    ? "border-primary bg-[color:var(--sage-soft)] text-primary"
-                    : "border-border bg-transparent text-muted-foreground hover:text-foreground"
+                    ? "border-primary bg-secondary text-primary"
+                    : "border-border bg-card text-foreground hover:bg-[var(--surface-2)]"
                 )}
               >
                 <SlidersHorizontal className="h-3.5 w-3.5" />
@@ -579,7 +581,7 @@ export function LibraryClient({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-transparent px-3 py-1.5 text-[12.5px] font-medium text-muted-foreground hover:text-foreground"
+                  className="inline-flex items-center gap-1.5 rounded-[11px] border border-border bg-card px-3 py-2 text-[12.5px] font-semibold text-foreground hover:bg-[var(--surface-2)]"
                   style={{ letterSpacing: "-0.05px" }}
                 >
                   <ArrowUpDown className="h-3.5 w-3.5" />
@@ -596,7 +598,7 @@ export function LibraryClient({
               </DropdownMenuContent>
             </DropdownMenu>
           ) : null}
-          <div className="inline-flex rounded-full border border-border p-0.5">
+          <div className="inline-flex rounded-[10px] border border-border bg-card p-0.5">
             <ViewToggleButton active={view === "grid"} onClick={() => setView("grid")} label="Grid view">
               <LayoutGrid className="h-4 w-4" />
             </ViewToggleButton>
@@ -848,10 +850,12 @@ function FilterChip({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        // Activity chips stay pills (rounded-full) on a white surface — matches
+        // the mobile chips (active = filled forest, inactive = white card).
+        "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         active
-          ? "border-primary bg-[color:var(--sage-soft)] text-primary"
-          : "border-border bg-transparent text-muted-foreground hover:bg-[var(--surface-2)] hover:text-foreground",
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-border bg-card text-muted-foreground hover:bg-[var(--surface-2)] hover:text-foreground",
         decorative ? "opacity-80" : ""
       )}
       style={{ letterSpacing: "-0.05px" }}
@@ -925,8 +929,10 @@ function ViewToggleButton({
       aria-label={label}
       aria-pressed={active}
       className={cn(
-        "flex h-8 w-8 items-center justify-center rounded-full transition-colors",
-        active ? "bg-[color:var(--sage-soft)] text-primary" : "text-muted-foreground hover:text-foreground"
+        // Squared inner buttons (radius 7) inside the rounded-[10px] container,
+        // matching the mobile Grid/List toggle.
+        "flex h-8 w-8 items-center justify-center rounded-[7px] transition-colors",
+        active ? "bg-secondary text-primary" : "text-muted-foreground hover:text-foreground"
       )}
     >
       {children}
