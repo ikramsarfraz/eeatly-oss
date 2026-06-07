@@ -7,27 +7,21 @@ import { usePathname } from "next/navigation";
 import { BookOpen, CalendarDays, Home, Menu, Plus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import {
-  AddSheetContent,
-  MobileSheet,
-  MoreSheetContent
-} from "@/components/mobile/mobile-sheet";
+import { MobileSheet, MoreSheetContent } from "@/components/mobile/mobile-sheet";
 
 type TabItem = {
   href: Route;
   label: string;
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number; fill?: string }>;
-  filled?: boolean;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
   match: (path: string) => boolean;
 };
 
 const tabs: TabItem[] = [
-  { href: "/home", label: "Home", icon: Home, filled: true, match: (p) => p === "/home" },
+  { href: "/home", label: "Home", icon: Home, match: (p) => p === "/home" },
   {
     href: "/library",
     label: "Library",
     icon: BookOpen,
-    filled: true,
     // Library stays active on the recipe-detail subtree.
     match: (p) => p.startsWith("/library") || p.startsWith("/meal")
   },
@@ -40,33 +34,36 @@ const tabs: TabItem[] = [
 ];
 
 /**
- * R35 mobile-web bottom tab bar — Home · Library · raised "+" FAB · Plans · More.
- * The FAB opens the Add sheet; More opens the More sheet (members / search /
- * notifications / settings / theme toggle). Hidden at `md+` (desktop sidebar).
+ * R35/R37 mobile-web bottom tab bar — the single nav used on every dashboard
+ * route: Home · Library · center-docked "+" FAB · Plans · More.
+ * The **center FAB is the app's primary verb**: it links straight to "Log a
+ * meal" (`/add`). More opens the More sheet (members / search / notifications /
+ * settings / theme toggle); account access lives on the app-bar avatar, not
+ * here. Hidden at `md+` (desktop sidebar).
  */
 export function BottomTabBar() {
   const pathname = usePathname() ?? "";
-  const [sheet, setSheet] = React.useState<null | "add" | "more">(null);
-  const close = React.useCallback(() => setSheet(null), []);
+  const [moreOpen, setMoreOpen] = React.useState(false);
 
   return (
     <>
       <nav
         aria-label="Primary"
-        className="fixed inset-x-0 bottom-0 z-30 flex h-[calc(74px+env(safe-area-inset-bottom))] items-stretch border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-border bg-[color:var(--surface)] px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+8px)] md:hidden"
       >
         <TabLink tab={tabs[0]} active={tabs[0].match(pathname)} />
         <TabLink tab={tabs[1]} active={tabs[1].match(pathname)} />
 
+        {/* Center-docked FAB — "Log a meal". 54×54 forest circle, overlapping
+            the bar's top edge by 22px (matches the design's `.tab-fab`). */}
         <div className="relative flex flex-1 justify-center">
-          <button
-            type="button"
-            aria-label="Add"
-            onClick={() => setSheet("add")}
-            className="absolute -top-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_6px_20px_rgba(46,87,57,0.35)] active:scale-95"
+          <Link
+            href={"/add" as Route}
+            aria-label="Log a meal"
+            className="absolute -top-[22px] flex h-[54px] w-[54px] items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_6px_20px_rgba(46,87,57,0.35)] active:scale-95"
           >
-            <Plus className="h-[26px] w-[26px]" strokeWidth={2.2} />
-          </button>
+            <Plus className="h-[25px] w-[25px]" strokeWidth={2.2} />
+          </Link>
         </div>
 
         <TabLink tab={tabs[2]} active={tabs[2].match(pathname)} />
@@ -74,19 +71,16 @@ export function BottomTabBar() {
         <button
           type="button"
           aria-label="More"
-          onClick={() => setSheet("more")}
-          className="flex flex-1 flex-col items-center justify-center gap-1 pt-2 text-[10.5px] font-medium text-[color:var(--ink3)]"
+          onClick={() => setMoreOpen(true)}
+          className="flex flex-1 flex-col items-center justify-center gap-[3px] px-0 py-1.5 text-[10px] font-semibold tracking-[0.1px] text-[color:var(--ink3)]"
         >
-          <Menu className="h-[23px] w-[23px]" strokeWidth={2} />
+          <Menu className="h-[22px] w-[22px]" strokeWidth={1.9} />
           More
         </button>
       </nav>
 
-      <MobileSheet open={sheet === "add"} label="Add to your kitchen" onClose={close}>
-        <AddSheetContent onClose={close} />
-      </MobileSheet>
-      <MobileSheet open={sheet === "more"} label="More" onClose={close}>
-        <MoreSheetContent onClose={close} />
+      <MobileSheet open={moreOpen} label="More" onClose={() => setMoreOpen(false)}>
+        <MoreSheetContent onClose={() => setMoreOpen(false)} />
       </MobileSheet>
     </>
   );
@@ -99,15 +93,13 @@ function TabLink({ tab, active }: { tab: TabItem; active: boolean }) {
       href={tab.href}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex flex-1 flex-col items-center justify-center gap-1 pt-2 text-[10.5px]",
-        active ? "font-semibold text-primary" : "font-medium text-[color:var(--ink3)]"
+        // Active state is a colour change only (forest stroke) — the design's
+        // `.tab.on` doesn't fill the icon or bump the weight.
+        "flex flex-1 flex-col items-center justify-center gap-[3px] py-1.5 text-[10px] font-semibold tracking-[0.1px]",
+        active ? "text-primary" : "text-[color:var(--ink3)]"
       )}
     >
-      <Icon
-        className="h-[23px] w-[23px]"
-        strokeWidth={2}
-        fill={active && tab.filled ? "currentColor" : "none"}
-      />
+      <Icon className="h-[22px] w-[22px]" strokeWidth={1.9} />
       {tab.label}
     </Link>
   );
