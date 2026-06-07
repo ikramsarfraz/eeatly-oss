@@ -11,11 +11,9 @@ import {
   Check,
   LayoutGrid,
   List as ListIcon,
-  Menu,
   MoreVertical,
   Pencil,
   RotateCcw,
-  Search,
   Share2,
   SlidersHorizontal,
   Sparkles,
@@ -28,8 +26,8 @@ import { trpc } from "@/lib/trpc/client";
 import { MealImage } from "@/components/mobile/meal-image";
 import { EffortPill } from "@/components/history/effort-pill";
 import { MobileScaffold } from "@/components/mobile/mobile-scaffold";
-import { MobileSheet, MoreSheetContent, SheetRow } from "@/components/mobile/mobile-sheet";
-import { AccountSheet } from "@/components/mobile/account-sheet";
+import { MobileSheet, SheetRow } from "@/components/mobile/mobile-sheet";
+import { MobileAppBar } from "@/components/mobile/mobile-app-bar";
 import { ShareSheet } from "@/components/sharing/share-sheet";
 import { useLibraryManagement } from "@/components/library/use-library-management";
 import { FilterPanelBody } from "@/components/library/filter-panel";
@@ -118,8 +116,6 @@ export function LibraryMobile({
   const [deleteTarget, setDeleteTarget] = React.useState<Target | null>(null);
   const [shareTarget, setShareTarget] = React.useState<{ id: string; name: string } | null>(null);
   const [editTagsTarget, setEditTagsTarget] = React.useState<{ id: string; name: string; tags: MealTags } | null>(null);
-  const [accountOpen, setAccountOpen] = React.useState(false);
-  const [navOpen, setNavOpen] = React.useState(false);
 
   // Facets: `staged` is edited in the sheet and applied to `facetState` on
   // "Show results" (per the handoff's staged-mobile model).
@@ -231,33 +227,7 @@ export function LibraryMobile({
 
   return (
     <MobileScaffold>
-      {/* App bar: hamburger (nav) · Library · search · avatar (account). */}
-      <div className="sticky top-0 z-20 flex items-center gap-2.5 bg-background px-3 pb-2 pt-[max(env(safe-area-inset-top),10px)]">
-        <button
-          type="button"
-          aria-label="Menu"
-          onClick={() => setNavOpen(true)}
-          className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[11px] border border-border bg-card text-foreground"
-        >
-          <Menu className="h-[18px] w-[18px]" />
-        </button>
-        <span className="flex-1 font-serif text-[20px] tracking-[-0.01em] text-foreground">Library</span>
-        <Link
-          href={"/search" as Route}
-          aria-label="Search recipes"
-          className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[11px] border border-border bg-card text-muted-foreground"
-        >
-          <Search className="h-[18px] w-[18px]" />
-        </Link>
-        <button
-          type="button"
-          aria-label="Your account"
-          onClick={() => setAccountOpen(true)}
-          className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-[11px] bg-primary font-serif text-[16px] text-primary-foreground"
-        >
-          {(userName?.trim()?.charAt(0) || userEmail?.charAt(0) || "?").toUpperCase()}
-        </button>
-      </div>
+      <MobileAppBar title="Library" userName={userName} userEmail={userEmail} />
 
       {/* Hero */}
       <div className="px-4 pt-2">
@@ -604,12 +574,6 @@ export function LibraryMobile({
       </MobileSheet>
 
       <EditTagsSheet target={editTagsTarget} onClose={() => setEditTagsTarget(null)} />
-
-      {/* Hamburger nav + avatar Account sheet. */}
-      <MobileSheet open={navOpen} label="Go to" onClose={() => setNavOpen(false)}>
-        <MoreSheetContent onClose={() => setNavOpen(false)} />
-      </MobileSheet>
-      <AccountSheet open={accountOpen} onClose={() => setAccountOpen(false)} name={userName} email={userEmail} />
 
       {shareTarget && (
         <ShareSheet
