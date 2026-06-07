@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { CheckCircle2, Eye, EyeOff, KeyRound, Loader2, Mail } from "lucide-react";
@@ -183,7 +184,17 @@ export function AuthEmailForm({ mode, initialEmail, callbackURL }: AuthEmailForm
 
       {usePassword ? (
         <div className="grid gap-2">
-          <Label htmlFor="password">Password</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password">Password</Label>
+            {!isSignUp ? (
+              <Link
+                href={"/forgot-password" as Route}
+                className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Forgot password?
+              </Link>
+            ) : null}
+          </div>
           <div className="relative">
             <Input
               id="password"
