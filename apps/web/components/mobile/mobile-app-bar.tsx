@@ -8,6 +8,7 @@ import { ChevronLeft, Menu, Search } from "lucide-react";
 
 import { MobileSheet, MoreSheetContent } from "@/components/mobile/mobile-sheet";
 import { AccountSheet } from "@/components/mobile/account-sheet";
+import { FeedbackDialog } from "@/components/feedback/feedback-dialog";
 import { authClient } from "@/lib/auth/client";
 
 /**
@@ -40,6 +41,7 @@ export function MobileAppBar({
   const email = userEmail ?? session?.user?.email ?? null;
   const [navOpen, setNavOpen] = React.useState(false);
   const [accountOpen, setAccountOpen] = React.useState(false);
+  const [feedbackOpen, setFeedbackOpen] = React.useState(false);
   const initial = (name?.trim()?.charAt(0) || email?.charAt(0) || "?").toUpperCase();
 
   return (
@@ -87,7 +89,14 @@ export function MobileAppBar({
       <MobileSheet open={navOpen} label="Go to" onClose={() => setNavOpen(false)}>
         <MoreSheetContent onClose={() => setNavOpen(false)} />
       </MobileSheet>
-      <AccountSheet open={accountOpen} onClose={() => setAccountOpen(false)} name={name} email={email} />
+      <AccountSheet
+        open={accountOpen}
+        onClose={() => setAccountOpen(false)}
+        name={name}
+        email={email}
+        onSendFeedback={() => setFeedbackOpen(true)}
+      />
+      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </>
   );
 }

@@ -33,6 +33,14 @@ import { feedbackInputSchema, type FeedbackInput } from "@eeatly/api/validators/
 
 type FeedbackDialogProps = {
   trigger?: React.ReactNode;
+  /**
+   * Controlled mode. When `open` is provided the dialog renders no inline
+   * trigger and its visibility is driven by the parent. Used by the mobile
+   * account menu, which opens feedback imperatively; the desktop sidebar keeps
+   * the default trigger-based, uncontrolled mode.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 };
 
 const feedbackTypeLabels: Record<FeedbackInput["type"], string> = {
@@ -42,11 +50,20 @@ const feedbackTypeLabels: Record<FeedbackInput["type"], string> = {
   general: "General"
 };
 
-export function FeedbackDialog({ trigger }: FeedbackDialogProps) {
+export function FeedbackDialog({ trigger, open: controlledOpen, onOpenChange }: FeedbackDialogProps) {
   const hydrated = useHydrated();
   const pathname = usePathname();
   const { showToast } = useToast();
-  const [open, setOpen] = React.useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : uncontrolledOpen;
+  const setOpen = React.useCallback(
+    (next: boolean) => {
+      if (isControlled) onOpenChange?.(next);
+      else setUncontrolledOpen(next);
+    },
+    [isControlled, onOpenChange]
+  );
   const form = useForm<FeedbackInput>({
     resolver: zodResolver(feedbackInputSchema),
     defaultValues: {
@@ -93,6 +110,76 @@ export function FeedbackDialog({ trigger }: FeedbackDialogProps) {
     </Button>
   );
 
+  const content = (
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Send feedback</DialogTitle>
+        <DialogDescription>
+          Tell us what felt confusing, useful, or missing.
+        </DialogDescription>
+      </DialogHeader>
+      <form className="grid gap-4" onSubmit={handleSend}>
+        <div className="grid gap-2">
+          <Label htmlFor="feedback-type">Feedback type</Label>
+          <Select
+            value={form.watch("type")}
+            onValueChange={(value) =>
+              form.setValue("type", value as FeedbackInput["type"], {
+                shouldValidate: true
+              })
+            }
+            disabled={isSubmitting}
+          >
+            <SelectTrigger id="feedback-type">
+              <SelectValue placeholder="Choose type" />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(feedbackTypeLabels).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="feedback-message">Message</Label>
+          <Textarea
+            id="feedback-message"
+            placeholder="What happened? What was confusing? What would make this easier?"
+            disabled={isSubmitting}
+            {...form.register("message")}
+          />
+          {form.formState.errors.message ? (
+            <p className="text-sm text-destructive">
+              {form.formState.errors.message.message}
+            </p>
+          ) : null}
+        </div>
+
+        <input type="hidden" {...form.register("context")} />
+
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          Send feedback
+        </Button>
+      </form>
+    </DialogContent>
+  );
+
+  // Controlled mode (mobile account menu): no inline trigger; the parent drives
+  // visibility, so render just the dialog.
+  if (isControlled) {
+    return (
+      <Dialog open={open} onOpenChange={setOpen}>
+        {content}
+      </Dialog>
+    );
+  }
+
+  // Uncontrolled mode (desktop sidebar): the trigger opens the dialog. Before
+  // hydration, render only the trigger so the SSR markup stays stable.
   if (!hydrated) {
     return <>{trigger ?? defaultTrigger}</>;
   }
@@ -100,61 +187,7 @@ export function FeedbackDialog({ trigger }: FeedbackDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger ?? defaultTrigger}</DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Send feedback</DialogTitle>
-          <DialogDescription>
-            Tell us what felt confusing, useful, or missing.
-          </DialogDescription>
-        </DialogHeader>
-        <form className="grid gap-4" onSubmit={handleSend}>
-          <div className="grid gap-2">
-            <Label htmlFor="feedback-type">Feedback type</Label>
-            <Select
-              value={form.watch("type")}
-              onValueChange={(value) =>
-                form.setValue("type", value as FeedbackInput["type"], {
-                  shouldValidate: true
-                })
-              }
-              disabled={isSubmitting}
-            >
-              <SelectTrigger id="feedback-type">
-                <SelectValue placeholder="Choose type" />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(feedbackTypeLabels).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="feedback-message">Message</Label>
-            <Textarea
-              id="feedback-message"
-              placeholder="What happened? What was confusing? What would make this easier?"
-              disabled={isSubmitting}
-              {...form.register("message")}
-            />
-            {form.formState.errors.message ? (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.message.message}
-              </p>
-            ) : null}
-          </div>
-
-          <input type="hidden" {...form.register("context")} />
-
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Send feedback
-          </Button>
-        </form>
-      </DialogContent>
+      {content}
     </Dialog>
   );
 }
