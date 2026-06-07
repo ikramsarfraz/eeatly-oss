@@ -6,7 +6,7 @@ import { ChevronRight } from "lucide-react";
 
 import { trpc } from "@/lib/trpc/client";
 import { useDashboardMeals } from "@/hooks/use-dashboard-meals";
-import { MealTile } from "@/components/ui/meal-tile";
+import { MealImage } from "@/components/mobile/meal-image";
 import { EffortPill } from "@/components/history/effort-pill";
 import { MobileScaffold, MobileTopBar } from "@/components/mobile/mobile-scaffold";
 import type { DashboardMeals, EffortLevel } from "@/types";
@@ -81,6 +81,7 @@ export function HomeMobile({
     ? {
         mealId: heroSuggestion.mealId,
         name: heroSuggestion.mealName,
+        photoUrl: heroSuggestion.photoUrl,
         effort: heroSuggestion.effortLevel,
         meta: heroSuggestion.title
       }
@@ -88,6 +89,7 @@ export function HomeMobile({
       ? {
           mealId: heroStat.mealId,
           name: heroStat.mealName,
+          photoUrl: heroStat.photoUrl,
           effort: null as EffortLevel | null,
           meta: `Cooked ${heroStat.cookCount}${heroStat.cookCount === 1 ? " time" : " times"}`
         }
@@ -96,8 +98,8 @@ export function HomeMobile({
   // Jump back in: recent cooks (dedup by meal), fall back to most-cooked.
   const seen = new Set<string>();
   const jumpBack = [
-    ...meals.recentMeals.map((m) => ({ mealId: m.mealId, name: m.mealName, effort: m.effortLevel })),
-    ...meals.mostCookedMeals.map((m) => ({ mealId: m.mealId, name: m.mealName, effort: null as EffortLevel | null }))
+    ...meals.recentMeals.map((m) => ({ mealId: m.mealId, name: m.mealName, photoUrl: m.photoUrl, effort: m.effortLevel })),
+    ...meals.mostCookedMeals.map((m) => ({ mealId: m.mealId, name: m.mealName, photoUrl: m.photoUrl, effort: null as EffortLevel | null }))
   ]
     .filter((m) => {
       if (seen.has(m.mealId)) return false;
@@ -135,7 +137,7 @@ export function HomeMobile({
           <SectionLabel>Cook tonight</SectionLabel>
           <div className="rounded-[18px] border border-border bg-card p-4 shadow-[0_1px_0_rgba(20,20,15,0.03)]">
             <div className="flex gap-[14px]">
-              <MealTile name={hero.name} size="m" className="aspect-square w-[68px] shrink-0 rounded-[14px] border" />
+              <MealImage name={hero.name} photoUrl={hero.photoUrl} size="m" className="aspect-square w-[68px] shrink-0 rounded-[14px] border" />
               <div className="min-w-0 flex-1 pt-[2px]">
                 <h3 className="truncate font-serif text-[21px] leading-tight tracking-[-0.01em] text-foreground">
                   {hero.name}
@@ -178,7 +180,7 @@ export function HomeMobile({
           <div className="flex snap-x gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {jumpBack.map((m) => (
               <Link key={m.mealId} href={`/meal/${m.mealId}`} className="w-[120px] shrink-0 snap-start">
-                <MealTile name={m.name} size="m" className="aspect-square w-full rounded-[14px] border" />
+                <MealImage name={m.name} photoUrl={m.photoUrl} size="m" className="aspect-square w-full rounded-[14px] border" />
                 <p className="mt-1.5 line-clamp-2 text-[13px] font-medium leading-tight text-foreground">{m.name}</p>
                 {m.effort && (
                   <span className="mt-1 inline-block font-mono text-[9.5px] uppercase tracking-[0.1em] text-[color:var(--ink3)]">

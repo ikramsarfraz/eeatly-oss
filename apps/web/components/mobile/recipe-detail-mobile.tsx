@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, ExternalLink, Pencil, Share2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { MealTile } from "@/components/ui/meal-tile";
+import { MealImage } from "@/components/mobile/meal-image";
 import { splitMealName } from "@/lib/meal/split-name";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { MobileScaffold } from "@/components/mobile/mobile-scaffold";
@@ -111,7 +111,7 @@ export function RecipeDetailMobile({ meal }: { meal: RecipeDetailMeal; viewer: R
             <Share2 className="h-[18px] w-[18px]" />
           </button>
         </div>
-        <MealTile name={meal.name} size="l" className="h-[180px] w-full rounded-none" />
+        <MealImage name={meal.name} photoUrl={meal.photoUrl} size="l" className="h-[180px] w-full rounded-none" />
       </div>
 
       <div className="px-4 pt-4">

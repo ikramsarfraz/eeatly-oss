@@ -74,7 +74,7 @@ export function mealPalette(name: string): MealTilePalette {
   return MEAL_TILE_PALETTES[mealHash(name) % MEAL_TILE_PALETTES.length];
 }
 
-type MealTileSize = "s" | "m" | "l";
+export type MealTileSize = "s" | "m" | "l";
 
 const TILE_LETTER_SIZE: Record<MealTileSize, string> = {
   // Tuned for web reading distance — `l` reads as a hero monogram

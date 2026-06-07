@@ -6,7 +6,7 @@ import type { Route } from "next";
 import { ChevronRight, Lock, ShoppingCart } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { MealTile } from "@/components/ui/meal-tile";
+import { MealImage } from "@/components/mobile/meal-image";
 import { EffortPill } from "@/components/history/effort-pill";
 import { MobileScaffold, MobileTopBar } from "@/components/mobile/mobile-scaffold";
 import type { EffortLevel } from "@/types";
@@ -15,6 +15,7 @@ type PlanDish = {
   id: string;
   mealId: string;
   mealName: string;
+  mealPhotoUrl: string | null;
   actualEffort: EffortLevel | null;
   annotationNotes: string | null;
   addedByName: string | null;
@@ -101,7 +102,7 @@ export function PlanDetailMobile({
                 href={`/meal/${d.mealId}` as Route}
                 className="flex items-center gap-3 rounded-[16px] border border-border bg-card p-3 active:bg-[color:var(--surface-2)]"
               >
-                <MealTile name={d.mealName} size="s" className="h-12 w-12 shrink-0 rounded-[12px] border" />
+                <MealImage name={d.mealName} photoUrl={d.mealPhotoUrl} size="s" className="h-12 w-12 shrink-0 rounded-[12px] border" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15px] font-semibold tracking-[-0.01em] text-foreground">
                     {d.mealName}

@@ -65,6 +65,7 @@ export default async function PlanDetailPage(props: {
           id: d.id,
           mealId: d.mealId,
           mealName: d.mealName,
+          mealPhotoUrl: d.mealPhotoUrl,
           actualEffort: d.actualEffort,
           annotationNotes: d.annotationNotes,
           addedByName: d.addedByName,
