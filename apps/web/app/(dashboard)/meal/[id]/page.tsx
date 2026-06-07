@@ -61,6 +61,7 @@ export default async function MealDetailPage({ params }: PageProps) {
     recipeIsAiDraft: meal.recipeIsAiDraft,
     viewerCanEdit: meal.viewerCanEdit,
     viewerCanManageSharing: meal.viewerCanManageSharing,
+    viewerIsCreator: meal.createdByUserId === user.id,
     createdByUserId: meal.createdByUserId,
     createdByName: meal.createdByName,
     cookCount: meal.cookCount,

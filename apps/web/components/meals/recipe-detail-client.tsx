@@ -4,13 +4,29 @@ import * as React from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
-import { Camera, Loader2, Pencil, Sparkles } from "lucide-react";
+import { Archive, Camera, Loader2, MoreVertical, Pencil, Sparkles, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MealTile } from "@/components/ui/meal-tile";
 import { WhoCanSeeStrip } from "@/components/sharing/who-can-see-strip";
 import { SectionLabel } from "@/components/ui/section-label";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from "@/components/ui/alert-dialog";
 
 import { IngredientChecklist } from "@/components/meals/ingredient-checklist";
 import { StepCard, type StepCardData } from "@/components/meals/step-card";
@@ -18,6 +34,7 @@ import { StructuredIngredientList } from "@/components/meals/structured-ingredie
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { GenerateImageButton } from "@/components/credits/generate-image-button";
 import { SourceUrlEmbed } from "@/components/embeds/source-url-embed";
+import { useRecipeLifecycle } from "@/components/meals/use-recipe-lifecycle";
 
 import { useToast } from "@/components/providers/toast-provider";
 import { useSetBreadcrumb } from "@/components/layout/breadcrumb-context";
@@ -151,6 +168,13 @@ export type RecipeDetailMeal = {
   /** Viewer's effective permissions (owner / admin / editor / viewer). */
   viewerCanEdit: boolean;
   viewerCanManageSharing: boolean;
+  /**
+   * Viewer is the recipe's creator. Gates the owner-only lifecycle actions
+   * (Archive / Delete), which the service enforces strictly on the creator —
+   * distinct from `viewerCanEdit` / `viewerCanManageSharing`, which also
+   * cover edit/admin grantees who'd hit a NOT_FOUND on these.
+   */
+  viewerIsCreator: boolean;
   createdByUserId: string | null;
   createdByName: string | null;
   cookCount: number;
@@ -338,6 +362,11 @@ export function RecipeDetailClient({
   const canEdit = meal.viewerCanEdit;
   const canManageSharing = meal.viewerCanManageSharing;
 
+  // Owner-only lifecycle (Archive / Delete). Archive fires directly (it's
+  // reversible, with an Undo toast); Delete routes through a confirm dialog.
+  const lifecycle = useRecipeLifecycle(meal.id, meal.name);
+  const [confirmDelete, setConfirmDelete] = React.useState(false);
+
   // Dish image. `meal.photoUrl` arrives already coalesced server-side
   // (the meal's own photo → the app-wide AI image), so a non-null value
   // means there's something to show. When it's null no image exists for
@@ -520,9 +549,71 @@ export function RecipeDetailClient({
                 onGenerated={(url) => setPhotoUrl(url)}
               />
             ) : null}
+            {/* Owner-only lifecycle, tucked behind a ⋯ menu so the destructive
+                actions don't sit inline with the everyday ones. Gated on
+                `viewerIsCreator` — edit/admin grantees would hit a NOT_FOUND. */}
+            {meal.viewerIsCreator ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-[40px] px-3"
+                    aria-label="More recipe actions"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => lifecycle.archive()}>
+                    <Archive className="h-4 w-4" />
+                    Archive recipe
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => setConfirmDelete(true)}
+                    className="text-[color:var(--terra,var(--destructive))] focus:text-[color:var(--terra,var(--destructive))]"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete recipe
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
           </div>
         </div>
       </section>
+
+      {/* Delete confirmation (destructive, owner-only). Mirrors the library's
+          copy + treatment; success leaves for /library with an Undo toast. */}
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--terra-soft,#f3e0d7)] text-[color:var(--terra,var(--destructive))]">
+                <Trash2 className="h-4 w-4" />
+              </span>
+              Delete &ldquo;{meal.name}&rdquo;?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {meal.cookCount > 0
+                ? `This removes the recipe and its ${meal.cookCount} logged cook${meal.cookCount === 1 ? "" : "s"}. You can undo right after.`
+                : "This removes the recipe from your library. You can undo right after."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-[color:var(--terra,var(--destructive))] text-white hover:opacity-90"
+              onClick={() => {
+                setConfirmDelete(false);
+                lifecycle.remove();
+              }}
+            >
+              Delete recipe
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* "Who can see this" strip — per-item sharing entry point. */}
       <WhoCanSeeStrip

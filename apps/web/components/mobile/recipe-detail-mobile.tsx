@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ExternalLink, Pencil, Share2 } from "lucide-react";
+import { Archive, ChevronLeft, ExternalLink, MoreVertical, Pencil, Share2, Trash2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { MealImage } from "@/components/mobile/meal-image";
@@ -11,7 +11,24 @@ import { splitMealName } from "@/lib/meal/split-name";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
 import { MobileScaffold } from "@/components/mobile/mobile-scaffold";
 import { ShareSheet } from "@/components/sharing/share-sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/components/providers/toast-provider";
+import { useRecipeLifecycle } from "@/components/meals/use-recipe-lifecycle";
 import type { RecipeDetailMeal, RecipeDetailViewer } from "@/components/meals/recipe-detail-client";
 
 const EFFORT_LABEL: Record<"quick" | "easy" | "medium" | "high_effort", string> = {
@@ -75,6 +92,11 @@ export function RecipeDetailMobile({ meal }: { meal: RecipeDetailMeal; viewer: R
   const { showToast } = useToast();
   const titleParts = splitMealName(meal.name);
   const [shareOpen, setShareOpen] = React.useState(false);
+
+  // Owner-only lifecycle (Archive / Delete), reached from the ⋯ menu in the
+  // hero bar. Same hook + UX as the desktop view.
+  const lifecycle = useRecipeLifecycle(meal.id, meal.name);
+  const [confirmDelete, setConfirmDelete] = React.useState(false);
 
   const ingredientLines = React.useMemo(() => {
     if (meal.structuredIngredients.length > 0) {
@@ -161,18 +183,44 @@ export function RecipeDetailMobile({ meal }: { meal: RecipeDetailMeal; viewer: R
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
-          {meal.viewerCanManageSharing ? (
-            <button
-              type="button"
-              aria-label="Share recipe"
-              onClick={() => setShareOpen(true)}
-              className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-card/85 text-foreground backdrop-blur"
-            >
-              <Share2 className="h-[18px] w-[18px]" />
-            </button>
-          ) : (
-            <span className="h-[38px] w-[38px]" aria-hidden />
-          )}
+          <div className="flex items-center gap-2">
+            {meal.viewerCanManageSharing ? (
+              <button
+                type="button"
+                aria-label="Share recipe"
+                onClick={() => setShareOpen(true)}
+                className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-card/85 text-foreground backdrop-blur"
+              >
+                <Share2 className="h-[18px] w-[18px]" />
+              </button>
+            ) : null}
+            {meal.viewerIsCreator ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="More recipe actions"
+                    className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-card/85 text-foreground backdrop-blur"
+                  >
+                    <MoreVertical className="h-[18px] w-[18px]" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => lifecycle.archive()}>
+                    <Archive className="h-4 w-4" />
+                    Archive recipe
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => setConfirmDelete(true)}
+                    className="text-[color:var(--terra,var(--destructive))] focus:text-[color:var(--terra,var(--destructive))]"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete recipe
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+          </div>
         </div>
         <MealImage name={meal.name} photoUrl={meal.photoUrl} size="l" className="h-[180px] w-full rounded-none" />
       </div>
@@ -358,6 +406,36 @@ export function RecipeDetailMobile({ meal }: { meal: RecipeDetailMeal; viewer: R
           onOpenChange={setShareOpen}
         />
       ) : null}
+
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--terra-soft,#f3e0d7)] text-[color:var(--terra,var(--destructive))]">
+                <Trash2 className="h-4 w-4" />
+              </span>
+              Delete &ldquo;{meal.name}&rdquo;?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {meal.cookCount > 0
+                ? `This removes the recipe and its ${meal.cookCount} logged cook${meal.cookCount === 1 ? "" : "s"}. You can undo right after.`
+                : "This removes the recipe from your library. You can undo right after."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-[color:var(--terra,var(--destructive))] text-white hover:opacity-90"
+              onClick={() => {
+                setConfirmDelete(false);
+                lifecycle.remove();
+              }}
+            >
+              Delete recipe
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MobileScaffold>
   );
 }
