@@ -4,18 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { useTheme } from "next-themes";
-import {
-  Bell,
-  CalendarPlus,
-  ChevronRight,
-  Moon,
-  Search,
-  Settings,
-  Sparkles,
-  Sun,
-  Users,
-  Utensils
-} from "lucide-react";
+import { Bell, ChevronRight, Moon, Search, Settings, Sun, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** Lightweight bottom sheet (scrim + slide-up cream card + grab handle). */
@@ -112,36 +101,9 @@ export function SheetRow({
 
 const ICON = "h-5 w-5";
 
-export function AddSheetContent({ onClose }: { onClose: () => void }) {
-  const router = useRouter();
-  const go = (href: Route) => {
-    onClose();
-    router.push(href);
-  };
-  return (
-    <>
-      <SheetRow
-        accent
-        icon={<Utensils className={ICON} />}
-        label="Add a meal"
-        sub="Log what you cooked, or capture a recipe"
-        onClick={() => go("/add" as Route)}
-      />
-      <SheetRow
-        icon={<Sparkles className={ICON} />}
-        label="Capture with AI"
-        sub="Photo, voice note or text"
-        onClick={() => go("/add?ai=1" as Route)}
-      />
-      <SheetRow
-        icon={<CalendarPlus className={ICON} />}
-        label="Plan an occasion"
-        sub="Build a menu for a day"
-        onClick={() => go("/plans/new" as Route)}
-      />
-    </>
-  );
-}
+// R37 — the Add sheet was retired: the bottom-bar center FAB now links straight
+// to "Log a meal" (/add) per the unified tab-bar pattern, so the multi-option
+// Add sheet is gone.
 
 export function MoreSheetContent({ onClose }: { onClose: () => void }) {
   const router = useRouter();
