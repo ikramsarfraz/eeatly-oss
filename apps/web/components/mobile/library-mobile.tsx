@@ -724,7 +724,7 @@ function RecipeCard({
         <p className="mt-2 line-clamp-2 text-[14px] font-medium leading-tight text-foreground">{name}</p>
         <div className="mt-1.5 flex items-center gap-2">
           {effort ? <EffortPill level={effort} compact /> : null}
-          <span className="truncate font-mono text-[9.5px] uppercase tracking-[0.1em] text-[color:var(--ink3)]">
+          <span className="truncate font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-foreground">
             {meta}
           </span>
         </div>
@@ -766,7 +766,7 @@ function RecipeRow({
           <span className="block truncate text-[14.5px] font-medium text-foreground">{name}</span>
           <span className="flex items-center gap-2">
             {effort ? <EffortPill level={effort} compact /> : null}
-            <span className="truncate font-mono text-[9px] uppercase tracking-[0.1em] text-[color:var(--ink3)]">{meta}</span>
+            <span className="truncate font-mono text-[10.5px] font-medium uppercase tracking-[0.1em] text-foreground">{meta}</span>
           </span>
         </span>
       </Link>

@@ -470,7 +470,7 @@ function RecentTile({ row }: { row: RecentMeal }) {
         <span className="truncate text-[13px] font-medium text-foreground group-hover:underline">
           {row.mealName}
         </span>
-        <span className="font-mono text-[10.5px] uppercase text-muted-foreground" style={{ letterSpacing: "0.12em" }}>
+        <span className="font-mono text-[12px] font-medium uppercase text-foreground" style={{ letterSpacing: "0.12em" }}>
           {row.cookedAt
             ? format(parseISO(row.cookedAt), "EEE, MMM d")
             : "—"}
@@ -507,7 +507,7 @@ function MostCookedTile({ meal }: { meal: MealStat }) {
             {meal.cookCount}× cooked
           </Badge>
           <span
-            className="font-mono text-[10.5px] uppercase text-muted-foreground"
+            className="font-mono text-[12px] font-medium uppercase text-foreground"
             style={{ letterSpacing: "0.12em" }}
           >
             {meal.lastCookedAt

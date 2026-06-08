@@ -3,6 +3,20 @@
 All notable changes to eeatly are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.3.2] - 2026-06-08
+
+Patch: mobile recipe-detail photo actions and more legible dates on recipe
+cards. No schema changes or migrations.
+
+### Improvements
+- Mobile: the recipe detail now lets editors change the dish photo (a camera
+  button on the image) or generate an AI image when there is none yet, matching
+  the desktop view.
+- Recipe cards on Home and Library show the cooked-on weekday and date more
+  prominently (larger and darker), so the day reads at a glance.
+
+[1.3.2]: https://github.com/ikramsarfraz/eeatly/releases/tag/v1.3.2
+
 ## [1.3.1] - 2026-06-07
 
 Patch: fixes for mobile add and edit, recipe saving, plan credit display, and
