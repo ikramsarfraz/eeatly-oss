@@ -52,3 +52,27 @@ export function isUpgradeRequired(
 export function isRateLimited(error: unknown): boolean {
   return getCause(error)?.reason === "RATE_LIMITED";
 }
+
+/**
+ * A human-readable message for an input-validation (Zod) failure. tRPC sets a
+ * BAD_REQUEST error's `message` to the serialized ZodError issue list, so a
+ * naive `error.message` renders a raw JSON array to the user. This pulls the
+ * first issue's `message` (e.g. "Step text is too long.") out of that array.
+ * Returns null when the error isn't a serialized validation failure, so callers
+ * can fall back to their generic copy.
+ */
+export function validationMessage(error: unknown): string | null {
+  if (!(error instanceof Error)) return null;
+  const raw = error.message?.trim();
+  if (!raw || raw[0] !== "[") return null;
+  try {
+    const issues = JSON.parse(raw);
+    if (Array.isArray(issues)) {
+      const withMessage = issues.find((i) => typeof i?.message === "string");
+      if (withMessage) return withMessage.message as string;
+    }
+  } catch {
+    // Not a serialized ZodError — let the caller use its fallback.
+  }
+  return null;
+}

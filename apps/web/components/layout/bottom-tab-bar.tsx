@@ -45,6 +45,13 @@ export function BottomTabBar() {
   const pathname = usePathname() ?? "";
   const [moreOpen, setMoreOpen] = React.useState(false);
 
+  // Focused create/edit flows (/add, /meal/<id>/edit) own the bottom edge with
+  // their own sticky Save bar. Rendering the nav there would overlap and hide it
+  // (both are fixed bottom-0). Exit is the screen's top-left back chevron.
+  const focusedFlow =
+    pathname === "/add" || (pathname.startsWith("/meal/") && pathname.endsWith("/edit"));
+  if (focusedFlow) return null;
+
   return (
     <>
       <nav

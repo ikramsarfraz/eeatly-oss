@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { SectionLabel } from "@/components/ui/section-label";
 import { useToast } from "@/components/providers/toast-provider";
 import { trpc } from "@/lib/trpc/client";
-import { displayedMonthlyCredits, TIERS, TIER_FEATURES } from "@/lib/pricing";
+import { MONTHLY_CREDIT_GRANT, TIERS, TIER_FEATURES } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
 
 type PaidTier = "plus" | "premium" | "pro";
@@ -206,7 +206,7 @@ export function PlanManager() {
               : interval === "monthly"
                 ? price?.display
                 : (t?.annual && "perMonthDisplay" in t.annual ? t.annual.perMonthDisplay : undefined);
-            const credits = displayedMonthlyCredits(tier, launchFreeAccess);
+            const credits = MONTHLY_CREDIT_GRANT[tier];
             const sellable = isFreeTier ? false : Boolean(t?.sellable);
             // Highlight the EFFECTIVE current tier so the cards agree with the
             // header: during the no-card trial that's Master Chef (badged

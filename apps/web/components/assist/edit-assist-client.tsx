@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import type { Route } from "next";
 
 import { trpc } from "@/lib/trpc/client";
-import { getCause } from "@/lib/trpc/errors";
+import { getCause, validationMessage } from "@/lib/trpc/errors";
 import { useToast } from "@/components/providers/toast-provider";
 import { blobToBase64 } from "@/lib/refine/use-voice-recorder";
 import { SUPPORTED_AUDIO_MEDIA_TYPES } from "@eeatly/api/validators/ai";
@@ -163,9 +163,13 @@ export function EditAssistClient({
         ingredients: ingredients
           .filter((r) => r.text.trim().length > 0)
           .map((r) => ({ name: r.text.trim() })),
+        // The single-line step editor captures the instruction itself, which
+        // is body text (cap 4000), not a short title (cap 160). Send it as the
+        // body with an empty title; the recipe view renders an empty-title step
+        // as a clean numbered instruction (see services/recipe-edit.ts).
         steps: steps
           .filter((r) => r.text.trim().length > 0)
-          .map((r) => ({ title: r.text.trim() }))
+          .map((r) => ({ title: "", body: r.text.trim() }))
       });
       await utils.meals.getById.invalidate({ mealId });
       showToast({ variant: "success", title: "Changes saved" });
@@ -175,7 +179,8 @@ export function EditAssistClient({
       showToast({
         variant: "error",
         title: collision ? "That name is taken" : "Couldn't save",
-        description: err instanceof Error ? err.message : "Please try again."
+        description:
+          validationMessage(err) ?? (err instanceof Error ? err.message : "Please try again.")
       });
     } finally {
       setSaving(false);
@@ -256,7 +261,7 @@ export function EditAssistClient({
       </div>
 
       {/* Mobile sticky save bar */}
-      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-2 border-t border-[color:var(--ae-border)] bg-[color:var(--ae-cream)] p-3 sm:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-2 border-t border-[color:var(--ae-border)] bg-[color:var(--ae-cream)] p-3 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:hidden">
         <button
           type="button"
           onClick={() => router.back()}

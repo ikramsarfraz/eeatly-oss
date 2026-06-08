@@ -1,8 +1,7 @@
 import "server-only";
 
 import { getStripeCatalog, perMonthDisplay } from "@/services/stripe-catalog";
-import { isLaunchFreeAccess } from "@/lib/env/server";
-import { displayedMonthlyCredits, TIERS, type TierDisplay, type TierDisplayMap } from "@/lib/pricing";
+import { MONTHLY_CREDIT_GRANT, TIERS, type TierDisplay, type TierDisplayMap } from "@/lib/pricing";
 
 /**
  * Single source of truth for the prices shown on every pricing surface
@@ -14,9 +13,9 @@ import { displayedMonthlyCredits, TIERS, type TierDisplay, type TierDisplayMap }
  */
 export async function getTierDisplayPrices(): Promise<TierDisplayMap> {
   const catalog = await getStripeCatalog();
-  // During the launch promo, every tier's shown credits are floored at the
-  // launch grant so the number matches what users actually receive.
-  const launch = isLaunchFreeAccess();
+  // Credits shown are each plan's real per-tier grant. Users may RECEIVE more
+  // during the launch promo (the credit engine floors the grant), but the
+  // plans advertise their true numbers. See `effectiveMonthlyGrant`.
 
   const resolve = (tier: "plus" | "premium" | "pro"): TierDisplay => {
     const t = TIERS[tier];
@@ -25,7 +24,7 @@ export async function getTierDisplayPrices(): Promise<TierDisplayMap> {
       monthly: cp.monthly?.display ?? t.monthly.display,
       annualPerMonth: cp.annual ? perMonthDisplay(cp.annual) : t.annual.perMonthDisplay,
       annualTotal: cp.annual?.display ?? t.annual.display,
-      credits: displayedMonthlyCredits(tier, launch)
+      credits: MONTHLY_CREDIT_GRANT[tier]
     };
   };
 
@@ -34,7 +33,7 @@ export async function getTierDisplayPrices(): Promise<TierDisplayMap> {
       monthly: "$0",
       annualPerMonth: "$0",
       annualTotal: "$0",
-      credits: displayedMonthlyCredits("free", launch)
+      credits: MONTHLY_CREDIT_GRANT.free
     },
     plus: resolve("plus"),
     premium: resolve("premium"),

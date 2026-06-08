@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 
 import { trpc } from "@/lib/trpc/client";
+import { formatCookedDay } from "@/lib/dates";
 import { useDashboardMeals } from "@/hooks/use-dashboard-meals";
 import { MealImage } from "@/components/mobile/meal-image";
 import { EffortPill } from "@/components/history/effort-pill";
@@ -99,8 +100,8 @@ export function HomeMobile({
   // Jump back in: recent cooks (dedup by meal), fall back to most-cooked.
   const seen = new Set<string>();
   const jumpBack = [
-    ...meals.recentMeals.map((m) => ({ mealId: m.mealId, name: m.mealName, photoUrl: m.photoUrl, effort: m.effortLevel })),
-    ...meals.mostCookedMeals.map((m) => ({ mealId: m.mealId, name: m.mealName, photoUrl: m.photoUrl, effort: null as EffortLevel | null }))
+    ...meals.recentMeals.map((m) => ({ mealId: m.mealId, name: m.mealName, photoUrl: m.photoUrl, date: m.cookedAt as string | null })),
+    ...meals.mostCookedMeals.map((m) => ({ mealId: m.mealId, name: m.mealName, photoUrl: m.photoUrl, date: m.lastCookedAt as string | null }))
   ]
     .filter((m) => {
       if (seen.has(m.mealId)) return false;
@@ -175,9 +176,9 @@ export function HomeMobile({
               <Link key={m.mealId} href={`/meal/${m.mealId}`} className="w-[120px] shrink-0 snap-start">
                 <MealImage name={m.name} photoUrl={m.photoUrl} size="m" className="aspect-square w-full rounded-[14px] border" />
                 <p className="mt-1.5 line-clamp-2 text-[13px] font-medium leading-tight text-foreground">{m.name}</p>
-                {m.effort && (
+                {m.date && (
                   <span className="mt-1 inline-block font-mono text-[9.5px] uppercase tracking-[0.1em] text-[color:var(--ink3)]">
-                    {m.effort === "high_effort" ? "Project" : m.effort}
+                    {formatCookedDay(m.date)}
                   </span>
                 )}
               </Link>

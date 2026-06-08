@@ -472,7 +472,7 @@ function RecentTile({ row }: { row: RecentMeal }) {
         </span>
         <span className="font-mono text-[10.5px] uppercase text-muted-foreground" style={{ letterSpacing: "0.12em" }}>
           {row.cookedAt
-            ? format(parseISO(row.cookedAt), "MMM d")
+            ? format(parseISO(row.cookedAt), "EEE, MMM d")
             : "—"}
         </span>
       </div>
@@ -481,9 +481,6 @@ function RecentTile({ row }: { row: RecentMeal }) {
 }
 
 function MostCookedTile({ meal }: { meal: MealStat }) {
-  const days = meal.lastCookedAt
-    ? differenceInCalendarDays(new Date(), parseISO(meal.lastCookedAt))
-    : null;
   return (
     <Link
       href={`/meal/${meal.mealId}` as Route}
@@ -513,10 +510,8 @@ function MostCookedTile({ meal }: { meal: MealStat }) {
             className="font-mono text-[10.5px] uppercase text-muted-foreground"
             style={{ letterSpacing: "0.12em" }}
           >
-            {days !== null
-              ? days === 0
-                ? "today"
-                : `${days}d ago`
+            {meal.lastCookedAt
+              ? format(parseISO(meal.lastCookedAt), "EEE, MMM d")
               : "—"}
           </span>
         </div>

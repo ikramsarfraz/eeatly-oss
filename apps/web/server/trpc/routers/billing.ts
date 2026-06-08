@@ -15,7 +15,7 @@ import {
 import { getStripeCatalog, perMonthDisplay } from "@/services/stripe-catalog";
 import { getTierStatus } from "@/services/ai-credits";
 import { isLaunchFreeAccess } from "@/lib/env/server";
-import { displayedMonthlyCredits, TIERS } from "@/lib/pricing";
+import { MONTHLY_CREDIT_GRANT, TIERS } from "@/lib/pricing";
 import { protectedProcedure, rateLimit, router } from "../trpc";
 
 function tierDisplay(
@@ -62,10 +62,10 @@ export const billingRouter = router({
    */
   tierStatus: protectedProcedure.query(({ ctx }) => getTierStatus(ctx.user.id)),
 
-  /** Live tier prices (from the Stripe catalog) + included monthly credits.
-   *  `monthlyCredits` is the number the user actually receives: floored at the
-   *  launch grant while the launch promo is on, so settings matches the engine.
-   *  `launchFreeAccess` lets the client floor the free-tier card the same way. */
+  /** Live tier prices (from the Stripe catalog) + each plan's real included
+   *  monthly credits (the per-tier base the plan advertises). Users may RECEIVE
+   *  more during the launch promo (the credit engine floors the grant);
+   *  `launchFreeAccess` lets the client reflect the promo state in the UI. */
   catalog: protectedProcedure.query(async () => {
     const catalog = await getStripeCatalog();
     const launchFreeAccess = isLaunchFreeAccess();
@@ -73,15 +73,15 @@ export const billingRouter = router({
       launchFreeAccess,
       plus: {
         ...tierDisplay("plus", catalog.tiers.plus),
-        monthlyCredits: displayedMonthlyCredits("plus", launchFreeAccess)
+        monthlyCredits: MONTHLY_CREDIT_GRANT.plus
       },
       premium: {
         ...tierDisplay("premium", catalog.tiers.premium),
-        monthlyCredits: displayedMonthlyCredits("premium", launchFreeAccess)
+        monthlyCredits: MONTHLY_CREDIT_GRANT.premium
       },
       pro: {
         ...tierDisplay("pro", catalog.tiers.pro),
-        monthlyCredits: displayedMonthlyCredits("pro", launchFreeAccess)
+        monthlyCredits: MONTHLY_CREDIT_GRANT.pro
       }
     };
   }),

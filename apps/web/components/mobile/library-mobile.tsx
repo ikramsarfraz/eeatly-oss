@@ -22,6 +22,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc/client";
+import { formatCookedDay } from "@/lib/dates";
 import { MealImage } from "@/components/mobile/meal-image";
 import { EffortPill } from "@/components/history/effort-pill";
 import { MobileScaffold } from "@/components/mobile/mobile-scaffold";
@@ -397,7 +398,7 @@ export function LibraryMobile({
                         name={row.name}
                         photoUrl={row.photoUrl}
                         effort={stat?.effortLevel ?? null}
-                        meta={listMeta(row, stat?.cookCount ?? 0)}
+                        meta={listMeta(row, stat ?? null)}
                         onMenu={() =>
                           setActionTarget({
                             id: row.id,
@@ -670,19 +671,22 @@ function ActionSheetBody({
 
 function metaFor(stat: LibraryStat | null): string {
   if (!stat || stat.cookCount <= 0) return "Not yet cooked";
-  return metaForCount(stat.cookCount);
+  return stat.lastCookedAt
+    ? `${formatCookedDay(stat.lastCookedAt)} · ${stat.cookCount}×`
+    : metaForCount(stat.cookCount);
 }
 function metaForCount(cookCount: number): string {
   if (cookCount <= 0) return "Not yet cooked";
   return `Cooked ${cookCount}${cookCount === 1 ? " time" : " times"}`;
 }
 
-/** List-row meta: `cuisine · course · n×` (per the handoff), tags first. */
-function listMeta(row: LibraryRow, cookCount: number): string {
+/** List-row meta: `Tue, Jun 3 · cuisine · course · n×` — cooked day first. */
+function listMeta(row: LibraryRow, stat: LibraryStat | null): string {
   const parts: string[] = [];
+  if (stat?.lastCookedAt) parts.push(formatCookedDay(stat.lastCookedAt));
   if (row.cuisine) parts.push(row.cuisine);
   if (row.course) parts.push(row.course);
-  if (cookCount > 0) parts.push(`${cookCount}×`);
+  if ((stat?.cookCount ?? 0) > 0) parts.push(`${stat?.cookCount}×`);
   return parts.length > 0 ? parts.join(" · ") : "Not yet cooked";
 }
 

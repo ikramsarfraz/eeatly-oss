@@ -875,7 +875,7 @@ function metaLine(item: Pick<CardItem, "cookCount" | "lastCookedAt">): string {
   const parts = [`${item.cookCount}× cooked`];
   if (item.lastCookedAt) {
     parts.push(
-      `last ${new Date(item.lastCookedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+      `last ${new Date(item.lastCookedAt).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`
     );
   }
   return parts.join(" · ");
