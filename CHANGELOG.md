@@ -3,6 +3,30 @@
 All notable changes to eeatly are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.3.1] - 2026-06-07
+
+Patch: fixes for mobile add and edit, recipe saving, plan credit display, and
+clearer dates on recipe cards. No schema changes or migrations.
+
+### Fixes
+- Mobile: the Save button on "Add a meal" and "Edit recipe" was hidden behind
+  the bottom navigation, so there was no way to save. The bottom bar now steps
+  aside on those screens, and the Save bar clears the home indicator.
+- Editing a recipe no longer fails with "Step title is too long" on ordinary
+  step instructions. Step text is saved as the instruction body (which allows
+  much longer text), and a failed save now shows a readable message instead of
+  raw validation details.
+- Pricing: each plan now shows its real monthly AI credits (the Cook plan reads
+  40, not 300). The launch promo is unchanged: everyone still receives the
+  larger launch grant while it is on.
+
+### Improvements
+- Recipe cards on Home and Library now lead with the weekday and date (for
+  example "Tue, Jun 3"), so you can see at a glance when a dish was last cooked.
+  Mobile cards that previously showed no date now include it.
+
+[1.3.1]: https://github.com/ikramsarfraz/eeatly/releases/tag/v1.3.1
+
 ## [1.3.0] - 2026-06-07
 
 Email and password sign-in with full account recovery, a redesigned web Library
