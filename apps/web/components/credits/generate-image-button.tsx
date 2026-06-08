@@ -128,8 +128,7 @@ export function GenerateImageButton({ mealId, onGenerated, className }: Generate
                   This uses <strong>{COST} credits</strong>
                   {afterSpend !== null ? (
                     <>
-                      {" "}
-                      — you&apos;ll have <strong>{afterSpend.toLocaleString()}</strong> left
+                      , you&apos;ll have <strong>{afterSpend.toLocaleString()}</strong> left
                     </>
                   ) : null}
                   .

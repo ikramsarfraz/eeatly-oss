@@ -3,12 +3,15 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Archive, ChevronLeft, ExternalLink, MoreVertical, Pencil, Share2, Trash2 } from "lucide-react";
+import { Archive, Camera, ChevronLeft, ExternalLink, Loader2, MoreVertical, Pencil, Share2, Trash2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { trpc } from "@/lib/trpc/client";
+import { uploadPhoto } from "@/lib/uploads/upload-photo";
 import { MealImage } from "@/components/mobile/meal-image";
 import { splitMealName } from "@/lib/meal/split-name";
 import { LogAgainButton } from "@/components/dashboard/log-again-button";
+import { GenerateImageButton } from "@/components/credits/generate-image-button";
 import { MobileScaffold } from "@/components/mobile/mobile-scaffold";
 import { ShareSheet } from "@/components/sharing/share-sheet";
 import {
@@ -97,6 +100,33 @@ export function RecipeDetailMobile({ meal }: { meal: RecipeDetailMeal; viewer: R
   // hero bar. Same hook + UX as the desktop view.
   const lifecycle = useRecipeLifecycle(meal.id, meal.name);
   const [confirmDelete, setConfirmDelete] = React.useState(false);
+
+  // Photo: editors can replace the hero image (device upload) or, when the dish
+  // has none yet, generate an AI one. Mirrors the desktop hero actions. Local
+  // `photoUrl` state swaps the hero in place once an upload/generation resolves.
+  const [photoUrl, setPhotoUrl] = React.useState<string | null>(meal.photoUrl);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const setMealPhoto = trpc.meals.setPhoto.useMutation();
+  const isUploadingPhoto = setMealPhoto.isPending;
+
+  async function handlePhotoSelected(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    // Reset so re-selecting the same file still fires onChange.
+    event.target.value = "";
+    if (!file) return;
+    try {
+      const url = await uploadPhoto(file);
+      const result = await setMealPhoto.mutateAsync({ mealId: meal.id, photoUrl: url });
+      setPhotoUrl(result.photoUrl);
+      showToast({ variant: "success", title: "Photo updated" });
+    } catch (error) {
+      showToast({
+        variant: "error",
+        title: "Couldn't update the photo",
+        description: error instanceof Error ? error.message : "Try again."
+      });
+    }
+  }
 
   const ingredientLines = React.useMemo(() => {
     if (meal.structuredIngredients.length > 0) {
@@ -222,7 +252,31 @@ export function RecipeDetailMobile({ meal }: { meal: RecipeDetailMeal; viewer: R
             ) : null}
           </div>
         </div>
-        <MealImage name={meal.name} photoUrl={meal.photoUrl} size="l" className="h-[180px] w-full rounded-none" />
+        <MealImage name={meal.name} photoUrl={photoUrl} size="l" className="h-[180px] w-full rounded-none" />
+        {meal.viewerCanEdit ? (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={handlePhotoSelected}
+            />
+            <button
+              type="button"
+              aria-label={photoUrl ? "Change photo" : "Add photo"}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploadingPhoto}
+              className="absolute bottom-3 right-3 z-10 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-card/85 text-foreground backdrop-blur disabled:opacity-60"
+            >
+              {isUploadingPhoto ? (
+                <Loader2 className="h-[18px] w-[18px] animate-spin" />
+              ) : (
+                <Camera className="h-[18px] w-[18px]" />
+              )}
+            </button>
+          </>
+        ) : null}
       </div>
 
       <div className="px-4 pt-4">
@@ -287,6 +341,18 @@ export function RecipeDetailMobile({ meal }: { meal: RecipeDetailMeal; viewer: R
             />
           </div>
         )}
+
+        {/* No image yet: offer AI generation (10 credits). A device upload via
+            the hero camera button wins over this and hides it. */}
+        {meal.viewerCanEdit && !photoUrl ? (
+          <div className="mt-2.5">
+            <GenerateImageButton
+              mealId={meal.id}
+              onGenerated={(url) => setPhotoUrl(url)}
+              className="h-11 w-full rounded-[12px]"
+            />
+          </div>
+        ) : null}
 
         {meal.recipeSourceUrl && (
           <a
