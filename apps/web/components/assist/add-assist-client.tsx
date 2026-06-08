@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import type { Route } from "next";
 
 import { trpc } from "@/lib/trpc/client";
-import { getCause } from "@/lib/trpc/errors";
+import { getCause, validationMessage } from "@/lib/trpc/errors";
 import { useToast } from "@/components/providers/toast-provider";
 import { useCreateMealLogImperative } from "@/hooks/use-dashboard-meals";
 import { uploadPhoto } from "@/lib/uploads/upload-photo";
@@ -144,7 +144,8 @@ export function AddAssistClient({ initialMealName }: { initialMealName?: string 
       showToast({
         variant: "error",
         title: "Couldn't save",
-        description: err instanceof Error ? err.message : "Please try again."
+        description:
+          validationMessage(err) ?? (err instanceof Error ? err.message : "Please try again.")
       });
     } finally {
       setSaving(false);
@@ -267,7 +268,7 @@ export function AddAssistClient({ initialMealName }: { initialMealName?: string 
       </div>
 
       {/* Mobile sticky save bar */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[color:var(--ae-border)] bg-[color:var(--ae-cream)] p-3 sm:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[color:var(--ae-border)] bg-[color:var(--ae-cream)] p-3 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:hidden">
         <button
           type="button"
           onClick={save}
