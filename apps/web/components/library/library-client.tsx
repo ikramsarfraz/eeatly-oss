@@ -1024,7 +1024,7 @@ function LibraryItemRow({ item, menu, archived }: { item: CardItem; menu: React.
         )}
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[14px] font-medium text-foreground">{item.name}</span>
-          <span className="font-mono text-[10.5px] uppercase tracking-[0.13em] text-muted-foreground">
+          <span className="font-mono text-[12px] font-medium uppercase tracking-[0.13em] text-foreground">
             {metaLine(item)}
           </span>
         </span>
@@ -1119,7 +1119,7 @@ function LibraryItemCard({
         </span>
         <div className="grid gap-0.5">
           <p className="truncate text-[14px] font-medium text-foreground group-hover:underline">{item.name}</p>
-          <p className="font-mono text-[10.5px] uppercase text-muted-foreground" style={{ letterSpacing: "0.13em" }}>
+          <p className="font-mono text-[12px] font-medium uppercase text-foreground" style={{ letterSpacing: "0.13em" }}>
             {metaLine(item)}
           </p>
           {item.effortLevel ? <div className="mt-1 flex flex-wrap items-center gap-1">{effortBadge(item.effortLevel)}</div> : null}

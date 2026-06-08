@@ -177,7 +177,7 @@ export function HomeMobile({
                 <MealImage name={m.name} photoUrl={m.photoUrl} size="m" className="aspect-square w-full rounded-[14px] border" />
                 <p className="mt-1.5 line-clamp-2 text-[13px] font-medium leading-tight text-foreground">{m.name}</p>
                 {m.date && (
-                  <span className="mt-1 inline-block font-mono text-[9.5px] uppercase tracking-[0.1em] text-[color:var(--ink3)]">
+                  <span className="mt-1 inline-block font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-foreground">
                     {formatCookedDay(m.date)}
                   </span>
                 )}
