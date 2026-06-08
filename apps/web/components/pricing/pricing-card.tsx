@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/components/providers/toast-provider";
 import { trpc } from "@/lib/trpc/client";
 import {
-  displayedMonthlyCredits,
+  MONTHLY_CREDIT_GRANT,
   TIER_FEATURES,
   TIERS,
   type BillingInterval,
@@ -34,9 +34,6 @@ type PricingCardProps = {
   prices: TierPriceDisplay | null;
   /** Launch promo (Chef-era) — only meaningful for the Chef card. */
   launchMode: boolean;
-  /** Launch free-access on → floor every card's shown credits at the launch
-   *  grant so the number matches what users actually receive. */
-  launchFreeAccess: boolean;
   authState: AuthState;
   /** Billing period — lifted to the page-level grid so all cards agree. */
   interval: BillingInterval;
@@ -60,7 +57,6 @@ export function PricingCard({
   tier,
   prices,
   launchMode,
-  launchFreeAccess,
   authState,
   interval
 }: PricingCardProps) {
@@ -187,7 +183,7 @@ export function PricingCard({
             isFeatured ? "text-primary" : "text-foreground"
           )}
         >
-          {displayedMonthlyCredits(tier, launchFreeAccess).toLocaleString()}
+          {MONTHLY_CREDIT_GRANT[tier].toLocaleString()}
         </span>
         <span className="whitespace-nowrap text-[12.5px] text-muted-foreground">
           AI credits / month

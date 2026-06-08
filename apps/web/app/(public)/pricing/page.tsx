@@ -3,7 +3,7 @@ import type { Metadata, Route } from "next";
 import { Sparkles } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getServerEnv, hasStripeEnv, isLaunchFreeAccess } from "@/lib/env/server";
-import { displayedMonthlyCredits, TIERS, type Tier } from "@/lib/pricing";
+import { MONTHLY_CREDIT_GRANT, TIERS, type Tier } from "@/lib/pricing";
 import { getSubscriptionState } from "@/services/billing";
 import { getStripeCatalog, perMonthDisplay } from "@/services/stripe-catalog";
 import { PricingGrid } from "@/components/pricing/pricing-grid";
@@ -168,7 +168,7 @@ export default async function PricingPage() {
                   </span>
                   <span className="font-mono text-[13px] text-muted-foreground">
                     <b className="font-semibold text-foreground">
-                      {displayedMonthlyCredits(tier, launchMode).toLocaleString()}
+                      {MONTHLY_CREDIT_GRANT[tier].toLocaleString()}
                     </b>{" "}
                     credits / mo
                   </span>

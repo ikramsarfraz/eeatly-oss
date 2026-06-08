@@ -172,23 +172,27 @@ export const MONTHLY_CREDIT_GRANT: Record<Tier, number> = {
 
 /**
  * Launch-promo credit floor. While `isLaunchFreeAccess()` is on (Stripe not
- * yet wired, or forced via `LAUNCH_FREE_ACCESS=true`), every user's monthly
- * grant is floored at this amount regardless of their resolved tier, so the
+ * yet wired, or forced via `LAUNCH_FREE_ACCESS=true`), the credits a user is
+ * actually GRANTED are floored at this amount regardless of tier, so the
  * "all plans open, free during launch" experience isn't undercut by the
  * 40-credit free bucket once the 7-day trial ends. Set to the Chef grant:
  * generous for normal use, bounded for COGS. Auto-reverts to plain per-tier
- * grants the moment the launch flag flips off. Keep `creditFloorForDisplay`
- * (below) and the credit engine's grant logic reading this same constant.
+ * grants the moment the launch flag flips off.
+ *
+ * This floors the GRANT only, NOT what the pricing surfaces advertise. Plans
+ * show their real per-tier credits (`MONTHLY_CREDIT_GRANT`), so Cook reads
+ * "40 / month" even while the engine still seeds 300. See `effectiveMonthlyGrant`.
  */
 export const LAUNCH_CREDIT_GRANT = TIERS.plus.monthlyCredits; // 300
 
 /**
- * The credits to SHOW for a tier given the launch flag: floored at the launch
- * grant while the promo is on, so pricing/settings numbers match what users
- * actually receive. Pure (no env read) so client components can call it; the
- * caller passes whether launch access is on.
+ * The credits a user is actually GRANTED for a tier: floored at the launch
+ * grant while the promo is on, so the credit engine seeds the launch amount.
+ * Distinct from the advertised plan number (`MONTHLY_CREDIT_GRANT`, the real
+ * per-tier base shown on pricing/settings). Pure (no env read) so the caller
+ * passes whether launch access is on.
  */
-export function displayedMonthlyCredits(tier: Tier, launchFreeAccess: boolean): number {
+export function effectiveMonthlyGrant(tier: Tier, launchFreeAccess: boolean): number {
   const base = MONTHLY_CREDIT_GRANT[tier];
   return launchFreeAccess ? Math.max(base, LAUNCH_CREDIT_GRANT) : base;
 }
