@@ -3,6 +3,20 @@
 All notable changes to eeatly are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.3.3] - 2026-06-09
+
+Patch: a sharper search-result favicon and canonical URLs aligned on the www
+host. No schema changes or migrations.
+
+### Improvements
+- Favicon: the browser-tab and search-result icon is now a crisp vector mark
+  that stays legible at small sizes, replacing the blurry raster version.
+- SEO: the homepage canonical, sitemap, robots, and social-share image URLs
+  now point straight at the www host, so crawlers and link previews no longer
+  take an extra redirect hop.
+
+[1.3.3]: https://github.com/ikramsarfraz/eeatly/releases/tag/v1.3.3
+
 ## [1.3.2] - 2026-06-08
 
 Patch: mobile recipe-detail photo actions and more legible dates on recipe
