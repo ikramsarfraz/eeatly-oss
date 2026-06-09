@@ -39,7 +39,8 @@ export default async function HomePage() {
   const env = getServerEnv();
   const prices = await getTierDisplayPrices();
 
-  const base = (env.NEXT_PUBLIC_APP_URL ?? "https://eeatly.com").replace(/\/$/, "");
+  // JSON-LD @id/url/logo must use the canonical `www` host (apex 308-redirects). R32.6.
+  const base = "https://www.eeatly.com";
   const structuredData = {
     "@context": "https://schema.org",
     "@graph": [
