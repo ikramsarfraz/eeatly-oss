@@ -3,6 +3,18 @@
 All notable changes to eeatly are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.3.4] - 2026-06-09
+
+Patch: restores the "Switch to admin" link host on the www origin. No schema
+changes or migrations.
+
+### Fixes
+- The "Switch to admin" shortcut now points at admin.eeatly.com again. After
+  the app origin moved to www, it had been building an unreachable
+  admin.www.eeatly.com host.
+
+[1.3.4]: https://github.com/ikramsarfraz/eeatly/releases/tag/v1.3.4
+
 ## [1.3.3] - 2026-06-09
 
 Patch: a sharper search-result favicon and canonical URLs aligned on the www

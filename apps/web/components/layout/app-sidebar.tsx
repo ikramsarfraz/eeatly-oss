@@ -137,18 +137,20 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
   const pathname = usePathname() ?? "";
 
   // Platform admins get a door back to the admin surface. It lives on the
-  // `admin.<root>` subdomain, so prepend `admin.` to the root app origin
-  // (NEXT_PUBLIC_APP_URL), falling back to the current host. Plain <a> for a
-  // full cross-host navigation; the shared cross-subdomain cookie carries the
+  // `admin.<root>` subdomain, so swap the leading host label for `admin.` on
+  // the root app origin (NEXT_PUBLIC_APP_URL), falling back to the current
+  // host. An optional `www.` is consumed in the same pass so a `www.eeatly.com`
+  // origin yields `admin.eeatly.com`, not `admin.www.eeatly.com`. Plain <a> for
+  // a full cross-host navigation; the shared cross-subdomain cookie carries the
   // session. (Single-origin deploys without the admin subdomain don't reach
   // here in practice — admins there use /admin on the same host.)
   const isAdmin = user.role === "platform_admin";
   const adminOrigin =
     (process.env.NEXT_PUBLIC_APP_URL ?? "")
       .replace(/\/$/, "")
-      .replace(/^(https?:\/\/)/, "$1admin.") ||
+      .replace(/^(https?:\/\/)(www\.)?/, "$1admin.") ||
     (typeof window !== "undefined"
-      ? window.location.origin.replace(/^(https?:\/\/)/, "$1admin.")
+      ? window.location.origin.replace(/^(https?:\/\/)(www\.)?/, "$1admin.")
       : "");
   const switchToAdminHref = `${adminOrigin}/admin/analytics`;
 
