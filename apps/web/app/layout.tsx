@@ -4,7 +4,6 @@ import { AppThemeProvider } from "@/components/providers/app-theme-provider";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { ToastProvider } from "@/components/providers/toast-provider";
 import { PostHogProvider } from "@/components/providers/posthog-provider";
-import { getPublicEnv } from "@/lib/env/public";
 import "./globals.css";
 
 // Self-hosted via next/font — no Google Fonts CDN dependency, font files are
@@ -41,12 +40,16 @@ const geist = Geist({
   display: "swap"
 });
 
-// NEXT_PUBLIC_APP_URL must be set to the production origin in Vercel env vars.
-// The localhost fallback is only for local development.
-const appUrl = getPublicEnv().NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+// Canonical production origin. The apex `eeatly.com` 308-redirects to this
+// `www` host, so every absolute URL Next derives from `metadataBase` (og:image,
+// twitter:image, and the per-page relative canonicals) must already be `www` to
+// avoid sending crawlers + social scrapers through that redirect hop. Fixed, not
+// env-derived: the canonical host is the same regardless of which host (preview,
+// apex, www) actually served the request. R32.6.
+const canonicalOrigin = "https://www.eeatly.com";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(appUrl),
+  metadataBase: new URL(canonicalOrigin),
   title: {
     default: "eeatly",
     template: "%s | eeatly"
@@ -56,7 +59,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "eeatly",
     description: "Remember meals you love. Decide what to cook next.",
-    url: appUrl,
+    url: canonicalOrigin,
     siteName: "eeatly",
     type: "website"
     // `og:image` is injected by the file-based `app/opengraph-image.tsx`
@@ -72,7 +75,7 @@ export const metadata: Metadata = {
     // `twitter:image` injected by `app/twitter-image.tsx`.
   }
   // Browser-tab favicon, modern icon, and apple-touch-icon come from the
-  // `app/` file conventions (`favicon.ico`, `icon.png`, `apple-icon.png`);
+  // `app/` file conventions (`favicon.ico`, `icon.svg`, `apple-icon.png`);
   // the PWA manifest from `app/manifest.ts`. Next auto-injects the link tags
   // for all of these, so no explicit `icons`/`manifest` metadata is needed.
 };

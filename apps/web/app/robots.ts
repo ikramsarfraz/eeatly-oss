@@ -1,5 +1,4 @@
 import type { MetadataRoute } from "next";
-import { getPublicEnv } from "@/lib/env/public";
 
 /**
  * robots.txt. Only the public marketing surfaces are crawlable; the whole
@@ -13,7 +12,8 @@ import { getPublicEnv } from "@/lib/env/public";
  * header, not by a crawl block here.
  */
 export default function robots(): MetadataRoute.Robots {
-  const base = (getPublicEnv().NEXT_PUBLIC_APP_URL ?? "https://eeatly.com").replace(/\/$/, "");
+  // Canonical `www` host (the apex 308-redirects here). R32.6.
+  const base = "https://www.eeatly.com";
   return {
     rules: [
       {
