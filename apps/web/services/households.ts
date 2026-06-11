@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomBytes } from "node:crypto";
-import { and, count, eq, gte, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, count, eq, gte, isNull, ne, sql } from "drizzle-orm";
 import {
   householdInvitations,
   householdMembers,
@@ -16,7 +16,6 @@ import {
   CannotRemoveOwnerError,
   CannotRemoveSelfError,
   InvitationInvalidError,
-  MealNameCollisionError,
   NotHouseholdOwnerError,
   NotMemberError,
   OwnershipTransferRequiredError,
@@ -245,8 +244,7 @@ export type AcceptHouseholdInvitationResult = {
 
 /**
  * Atomic acceptance. Validates the invitation, checks for the ownership-
- * transfer-required wall, pre-flights meal name collisions, then in one
- * transaction:
+ * transfer-required wall, then in one transaction:
  *   1. moves the user's meals (createdByUserId = userId) to the new household
  *   2. moves the user's meal_logs (cookedByUserId = userId) to the new household
  *   3. deletes the user's old household_members row
@@ -254,6 +252,11 @@ export type AcceptHouseholdInvitationResult = {
  *   5. inserts a member row in the new household
  *   6. updates users.preferred_household_id
  *   7. marks the invitation accepted
+ *
+ * Same-named meals in the target household do NOT block or merge (0045):
+ * uniqueness is per (household, creator, name) and visibility is per-item,
+ * so the joiner's copy and the kitchen's copy coexist, each private to its
+ * owner.
  *
  * Returns context the action needs for the inviter confirmation email.
  */
@@ -381,51 +384,12 @@ export async function acceptHouseholdInvitation(
       willDeleteOldHousehold = true;
     }
 
-    // 4. Meal-name collision pre-flight. Compare the normalized names of
-    // meals this user created against the target household's existing meals.
-    // If any collide, throw with the list so the user can rename or delete
-    // before re-attempting. Skip the pre-flight when the user has no source
-    // household (no meals to move).
-    let collidingNames: string[] = [];
-    if (currentMembership) {
-      const userMealNames = await tx
-        .select({
-          name: meals.name,
-          normalizedName: meals.normalizedName
-        })
-        .from(meals)
-        .where(
-          and(
-            eq(meals.householdId, currentMembership.householdId),
-            eq(meals.createdByUserId, userId),
-            isNull(meals.archivedAt), isNull(meals.deletedAt)
-          )
-        );
-
-      if (userMealNames.length > 0) {
-        const targetNames = await tx
-          .select({ normalizedName: meals.normalizedName })
-          .from(meals)
-          .where(
-            and(
-              eq(meals.householdId, invitation.householdId),
-              inArray(
-                meals.normalizedName,
-                userMealNames.map((m) => m.normalizedName)
-              ),
-              isNull(meals.archivedAt), isNull(meals.deletedAt)
-            )
-          );
-        const targetSet = new Set(targetNames.map((m) => m.normalizedName));
-        collidingNames = userMealNames
-          .filter((m) => targetSet.has(m.normalizedName))
-          .map((m) => m.name);
-
-        if (collidingNames.length > 0) {
-          throw new MealNameCollisionError(collidingNames);
-        }
-      }
-    }
+    // 4. Name overlaps with the target household do NOT block or merge
+    // anything (0045). Meal uniqueness is per (household, creator, name),
+    // and visibility is per-item (own-or-granted) — so the joiner's
+    // "chicken biryani" and the kitchen's existing one coexist as two
+    // private rows with different owners. The joiner keeps full ownership
+    // of every recipe they bring; nothing is exposed to the inviter.
 
     // R15.5 Task 6 — dry-run preview short-circuit. Same validation
     // path as the real accept (invitation valid, email matches,

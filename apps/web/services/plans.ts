@@ -140,7 +140,12 @@ export async function getPlanShoppingList(mealIds: string[]): Promise<string[]> 
   const structured = await db
     .select({ mealId: mealIngredients.mealId, name: mealIngredients.name })
     .from(mealIngredients)
-    .where(inArray(mealIngredients.mealId, mealIds))
+    .where(
+      and(
+        inArray(mealIngredients.mealId, mealIds),
+        isNull(mealIngredients.variantId)
+      )
+    )
     .orderBy(asc(mealIngredients.position));
 
   const withStructured = new Set(structured.map((r) => r.mealId));

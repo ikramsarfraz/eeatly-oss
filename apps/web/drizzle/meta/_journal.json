@@ -302,6 +302,20 @@
       "when": 1780911656000,
       "tag": "0043_meal_tags",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1781071836720,
+      "tag": "0044_recipe_variants",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1781076272089,
+      "tag": "0045_meals_per_creator_unique",
+      "breakpoints": true
     }
   ]
 }

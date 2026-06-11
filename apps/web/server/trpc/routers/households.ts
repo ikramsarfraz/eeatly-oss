@@ -1,6 +1,7 @@
 import "server-only";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { isMobileOrigin, pickInviteUrl } from "@/lib/auth/deep-links";
@@ -11,7 +12,6 @@ import {
   CannotRemoveOwnerError,
   CannotRemoveSelfError,
   InvitationInvalidError,
-  MealNameCollisionError,
   NotHouseholdOwnerError,
   NotMemberError,
   OwnershipTransferRequiredError,
@@ -139,31 +139,36 @@ export const householdsRouter = router({
         // into the app on mobile devices, so the web URL stays the
         // robust default.
         const inviterIsMobile = isMobileOrigin(ctx.headers.get("origin"));
-        void dispatchTransactionalEmail({
-          template: "household_invitation",
-          toEmail: input.email,
-          toName: input.email,
-          userId: ctx.user.id,
-          invitation: {
-            inviterName: result.inviterName,
-            householdName: result.householdName,
-            inviteUrl: buildInviteUrl(result.token, {
-              isMobile: inviterIsMobile
-            }),
-            expiresInDays: Math.max(
-              1,
-              Math.round(
-                (result.expiresAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000)
-              )
-            )
-          }
-        }).catch((error) => {
-          logger.warn("invitation_email_dispatch_failed", {
+        // `after()` keeps the serverless function alive until the send
+        // settles — a bare floating promise gets frozen with the lambda
+        // and surfaces as a network error from the Resend SDK.
+        after(() =>
+          dispatchTransactionalEmail({
+            template: "household_invitation",
+            toEmail: input.email,
+            toName: input.email,
             userId: ctx.user.id,
-            invitationId: result.invitationId,
-            error: error instanceof Error ? error.message : String(error)
-          });
-        });
+            invitation: {
+              inviterName: result.inviterName,
+              householdName: result.householdName,
+              inviteUrl: buildInviteUrl(result.token, {
+                isMobile: inviterIsMobile
+              }),
+              expiresInDays: Math.max(
+                1,
+                Math.round(
+                  (result.expiresAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000)
+                )
+              )
+            }
+          }).catch((error) => {
+            logger.warn("invitation_email_dispatch_failed", {
+              userId: ctx.user.id,
+              invitationId: result.invitationId,
+              error: error instanceof Error ? error.message : String(error)
+            });
+          })
+        );
 
         logger.info("invitation_created", {
           userId: ctx.user.id,
@@ -211,21 +216,23 @@ export const householdsRouter = router({
           };
         }
 
-        // Notify the inviter — fire-and-forget; membership is committed.
-        void createNotification({
-          userId: result.inviterUserId,
-          type: "household_invitation",
-          title: `${ctx.user.name} joined ${result.newHouseholdName}`,
-          body:
-            "Their meals and cook history have been merged into your kitchen.",
-          href: "/settings"
-        }).catch((error) => {
-          logger.warn("invitation_accept_notify_failed", {
-            userId: ctx.user.id,
-            newHouseholdId: result.newHouseholdId,
-            error: error instanceof Error ? error.message : String(error)
-          });
-        });
+        // Notify the inviter — runs after the response; membership is committed.
+        after(() =>
+          createNotification({
+            userId: result.inviterUserId,
+            type: "household_invitation",
+            title: `${ctx.user.name} joined ${result.newHouseholdName}`,
+            body:
+              "Their meals and cook history have been merged into your kitchen.",
+            href: "/settings"
+          }).catch((error) => {
+            logger.warn("invitation_accept_notify_failed", {
+              userId: ctx.user.id,
+              newHouseholdId: result.newHouseholdId,
+              error: error instanceof Error ? error.message : String(error)
+            });
+          })
+        );
 
         logger.info("invitation_accepted", {
           userId: ctx.user.id,
@@ -259,16 +266,6 @@ export const householdsRouter = router({
             code: "PRECONDITION_FAILED",
             message: error.message,
             cause: { reason: error.code }
-          });
-        }
-        if (error instanceof MealNameCollisionError) {
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: error.message,
-            cause: {
-              reason: error.code,
-              collidingNames: [...error.collidingNames]
-            }
           });
         }
         throw error;
@@ -349,34 +346,38 @@ export const householdsRouter = router({
           ctx.household.id
         );
 
-        void createNotification({
-          userId: result.removedUserId,
-          type: "system",
-          title: `You were removed from ${result.householdName}`,
-          body:
-            "You'll land in a fresh personal kitchen the next time you sign in.",
-          href: "/home"
-        }).catch((error) => {
-          logger.warn("removal_notification_failed", {
-            actorId: ctx.user.id,
-            removedUserId: result.removedUserId,
-            error: error instanceof Error ? error.message : String(error)
-          });
-        });
+        after(() =>
+          createNotification({
+            userId: result.removedUserId,
+            type: "system",
+            title: `You were removed from ${result.householdName}`,
+            body:
+              "You'll land in a fresh personal kitchen the next time you sign in.",
+            href: "/home"
+          }).catch((error) => {
+            logger.warn("removal_notification_failed", {
+              actorId: ctx.user.id,
+              removedUserId: result.removedUserId,
+              error: error instanceof Error ? error.message : String(error)
+            });
+          })
+        );
 
-        void dispatchTransactionalEmail({
-          template: "household_member_removed",
-          toEmail: result.removedUserEmail,
-          toName: result.removedUserName,
-          userId: result.removedUserId,
-          removal: { householdName: result.householdName }
-        }).catch((error) => {
-          logger.warn("removal_email_dispatch_failed", {
-            actorId: ctx.user.id,
-            removedUserId: result.removedUserId,
-            error: error instanceof Error ? error.message : String(error)
-          });
-        });
+        after(() =>
+          dispatchTransactionalEmail({
+            template: "household_member_removed",
+            toEmail: result.removedUserEmail,
+            toName: result.removedUserName,
+            userId: result.removedUserId,
+            removal: { householdName: result.householdName }
+          }).catch((error) => {
+            logger.warn("removal_email_dispatch_failed", {
+              actorId: ctx.user.id,
+              removedUserId: result.removedUserId,
+              error: error instanceof Error ? error.message : String(error)
+            });
+          })
+        );
 
         revalidatePath("/settings");
         revalidatePath("/home");

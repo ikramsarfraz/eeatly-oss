@@ -114,12 +114,17 @@ async function loadRecipeContext(mealId: string): Promise<RecipeContext> {
     db
       .select()
       .from(mealIngredients)
-      .where(eq(mealIngredients.mealId, mealId))
+      .where(
+        and(
+          eq(mealIngredients.mealId, mealId),
+          isNull(mealIngredients.variantId)
+        )
+      )
       .orderBy(asc(mealIngredients.position)),
     db
       .select()
       .from(recipeSteps)
-      .where(eq(recipeSteps.mealId, mealId))
+      .where(and(eq(recipeSteps.mealId, mealId), isNull(recipeSteps.variantId)))
       .orderBy(asc(recipeSteps.position))
   ]);
 
@@ -777,7 +782,12 @@ export async function saveSession(args: {
       const existing = await tx
         .select({ id: mealIngredients.id })
         .from(mealIngredients)
-        .where(eq(mealIngredients.mealId, session.mealId))
+        .where(
+          and(
+            eq(mealIngredients.mealId, session.mealId),
+            isNull(mealIngredients.variantId)
+          )
+        )
         .limit(1);
       if (existing.length === 0) {
         const legacyArr = mealRow.ingredients ?? [];
@@ -818,11 +828,17 @@ export async function saveSession(args: {
             prepNote?: string | null;
             position?: number;
           };
-          // Default position = current max + 1.
+          // Default position = current max + 1 (base recipe rows only —
+          // variant rows keep their own position sequence).
           const [maxRow] = await tx
             .select({ p: max(mealIngredients.position) })
             .from(mealIngredients)
-            .where(eq(mealIngredients.mealId, session.mealId));
+            .where(
+              and(
+                eq(mealIngredients.mealId, session.mealId),
+                isNull(mealIngredients.variantId)
+              )
+            );
           const nextPos =
             typeof payload.position === "number"
               ? payload.position
@@ -845,7 +861,12 @@ export async function saveSession(args: {
           const [maxRow] = await tx
             .select({ p: max(recipeSteps.position) })
             .from(recipeSteps)
-            .where(eq(recipeSteps.mealId, session.mealId));
+            .where(
+              and(
+                eq(recipeSteps.mealId, session.mealId),
+                isNull(recipeSteps.variantId)
+              )
+            );
           const nextPos =
             typeof payload.position === "number"
               ? payload.position

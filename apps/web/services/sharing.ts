@@ -936,7 +936,12 @@ export async function forkRecipe(args: {
         prepNote: mealIngredients.prepNote
       })
       .from(mealIngredients)
-      .where(eq(mealIngredients.mealId, args.sourceMealId))
+      .where(
+        and(
+          eq(mealIngredients.mealId, args.sourceMealId),
+          isNull(mealIngredients.variantId)
+        )
+      )
       .orderBy(asc(mealIngredients.position)),
     db
       .select({
@@ -947,7 +952,12 @@ export async function forkRecipe(args: {
         ingredientIds: recipeSteps.ingredientIds
       })
       .from(recipeSteps)
-      .where(eq(recipeSteps.mealId, args.sourceMealId))
+      .where(
+        and(
+          eq(recipeSteps.mealId, args.sourceMealId),
+          isNull(recipeSteps.variantId)
+        )
+      )
       .orderBy(asc(recipeSteps.position))
   ]);
 

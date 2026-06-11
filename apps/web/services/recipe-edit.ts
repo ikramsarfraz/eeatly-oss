@@ -96,9 +96,21 @@ export async function saveStructuredRecipe(args: {
   await db.transaction(async (tx) => {
     // Replace: clear existing structured rows, then re-insert at fresh
     // positions. The unique (meal_id, position) index is satisfied because we
-    // delete first and index sequentially.
-    await tx.delete(mealIngredients).where(eq(mealIngredients.mealId, args.mealId));
-    await tx.delete(recipeSteps).where(eq(recipeSteps.mealId, args.mealId));
+    // delete first and index sequentially. variant_id IS NULL keeps the
+    // edit scoped to the base recipe — variant rows are read-only here.
+    await tx
+      .delete(mealIngredients)
+      .where(
+        and(
+          eq(mealIngredients.mealId, args.mealId),
+          isNull(mealIngredients.variantId)
+        )
+      );
+    await tx
+      .delete(recipeSteps)
+      .where(
+        and(eq(recipeSteps.mealId, args.mealId), isNull(recipeSteps.variantId))
+      );
 
     if (cleanIngredients.length > 0) {
       await tx.insert(mealIngredients).values(

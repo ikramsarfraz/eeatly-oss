@@ -1,10 +1,10 @@
 import "server-only";
 
-import { and, asc, count, desc, eq, inArray, isNotNull, isNull, max, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull, max, ne, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { requireHouseholdMember } from "@/lib/auth/session";
 import { withSuggestions } from "@/lib/meals/rediscovery";
-import { mealVisibilityFilter } from "@/lib/meals/visibility";
+import { hasActiveGrant, mealVisibilityFilter } from "@/lib/meals/visibility";
 import {
   canEditItem,
   canManageSharing,
@@ -24,6 +24,7 @@ import {
   mealLogs,
   meals,
   recipeSteps,
+  recipeVariants,
   users
 } from "@/db/schema";
 import type { DashboardMeals, MealStat, RecentMeal } from "@/types";
@@ -97,13 +98,14 @@ export async function getDashboardMeals(
       .innerJoin(meals, eq(mealLogs.mealId, meals.id))
       .leftJoin(dishImages, eq(dishImages.normalizedName, meals.normalizedName))
       .leftJoin(users, eq(users.id, mealLogs.cookedByUserId))
-      // R32 — recent-cooks join hits meals, so the visibility predicate
-      // applies to the joined row. Another member's personal meal that
-      // somehow has a log against it (e.g. legacy data, or future
-      // cross-user logging) is excluded here.
+      // Cook history is PERSONAL: only the viewer's own logs surface, on
+      // top of the R32 meal-visibility predicate. Sharing a recipe (or
+      // sharing a kitchen) never exposes when/how often someone cooked
+      // it, nor their log notes/photos.
       .where(
         and(
           activeMealLogsForHousehold(householdId),
+          eq(mealLogs.cookedByUserId, userId),
           mealVisibilityFilter(userId, householdId)
         )
       )
@@ -121,7 +123,16 @@ export async function getDashboardMeals(
         recipeSourceUrl: meals.recipeSourceUrl
       })
       .from(meals)
-      .innerJoin(mealLogs, and(eq(mealLogs.mealId, meals.id), isNull(mealLogs.deletedAt)))
+      .innerJoin(
+        mealLogs,
+        and(
+          eq(mealLogs.mealId, meals.id),
+          isNull(mealLogs.deletedAt),
+          // Personal history: cook counts only ever aggregate the
+          // viewer's own logs.
+          eq(mealLogs.cookedByUserId, userId)
+        )
+      )
       .leftJoin(dishImages, eq(dishImages.normalizedName, meals.normalizedName))
       .where(
         and(
@@ -147,7 +158,17 @@ export async function getDashboardMeals(
         recipeSourceUrl: meals.recipeSourceUrl
       })
       .from(meals)
-      .leftJoin(mealLogs, and(eq(mealLogs.mealId, meals.id), isNull(mealLogs.deletedAt)))
+      .leftJoin(
+        mealLogs,
+        and(
+          eq(mealLogs.mealId, meals.id),
+          isNull(mealLogs.deletedAt),
+          // Personal history — inside the LEFT JOIN condition (not the
+          // WHERE) so never-cooked meals keep their NULL row and still
+          // surface as most-neglected.
+          eq(mealLogs.cookedByUserId, userId)
+        )
+      )
       .leftJoin(dishImages, eq(dishImages.normalizedName, meals.normalizedName))
       .where(
         and(
@@ -227,12 +248,27 @@ export async function createMealLog(
   const recipeGenerated = payload.recipeGenerated;
 
   return db.transaction(async (tx) => {
-    // Match against the household's existing meal by normalized name —
-    // the post-0016 unique index is (household_id, normalized_name), so
-    // any duplicate is the right one to merge into.
-    const existingMeal = await tx.query.meals.findFirst({
-      where: and(scopeMealsToHousehold(householdId), eq(meals.normalizedName, normalizedName))
+    // Resolve which meal row this log belongs to. Uniqueness is per
+    // (household, creator, name) since 0045, so several members can hold
+    // private same-named rows side by side. Resolution order:
+    //   1. the viewer's OWN row — your log always lands on your copy;
+    //   2. a row shared WITH the viewer (active grant) — cooking a
+    //      housemate's shared dish converges on the shared row;
+    //   3. nothing → insert a fresh row owned by the viewer. Critically,
+    //      another member's PRIVATE same-named row is never matched: their
+    //      recipe stays untouched and invisible.
+    const nameScope = and(
+      scopeMealsToHousehold(householdId),
+      eq(meals.normalizedName, normalizedName)
+    );
+    const ownMeal = await tx.query.meals.findFirst({
+      where: and(nameScope, eq(meals.createdByUserId, userId))
     });
+    const existingMeal =
+      ownMeal ??
+      (await tx.query.meals.findFirst({
+        where: and(nameScope, hasActiveGrant("recipe", meals.id, userId))
+      }));
 
     const meal =
       existingMeal ??
@@ -262,7 +298,16 @@ export async function createMealLog(
       throw new Error("Unable to create meal.");
     }
 
-    if (existingMeal) {
+    // Recipe-field writes need write permission on the matched row: the
+    // viewer's own row always qualifies; a grant-matched (shared) row only
+    // when the grant role allows editing. A view-only grantee's log still
+    // records the cook, but never rewrites the owner's recipe content.
+    const canWriteRecipeFields = existingMeal
+      ? existingMeal.createdByUserId === userId ||
+        canEditItem(await getGrantRole(userId, "recipe", existingMeal.id))
+      : true;
+
+    if (existingMeal && canWriteRecipeFields) {
       await tx
         .update(meals)
         .set({
@@ -283,18 +328,26 @@ export async function createMealLog(
     // structured ingredient + step rows so the recipe view + manual editor get
     // cleanly separated content (not one prose blob). Only when we can
     // confidently find steps, and only when the meal has no structured rows yet
-    // (never clobber a Refine'd or already-structured recipe).
+    // (never clobber a Refine'd or already-structured recipe). Skipped when
+    // the viewer can't write the matched row's recipe content.
     const parsed = parseStructuredRecipe(recipeText ?? null, ingredients ?? null);
-    if (parsed.steps.length > 0) {
+    if (parsed.steps.length > 0 && canWriteRecipeFields) {
       const [hasIngredient] = await tx
         .select({ id: mealIngredients.id })
         .from(mealIngredients)
-        .where(eq(mealIngredients.mealId, meal.id))
+        .where(
+          and(
+            eq(mealIngredients.mealId, meal.id),
+            isNull(mealIngredients.variantId)
+          )
+        )
         .limit(1);
       const [hasStep] = await tx
         .select({ id: recipeSteps.id })
         .from(recipeSteps)
-        .where(eq(recipeSteps.mealId, meal.id))
+        .where(
+          and(eq(recipeSteps.mealId, meal.id), isNull(recipeSteps.variantId))
+        )
         .limit(1);
       if (!hasIngredient && !hasStep) {
         if (parsed.ingredients.length > 0) {
@@ -417,6 +470,10 @@ export async function getHistoryRows(
 
   const baseFilters = [
     activeMealLogsForHousehold(householdId),
+    // Cook history is PERSONAL: /history only ever lists the viewer's
+    // own logs. Sharing a recipe or a kitchen never surfaces another
+    // member's cooking dates, notes, or log photos here.
+    eq(mealLogs.cookedByUserId, userId),
     // R32 — history rows always join meals, so the visibility filter
     // applies to the joined meal row. Without this, a member could see
     // log entries pointing at another member's personal meal in their
@@ -607,6 +664,9 @@ export async function getHistoryStats(
       .where(
         and(
           activeMealLogsForHousehold(householdId),
+          // Personal history — header totals count the viewer's own
+          // cooks only.
+          eq(mealLogs.cookedByUserId, userId),
           mealVisibilityFilter(userId, householdId)
         )
       ),
@@ -619,7 +679,11 @@ export async function getHistoryStats(
       .from(meals)
       .innerJoin(
         mealLogs,
-        and(eq(mealLogs.mealId, meals.id), isNull(mealLogs.deletedAt))
+        and(
+          eq(mealLogs.mealId, meals.id),
+          isNull(mealLogs.deletedAt),
+          eq(mealLogs.cookedByUserId, userId)
+        )
       )
       .where(
         and(
@@ -732,6 +796,51 @@ export type MealDetailView = {
     body: string;
     ingredientIds: string[];
   }>;
+  /**
+   * Alternate recipes for the same dish, e.g. brought in when a member
+   * joined the household with their own copy of a dish that already
+   * existed there. Empty for most meals. Each variant snapshots the
+   * source meal's recipe-bearing fields and carries its own structured
+   * rows; readers render a switcher between the base recipe and these.
+   */
+  variants: Array<{
+    id: string;
+    label: string;
+    recipeText: string | null;
+    ingredients: string[] | null;
+    recipeSourceUrl: string | null;
+    servings: string | null;
+    photoUrl: string | null;
+    notes: string | null;
+    structuredIngredients: Array<{
+      id: string;
+      position: number;
+      name: string;
+      quantityString: string;
+      prepNote: string | null;
+    }>;
+    structuredSteps: Array<{
+      id: string;
+      position: number;
+      title: string;
+      time: string | null;
+      body: string;
+      ingredientIds: string[];
+    }>;
+  }>;
+  /**
+   * Other VISIBLE recipes for the same dish name: the viewer's own copy
+   * and/or copies shared with them. The recipe view renders these as
+   * switch pills (each links to that meal's own detail page). Empty when
+   * the viewer can see only one recipe for this dish — other members'
+   * private same-named copies never appear.
+   */
+  sameDishRecipes: Array<{
+    mealId: string;
+    /** Pill label, e.g. "My recipe" or "Ayesha's recipe". */
+    ownerName: string;
+    viewerIsOwner: boolean;
+  }>;
 };
 
 export async function getMealDetail(
@@ -745,6 +854,7 @@ export async function getMealDetail(
     .select({
       id: meals.id,
       name: meals.name,
+      normalizedName: meals.normalizedName,
       // Own photo wins; the app-wide AI dish image is the fallback. SSR
       // therefore shows a generated image immediately on repeat visits
       // (the client only fires generation when this resolves to null).
@@ -797,6 +907,8 @@ export async function getMealDetail(
   // Cook count + last-cooked roll-up. Joined separately so the meal row
   // returns even when there are no logs (a meal can be added without
   // being logged via legacy paths or via Task 5 re-extract flows).
+  // Personal history: the stats only count the VIEWER's cooks — a shared
+  // recipe never reveals how often (or when) its owner cooked it.
   const [stats] = await db
     .select({
       cookCount: count(mealLogs.id),
@@ -806,7 +918,7 @@ export async function getMealDetail(
     .where(
       and(
         eq(mealLogs.mealId, mealId),
-        eq(mealLogs.householdId, householdId),
+        eq(mealLogs.cookedByUserId, userId),
         isNull(mealLogs.deletedAt)
       )
     );
@@ -824,7 +936,7 @@ export async function getMealDetail(
     .where(
       and(
         eq(mealLogs.mealId, mealId),
-        eq(mealLogs.householdId, householdId),
+        eq(mealLogs.cookedByUserId, userId),
         isNull(mealLogs.deletedAt)
       )
     )
@@ -833,32 +945,143 @@ export async function getMealDetail(
   // Round 18 — structured ingredient + step rows. The Refine save path
   // (R18) writes here; legacy meals stay empty until a Refine round-trip
   // upgrades them. Read both in parallel and let the mobile UI pick
-  // structured-when-present, legacy-when-not.
-  const [structuredIngredientRows, structuredStepRows] = await Promise.all([
-    db
-      .select({
-        id: mealIngredients.id,
-        position: mealIngredients.position,
-        name: mealIngredients.name,
-        quantityString: mealIngredients.quantityString,
-        prepNote: mealIngredients.prepNote
-      })
-      .from(mealIngredients)
-      .where(eq(mealIngredients.mealId, mealId))
-      .orderBy(asc(mealIngredients.position)),
-    db
-      .select({
-        id: recipeSteps.id,
-        position: recipeSteps.position,
-        title: recipeSteps.title,
-        time: recipeSteps.time,
-        body: recipeSteps.body,
-        ingredientIds: recipeSteps.ingredientIds
-      })
-      .from(recipeSteps)
-      .where(eq(recipeSteps.mealId, mealId))
-      .orderBy(asc(recipeSteps.position))
-  ]);
+  // structured-when-present, legacy-when-not. variant_id IS NULL scopes
+  // these to the BASE recipe — variant rows ride along in `variants`.
+  const [structuredIngredientRows, structuredStepRows, variantRows, sameDishRows] =
+    await Promise.all([
+      db
+        .select({
+          id: mealIngredients.id,
+          position: mealIngredients.position,
+          name: mealIngredients.name,
+          quantityString: mealIngredients.quantityString,
+          prepNote: mealIngredients.prepNote
+        })
+        .from(mealIngredients)
+        .where(
+          and(
+            eq(mealIngredients.mealId, mealId),
+            isNull(mealIngredients.variantId)
+          )
+        )
+        .orderBy(asc(mealIngredients.position)),
+      db
+        .select({
+          id: recipeSteps.id,
+          position: recipeSteps.position,
+          title: recipeSteps.title,
+          time: recipeSteps.time,
+          body: recipeSteps.body,
+          ingredientIds: recipeSteps.ingredientIds
+        })
+        .from(recipeSteps)
+        .where(
+          and(eq(recipeSteps.mealId, mealId), isNull(recipeSteps.variantId))
+        )
+        .orderBy(asc(recipeSteps.position)),
+      db
+        .select({
+          id: recipeVariants.id,
+          label: recipeVariants.label,
+          recipeText: recipeVariants.recipeText,
+          ingredients: recipeVariants.ingredients,
+          recipeSourceUrl: recipeVariants.recipeSourceUrl,
+          servings: recipeVariants.servings,
+          photoUrl: recipeVariants.photoUrl,
+          notes: recipeVariants.notes,
+          position: recipeVariants.position
+        })
+        .from(recipeVariants)
+        .where(eq(recipeVariants.mealId, mealId))
+        .orderBy(asc(recipeVariants.position)),
+      // Other VISIBLE recipes for the same dish name — the viewer's own
+      // copy plus any copy shared with them (own-or-granted, household-
+      // independent like the detail lookup itself). Powers the "switch
+      // between recipes of this dish" pills on the recipe view. Private
+      // same-named copies of other members never show up here.
+      db
+        .select({
+          id: meals.id,
+          createdByUserId: meals.createdByUserId,
+          ownerName: users.name
+        })
+        .from(meals)
+        .leftJoin(users, eq(users.id, meals.createdByUserId))
+        .where(
+          and(
+            eq(meals.normalizedName, row.normalizedName),
+            ne(meals.id, mealId),
+            isNull(meals.archivedAt),
+            isNull(meals.deletedAt),
+            mealVisibilityFilter(userId, householdId)
+          )
+        )
+        .orderBy(asc(meals.createdAt))
+    ]);
+
+  // Variant structured rows, fetched only when variants exist (the common
+  // meal has none and skips this round-trip entirely).
+  const variantIds = variantRows.map((v) => v.id);
+  const [variantIngredientRows, variantStepRows] =
+    variantIds.length > 0
+      ? await Promise.all([
+          db
+            .select({
+              id: mealIngredients.id,
+              variantId: mealIngredients.variantId,
+              position: mealIngredients.position,
+              name: mealIngredients.name,
+              quantityString: mealIngredients.quantityString,
+              prepNote: mealIngredients.prepNote
+            })
+            .from(mealIngredients)
+            .where(inArray(mealIngredients.variantId, variantIds))
+            .orderBy(asc(mealIngredients.position)),
+          db
+            .select({
+              id: recipeSteps.id,
+              variantId: recipeSteps.variantId,
+              position: recipeSteps.position,
+              title: recipeSteps.title,
+              time: recipeSteps.time,
+              body: recipeSteps.body,
+              ingredientIds: recipeSteps.ingredientIds
+            })
+            .from(recipeSteps)
+            .where(inArray(recipeSteps.variantId, variantIds))
+            .orderBy(asc(recipeSteps.position))
+        ])
+      : [[], []];
+
+  const variants = variantRows.map((v) => ({
+    id: v.id,
+    label: v.label,
+    recipeText: v.recipeText,
+    ingredients: v.ingredients,
+    recipeSourceUrl: v.recipeSourceUrl,
+    servings: v.servings,
+    photoUrl: v.photoUrl,
+    notes: v.notes,
+    structuredIngredients: variantIngredientRows
+      .filter((r) => r.variantId === v.id)
+      .map((r) => ({
+        id: r.id,
+        position: r.position,
+        name: r.name,
+        quantityString: r.quantityString,
+        prepNote: r.prepNote
+      })),
+    structuredSteps: variantStepRows
+      .filter((r) => r.variantId === v.id)
+      .map((r) => ({
+        id: r.id,
+        position: r.position,
+        title: r.title,
+        time: r.time,
+        body: r.body,
+        ingredientIds: r.ingredientIds
+      }))
+  }));
 
   return {
     id: row.id,
@@ -882,7 +1105,16 @@ export async function getMealDetail(
     // modal effort when the recipe has no override.
     effortLevel: row.effortOverride ?? pickModalEffort(effortRows),
     structuredIngredients: structuredIngredientRows,
-    structuredSteps: structuredStepRows
+    structuredSteps: structuredStepRows,
+    variants,
+    sameDishRecipes: sameDishRows.map((r) => ({
+      mealId: r.id,
+      ownerName:
+        r.createdByUserId === userId
+          ? "My recipe"
+          : `${(r.ownerName ?? "Former member").trim().split(/\s+/)[0]}'s recipe`,
+      viewerIsOwner: r.createdByUserId === userId
+    }))
   };
 }
 
@@ -959,11 +1191,10 @@ export async function deleteMealLog(
 ): Promise<void> {
   await requireHouseholdMember(userId, householdId);
 
-  // Household trust model: any member can delete any log in the shared
-  // kitchen. Authorization is "user is in this household AND log is in
-  // this household." Notably NOT scoped to cookedByUserId — that would
-  // be cook-only deletion, which can be added later if households want
-  // that policy.
+  // Cook-only deletion: logs are personal history, invisible to other
+  // members since the personal-history scoping — so only the cook who
+  // logged it can delete it. (Replaces the earlier household-trust
+  // model where any member could delete any log.)
   const [updated] = await db
     .update(mealLogs)
     .set({ deletedAt: new Date(), updatedAt: new Date() })
@@ -971,6 +1202,7 @@ export async function deleteMealLog(
       and(
         eq(mealLogs.id, logId),
         eq(mealLogs.householdId, householdId),
+        eq(mealLogs.cookedByUserId, userId),
         isNull(mealLogs.deletedAt)
       )
     )

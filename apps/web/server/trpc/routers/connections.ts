@@ -1,5 +1,6 @@
 import "server-only";
 
+import { after } from "next/server";
 import { z } from "zod";
 import {
   acceptInvitation,
@@ -33,20 +34,23 @@ export const connectionsRouter = router({
     .input(z.object({ email: z.string().email().max(320) }))
     .mutation(async ({ ctx, input }) => {
       const result = await inviteConnection(ctx.user.id, input.email);
-      // Email the invite (fire-and-forget; falls back to console when
+      // Email the invite after the response (falls back to console when
       // Resend isn't configured). The copyable link is still returned.
       if (result.ok) {
-        void dispatchTransactionalEmail({
-          template: "connection_invitation",
-          toEmail: input.email,
-          toName: input.email,
-          userId: ctx.user.id,
-          connectionInvitation: {
-            inviterName: ctx.user.name?.trim() || ctx.user.email.split("@")[0] || "Someone",
-            inviteUrl: result.url,
-            expiresInDays: 14
-          }
-        }).catch(() => undefined);
+        const inviteUrl = result.url;
+        after(() =>
+          dispatchTransactionalEmail({
+            template: "connection_invitation",
+            toEmail: input.email,
+            toName: input.email,
+            userId: ctx.user.id,
+            connectionInvitation: {
+              inviterName: ctx.user.name?.trim() || ctx.user.email.split("@")[0] || "Someone",
+              inviteUrl,
+              expiresInDays: 14
+            }
+          }).catch(() => undefined)
+        );
       }
       return result;
     }),

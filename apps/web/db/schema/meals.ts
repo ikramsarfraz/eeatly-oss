@@ -97,10 +97,22 @@ export const meals = pgTable(
     // own-or-granted.
   },
   (table) => ({
-    // Round 4: unique scope moved to (householdId, normalizedName). Two
-    // members in the same household can't add the same recipe twice;
-    // two households can both have "Soy ginger noodles" with no conflict.
-    householdMealIdx: uniqueIndex("meals_household_normalized_name_idx").on(
+    // Uniqueness is per CREATOR within a household (0045). The R4
+    // household-wide unique index predated R32's per-item privacy: once
+    // recipes became private-by-default, two members each privately owning
+    // "chicken biryani" is legitimate, and the household-wide constraint
+    // forced joins/log-upserts to collide with rows the viewer can't even
+    // see. NULL creators (former members, SET NULL on delete) are treated
+    // as distinct by Postgres, which is acceptable — new inserts always
+    // carry a creator.
+    creatorMealIdx: uniqueIndex("meals_household_creator_normalized_name_idx").on(
+      table.householdId,
+      table.createdByUserId,
+      table.normalizedName
+    ),
+    // Non-unique lookup index for name-scoped queries (log upsert, join
+    // duplicate detection) that previously rode the unique index.
+    householdNameIdx: index("meals_household_normalized_name_lookup_idx").on(
       table.householdId,
       table.normalizedName
     ),

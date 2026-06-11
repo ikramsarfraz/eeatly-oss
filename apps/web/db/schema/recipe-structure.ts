@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   index,
   integer,
@@ -9,6 +9,52 @@ import {
   uuid
 } from "drizzle-orm/pg-core";
 import { meals } from "./meals";
+import { users } from "./auth";
+
+/**
+ * Recipe variants — alternate recipes for the same dish.
+ *
+ * Born from the household-join flow: when a joining member brings a meal
+ * whose name already exists in the target kitchen, we keep ONE dish entry
+ * (the incumbent meal row) and attach the joiner's recipe as a variant the
+ * household can switch to on the recipe view. Nothing is renamed, merged,
+ * or dropped: the variant snapshots the source meal's recipe-bearing
+ * columns, and its structured rows move over carrying `variant_id`.
+ *
+ * The base recipe is NOT mirrored here — it stays on the meals row +
+ * structured rows with `variant_id IS NULL`. A meal with no variants has
+ * no rows in this table.
+ */
+export const recipeVariants = pgTable(
+  "recipe_variants",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    mealId: uuid("meal_id")
+      .notNull()
+      .references(() => meals.id, { onDelete: "cascade" }),
+    /** Shown on the switcher, e.g. "Ayesha's recipe". */
+    label: text("label").notNull(),
+    // Same nullable-text shape as meals.created_by_user_id: SET NULL so a
+    // member leaving doesn't take their recipe variant with them.
+    createdByUserId: text("created_by_user_id").references(() => users.id, {
+      onDelete: "set null"
+    }),
+    // Snapshot of the source meal's recipe-bearing columns at merge time.
+    recipeText: text("recipe_text"),
+    ingredients: text("ingredients").array(),
+    recipeSourceUrl: text("recipe_source_url"),
+    servings: text("servings"),
+    photoUrl: text("photo_url"),
+    notes: text("notes"),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+  },
+  (table) => ({
+    mealIdx: index("recipe_variants_meal_idx").on(table.mealId)
+  })
+);
 
 /**
  * Round 18 — structured ingredient + step storage.
@@ -32,6 +78,11 @@ export const mealIngredients = pgTable(
     mealId: uuid("meal_id")
       .notNull()
       .references(() => meals.id, { onDelete: "cascade" }),
+    // NULL = the meal's base recipe; set = rows belonging to a variant.
+    // CASCADE: deleting a variant takes its structured rows with it.
+    variantId: uuid("variant_id").references(() => recipeVariants.id, {
+      onDelete: "cascade"
+    }),
     position: integer("position").notNull(),
     name: text("name").notNull(),
     quantityString: text("quantity_string").notNull().default(""),
@@ -44,10 +95,17 @@ export const mealIngredients = pgTable(
       .defaultNow()
   },
   (table) => ({
-    mealPositionUnique: uniqueIndex("meal_ingredients_meal_position_idx").on(
-      table.mealId,
-      table.position
-    ),
+    // Positions are unique within a recipe — i.e. per (meal, variant).
+    // Split into two partial indexes because variant_id is nullable and
+    // Postgres treats NULLs as distinct in a plain composite unique index.
+    basePositionUnique: uniqueIndex("meal_ingredients_meal_position_idx")
+      .on(table.mealId, table.position)
+      .where(sql`${table.variantId} IS NULL`),
+    variantPositionUnique: uniqueIndex(
+      "meal_ingredients_variant_position_idx"
+    )
+      .on(table.variantId, table.position)
+      .where(sql`${table.variantId} IS NOT NULL`),
     mealIdx: index("meal_ingredients_meal_idx").on(table.mealId)
   })
 );
@@ -67,6 +125,11 @@ export const recipeSteps = pgTable(
     mealId: uuid("meal_id")
       .notNull()
       .references(() => meals.id, { onDelete: "cascade" }),
+    // NULL = base recipe; set = steps belonging to a variant (see
+    // meal_ingredients.variant_id).
+    variantId: uuid("variant_id").references(() => recipeVariants.id, {
+      onDelete: "cascade"
+    }),
     position: integer("position").notNull(),
     title: text("title").notNull(),
     time: text("time"),
@@ -80,10 +143,12 @@ export const recipeSteps = pgTable(
       .defaultNow()
   },
   (table) => ({
-    mealPositionUnique: uniqueIndex("recipe_steps_meal_position_idx").on(
-      table.mealId,
-      table.position
-    ),
+    basePositionUnique: uniqueIndex("recipe_steps_meal_position_idx")
+      .on(table.mealId, table.position)
+      .where(sql`${table.variantId} IS NULL`),
+    variantPositionUnique: uniqueIndex("recipe_steps_variant_position_idx")
+      .on(table.variantId, table.position)
+      .where(sql`${table.variantId} IS NOT NULL`),
     mealIdx: index("recipe_steps_meal_idx").on(table.mealId)
   })
 );
@@ -94,6 +159,10 @@ export const mealIngredientsRelations = relations(
     meal: one(meals, {
       fields: [mealIngredients.mealId],
       references: [meals.id]
+    }),
+    variant: one(recipeVariants, {
+      fields: [mealIngredients.variantId],
+      references: [recipeVariants.id]
     })
   })
 );
@@ -101,6 +170,17 @@ export const mealIngredientsRelations = relations(
 export const recipeStepsRelations = relations(recipeSteps, ({ one }) => ({
   meal: one(meals, {
     fields: [recipeSteps.mealId],
+    references: [meals.id]
+  }),
+  variant: one(recipeVariants, {
+    fields: [recipeSteps.variantId],
+    references: [recipeVariants.id]
+  })
+}));
+
+export const recipeVariantsRelations = relations(recipeVariants, ({ one }) => ({
+  meal: one(meals, {
+    fields: [recipeVariants.mealId],
     references: [meals.id]
   })
 }));

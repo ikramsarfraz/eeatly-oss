@@ -128,6 +128,16 @@ export function AcceptInvitationCard({
       preview.logsToMerge > 0 ||
       preview.willDissolveCurrentHousehold);
 
+  // The dry-run already ran the full accept validation, so a collision or
+  // ownership-transfer preview error means the real accept is guaranteed to
+  // fail the same way — keep the button disabled instead of letting the
+  // user collect a second copy of the same error. Generic preview errors
+  // (network blips) don't block; accepting may still succeed.
+  const blockingPreviewError = previewError && previewError.kind !== "generic";
+  // One error slot: a fresh accept error supersedes the preview error
+  // rather than stacking a duplicate panel under it.
+  const visibleError = error ?? previewError;
+
   return (
     <Card>
       <CardHeader>
@@ -136,12 +146,11 @@ export function AcceptInvitationCard({
         </CardTitle>
         <CardDescription>
           Join {householdName} to plan and cook together. Your recipes and history move
-          with you, but stay private — kitchen members only see the meals and plans you
+          with you, but stay private. Kitchen members only see the meals and plans you
           choose to share.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
-        {previewError ? <ErrorPanel error={previewError} /> : null}
         {!previewError && previewing && !preview ? (
           <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -166,10 +175,19 @@ export function AcceptInvitationCard({
                 ? " Your current personal kitchen will be dissolved."
                 : ""}
             </p>
+            <p className="text-muted-foreground">
+              You keep ownership of everything you bring. If a dish name
+              already exists in {householdName}, both copies stay, each
+              visible only to its owner.
+            </p>
           </div>
         ) : null}
-        {error ? <ErrorPanel error={error} /> : null}
-        <Button type="button" onClick={handleAccept} disabled={pending || previewing}>
+        {visibleError ? <ErrorPanel error={visibleError} /> : null}
+        <Button
+          type="button"
+          onClick={handleAccept}
+          disabled={pending || previewing || Boolean(blockingPreviewError)}
+        >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {pending ? "Joining…" : "Accept & join"}
         </Button>

@@ -128,30 +128,54 @@ export function RecipeDetailMobile({ meal }: { meal: RecipeDetailMeal; viewer: R
     }
   }
 
+  // Recipe variants — alternate recipes for the same dish. `null` selects
+  // the base recipe; picking a variant swaps the recipe content below
+  // while the dish identity (name, logs, sharing) stays put.
+  const variants = meal.variants ?? [];
+  const sameDishRecipes = meal.sameDishRecipes ?? [];
+  const [activeVariantId, setActiveVariantId] = React.useState<string | null>(
+    null
+  );
+  const activeVariant =
+    variants.find((v) => v.id === activeVariantId) ?? null;
+  const activeStructuredIngredients =
+    activeVariant?.structuredIngredients ?? meal.structuredIngredients;
+  const activeStructuredSteps =
+    activeVariant?.structuredSteps ?? meal.structuredSteps;
+  const activeLegacyIngredients = activeVariant
+    ? activeVariant.ingredients
+    : meal.ingredients;
+  const activeRecipeText = activeVariant
+    ? activeVariant.recipeText
+    : meal.recipeText;
+  const activeSourceUrl = activeVariant
+    ? activeVariant.recipeSourceUrl
+    : meal.recipeSourceUrl;
+
   const ingredientLines = React.useMemo(() => {
-    if (meal.structuredIngredients.length > 0) {
-      return [...meal.structuredIngredients]
+    if (activeStructuredIngredients.length > 0) {
+      return [...activeStructuredIngredients]
         .sort((a, b) => a.position - b.position)
         .map((r) => formatIngredient(r));
     }
-    return (meal.ingredients ?? []).map((s) => s.trim()).filter(Boolean);
-  }, [meal.structuredIngredients, meal.ingredients]);
+    return (activeLegacyIngredients ?? []).map((s) => s.trim()).filter(Boolean);
+  }, [activeStructuredIngredients, activeLegacyIngredients]);
 
   const steps = React.useMemo(() => {
-    if (meal.structuredSteps.length > 0) {
-      return [...meal.structuredSteps]
+    if (activeStructuredSteps.length > 0) {
+      return [...activeStructuredSteps]
         .sort((a, b) => a.position - b.position)
         .map((s) => ({ title: s.title, time: s.time, body: s.body }));
     }
     // Legacy fallback: split the recipe-text blob into paragraph "steps".
-    const text = meal.recipeText?.trim() ?? "";
+    const text = activeRecipeText?.trim() ?? "";
     if (!text) return [];
     return text
       .split(/\n{2,}|\r\n{2,}/)
       .map((p) => p.replace(/^\s*\d+[.)]\s*/, "").trim())
       .filter(Boolean)
       .map((body) => ({ title: "", time: null as string | null, body }));
-  }, [meal.structuredSteps, meal.recipeText]);
+  }, [activeStructuredSteps, activeRecipeText]);
 
   // Ingredient checklist: checked = "have it"; remaining = "to buy".
   const [checked, setChecked] = React.useState<Set<number>>(() => new Set());
@@ -354,9 +378,9 @@ export function RecipeDetailMobile({ meal }: { meal: RecipeDetailMeal; viewer: R
           </div>
         ) : null}
 
-        {meal.recipeSourceUrl && (
+        {activeSourceUrl && (
           <a
-            href={meal.recipeSourceUrl}
+            href={activeSourceUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-primary"
@@ -364,6 +388,56 @@ export function RecipeDetailMobile({ meal }: { meal: RecipeDetailMeal; viewer: R
             <ExternalLink className="h-3.5 w-3.5" />
             View original source
           </a>
+        )}
+
+        {/* Recipe switcher — other visible recipes for this dish (own copy
+            and/or copies shared with the viewer; pills navigate) plus any
+            in-place variants. */}
+        {(variants.length > 0 || sameDishRecipes.length > 0) && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              aria-pressed={!activeVariant}
+              onClick={() => setActiveVariantId(null)}
+              className={cn(
+                "rounded-full border px-3.5 py-1.5 text-[12.5px] font-semibold active:scale-[0.98]",
+                !activeVariant
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-card text-foreground"
+              )}
+            >
+              {meal.viewerIsCreator
+                ? "My recipe"
+                : meal.createdByName
+                  ? `${meal.createdByName.trim().split(/\s+/)[0]}'s recipe`
+                  : "This recipe"}
+            </button>
+            {variants.map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                aria-pressed={activeVariantId === v.id}
+                onClick={() => setActiveVariantId(v.id)}
+                className={cn(
+                  "rounded-full border px-3.5 py-1.5 text-[12.5px] font-semibold active:scale-[0.98]",
+                  activeVariantId === v.id
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-card text-foreground"
+                )}
+              >
+                {v.label}
+              </button>
+            ))}
+            {sameDishRecipes.map((r) => (
+              <Link
+                key={r.mealId}
+                href={`/meal/${r.mealId}`}
+                className="rounded-full border border-border bg-card px-3.5 py-1.5 text-[12.5px] font-semibold text-foreground active:scale-[0.98]"
+              >
+                {r.ownerName}
+              </Link>
+            ))}
+          </div>
         )}
       </div>
 

@@ -82,7 +82,6 @@ import {
 } from "./households";
 import {
   CannotRemoveSelfError,
-  MealNameCollisionError,
   NotHouseholdOwnerError,
   NotMemberError,
   OwnershipTransferRequiredError,
@@ -135,77 +134,78 @@ function makeInvitation(overrides: Partial<{
   };
 }
 
-describe("acceptHouseholdInvitation rejects on meal name collision before any data change", () => {
-  it("throws MealNameCollisionError with the colliding names and performs no writes", async () => {
-    // Queue order mirrors the service's read sequence inside the
-    // transaction:
-    //   1. invitation lookup (validate)
-    //   2. user email lookup (match check)
-    //   3. current membership lookup (B is sole owner of h-b)
-    //   4. other-members count (B has none → willDeleteOldHousehold = true)
-    //   5. user's meals in their household
-    //   6. target household's matching normalized names → COLLISION
+describe("acceptHouseholdInvitation with same-named meals in the target household", () => {
+  it("moves everything untouched — no collision queries, no merge, no deletion (0045 coexistence)", async () => {
+    // Queue shape IS the assertion here: the service goes straight from
+    // the membership/ownership reads to the bulk move. There are no
+    // source-name / target-name lookups, no recipe_variants writes, and no
+    // meal deletions — the joiner's same-named copy coexists with the
+    // kitchen's copy under the per-creator unique index, each private to
+    // its owner. Any extra query would either drain the queue early or
+    // leave it non-empty (afterEach asserts emptiness).
     queue([makeInvitation()]);
     queue([{ email: "b@example.com" }]);
     queue([{ householdId: "h-b", role: "owner" }]);
-    queue([{ value: 0 }]);
-    queue([
-      { name: "Pasta", normalizedName: "pasta" },
-      { name: "Biryani", normalizedName: "biryani" }
-    ]);
-    queue([{ normalizedName: "pasta" }]);
+    queue([{ value: 0 }]); // sole owner → old household dissolves
 
-    await expect(
-      acceptHouseholdInvitation("u-b", "tok-123456789012345678901234567890")
-    ).rejects.toBeInstanceOf(MealNameCollisionError);
+    // Bulk move + membership writes:
+    queue([{ id: "m-pasta-b" }, { id: "m-biryani-b" }]); // .update meals .returning — ALL meals move
+    queue([{ id: "l1" }, { id: "l2" }]); // .update mealLogs .returning
+    queue([]); // .delete old member
+    queue([]); // .delete old household
+    queue([]); // .insert new member
+    queue([]); // .update users.preferred_household_id
+    queue([]); // .update invitation accepted
 
-    // The queue having been fully drained at this exact point (afterEach
-    // asserts length 0) proves the service threw before any of the
-    // mutation queries (.update meals, .update mealLogs, .delete member,
-    // .delete household, .insert member, .update preferred, .update
-    // invitation accepted) ran. If any had been attempted, the proxy
-    // would have rejected with "queue empty".
+    queue([{ name: "A's Kitchen" }]);
+    queue([{ email: "a@example.com", name: "Alice" }]);
+
+    const result = await acceptHouseholdInvitation(
+      "u-b",
+      "tok-123456789012345678901234567890"
+    );
+
+    expect(result.kind).toBe("accepted");
+    if (result.kind !== "accepted") return;
+    expect(result.mealsMoved).toBe(2);
+    expect(result.logsMoved).toBe(2);
   });
 
-  it("exposes the colliding meal names via the typed error", async () => {
+  it("dry-run previews counts without name-collision lookups or writes", async () => {
     queue([makeInvitation()]);
     queue([{ email: "b@example.com" }]);
     queue([{ householdId: "h-b", role: "owner" }]);
     queue([{ value: 0 }]);
-    queue([
-      { name: "Pasta", normalizedName: "pasta" },
-      { name: "Biryani", normalizedName: "biryani" }
-    ]);
-    queue([
-      { normalizedName: "pasta" },
-      { normalizedName: "biryani" }
-    ]);
+    // Dry-run preview reads: meals count, logs count, household, inviter.
+    queue([{ value: 2 }]);
+    queue([{ value: 3 }]);
+    queue([{ name: "A's Kitchen" }]);
+    queue([{ name: "Alice" }]);
 
-    try {
-      await acceptHouseholdInvitation("u-b", "tok-123456789012345678901234567890");
-      throw new Error("expected throw");
-    } catch (error) {
-      expect(error).toBeInstanceOf(MealNameCollisionError);
-      const err = error as MealNameCollisionError;
-      expect([...err.collidingNames].sort()).toEqual(["Biryani", "Pasta"]);
-    }
+    const result = await acceptHouseholdInvitation(
+      "u-b",
+      "tok-123456789012345678901234567890",
+      { dryRun: true }
+    );
+
+    expect(result.kind).toBe("preview");
+    if (result.kind !== "preview") return;
+    expect(result.mealsToMerge).toBe(2);
+    expect(result.logsToMerge).toBe(3);
+    expect(result.willDissolveCurrentHousehold).toBe(true);
   });
 });
 
 describe("acceptHouseholdInvitation sole-owner cleanup", () => {
   it("moves meals + logs, deletes the empty old household, and reparents the user", async () => {
-    // Reads (1-6)
+    // Reads (1-4) — no meal-name lookups since 0045: same-named meals
+    // coexist per-creator, so the accept path has no collision pre-flight.
     queue([makeInvitation()]);
     queue([{ email: "b@example.com" }]);
     queue([{ householdId: "h-b", role: "owner" }]);
     queue([{ value: 0 }]); // B has no other members
-    queue([
-      { name: "Lasagna", normalizedName: "lasagna" },
-      { name: "Biryani", normalizedName: "biryani" }
-    ]);
-    queue([]); // No collisions in target
 
-    // Writes (7-13)
+    // Writes (5-11)
     queue([{ id: "m1" }, { id: "m2" }]); // .update meals .returning
     queue([{ id: "l1" }, { id: "l2" }, { id: "l3" }]); // .update mealLogs .returning
     queue([]); // .delete old member
@@ -214,7 +214,7 @@ describe("acceptHouseholdInvitation sole-owner cleanup", () => {
     queue([]); // .update users.preferred_household_id
     queue([]); // .update invitation accepted
 
-    // Final reads for the result payload (14-15)
+    // Final reads for the result payload (12-13)
     queue([{ name: "A's Kitchen" }]);
     queue([{ email: "a@example.com", name: "Alice" }]);
 

@@ -152,6 +152,11 @@ describe("getMealDetail (Round 10)", () => {
         ingredientIds: ["mi-1"]
       }
     ]);
+    // Recipe variants — none for this meal; the follow-up variant-rows
+    // queries are skipped entirely when this comes back empty.
+    queue([]);
+    // Same-dish visible recipes — none (the viewer can see only this one).
+    queue([]);
 
     const result = await getMealDetail("u-member", "h-a", "m-1");
 
@@ -192,7 +197,9 @@ describe("getMealDetail (Round 10)", () => {
           body: "Combine with spices and rest.",
           ingredientIds: ["mi-1"]
         }
-      ]
+      ],
+      variants: [],
+      sameDishRecipes: []
     });
   });
 
@@ -236,6 +243,10 @@ describe("getMealDetail (Round 10)", () => {
       body: string;
       ingredientIds: string[];
     }>);
+    // Recipe variants — none.
+    queue([]);
+    // Same-dish visible recipes — none.
+    queue([]);
 
     const result = await getMealDetail("u-member", "h-a", "m-legacy");
 
@@ -248,5 +259,7 @@ describe("getMealDetail (Round 10)", () => {
     expect(result?.effortLevel).toBeNull();
     expect(result?.structuredIngredients).toEqual([]);
     expect(result?.structuredSteps).toEqual([]);
+    expect(result?.variants).toEqual([]);
+    expect(result?.sameDishRecipes).toEqual([]);
   });
 });

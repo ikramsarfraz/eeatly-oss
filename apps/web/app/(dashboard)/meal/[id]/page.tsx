@@ -68,7 +68,9 @@ export default async function MealDetailPage({ params }: PageProps) {
     lastCookedAt: meal.lastCookedAt,
     effortLevel: meal.effortLevel,
     structuredIngredients: meal.structuredIngredients ?? [],
-    structuredSteps: meal.structuredSteps ?? []
+    structuredSteps: meal.structuredSteps ?? [],
+    variants: meal.variants ?? [],
+    sameDishRecipes: meal.sameDishRecipes ?? []
   };
 
   const viewer: RecipeDetailViewer = {

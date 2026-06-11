@@ -195,6 +195,49 @@ export type RecipeDetailMeal = {
     body: string;
     ingredientIds: string[];
   }>;
+  /**
+   * Alternate recipes for the same dish (e.g. brought in when a member
+   * joined the kitchen with their own copy). Empty for most meals; when
+   * present the view renders a switcher between the base recipe and each
+   * variant.
+   */
+  variants: RecipeVariantView[];
+  /**
+   * Other VISIBLE recipes for the same dish name — the viewer's own copy
+   * and/or copies shared with them. Rendered as switch pills that link to
+   * each recipe's own page.
+   */
+  sameDishRecipes: Array<{
+    mealId: string;
+    ownerName: string;
+    viewerIsOwner: boolean;
+  }>;
+};
+
+export type RecipeVariantView = {
+  id: string;
+  label: string;
+  recipeText: string | null;
+  ingredients: string[] | null;
+  recipeSourceUrl: string | null;
+  servings: string | null;
+  photoUrl: string | null;
+  notes: string | null;
+  structuredIngredients: Array<{
+    id: string;
+    position: number;
+    name: string;
+    quantityString: string;
+    prepNote: string | null;
+  }>;
+  structuredSteps: Array<{
+    id: string;
+    position: number;
+    title: string;
+    time: string | null;
+    body: string;
+    ingredientIds: string[];
+  }>;
 };
 
 /**
@@ -264,6 +307,18 @@ export function RecipeDetailClient({
   // on `meal` (viewerCanEdit / viewerCanManageSharing).
   viewer?: RecipeDetailViewer;
 }) {
+  // Recipe variants — alternate recipes for the same dish (e.g. brought in
+  // when a member joined the kitchen with their own copy). `null` selects
+  // the base recipe; a variant id swaps the recipe-bearing content below
+  // while the dish identity (name, logs, sharing) stays put.
+  const variants = meal.variants ?? [];
+  const sameDishRecipes = meal.sameDishRecipes ?? [];
+  const [activeVariantId, setActiveVariantId] = React.useState<string | null>(
+    null
+  );
+  const activeVariant =
+    variants.find((v) => v.id === activeVariantId) ?? null;
+
   // Structured-prefer with legacy fallback — mirrors mobile (R19) +
   // R21's web parity. Empty structured arrays mean the meal predates
   // the R18 Refine save path; fall through to the R10 text[] +
@@ -273,13 +328,24 @@ export function RecipeDetailClient({
   // is stable for downstream memos. Without it, each render creates a
   // fresh `[]` and the dependent useMemos re-run unnecessarily.
   const structuredIngredients = React.useMemo(
-    () => meal.structuredIngredients ?? [],
-    [meal.structuredIngredients]
+    () => (activeVariant?.structuredIngredients ?? meal.structuredIngredients) ?? [],
+    [activeVariant, meal.structuredIngredients]
   );
   const structuredSteps = React.useMemo(
-    () => meal.structuredSteps ?? [],
-    [meal.structuredSteps]
+    () => (activeVariant?.structuredSteps ?? meal.structuredSteps) ?? [],
+    [activeVariant, meal.structuredSteps]
   );
+  // Legacy-shaped fields follow the active recipe too.
+  const activeRecipeText = activeVariant
+    ? activeVariant.recipeText
+    : meal.recipeText;
+  const activeLegacyIngredients = activeVariant
+    ? activeVariant.ingredients
+    : meal.ingredients;
+  const activeServings = activeVariant ? activeVariant.servings : meal.servings;
+  const activeSourceUrl = activeVariant
+    ? activeVariant.recipeSourceUrl
+    : meal.recipeSourceUrl;
   const hasStructuredIngredients = structuredIngredients.length > 0;
 
   const sortedStructuredIngredients = React.useMemo(
@@ -312,7 +378,7 @@ export function RecipeDetailClient({
   const totalTime = totalStepTimeLabel(structuredSteps);
   const ingredientCount = hasStructuredIngredients
     ? sortedStructuredIngredients.length
-    : meal.ingredients?.length ?? 0;
+    : activeLegacyIngredients?.length ?? 0;
   const stepCount = stepCards.length;
 
   // R28 — retroactive dynamic breadcrumb. The TopBar's static map
@@ -460,8 +526,8 @@ export function RecipeDetailClient({
                 {EFFORT_LABEL[meal.effortLevel]}
               </Badge>
             ) : null}
-            {meal.servings?.trim() ? (
-              <Badge variant="ghost">{meal.servings.trim()}</Badge>
+            {activeServings?.trim() ? (
+              <Badge variant="ghost">{activeServings.trim()}</Badge>
             ) : null}
             {ingredientCount > 0 ? (
               <Badge variant="ghost">
@@ -624,10 +690,57 @@ export function RecipeDetailClient({
         ownerName={meal.createdByName}
       />
 
+      {/* Recipe switcher — shown when the viewer can see OTHER recipes for
+          this same dish (their own copy and/or copies shared with them; each
+          pill navigates to that recipe's page), and/or when this meal carries
+          in-place variants. Other members' private same-named copies never
+          appear here. */}
+      {variants.length > 0 || sameDishRecipes.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--surface-2)] px-5 py-3">
+          <span
+            className="font-mono text-[11px] uppercase text-muted-foreground"
+            style={{ letterSpacing: "0.13em" }}
+          >
+            Recipes
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            variant={activeVariant ? "outline" : "default"}
+            aria-pressed={!activeVariant}
+            onClick={() => setActiveVariantId(null)}
+          >
+            {meal.viewerIsCreator
+              ? "My recipe"
+              : meal.createdByName
+                ? `${meal.createdByName.trim().split(/\s+/)[0]}'s recipe`
+                : "This recipe"}
+          </Button>
+          {variants.map((v) => (
+            <Button
+              key={v.id}
+              type="button"
+              size="sm"
+              variant={activeVariantId === v.id ? "default" : "outline"}
+              aria-pressed={activeVariantId === v.id}
+              onClick={() => setActiveVariantId(v.id)}
+            >
+              {v.label}
+            </Button>
+          ))}
+          {sameDishRecipes.map((r) => (
+            <Button key={r.mealId} asChild size="sm" variant="outline">
+              <Link href={`/meal/${r.mealId}` as Route}>{r.ownerName}</Link>
+            </Button>
+          ))}
+        </div>
+      ) : null}
+
       {/* AI-generated draft notice — this recipe was inferred from the dish
           name, not the user's source, so nudge a review. Cleared once the
-          recipe is hand-edited or refined. */}
-      {meal.recipeIsAiDraft ? (
+          recipe is hand-edited or refined. The flag describes the BASE
+          recipe, so it hides while a variant is selected. */}
+      {meal.recipeIsAiDraft && !activeVariant ? (
         <div className="flex flex-wrap items-center gap-3 border-b border-[color:var(--warning,#b7791f)]/30 bg-[color:var(--warning,#b7791f)]/10 px-5 py-3 text-[13px] text-foreground">
           <Sparkles className="h-4 w-4 shrink-0 text-[color:var(--warning,#b7791f)]" />
           <span className="min-w-0 flex-1">
@@ -672,10 +785,12 @@ export function RecipeDetailClient({
             />
           ) : (
             <IngredientChecklist
-              ingredients={meal.ingredients}
+              ingredients={activeLegacyIngredients}
               mealName={meal.name}
               mealId={meal.id}
-              canExtract={Boolean(meal.recipeText?.trim())}
+              // Extraction writes the BASE recipe's structured rows —
+              // disabled while a variant is selected.
+              canExtract={!activeVariant && Boolean(meal.recipeText?.trim())}
             />
           )}
         </aside>
@@ -694,7 +809,7 @@ export function RecipeDetailClient({
                 </li>
               ))}
             </ol>
-          ) : meal.recipeText ? (
+          ) : activeRecipeText ? (
             // pre-wrap preserves the AI-extracted line breaks; font-sans
             // overrides the <pre> default so the recipe reads as prose,
             // not code. Comfortable reading line-height.
@@ -703,23 +818,23 @@ export function RecipeDetailClient({
                 "max-w-[620px] whitespace-pre-wrap font-sans text-[15px] leading-[1.6] text-foreground"
               )}
             >
-              {meal.recipeText}
+              {activeRecipeText}
             </pre>
           ) : (
             <p className="text-sm italic text-muted-foreground">
               No recipe saved for this meal yet.
             </p>
           )}
-          {meal.recipeSourceUrl ? (
+          {activeSourceUrl ? (
             <div className="mt-8 grid gap-2">
               <SectionLabel>Source</SectionLabel>
               <SourceUrlEmbed
-                url={meal.recipeSourceUrl}
+                url={activeSourceUrl}
                 mealName={meal.name}
               />
               <p className="text-xs text-muted-foreground">
                 <a
-                  href={meal.recipeSourceUrl}
+                  href={activeSourceUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="underline-offset-2 hover:underline"
