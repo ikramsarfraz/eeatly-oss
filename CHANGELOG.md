@@ -3,6 +3,50 @@
 All notable changes to eeatly are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] - 2026-06-11
+
+Minor: joining a kitchen never collides with your recipes anymore, cook
+history is now private to each member, and the recipe page can switch
+between your copy and copies shared with you. Two migrations ship with this
+release (0044, 0045); run `pnpm db:migrate` before deploying.
+
+### Improvements
+- Joining a kitchen is no longer blocked when you and the kitchen both have
+  a dish with the same name. You keep full ownership of everything you
+  bring; both copies coexist, each visible only to its owner.
+- The recipe page now shows switch pills when you can see more than one
+  recipe for the same dish (your copy plus copies shared with you), one
+  click apart on web and mobile web.
+- Logging a meal now always lands on your own recipe first, then a recipe
+  shared with you, and otherwise creates your own copy. Logging can no
+  longer attach your cooks (or your recipe edits) to another member's
+  private recipe just because the names match.
+
+### Privacy
+- Cook history is personal now. Dashboards, History, and the recipe page
+  count and list only your own cooks. Sharing a recipe or a kitchen no
+  longer reveals when or how often someone else cooked, nor their log notes
+  and photos.
+- Deleting a cook log is now restricted to the member who logged it.
+- A recipe shared with view-only access can no longer have its content
+  overwritten by the viewer's log.
+
+### Fixes
+- Kitchen invitation and connection emails now send reliably. They were
+  fired without awaiting on serverless, so sends could be cut off mid-flight
+  and fail with a network error.
+- The invitation accept page no longer stacks the same error twice, and the
+  Accept button stays disabled when the preview already found a blocker.
+
+### Database
+- `0044_recipe_variants.sql`: adds the `recipe_variants` table and
+  `variant_id` columns on `meal_ingredients` / `recipe_steps` (currently
+  dormant; reserved for a future explicit merge tool).
+- `0045_meals_per_creator_unique.sql`: meal uniqueness moves from
+  household-wide to per creator within a household.
+
+[1.4.0]: https://github.com/ikramsarfraz/eeatly/releases/tag/v1.4.0
+
 ## [1.3.4] - 2026-06-09
 
 Patch: restores the "Switch to admin" link host on the www origin. No schema
