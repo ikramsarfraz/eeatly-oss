@@ -1,4 +1,4 @@
-import { forwardRef, useState } from "react";
+import { forwardRef, useState, type ReactNode } from "react";
 import { Text, TextInput, View } from "react-native";
 import type { TextInputProps } from "react-native";
 import { useThemeColors } from "../../lib/design/use-theme-colors";
@@ -31,6 +31,10 @@ type InputProps = Omit<TextInputProps, "style"> & {
   /** Render placeholder/notes in italic serif — matches the
    *  "Doubled the garlic…" notes field on the log form. */
   italicSerif?: boolean;
+  /** Optional element pinned to the trailing edge inside the field, e.g.
+   *  a password show/hide toggle. Adds right padding so text never runs
+   *  under it. Single-line fields only. */
+  trailingAccessory?: ReactNode;
 };
 
 export const Input = forwardRef<TextInput, InputProps>(function Input(
@@ -45,6 +49,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
     className,
     mono,
     italicSerif,
+    trailingAccessory,
     ...rest
   },
   ref
@@ -75,28 +80,35 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
           {label}
         </Text>
       ) : null}
-      <TextInput
-        ref={ref}
-        placeholderTextColor={colors.ink3}
-        className={`
-          rounded-md border bg-surface dark:bg-surface-dark
-          px-4 ${multiline ? "py-3.5 min-h-[96px]" : "h-12"}
-          text-body-lg text-ink dark:text-ink-dark
-          ${fontClass}
-          ${borderClass}
-        `}
-        multiline={multiline}
-        textAlignVertical={multiline ? "top" : "auto"}
-        onFocus={(event) => {
-          setFocused(true);
-          onFocus?.(event);
-        }}
-        onBlur={(event) => {
-          setFocused(false);
-          onBlur?.(event);
-        }}
-        {...rest}
-      />
+      <View className="relative justify-center">
+        <TextInput
+          ref={ref}
+          placeholderTextColor={colors.ink3}
+          className={`
+            rounded-md border bg-surface dark:bg-surface-dark
+            ${trailingAccessory ? "pl-4 pr-12" : "px-4"} ${multiline ? "py-3.5 min-h-[96px]" : "h-12"}
+            text-body-lg text-ink dark:text-ink-dark
+            ${fontClass}
+            ${borderClass}
+          `}
+          multiline={multiline}
+          textAlignVertical={multiline ? "top" : "auto"}
+          onFocus={(event) => {
+            setFocused(true);
+            onFocus?.(event);
+          }}
+          onBlur={(event) => {
+            setFocused(false);
+            onBlur?.(event);
+          }}
+          {...rest}
+        />
+        {trailingAccessory ? (
+          <View className="absolute right-0 h-12 w-12 items-center justify-center">
+            {trailingAccessory}
+          </View>
+        ) : null}
+      </View>
       {error ? (
         <Text className="font-body text-body-md text-danger dark:text-danger-dark">
           {error}
