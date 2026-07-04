@@ -1,7 +1,7 @@
 import "server-only";
 
 import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
-import { db } from "@/lib/db/client";
+import { db, dbPrivileged } from "@/lib/db/client";
 import { requireHouseholdMember } from "@/lib/auth/session";
 import { requireFeatureAccess } from "@/lib/gates/resolver";
 import { logger } from "@/lib/observability/logger";
@@ -731,7 +731,12 @@ export async function getPlanEffortAggregate(args: {
   // members' personal meals) drop out of the aggregate. Without this,
   // a non-creator viewing a shared plan would see the aggregate
   // include dishes they can't see — the header chip would over-count.
-  const rows = await db
+  //
+  // RLS: this read runs on the PRIVILEGED connection to preserve its
+  // documented HOUSEHOLD-WIDE effort fallback (the meal_logs subquery has no
+  // cooked_by filter). Per-creator visibility is still enforced by the explicit
+  // mealVisibilityFilter in the WHERE below, so privileged is safe here.
+  const rows = await dbPrivileged
     .select({
       actualEffort: planDishes.actualEffort,
       mealId: planDishes.mealId,

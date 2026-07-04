@@ -1,16 +1,38 @@
 # eeatly
 
-eeatly is a personal meal memory app for quick meal logging, cooking history, and smart meal resurfacing.
+eeatly is a personal recipe library and meal-planning app: capture recipes (text, voice, or photo), refine them with AI, log cooking history, plan meals, and share selectively within a household. A Next.js web app and an Expo mobile client share one typed tRPC API.
+
+> Source-available under **AGPL-3.0**. This is the codebase behind a running product; see [License](#license) before deploying your own copy.
+
+## Monorepo layout
+
+pnpm workspaces:
+
+```
+apps/
+  web/        Next.js 16 (App Router) — the eeatly web product
+  mobile/     Expo + React Native — full client (auth, library, recipe
+              detail, Refine, meal plans, household, AI capture, settings)
+packages/
+  api/        AppRouter type + validators + feature-gate registry
+              (both clients import via subpath exports)
+  shared/     Framework-agnostic pure utilities
+```
+
+Every command below runs from the **repo root** unless noted.
 
 ## Stack
 
 - Next.js 16 App Router, React 19, TypeScript 5
-- Tailwind CSS 4 and shadcn/ui-style components
-- Better Auth with Drizzle adapter
-- Neon serverless Postgres, Drizzle ORM, Drizzle Kit
+- Tailwind CSS 4 and shadcn/ui-style components (web); Expo + NativeWind (mobile)
+- tRPC v11 + superjson — every client-driven interaction
+- Better Auth with Drizzle adapter (magic links, optional Google OAuth)
+- Neon serverless Postgres, Drizzle ORM, Drizzle Kit (with optional Postgres RLS)
+- OpenAI (primary) + Anthropic (fallback) for capture / refine / share copy; Whisper transcription
 - TanStack Query v5, TanStack Table v8
 - React Hook Form and Zod
 - Resend, React Email, Cloudflare R2
+- Stripe (billing)
 
 ## Local Setup
 
@@ -19,11 +41,13 @@ nvm use
 corepack enable
 corepack prepare pnpm@10.33.2 --activate
 pnpm install
-cp .env.example .env.local
+cp apps/web/.env.example apps/web/.env.local
 pnpm dev
 ```
 
 Open `http://localhost:3000`. The project is pinned to Node `24.14.x` and pnpm `10.33.x`.
+
+Start the mobile bundler (with the web dev server running): `pnpm --filter @eeatly/mobile start`
 
 ## Auth And Database
 
@@ -47,6 +71,8 @@ Server-only:
 - `DATABASE_URL` — Neon serverless Postgres URL (use the pooled connection string)
 - `BETTER_AUTH_SECRET` — 32-byte or longer secret for Better Auth
 - `BETTER_AUTH_URL` — App origin used by Better Auth, e.g. `https://eeatly.app`
+- `OPENAI_API_KEY` — primary AI provider (capture, refine) and Whisper transcription
+- `ANTHROPIC_API_KEY` — AI fallback provider (capture, refine, share copy)
 - `RESEND_API_KEY` and `EMAIL_FROM` — required before sending production magic-link email
 - `RESEND_WEBHOOK_SECRET` (typically `whsec_…`) — Svix signing secret from the Resend webhook pointed at `/api/webhooks/resend`; optional locally
 - `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_BASE_URL` — all required together for photo uploads; omit all to disable
@@ -82,7 +108,7 @@ pnpm smoke:prod -- --base-url http://localhost:3000
 - **Corepack not found** — run `nvm use` first. If `corepack` is still missing, use a Node 24 install that includes Corepack, then run `corepack enable`.
 - **pnpm not found** — run `corepack prepare pnpm@10.33.2 --activate`. If Corepack is unavailable, install pnpm 10.33.x directly.
 - **Node version mismatch** — run `nvm use` from the project root and confirm `node --version` reports `v24.14.x`.
-- **Environment variables missing** — copy `.env.example` to `.env.local`, fill in the four required vars, then run `pnpm db:generate` and `pnpm db:migrate`.
+- **Environment variables missing** — copy `apps/web/.env.example` to `apps/web/.env.local`, fill in the required vars, then run `pnpm db:generate` and `pnpm db:migrate`.
 
 ## Deployment
 
@@ -184,17 +210,34 @@ Key tracked events: `signed_up`, `signed_in`, `completed_onboarding`, `first_mea
 ## What eeatly Does (and Does Not) Do
 
 **Implemented:**
-- Quick meal logging with optional notes and photo
-- Recent cooking history
-- Most cooked meals and meals not cooked recently
-- Smart rediscovery suggestions from your own history
+- Recipe capture from text, voice, or photo, plus AI "Refine" editing
+- Structured recipes (ingredients + steps) with a legacy free-text fallback
+- Quick meal logging with optional notes and photo; personal cooking history
+- Most cooked meals, meals not cooked recently, and smart rediscovery
+- Meal planning (named, ordered collections of dishes)
+- Household sharing with per-item view/edit/admin grants and link shares
+- Full Expo mobile client (auth, library, recipe detail, Refine, plans, capture)
+- Billing (Stripe): free / plus / pro tiers with feature gates
 - Settings and account management
 - Platform admin dashboard (analytics, users, feedback, email delivery)
 
 **Out of scope for now:**
 - Nutrition tracking
 - Grocery lists
-- Recipe importing
-- Social features
-- AI suggestions
-- Billing
+- General social feed
+
+## Architecture
+
+Design notes, request flow, database schema, the auth model, and the Row-Level Security rollout are documented in [CLAUDE.md](CLAUDE.md). Additional runbooks and audits live under [docs/](docs/).
+
+## Contributing
+
+Issues and pull requests welcome. Before submitting, make sure `pnpm lint`, `pnpm typecheck`, and `pnpm test` pass. Contributions are accepted under the project's AGPL-3.0 license.
+
+## License
+
+Copyright (C) 2026 Ikram Sarfraz.
+
+This program is free software: you can redistribute it and/or modify it under the terms of the **GNU Affero General Public License** as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+AGPL-3.0 is a strong copyleft license: **if you run a modified version of this software as a network service, you must make your modified source available to its users.** Full text in [LICENSE](LICENSE).

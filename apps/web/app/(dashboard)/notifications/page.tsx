@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
+import { loadHousehold } from "@/lib/auth/rls";
 import {
   NotificationsMobile,
   NotificationsDesktop
@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
  * fetched client-side so read-state mutations invalidate live.
  */
 export default async function NotificationsPage() {
-  await requireCurrentUserWithHousehold();
+  await loadHousehold(async () => {});
   return (
     <>
       <NotificationsMobile />

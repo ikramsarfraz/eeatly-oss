@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
-import { requirePlatformAdmin } from "@/lib/auth/session";
+import { loadAdmin } from "@/lib/auth/rls";
 import { RETENTION_STATUS_LABELS, type RetentionStatus } from "@/lib/retention/status";
 import { getAdminAnalyticsSummary } from "@/services/analytics";
 
@@ -62,8 +62,7 @@ function formatReasonLabel(reason: string) {
 }
 
 export default async function AdminAnalyticsPage() {
-  await requirePlatformAdmin();
-  const analytics = await getAdminAnalyticsSummary();
+  const analytics = await loadAdmin(() => getAdminAnalyticsSummary());
 
   const healthCards = [
     ["Total users", analytics.totals.users.toString()],

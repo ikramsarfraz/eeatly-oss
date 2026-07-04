@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { ConnectAcceptCard } from "@/components/people/connect-accept-card";
 import { buildAuthCallbackHref } from "@/lib/auth/callback-url";
 import { getCurrentUser } from "@/lib/auth/session";
+import { withPrivileged } from "@/lib/db/client";
 import { findInvitationByToken } from "@/services/connections";
 import { noIndexMetadata } from "@/lib/seo/no-index";
 
@@ -32,7 +33,9 @@ export default async function ConnectAcceptPage({
   params: Promise<{ token: string }>;
 }) {
   const { token } = await params;
-  const invitation = await findInvitationByToken(token);
+  // Bearer-token public read: the token IS the authorization, so it bypasses
+  // RLS (connection_invitations is inviter-scoped under RLS).
+  const invitation = await withPrivileged(() => findInvitationByToken(token));
   const user = await getCurrentUser();
 
   return (

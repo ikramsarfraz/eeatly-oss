@@ -37,6 +37,14 @@ const r2PublicBaseUrl = z.preprocess(
 
 const serverEnvSchema = z.object({
   DATABASE_URL: z.string().url("DATABASE_URL must be a valid Postgres connection URL."),
+  // Restricted (non-owner) Postgres role used for RLS-enforced app queries.
+  // Optional: when unset, the app falls back to DATABASE_URL and RLS stays
+  // dormant (see lib/db/client.ts). Set in uat/prod once the role is
+  // provisioned to turn enforcement on. All-or-nothing with the RLS policies.
+  DATABASE_URL_APP: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.string().url("DATABASE_URL_APP must be a valid Postgres connection URL.").optional()
+  ),
   BETTER_AUTH_SECRET: z
     .string()
     .min(32, "BETTER_AUTH_SECRET must be at least 32 characters."),
@@ -171,6 +179,34 @@ export function getDatabaseUrl(): string {
 
   cachedDatabaseUrl = result.data;
   return cachedDatabaseUrl;
+}
+
+let cachedAppDatabaseUrl: string | null | undefined;
+
+/**
+ * Validate and return ONLY `DATABASE_URL_APP` (the restricted RLS role),
+ * independent of the full `getServerEnv()` schema — same narrow-accessor
+ * rationale as `getDatabaseUrl()`. Returns `null` when unset (RLS dormant;
+ * the app falls back to the privileged `DATABASE_URL` connection). Keep all
+ * `process.env` access in this file.
+ */
+export function getAppDatabaseUrl(): string | null {
+  if (cachedAppDatabaseUrl !== undefined) {
+    return cachedAppDatabaseUrl;
+  }
+  const raw = process.env.DATABASE_URL_APP;
+  if (!raw) {
+    cachedAppDatabaseUrl = null;
+    return null;
+  }
+  const result = databaseUrlSchema.safeParse(raw);
+  if (!result.success) {
+    throw new Error(
+      "Invalid DATABASE_URL_APP: must be a valid Postgres connection URL."
+    );
+  }
+  cachedAppDatabaseUrl = result.data;
+  return cachedAppDatabaseUrl;
 }
 
 export function hasR2Env(env = getServerEnv()) {

@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import type { Route } from "next";
 import { format } from "date-fns";
-import { requirePlatformAdmin } from "@/lib/auth/session";
+import { loadAdmin } from "@/lib/auth/rls";
 import { FEATURE_REGISTRY, isFeatureKey } from "@eeatly/api/gates/registry";
 import { listOverridesForFeature } from "@/services/feature-overrides";
 import { FeatureOverridesPanel } from "@/components/admin/feature-overrides-panel";
@@ -17,11 +17,10 @@ export const metadata: Metadata = {
 export default async function AdminFeatureDetailPage(props: {
   params: Promise<{ feature: string }>;
 }) {
-  await requirePlatformAdmin();
   const { feature } = await props.params;
   if (!isFeatureKey(feature)) notFound();
 
-  const overrides = await listOverridesForFeature(feature);
+  const overrides = await loadAdmin(() => listOverridesForFeature(feature));
   const config = FEATURE_REGISTRY[feature];
 
   return (

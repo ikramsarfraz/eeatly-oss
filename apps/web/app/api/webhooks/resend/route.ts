@@ -2,6 +2,7 @@ import { Resend } from "resend";
 
 import { getServerEnv } from "@/lib/env/server";
 import { logger } from "@/lib/observability/logger";
+import { withPrivileged } from "@/lib/db/client";
 import { ingestVerifiedResendPayload } from "@/services/resend-webhook";
 
 export const runtime = "nodejs";
@@ -61,7 +62,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    await ingestVerifiedResendPayload(verified, svixId);
+    // Webhook acts on behalf of the system across users → privileged.
+    await withPrivileged(() => ingestVerifiedResendPayload(verified, svixId));
     return Response.json({ received: true });
   } catch {
     return Response.json({ error: "Processing failed" }, { status: 500 });

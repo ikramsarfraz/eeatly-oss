@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { HomeClient } from "@/components/dashboard/home-client";
 import { HomeMobile } from "@/components/mobile/home-mobile";
 import { WelcomeToast } from "@/components/dashboard/welcome-toast";
-import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
+import { loadHousehold } from "@/lib/auth/rls";
 import { getDashboardMeals } from "@/services/meals";
 import { isHouseholdOwner } from "@/services/households";
 
@@ -21,14 +21,18 @@ import { isHouseholdOwner } from "@/services/households";
  * follow-up wants its hero copy; it can be removed once R26 settles.
  */
 export default async function DashboardPage() {
-  const { user, household } = await requireCurrentUserWithHousehold();
-  // Run the household-scoped meals query — the household lookup
-  // doubles as the auth gate (`requireHouseholdMember` runs inside
+  // Run the household-scoped meals query inside the RLS scope — the household
+  // lookup doubles as the auth gate (`requireHouseholdMember` runs inside
   // `getDashboardMeals`).
-  const [meals, ownsHousehold] = await Promise.all([
-    getDashboardMeals(user.id, household.id),
-    isHouseholdOwner(user.id, household.id)
-  ]);
+  const { user, household, meals, ownsHousehold } = await loadHousehold(
+    async ({ user, household }) => {
+      const [meals, ownsHousehold] = await Promise.all([
+        getDashboardMeals(user.id, household.id),
+        isHouseholdOwner(user.id, household.id)
+      ]);
+      return { user, household, meals, ownsHousehold };
+    }
+  );
 
   return (
     <>

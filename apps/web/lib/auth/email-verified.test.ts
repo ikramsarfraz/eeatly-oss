@@ -58,7 +58,8 @@ describe("users.emailVerified — schema + plugin contract", () => {
       hasGoogleAuthEnv: () => false
     }));
     vi.doMock("@/lib/db/client", () => ({
-      db: {} as never
+      db: {} as never,
+      dbPrivileged: {} as never
     }));
     vi.doMock("@/lib/email/resend", () => ({
       sendMagicLinkEmail: async () => undefined

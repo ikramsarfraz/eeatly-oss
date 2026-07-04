@@ -3,7 +3,7 @@ import "server-only";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { bearer, magicLink } from "better-auth/plugins";
-import { db } from "@/lib/db/client";
+import { dbPrivileged } from "@/lib/db/client";
 import * as schema from "@/db/schema";
 import { isMobileOrigin, pickMagicLinkUrl } from "@/lib/auth/deep-links";
 import {
@@ -122,7 +122,11 @@ function buildAuth() {
     appName: "eeatly",
     baseURL: appUrl,
     secret: env.BETTER_AUTH_SECRET,
-  database: drizzleAdapter(db, {
+  // Better Auth runs BEFORE request identity is known (it IS what resolves the
+  // session), and its signup hooks write across users. It therefore uses the
+  // privileged connection that bypasses RLS — otherwise the session lookup on
+  // the restricted role (no GUC set yet) would return nothing and break login.
+  database: drizzleAdapter(dbPrivileged, {
     provider: "pg",
     schema: {
       ...schema,

@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/table";
 import type { Route } from "next";
 import Link from "next/link";
-import { requirePlatformAdmin } from "@/lib/auth/session";
+import { loadAdmin } from "@/lib/auth/rls";
 import { getAiUsageSummary, imageModelLabel } from "@/services/ai-usage";
 import { TIERS, type Tier } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
@@ -35,11 +35,10 @@ export default async function AdminAiUsagePage({
 }: {
   searchParams: Promise<{ range?: string }>;
 }) {
-  await requirePlatformAdmin();
   const { range } = await searchParams;
   // Default to all-time (lifetime); the filter narrows it.
   const selected = RANGES.find((r) => r.value === range) ?? RANGES[3];
-  const data = await getAiUsageSummary(selected.days);
+  const data = await loadAdmin(() => getAiUsageSummary(selected.days));
   const { totals } = data;
   const wl = windowLabel(data.windowDays);
 

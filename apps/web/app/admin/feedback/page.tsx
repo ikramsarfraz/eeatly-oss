@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
-import { requirePlatformAdmin } from "@/lib/auth/session";
+import { loadAdmin } from "@/lib/auth/rls";
 import { listBetaFeedback } from "@/services/feedback";
 import { FeedbackReplyDialog } from "@/components/admin/feedback-reply-dialog";
 
@@ -21,8 +21,7 @@ const typeLabels = {
 };
 
 export default async function AdminFeedbackPage() {
-  await requirePlatformAdmin();
-  const feedback = await listBetaFeedback();
+  const feedback = await loadAdmin(() => listBetaFeedback());
 
   return (
     <main id="main" tabIndex={-1} className="grid w-full gap-5 px-5 py-5">

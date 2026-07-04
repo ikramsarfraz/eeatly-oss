@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
+import { loadHousehold } from "@/lib/auth/rls";
 import { SearchMobile } from "@/components/mobile/search-mobile";
 
 export const metadata: Metadata = {
@@ -14,6 +14,6 @@ export const dynamic = "force-dynamic";
  * centered desktop fallback) over the same `trpc.search.meals` query.
  */
 export default async function SearchPage() {
-  await requireCurrentUserWithHousehold();
+  await loadHousehold(async () => {});
   return <SearchMobile />;
 }

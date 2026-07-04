@@ -13,6 +13,7 @@ import { AcceptInvitationCard } from "@/components/account/accept-invitation-car
 import { InviteEmailMismatch } from "@/components/account/invite-email-mismatch";
 import { buildAuthCallbackHref } from "@/lib/auth/callback-url";
 import { getCurrentUser, type AppUser } from "@/lib/auth/session";
+import { withPrivileged } from "@/lib/db/client";
 import {
   findInvitationContextByToken,
   type InvitationContext
@@ -30,7 +31,9 @@ export default async function InviteAcceptPage({
   params: Promise<{ token: string }>;
 }) {
   const { token } = await params;
-  const invitation = await findInvitationContextByToken(token);
+  // Bearer-token public read: the token IS the authorization, so it bypasses
+  // RLS (household_invitations is member-scoped under RLS).
+  const invitation = await withPrivileged(() => findInvitationContextByToken(token));
   const user = await getCurrentUser();
 
   return (

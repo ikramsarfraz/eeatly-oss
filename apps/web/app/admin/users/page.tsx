@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
-import { requirePlatformAdmin } from "@/lib/auth/session";
+import { loadAdmin } from "@/lib/auth/rls";
 import {
   RETENTION_STATUS_LABELS,
   parseSegmentFilter,
@@ -64,17 +64,13 @@ type PageProps = {
 };
 
 export default async function AdminUsersPage(props: PageProps) {
-  await requirePlatformAdmin();
-
   const sp = await Promise.resolve(props.searchParams ?? {});
   const q = typeof sp.q === "string" ? sp.q : "";
   const segment = parseSegmentFilter(sp.segment);
 
-  const rows = await listOperationalUserRows({
-    q: q || undefined,
-    segment,
-    limit: 800
-  });
+  const rows = await loadAdmin(() =>
+    listOperationalUserRows({ q: q || undefined, segment, limit: 800 })
+  );
 
   const filters: { label: string; segment: RetentionStatus | "all" }[] = [
     { label: "All people", segment: "all" },

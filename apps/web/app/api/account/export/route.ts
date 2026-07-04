@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { desc, eq, isNull, and } from "drizzle-orm";
 import { mealLogs, meals } from "@/db/schema";
 import { requireApiUser } from "@/lib/auth/session";
-import { db } from "@/lib/db/client";
+import { db, withRlsContext } from "@/lib/db/client";
 import { logger } from "@/lib/observability/logger";
 import { getRequestId } from "@/lib/observability/request-id";
 
@@ -26,22 +26,24 @@ export async function GET() {
   }
 
   try {
-    const rows = await db
-      .select({
-        mealName: meals.name,
-        cookedAt: mealLogs.cookedAt,
-        effortLevel: mealLogs.effortLevel,
-        notes: mealLogs.notes,
-        photoUrl: mealLogs.photoUrl,
-        recipeText: meals.recipeText,
-        recipeSourceUrl: meals.recipeSourceUrl,
-        servings: meals.servings,
-        loggedAt: mealLogs.createdAt
-      })
-      .from(mealLogs)
-      .innerJoin(meals, eq(mealLogs.mealId, meals.id))
-      .where(and(eq(mealLogs.cookedByUserId, user.id), isNull(mealLogs.deletedAt)))
-      .orderBy(desc(mealLogs.cookedAt));
+    const rows = await withRlsContext(user.id, () =>
+      db
+        .select({
+          mealName: meals.name,
+          cookedAt: mealLogs.cookedAt,
+          effortLevel: mealLogs.effortLevel,
+          notes: mealLogs.notes,
+          photoUrl: mealLogs.photoUrl,
+          recipeText: meals.recipeText,
+          recipeSourceUrl: meals.recipeSourceUrl,
+          servings: meals.servings,
+          loggedAt: mealLogs.createdAt
+        })
+        .from(mealLogs)
+        .innerJoin(meals, eq(mealLogs.mealId, meals.id))
+        .where(and(eq(mealLogs.cookedByUserId, user.id), isNull(mealLogs.deletedAt)))
+        .orderBy(desc(mealLogs.cookedAt))
+    );
 
     const csv = toCsv(rows);
 

@@ -5,7 +5,7 @@ import {
   type RecipeDetailViewer
 } from "@/components/meals/recipe-detail-client";
 import { RecipeDetailMobile } from "@/components/mobile/recipe-detail-mobile";
-import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
+import { loadHousehold } from "@/lib/auth/rls";
 import { countHouseholdMembers } from "@/services/households";
 import { getMealDetail } from "@/services/meals";
 
@@ -33,16 +33,18 @@ type PageProps = {
 
 export default async function MealDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const { user, household } = await requireCurrentUserWithHousehold();
 
-  // R32 — fetch meal + member count in parallel. Member count drives
-  // the TopBar share affordance + visibility chip; the recipe view
-  // hides both on single-member households (no signal to surface
-  // when there's no one else to share with).
-  const [meal, memberCount] = await Promise.all([
-    getMealDetail(user.id, household.id, id),
-    countHouseholdMembers(user.id, household.id)
-  ]);
+  // R32 — fetch meal + member count in parallel, inside the RLS scope. Member
+  // count drives the TopBar share affordance + visibility chip; the recipe view
+  // hides both on single-member households (no signal to surface when there's no
+  // one else to share with).
+  const { user, meal, memberCount } = await loadHousehold(async ({ user, household }) => {
+    const [meal, memberCount] = await Promise.all([
+      getMealDetail(user.id, household.id, id),
+      countHouseholdMembers(user.id, household.id)
+    ]);
+    return { user, meal, memberCount };
+  });
   if (!meal) {
     notFound();
   }

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
+import { loadHousehold } from "@/lib/auth/rls";
 import { listPlansForHousehold } from "@/services/plans";
 import { PlansClient } from "@/components/plans/plans-client";
 import { PlansMobile } from "@/components/mobile/plans-mobile";
@@ -19,13 +19,13 @@ export const dynamic = "force-dynamic";
  * "Drafts & ideas" rather than behind a toggle.
  */
 export default async function PlansPage() {
-  const { user, household } = await requireCurrentUserWithHousehold();
-
-  const plans = await listPlansForHousehold({
-    householdId: household.id,
-    userId: user.id,
-    includeArchived: true
-  });
+  const plans = await loadHousehold(({ user, household }) =>
+    listPlansForHousehold({
+      householdId: household.id,
+      userId: user.id,
+      includeArchived: true
+    })
+  );
 
   const planItems = plans.map((p) => ({
     id: p.id,

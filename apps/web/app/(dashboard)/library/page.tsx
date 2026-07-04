@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
+import { loadHousehold } from "@/lib/auth/rls";
 import { countHouseholdMembers } from "@/services/households";
 import { getDashboardMeals } from "@/services/meals";
 import { listMealLibrary } from "@/services/plans";
@@ -42,20 +42,23 @@ export default async function HistoryPage({
 }: {
   searchParams: Promise<{ surface?: string }>;
 }) {
-  const { user, household } = await requireCurrentUserWithHousehold();
   const { surface } = await searchParams;
 
   // Per-item sharing surfaces fetch alongside the owned-library data:
   // "Shared with you" items, tombstones, and owner-side share counts.
-  const [rows, dashboard, memberCount, sharedWithMe, tombstones, shareCounts] =
-    await Promise.all([
-      listMealLibrary({ userId: user.id, householdId: household.id }),
-      getDashboardMeals(user.id, household.id, { recentMealsLimit: 25 }),
-      countHouseholdMembers(user.id, household.id),
-      listSharedWithMe(user.id),
-      listTombstones(user.id),
-      getRecipeShareCounts(user.id)
-    ]);
+  const { user, rows, dashboard, memberCount, sharedWithMe, tombstones, shareCounts } =
+    await loadHousehold(async ({ user, household }) => {
+      const [rows, dashboard, memberCount, sharedWithMe, tombstones, shareCounts] =
+        await Promise.all([
+          listMealLibrary({ userId: user.id, householdId: household.id }),
+          getDashboardMeals(user.id, household.id, { recentMealsLimit: 25 }),
+          countHouseholdMembers(user.id, household.id),
+          listSharedWithMe(user.id),
+          listTombstones(user.id),
+          getRecipeShareCounts(user.id)
+        ]);
+      return { user, household, rows, dashboard, memberCount, sharedWithMe, tombstones, shareCounts };
+    });
 
   // Build the stat overlay from dashboard data. recentMeals carry
   // per-cook effort (modal effort isn't surfaced here); mostCooked

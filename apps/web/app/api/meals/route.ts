@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentHousehold, requireApiUser } from "@/lib/auth/session";
+import { withRlsContext } from "@/lib/db/client";
 import { trackMealLogLifecycleEvent } from "@/lib/observability/funnel";
 import { logger } from "@/lib/observability/logger";
 import { checkMealMutationLimit } from "@/lib/security/rate-limit";
@@ -13,8 +14,10 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const household = await getCurrentHousehold(user.id);
-  const meals = await getDashboardMeals(user.id, household.id);
+  const meals = await withRlsContext(user.id, async () => {
+    const household = await getCurrentHousehold(user.id);
+    return getDashboardMeals(user.id, household.id);
+  });
 
   return NextResponse.json(meals);
 }
@@ -46,11 +49,17 @@ export async function POST(request: Request) {
   }
 
   try {
-    const household = await getCurrentHousehold(user.id);
-    const { mealLog, mealLogCount } = await createMealLog(
+    const { household, mealLog, mealLogCount } = await withRlsContext(
       user.id,
-      household.id,
-      parsed.data
+      async () => {
+        const household = await getCurrentHousehold(user.id);
+        const { mealLog, mealLogCount } = await createMealLog(
+          user.id,
+          household.id,
+          parsed.data
+        );
+        return { household, mealLog, mealLogCount };
+      }
     );
     logger.info("api_meal_log_created", {
       userId: user.id,

@@ -19,6 +19,7 @@ import {
   requireHouseholdMember,
   requireHouseholdOwner
 } from "@/lib/auth/session";
+import { withPrivileged, withRlsContext } from "@/lib/db/client";
 import type { TRPCContext } from "./context";
 
 /**
@@ -51,9 +52,40 @@ export const mergeRouters = t.mergeRouters;
 export const createCallerFactory = t.createCallerFactory;
 
 /**
- * Public — no auth. The base every other builder extends.
+ * RLS identity middleware. When the request is authenticated, binds the
+ * caller's id to the DB session (via `withRlsContext`) for the WHOLE resolver
+ * chain — including the auth/household middlewares below, whose own DB reads
+ * then run under the same policy scope. Unauthenticated calls pass through, and
+ * the whole thing is a no-op until a restricted role is provisioned
+ * (DATABASE_URL_APP). This is why every builder below extends
+ * `publicProcedure` rather than `t.procedure` directly.
+ *
+ * One consequence once RLS is live: each authenticated request runs in a single
+ * transaction, so a procedure's writes are atomic per request (a late failure
+ * rolls back earlier writes). That is stricter than the old per-statement
+ * autocommit and is intended.
  */
-export const publicProcedure = t.procedure;
+const rlsMiddleware = t.middleware(({ ctx, next }) => {
+  if (ctx.user) {
+    return withRlsContext(ctx.user.id, () => next());
+  }
+  return next();
+});
+
+/**
+ * Privileged middleware — runs the resolver on the RLS-bypassing connection.
+ * For admin procedures ONLY: platform admins legitimately read across every
+ * user (all users, analytics, billing), which RLS scoped to the admin's own id
+ * would block. `requireAdmin` is the gate; this just picks the connection. Do
+ * NOT use it for user-facing procedures.
+ */
+const privilegedMiddleware = t.middleware(({ next }) => withPrivileged(() => next()));
+
+/**
+ * Public — no auth. The base every other builder extends (carries
+ * `rlsMiddleware`).
+ */
+export const publicProcedure = t.procedure.use(rlsMiddleware);
 
 /**
  * Auth middleware. Reads `ctx.user` (populated by `createTRPCContext`)
@@ -77,7 +109,7 @@ const requireAuth = t.middleware(({ ctx, next }) => {
  * Protected — requires `ctx.user`. The successor to most existing
  * `await requireCurrentUser()` first-line guards.
  */
-export const protectedProcedure = t.procedure.use(requireAuth);
+export const protectedProcedure = publicProcedure.use(requireAuth);
 
 /**
  * Admin — requires `ctx.user.role === "platform_admin"`. We do NOT
@@ -100,7 +132,9 @@ const requireAdmin = t.middleware(({ ctx, next }) => {
   return next({ ctx: { ...ctx, user: ctx.user } });
 });
 
-export const adminProcedure = t.procedure.use(requireAdmin);
+// Admin runs PRIVILEGED (RLS-bypassing), not via `publicProcedure`/rlsMiddleware
+// — cross-user admin reads must not be scoped to the admin's own id.
+export const adminProcedure = t.procedure.use(privilegedMiddleware).use(requireAdmin);
 
 /**
  * Household-member middleware. The procedure's input determines which
@@ -161,7 +195,7 @@ const requireHouseholdMembership = t.middleware(async ({ ctx, getRawInput, next 
   });
 });
 
-export const householdMemberProcedure = t.procedure.use(requireHouseholdMembership);
+export const householdMemberProcedure = publicProcedure.use(requireHouseholdMembership);
 
 /**
  * Household-owner middleware. Layers on top of `householdMemberProcedure`.

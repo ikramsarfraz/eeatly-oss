@@ -1,4 +1,4 @@
-import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
+import { loadHousehold } from "@/lib/auth/rls";
 import { getPeopleOverview } from "@/services/connections";
 import { PeopleClient } from "@/components/people/people-client";
 
@@ -13,8 +13,7 @@ import { PeopleClient } from "@/components/people/people-client";
 export const dynamic = "force-dynamic";
 
 export default async function PeoplePage() {
-  const { user } = await requireCurrentUserWithHousehold();
-  const overview = await getPeopleOverview(user.id);
+  const overview = await loadHousehold(({ user }) => getPeopleOverview(user.id));
 
   return <PeopleClient initialOverview={overview} />;
 }

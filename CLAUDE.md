@@ -9,8 +9,10 @@ Round 12 restructured this into a pnpm-workspaces monorepo:
 ```
 apps/
   web/        Next.js app — the eeatly web product
-  mobile/     Expo + React Native — Phase-1 magic-link auth (R12);
-              features land in R13+
+  mobile/     Expo + React Native — full client: magic-link auth, library,
+              recipe detail, Refine, meal plans, household, AI capture,
+              notifications, settings. Consumes the same tRPC AppRouter +
+              validators as web via @eeatly/api.
 packages/
   api/        AppRouter type + validators + gate registry — both clients
               import via subpath exports (`@eeatly/api/validators/meals`,
@@ -102,12 +104,42 @@ Magic links (always on) plus optional Google OAuth. Session is cached for 5 minu
 
 Google sign-in is gated on `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` — the button only renders when both are present. To enable: register an OAuth 2.0 Web client in [Google Cloud Console](https://console.cloud.google.com/apis/credentials), add `<BETTER_AUTH_URL>/api/auth/callback/google` as an authorized redirect URI (one entry per environment), then set the two env vars.
 
+### Row-Level Security (Round 37, phased rollout)
+
+Postgres RLS is the DB-level backstop for the per-creator / personal-cook-history
+isolation that services enforce in `WHERE` clauses. **Currently dormant**: it
+activates only when `DATABASE_URL_APP` (a restricted, non-owner role) is set;
+until then everything runs on the single owner connection unchanged.
+
+- **Two clients** ([apps/web/lib/db/client.ts](apps/web/lib/db/client.ts)): `db`
+  (restricted, RLS-enforced) is the default; `dbPrivileged` (owner, bypasses
+  RLS) is for system paths only. `withRlsContext(userId, fn)` opens a tx, sets
+  `app.current_user_id`, and scopes `db` to it via `AsyncLocalStorage`
+  ([request-context.ts](apps/web/lib/db/request-context.ts)); `withPrivileged(fn)`
+  routes `db` to the owner connection.
+- **Wiring**: every authenticated tRPC procedure runs in `withRlsContext`;
+  `adminProcedure` + Better Auth + cron + Stripe/Resend webhooks run
+  `withPrivileged`. Authenticated server components + API route handlers wrap
+  their data loads via `lib/auth/rls.ts` (`loadAuthed` / `loadHousehold` /
+  `loadAdmin`); token-accept pages (`/invite`, `/connect`) use `withPrivileged`.
+  AsyncLocalStorage does not propagate reliably across the RSC render tree, so
+  each page wraps its own data-loading function, not a layout.
+- **Policies** live in [apps/web/db/rls/](apps/web/db/rls/) (`*.sql`, kept out of
+  the auto-generated `drizzle/` journal). Apply via `drizzle-kit generate
+  --custom` (see the README runbook). Helper fns: `app_current_user()` (the GUC)
+  and `app_user_households()` (SECURITY DEFINER, so it bypasses RLS and avoids
+  policy recursion). Adding a table → add its policy to the matching phase file.
+- **Gotcha**: with RLS on, an authenticated request runs in ONE transaction, so
+  AI procedures hold a connection across the LLM call (idle-in-transaction risk)
+  and per-request writes become atomic. See the README for the open decisions
+  (AI procedures, `plans.ts` household-wide effort, `user`-table residual).
+
 ### Database schema
 
 Core tables live in `apps/web/db/schema/`:
 - `meals` — unique per `(householdId, createdByUserId, normalizedName)` (`0045`). The R4 household-wide unique index predated R32's per-item privacy: now two members can each privately own "chicken biryani" in the same kitchen. Joining a household never blocks, merges, renames, or exposes same-named meals — the joiner keeps full ownership and both copies coexist. Soft-deleted via `archivedAt` (always filter with `isNull(archivedAt)`). `recipe_source_url` is the canonical "where I got this recipe" field, rendered as a platform embed on the recipe view (R16).
 - **Log-time meal resolution** (`createMealLog`, 0045): own row → row shared with the viewer (active grant) → insert a fresh own row. Another member's private same-named row is never matched. Recipe-field updates on a grant-matched row require an edit/admin grant; a view-only grantee's log records the cook but never rewrites the owner's recipe.
-- **Cook history is personal.** Every log read (dashboard, /history rows + stats, `getMealDetail` cook count / last-cooked / modal effort) filters `mealLogs.cookedByUserId = viewer` on top of meal visibility — sharing a recipe or a kitchen never exposes another member's cooking dates, counts, log notes, or log photos. `deleteMealLog` is cook-only for the same reason. Exceptions (effort enum only, no personal payload): the AI-context latest-log read in `services/ai.ts` and the plan-dish effort modal in `services/plans.ts`.
+- **Cook history is personal.** Every log read (dashboard, /history rows + stats, `getMealDetail` cook count / last-cooked / modal effort) filters `mealLogs.cookedByUserId = viewer` on top of meal visibility — sharing a recipe or a kitchen never exposes another member's cooking dates, counts, log notes, or log photos. `deleteMealLog` is cook-only for the same reason. The intended effort-only exception (effort enum, no personal payload) is the plan-dish effort modal in `services/plans.ts`. NOTE: the `services/ai.ts` latest-log read (`generateShareableRecipe`) currently reads another member's log `notes`, not just effort, contrary to the rule. It is enforced by the `meal_logs` RLS policy (see **Row-Level Security**) rather than hand-patched. See [docs/audits/isolation-read-audit-2026-06.md](docs/audits/isolation-read-audit-2026-06.md).
 - `recipe_variants` (`0044_recipe_variants.sql`) — alternate recipes for one dish, with `meal_ingredients.variant_id` / `recipe_steps.variant_id` scoping structured rows (`variant_id IS NULL` = the base recipe, so **every base-recipe read/delete on those tables must filter `isNull(variantId)`**). `getMealDetail` returns a `variants` array and both web recipe views render an Original/variant switcher when variants exist. Currently DORMANT: no flow writes variants (the household-join merge that originally motivated them was replaced by per-creator coexistence); the infra is kept for a future explicit "merge duplicates" user action.
 - `mealLogs` — one log per cooking event; has `effortLevel` enum: `quick | easy | medium | high_effort`
 - `analytics_events` — in-house event tracking
@@ -118,6 +150,8 @@ Core tables live in `apps/web/db/schema/`:
 - `recipe_steps` (R18, same migration) — structured steps with `title`, free-form `time` ("10 min · then 20 min rest"), `body`, and `ingredient_ids: text[]` referencing `meal_ingredients.id`. Legacy `meals.recipe_text` blob remains the fallback for unstructured recipes.
 - **R19 read path**: `getMealDetail` now surfaces `structuredIngredients` + `structuredSteps` arrays alongside the legacy `ingredients: string[]` + `recipeText` fields. The mobile Recipe Detail screen prefers structured rows when present (cooks who've used the Refine flow at least once) and falls back to the legacy fields + a client-side parser when the rows are empty (legacy meals predating Refine).
 - `refine_sessions` / `refine_turns` / `refine_pending_changes` (R18, `0027_refine_sessions.sql`) — back the chat-style "Refine recipe" editor. Per-device per-recipe-per-user; one active session at a time enforced by a partial unique index. See **Refine recipe** below.
+- `plans` / `plan_dishes` (`apps/web/db/schema/plans.ts`) — meal planning. A plan is a named, ordered collection of dishes; each `plan_dishes` row points at a meal with a per-dish annotation and explicit ordering (`addDishToPlan` / `reorderDishes` / `updateDishAnnotation`, `clonePlanFromPast` duplicates a prior plan). Gated behind `plans_create`; the `services/plans.ts` + `routers/plans.ts` pair owns the domain.
+- **Sharing & grants** (`apps/web/db/schema/sharing.ts` + `shares.ts`) — the privacy/visibility model the prose above relies on. `item_grants` (per-meal view/edit/admin grants between members), `recipe_shares` / `plan_shares` (link-based shares), `item_requests`, `connections` + `connection_invitations` (cross-household sharing), `share_tombstones` (revocation). When reasoning about "shared with me" reads or grant checks, start here.
 
 Always run `pnpm db:generate` then `pnpm db:migrate` after schema changes. Never hand-edit files in `apps/web/drizzle/` (auto-generated migration history).
 
@@ -137,7 +171,8 @@ All server-side env access goes through `apps/web/lib/env/server.ts` → `getSer
 
 | Var | Required | Purpose |
 |---|---|---|
-| `DATABASE_URL` | ✅ | Neon pooled connection string |
+| `DATABASE_URL` | ✅ | Neon pooled connection string (owner role; `dbPrivileged` + migrations) |
+| `DATABASE_URL_APP` | optional | Restricted RLS role for app queries. Unset = RLS dormant (falls back to `DATABASE_URL`). See **Row-Level Security** |
 | `BETTER_AUTH_SECRET` | ✅ | ≥32 chars, signs sessions |
 | `BETTER_AUTH_URL` | ✅ | App origin (e.g. `https://eeatly.app`) |
 | `NEXT_PUBLIC_APP_URL` | ✅ | Public origin (the only `NEXT_PUBLIC_` var) |

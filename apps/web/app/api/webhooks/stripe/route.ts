@@ -1,6 +1,7 @@
 import { getServerEnv, hasStripeEnv } from "@/lib/env/server";
 import { logger } from "@/lib/observability/logger";
 import { getStripeClient } from "@/lib/stripe/client";
+import { withPrivileged } from "@/lib/db/client";
 import { ingestStripeEvent } from "@/services/billing";
 
 export const runtime = "nodejs";
@@ -68,7 +69,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    await ingestStripeEvent(event);
+    // Webhook acts on behalf of the system across users → privileged.
+    await withPrivileged(() => ingestStripeEvent(event));
     return Response.json({ received: true });
   } catch (error) {
     // Handler error — 500 so Stripe retries with exponential backoff.

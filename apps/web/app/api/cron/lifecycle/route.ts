@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerEnv } from "@/lib/env/server";
 import { logger } from "@/lib/observability/logger";
+import { withPrivileged } from "@/lib/db/client";
 import { runLifecycleNudges } from "@/services/lifecycle-cron";
 
 export const runtime = "nodejs";
@@ -34,7 +35,8 @@ export async function GET(request: Request) {
 
   const start = Date.now();
   try {
-    const result = await runLifecycleNudges();
+    // Cron touches every user → privileged (RLS-bypassing) connection.
+    const result = await withPrivileged(() => runLifecycleNudges());
     logger.info("lifecycle_cron_run", {
       ...result,
       durationMs: Date.now() - start

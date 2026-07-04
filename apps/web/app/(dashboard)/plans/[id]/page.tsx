@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
+import { loadHousehold } from "@/lib/auth/rls";
 import {
   getPlan,
   getPlanShoppingList,
@@ -32,24 +32,28 @@ export const metadata: Metadata = {
 export default async function PlanDetailPage(props: {
   params: Promise<{ id: string }>;
 }) {
-  const { user, household } = await requireCurrentUserWithHousehold();
   const { id } = await props.params;
 
-  let plan;
-  try {
-    plan = await getPlan({ planId: id, userId: user.id });
-  } catch {
-    notFound();
-  }
+  const result = await loadHousehold(async ({ user, household }) => {
+    let plan;
+    try {
+      plan = await getPlan({ planId: id, userId: user.id });
+    } catch {
+      return null;
+    }
+    // Combined shopping aggregates only the dishes the viewer can actually
+    // open (locked co-cook rows are excluded).
+    const accessibleMealIds = plan.dishes.filter((d) => !d.locked).map((d) => d.mealId);
+    const [library, members, shoppingList] = await Promise.all([
+      listMealLibrary({ userId: user.id, householdId: household.id }),
+      listHouseholdMembers(user.id, household.id),
+      getPlanShoppingList(accessibleMealIds)
+    ]);
+    return { plan, library, members, shoppingList };
+  });
 
-  // Combined shopping aggregates only the dishes the viewer can actually
-  // open (locked co-cook rows are excluded).
-  const accessibleMealIds = plan.dishes.filter((d) => !d.locked).map((d) => d.mealId);
-  const [library, members, shoppingList] = await Promise.all([
-    listMealLibrary({ userId: user.id, householdId: household.id }),
-    listHouseholdMembers(user.id, household.id),
-    getPlanShoppingList(accessibleMealIds)
-  ]);
+  if (!result) notFound();
+  const { plan, library, members, shoppingList } = result;
 
   return (
     <>

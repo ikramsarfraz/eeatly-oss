@@ -11,7 +11,13 @@ dist/
 coverage/
 *.tsbuildinfo
 .vercel
+
+# Local agent / editor tooling — keep local, never publish
 .claude/
+.agents/
+skills-lock.json
+.cursor/
+.aider*
 
 # Sentry build plugin
 .env.sentry-build-plugin

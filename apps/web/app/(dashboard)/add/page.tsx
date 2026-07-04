@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
+import { loadHousehold } from "@/lib/auth/rls";
 import { AddAssistClient } from "@/components/assist/add-assist-client";
 
 export const metadata: Metadata = {
@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 export default async function AddPage(props: {
   searchParams: Promise<{ method?: string; name?: string }>;
 }) {
-  await requireCurrentUserWithHousehold();
+  await loadHousehold(async () => {});
   const { name } = await props.searchParams;
   return <AddAssistClient initialMealName={name} />;
 }

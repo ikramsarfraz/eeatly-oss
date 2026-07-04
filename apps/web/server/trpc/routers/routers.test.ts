@@ -21,7 +21,11 @@ vi.mock("@/lib/db/client", () => ({
         })
       })
     })
-  }
+  },
+  dbPrivileged: {},
+  // rlsMiddleware wraps every authenticated resolver in this; pass through.
+  withRlsContext: (_userId: string, fn: () => unknown) => fn(),
+  withPrivileged: (fn: () => unknown) => fn()
 }));
 
 vi.mock("@/lib/email/transactional", () => ({

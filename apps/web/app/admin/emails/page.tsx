@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
-import { requirePlatformAdmin } from "@/lib/auth/session";
+import { loadAdmin } from "@/lib/auth/rls";
 import {
   listEmailDeliveryLogsForAdmin,
   type EmailDeliveryAdminFilter
@@ -38,15 +38,12 @@ export default async function AdminEmailsPage(props: {
         filter?: string;
       };
 }) {
-  await requirePlatformAdmin();
-
   const sp = await Promise.resolve(props.searchParams ?? {});
   const filter = parseDeliveryFilter(sp.filter);
 
-  const rows = await listEmailDeliveryLogsForAdmin({
-    filter,
-    limit: 150
-  });
+  const rows = await loadAdmin(() =>
+    listEmailDeliveryLogsForAdmin({ filter, limit: 150 })
+  );
 
   const chips: { label: string; value: EmailDeliveryAdminFilter }[] = [
     { label: "All", value: "all" },

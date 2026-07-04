@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
+import { loadHousehold } from "@/lib/auth/rls";
 import { getMealDetail } from "@/services/meals";
 import { parseStructuredRecipe } from "@/lib/meals/parse-recipe";
 import { EditAssistClient } from "@/components/assist/edit-assist-client";
@@ -30,9 +30,10 @@ function stepLine(s: { title: string; body: string }): string {
 
 export default async function MealEditPage({ params }: PageProps) {
   const { id } = await params;
-  const { user, household } = await requireCurrentUserWithHousehold();
 
-  const meal = await getMealDetail(user.id, household.id, id);
+  const meal = await loadHousehold(({ user, household }) =>
+    getMealDetail(user.id, household.id, id)
+  );
   // Same write gate as Refine — only editors (owner / edit / admin grantee).
   if (!meal || !meal.viewerCanEdit) {
     notFound();

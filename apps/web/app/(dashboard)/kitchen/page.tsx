@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { households } from "@/db/schema";
-import { requireCurrentUserWithHousehold } from "@/lib/auth/session";
+import { loadHousehold } from "@/lib/auth/rls";
 import { db } from "@/lib/db/client";
 import {
   listHouseholdMembers,
@@ -25,21 +25,24 @@ import { MembersMobile } from "@/components/mobile/members-mobile";
  * (R31 — restored from the R26-removed members link) deep-links here.
  */
 export default async function HouseholdPage() {
-  const { user, household } = await requireCurrentUserWithHousehold();
-
-  const [householdRow] = await db
-    .select({ ownerId: households.ownerId, createdAt: households.createdAt })
-    .from(households)
-    .where(eq(households.id, household.id))
-    .limit(1);
+  const { user, household, householdRow, members, invitations } = await loadHousehold(
+    async ({ user, household }) => {
+      const [householdRow] = await db
+        .select({ ownerId: households.ownerId, createdAt: households.createdAt })
+        .from(households)
+        .where(eq(households.id, household.id))
+        .limit(1);
+      const isOwner = householdRow?.ownerId === user.id;
+      const [members, invitations] = await Promise.all([
+        listHouseholdMembers(user.id, household.id),
+        isOwner
+          ? listPendingInvitations(user.id, household.id)
+          : Promise.resolve([])
+      ]);
+      return { user, household, householdRow, members, invitations };
+    }
+  );
   const isOwner = householdRow?.ownerId === user.id;
-
-  const [members, invitations] = await Promise.all([
-    listHouseholdMembers(user.id, household.id),
-    isOwner
-      ? listPendingInvitations(user.id, household.id)
-      : Promise.resolve([])
-  ]);
 
   const householdCreatedAt = (householdRow?.createdAt ?? new Date()).toISOString();
   const memberItems = members.map((m) => ({

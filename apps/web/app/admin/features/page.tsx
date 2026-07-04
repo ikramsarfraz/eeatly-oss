@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import type { Route } from "next";
-import { requirePlatformAdmin } from "@/lib/auth/session";
+import { loadAdmin } from "@/lib/auth/rls";
 import { listFeaturesWithCounts } from "@/services/feature-overrides";
 
 export const dynamic = "force-dynamic";
@@ -11,8 +11,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminFeaturesPage() {
-  await requirePlatformAdmin();
-  const features = await listFeaturesWithCounts();
+  const features = await loadAdmin(() => listFeaturesWithCounts());
 
   return (
     <main className="w-full px-5 py-5">

@@ -44,7 +44,7 @@ const dbState = vi.hoisted(() => {
   return { chain, queue };
 });
 
-vi.mock("@/lib/db/client", () => ({ db: dbState.chain }));
+vi.mock("@/lib/db/client", () => ({ db: dbState.chain, dbPrivileged: dbState.chain }));
 
 // Short-circuit the env-validation chain (services/plans.ts → lib/auth/session
 // → lib/auth/index → getServerEnv). Hoisted vi.fn so tests can override
